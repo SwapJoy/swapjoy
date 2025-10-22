@@ -31,7 +31,6 @@ CREATE TABLE items (
   description TEXT,
   category_id UUID,
   estimated_value DECIMAL(10, 2),
-  max_discount_amount DECIMAL(10, 2),
   
   -- Vector embedding (1536 dimensions for OpenAI ada-002)
   embedding vector(1536),

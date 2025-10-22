@@ -129,7 +129,6 @@ CREATE TABLE items (
   condition VARCHAR(50) NOT NULL, -- new, like_new, good, fair, poor
   estimated_value DECIMAL(10, 2),
   currency VARCHAR(3) DEFAULT 'USD', -- ISO 4217: USD, EUR, GBP, JPY, etc.
-  max_discount_amount DECIMAL(10, 2) DEFAULT 0, -- Maximum discount willing to accept
   
   -- AI/Vector Embeddings (Supabase pgvector)
   embedding vector(1536), -- OpenAI ada-002 embeddings for semantic search
@@ -168,8 +167,9 @@ CREATE INDEX ON items USING hnsw (embedding vector_cosine_ops);
 -- 3. Removed: city varchar and city_id (just coordinates, cities table for UI only)
 -- 4. Removed: looking_for, open_to_offers (not needed for MVP)
 -- 5. Removed: view_count, favorite_count, offer_count (moved to item_metrics)
--- 6. Removed: swapped_at (status change handles this, can query from swaps table)
--- 7. Cities table exists for UI dropdown, but items don't reference it
+-- 6. Removed: swapped_at (status change handles this)
+-- 7. Removed: max_discount_amount (similarity score handles value tolerance)
+-- 8. Cities table exists for UI dropdown, but items don't reference it
 ```
 
 ### 4. Item Images
@@ -260,6 +260,12 @@ CREATE TABLE offers (
   
   -- Offer message
   message TEXT,
+  
+  -- Financial terms
+  top_up_amount DECIMAL(10, 2) DEFAULT 0, -- Money to add/request for swap
+  -- Positive: sender offers to add money
+  -- Negative: sender requests money from receiver
+  -- Zero: even value swap (no money involved)
   
   -- Status
   status VARCHAR(50) DEFAULT 'pending', 

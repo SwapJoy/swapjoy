@@ -347,7 +347,15 @@ Get user's offers (sent and received).
           "images": [...]
         }
       ],
+      "requestedItems": [
+        {
+          "id": "uuid",
+          "title": "Vintage Camera",
+          "images": [...]
+        }
+      ],
       "message": "Would love to swap!",
+      "topUpAmount": 25.50,
       "status": "pending",
       "createdAt": "2024-01-21T10:00:00Z"
     }
@@ -364,12 +372,20 @@ Create a new offer.
 **Request:**
 ```json
 {
-  "targetItemId": "uuid",
+  "receiverId": "uuid",
   "offeredItemIds": ["uuid1", "uuid2"],
+  "requestedItemIds": ["uuid3", "uuid4"],
   "message": "I'd love to swap for this!",
-  "suggestedMeetingPlace": "Central Park"
+  "topUpAmount": 25.50
 }
 ```
+
+**Request Fields:**
+- `receiverId`: User receiving the offer
+- `offeredItemIds`: Items sender is offering (their items)
+- `requestedItemIds`: Items sender wants (receiver's items)
+- `message`: Optional message
+- `topUpAmount`: Money to add/request (positive = sender adds money, negative = sender requests money, 0 = even swap)
 
 **Response:** `201 Created`
 
@@ -393,7 +409,9 @@ Create a counter offer.
 ```json
 {
   "offeredItemIds": ["uuid3", "uuid4"],
-  "message": "How about these instead?"
+  "requestedItemIds": ["uuid5", "uuid6"],
+  "message": "How about these instead?",
+  "topUpAmount": -15.00
 }
 ```
 
