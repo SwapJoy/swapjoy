@@ -45,16 +45,16 @@ Authorization: Bearer <jwt_token>
 ## 1. Authentication Endpoints
 
 ### POST /auth/register
-Register a new user.
+Register a new user with phone number.
 
 **Request:**
 ```json
 {
-  "email": "user@example.com",
+  "phone": "+1234567890",
   "password": "SecurePass123!",
   "firstName": "John",
   "lastName": "Doe",
-  "phoneNumber": "+1234567890"
+  "username": "john_doe"
 }
 ```
 
@@ -65,9 +65,10 @@ Register a new user.
   "data": {
     "user": {
       "id": "uuid",
-      "email": "user@example.com",
+      "phone": "+1234567890",
       "firstName": "John",
-      "lastName": "Doe"
+      "lastName": "Doe",
+      "username": "john_doe"
     },
     "tokens": {
       "accessToken": "jwt_token",
@@ -78,30 +79,66 @@ Register a new user.
 ```
 
 ### POST /auth/login
-Login with credentials.
+Login with phone number and password.
 
 **Request:**
 ```json
 {
-  "email": "user@example.com",
+  "phone": "+1234567890",
   "password": "SecurePass123!"
 }
 ```
 
 **Response:** `200 OK`
 
-### POST /auth/oauth/google
-Google OAuth login.
+### POST /auth/otp/send
+Send OTP to phone number.
 
 **Request:**
 ```json
 {
-  "idToken": "google_id_token"
+  "phone": "+1234567890"
 }
 ```
 
-### POST /auth/oauth/apple
-Apple Sign In.
+**Response:** `200 OK`
+```json
+{
+  "success": true,
+  "message": "OTP sent to phone number"
+}
+```
+
+### POST /auth/otp/verify
+Verify OTP and sign in.
+
+**Request:**
+```json
+{
+  "phone": "+1234567890",
+  "token": "123456"
+}
+```
+
+**Response:** `200 OK`
+```json
+{
+  "success": true,
+  "data": {
+    "user": {
+      "id": "uuid",
+      "phone": "+1234567890",
+      "firstName": "John",
+      "lastName": "Doe",
+      "username": "john_doe"
+    },
+    "tokens": {
+      "accessToken": "jwt_token",
+      "refreshToken": "refresh_token"
+    }
+  }
+}
+```
 
 ### POST /auth/refresh
 Refresh access token.
@@ -122,8 +159,37 @@ Request password reset.
 ### POST /auth/reset-password
 Reset password with token.
 
+### POST /auth/verify-phone
+Verify phone number (if needed).
+
+---
+
+## Future Authentication Endpoints (Not in MVP)
+
+### POST /auth/oauth/google
+Google OAuth login.
+
+**Request:**
+```json
+{
+  "idToken": "google_id_token"
+}
+```
+
+### POST /auth/oauth/apple
+Apple Sign In.
+
+### POST /auth/oauth/facebook
+Facebook OAuth login.
+
+### POST /auth/email/register
+Email registration (future).
+
+### POST /auth/email/login
+Email login (future).
+
 ### POST /auth/verify-email
-Verify email address.
+Verify email address (future).
 
 ---
 
@@ -138,16 +204,25 @@ Get current user profile.
   "success": true,
   "data": {
     "id": "uuid",
-    "email": "user@example.com",
+    "phone": "+1234567890",
     "firstName": "John",
     "lastName": "Doe",
-    "displayName": "John D.",
+    "username": "john_doe",
     "bio": "Love swapping!",
     "profileImageUrl": "https://...",
     "location": {
+      "lat": 37.7749,
+      "lng": -122.4194,
       "city": "San Francisco",
       "state": "CA",
       "country": "USA"
+    },
+    "preferences": {
+      "preferredRadiusKm": 50.00,
+      "manualLocation": {
+        "lat": 37.7849,
+        "lng": -122.4094
+      }
     },
     "stats": {
       "totalSwaps": 15,
@@ -204,6 +279,41 @@ Block a user.
 ### DELETE /users/:userId/block
 Unblock a user.
 
+### PUT /users/me/location-preferences
+Update location preferences.
+
+**Request:**
+```json
+{
+  "preferredRadiusKm": 75.50,
+  "manualLocation": {
+    "lat": 37.7849,
+    "lng": -122.4094
+  }
+}
+```
+
+### GET /users/me/location-preferences
+Get location preferences.
+
+**Response:** `200 OK`
+```json
+{
+  "success": true,
+  "data": {
+    "preferredRadiusKm": 50.00,
+    "manualLocation": {
+      "lat": 37.7849,
+      "lng": -122.4094
+    },
+    "currentLocation": {
+      "lat": 37.7749,
+      "lng": -122.4194
+    }
+  }
+}
+```
+
 ---
 
 ## 3. Item Endpoints
@@ -239,6 +349,7 @@ Get items with filters.
       },
       "condition": "good",
       "estimatedValue": 150,
+      "currency": "USD",
       "images": [
         {
           "url": "https://...",
@@ -275,13 +386,13 @@ Create a new item.
   "title": "Vintage Camera",
   "description": "Canon AE-1 from 1980...",
   "categoryId": "uuid",
-  "subcategoryId": "uuid",
   "condition": "good",
   "estimatedValue": 150,
-  "brand": "Canon",
-  "model": "AE-1",
-  "lookingFor": ["Digital Camera", "Lens"],
-  "openToOffers": true
+  "currency": "USD",
+  "location": {
+    "lat": 37.7749,
+    "lng": -122.4194
+  }
 }
 ```
 
@@ -525,6 +636,7 @@ Get search suggestions/autocomplete.
 ```
 
 ---
+
 
 ## 7. Category Endpoints
 

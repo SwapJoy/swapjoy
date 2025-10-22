@@ -5,9 +5,11 @@ Supabase provides a complete authentication system via the `auth` schema. The `a
 
 ## Authentication Providers
 
-### Enabled Providers:
-1. **Email/Password** (Email + password authentication)
-2. **Phone** (Phone number + OTP)
+### MVP (Phone Only):
+1. **Phone** (Phone number + OTP) - Primary authentication method
+
+### Future (Available but not enabled in MVP):
+2. **Email/Password** (Email + password authentication)
 3. **Google OAuth**
 4. **Apple OAuth**
 5. **Facebook OAuth**
@@ -47,24 +49,9 @@ public.users (
 
 ## Authentication Flow
 
-### 1. Email/Password Signup
-```typescript
-const { data, error } = await supabase.auth.signUp({
-  email: 'user@example.com',
-  password: 'securePassword123!',
-  options: {
-    data: {
-      username: 'john_doe', // Will be used to create public.users record
-      first_name: 'John',
-      last_name: 'Doe',
-    }
-  }
-})
-// Supabase creates record in auth.users
-// Your trigger creates record in public.users
-```
+### MVP: Phone Number Authentication Only
 
-### 2. Phone Number Signup
+#### 1. Phone Number Signup
 ```typescript
 const { data, error } = await supabase.auth.signUp({
   phone: '+1234567890',
@@ -81,7 +68,48 @@ const { data, error } = await supabase.auth.signUp({
 // User verifies with OTP
 ```
 
-### 3. Google OAuth
+#### 2. Phone Number Sign In
+```typescript
+const { data, error } = await supabase.auth.signInWithPassword({
+  phone: '+1234567890',
+  password: 'securePassword123!'
+})
+// User signs in with phone + password
+```
+
+#### 3. Phone Number OTP Sign In (Alternative)
+```typescript
+// Send OTP
+const { data, error } = await supabase.auth.signInWithOtp({
+  phone: '+1234567890'
+})
+
+// Verify OTP
+const { data, error } = await supabase.auth.verifyOtp({
+  phone: '+1234567890',
+  token: '123456',
+  type: 'sms'
+})
+```
+
+### Future: Additional Authentication Methods (Not in MVP)
+
+#### 4. Email/Password Signup
+```typescript
+const { data, error } = await supabase.auth.signUp({
+  email: 'user@example.com',
+  password: 'securePassword123!',
+  options: {
+    data: {
+      username: 'john_doe',
+      first_name: 'John',
+      last_name: 'Doe',
+    }
+  }
+})
+```
+
+#### 5. Google OAuth
 ```typescript
 const { data, error } = await supabase.auth.signInWithOAuth({
   provider: 'google',
@@ -89,11 +117,9 @@ const { data, error } = await supabase.auth.signInWithOAuth({
     redirectTo: 'swapjoy://auth/callback',
   }
 })
-// Google handles authentication
-// User data automatically synced
 ```
 
-### 4. Apple Sign In
+#### 6. Apple Sign In
 ```typescript
 const { data, error } = await supabase.auth.signInWithOAuth({
   provider: 'apple',
@@ -103,7 +129,7 @@ const { data, error } = await supabase.auth.signInWithOAuth({
 })
 ```
 
-### 5. Facebook OAuth
+#### 7. Facebook OAuth
 ```typescript
 const { data, error } = await supabase.auth.signInWithOAuth({
   provider: 'facebook',
@@ -283,34 +309,43 @@ CREATE POLICY "Prevent direct insert"
 
 ## Supabase Dashboard Configuration
 
-### Enable Authentication Providers
+### MVP: Enable Phone Authentication Only
 
 1. **Go to:** Supabase Dashboard → Authentication → Providers
 
-2. **Email:**
-   - Already enabled by default
-   - Configure email templates (optional)
-   - Set confirmation URL: `swapjoy://auth/confirm`
-
-3. **Phone:**
+2. **Phone (Required for MVP):**
    - Enable Phone provider
    - Choose SMS provider (Twilio, MessageBird, etc.)
    - Add credentials
    - Set confirmation URL: `swapjoy://auth/confirm`
+   - Configure OTP settings (6-digit code, 5-minute expiry)
 
-4. **Google:**
+3. **Disable Other Providers (for MVP):**
+   - Email: Disable (not needed for MVP)
+   - Google: Disable (not needed for MVP)
+   - Apple: Disable (not needed for MVP)
+   - Facebook: Disable (not needed for MVP)
+
+### Future: Additional Providers (Enable Later)
+
+4. **Email (Future):**
+   - Enable Email provider
+   - Configure email templates
+   - Set confirmation URL: `swapjoy://auth/confirm`
+
+5. **Google (Future):**
    - Enable Google provider
    - Add Client ID (from Google Cloud Console)
    - Add Client Secret
    - Redirect URL: `https://your-project.supabase.co/auth/v1/callback`
 
-5. **Apple:**
+6. **Apple (Future):**
    - Enable Apple provider
    - Add Services ID
    - Add Key ID and Private Key
    - Redirect URL: `https://your-project.supabase.co/auth/v1/callback`
 
-6. **Facebook:**
+7. **Facebook (Future):**
    - Enable Facebook provider
    - Add Facebook App ID
    - Add Facebook App Secret

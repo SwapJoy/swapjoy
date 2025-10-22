@@ -30,7 +30,6 @@ CREATE TABLE users (
   username VARCHAR(50) UNIQUE NOT NULL, -- NEW: Unique username
   first_name VARCHAR(100) NOT NULL,
   last_name VARCHAR(100) NOT NULL,
-  display_name VARCHAR(200),
   bio TEXT,
   profile_image_url TEXT,
   
@@ -55,6 +54,11 @@ CREATE TABLE users (
   
   -- Preferences
   favorite_categories UUID[], -- Array of category IDs user is interested in
+  preferred_radius_km DECIMAL(5, 2) DEFAULT 50.00, -- Search radius in kilometers
+  
+  -- Manual Location (alternative to current location)
+  manual_location_lat DECIMAL(10, 8), -- User-selected location latitude
+  manual_location_lng DECIMAL(11, 8), -- User-selected location longitude
   
   -- Settings
   notification_preferences JSONB DEFAULT '{}',
@@ -71,11 +75,13 @@ CREATE TABLE users (
   INDEX idx_phone (phone_number),
   INDEX idx_status (status),
   INDEX idx_location (location_lat, location_lng),
+  INDEX idx_manual_location (manual_location_lat, manual_location_lng),
   INDEX idx_created_at (created_at)
 );
 
 -- Note: Authentication is handled by Supabase Auth (auth.users table)
--- Supabase Auth supports: Email, Phone, Google, Apple, Facebook
+-- MVP: Phone number authentication only
+-- Future: Email, Google, Apple, Facebook authentication available
 -- password_hash is stored in auth.users, not in public.users
 -- This users table is created automatically via trigger when user signs up
 ```
@@ -405,12 +411,12 @@ CREATE TABLE reviews (
 );
 ```
 
-### 12. Reviews (Linked to Offers)
+### 11. Reviews
 User ratings and reviews after swaps.
 
 **Note:** No separate swaps table needed! Reviews link directly to offers with status='completed'.
 
-### 13. Favorites
+### 12. Favorites
 Saved/favorited items.
 
 ```sql
@@ -427,7 +433,7 @@ CREATE TABLE favorites (
 );
 ```
 
-### 14. Notifications
+### 13. Notifications
 User notifications.
 
 ```sql
@@ -461,7 +467,7 @@ CREATE TABLE notifications (
 );
 ```
 
-### 15. Reports
+### 14. Reports
 User and item reports.
 
 ```sql
@@ -492,7 +498,7 @@ CREATE TABLE reports (
 );
 ```
 
-### 16. User Blocks
+### 15. User Blocks
 Blocked users.
 
 ```sql
@@ -510,7 +516,7 @@ CREATE TABLE user_blocks (
 );
 ```
 
-### 17. User Follows
+### 16. User Follows
 Following other users.
 
 ```sql
@@ -527,7 +533,7 @@ CREATE TABLE user_follows (
 );
 ```
 
-### 18. User Stats
+### 17. User Stats
 Denormalized user statistics for performance (updated via triggers).
 
 ```sql
@@ -570,7 +576,7 @@ CREATE TABLE user_stats (
 -- These are updated via database triggers when offer status changes to 'completed'
 ```
 
-### 19. User Ratings
+### 18. User Ratings
 Separate table for ratings (instead of denormalized in users table).
 
 ```sql
@@ -603,7 +609,7 @@ CREATE TABLE user_ratings (
 -- Updated via trigger when new review is added
 ```
 
-### 20. Activity Log
+### 19. Activity Log
 User activity tracking.
 
 ```sql
