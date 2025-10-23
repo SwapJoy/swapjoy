@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { memo } from 'react';
 import {
   View,
   Text,
@@ -9,176 +9,69 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { OffersScreenProps } from '../types/navigation';
-import { ApiService } from '../services/api';
+import { useOffersData, Offer } from '../hooks/useOffersData';
 
-interface Offer {
-  id: string;
-  message?: string;
-  top_up_amount: number;
-  status: string;
-  created_at: string;
-  sender: {
-    id: string;
-    username: string;
-    first_name: string;
-    last_name: string;
-  };
-  receiver: {
-    id: string;
-    username: string;
-    first_name: string;
-    last_name: string;
-  };
-  offer_items: Array<{
-    id: string;
-    side: 'offered' | 'requested';
-    item: {
-      id: string;
-      title: string;
-      description: string;
-      condition: string;
-      estimated_value: number;
-    };
-  }>;
-}
+const OffersScreen: React.FC<OffersScreenProps> = memo(() => {
+  const { offers, loading, refreshing, onRefresh, getStatusColor, getStatusText } = useOffersData();
 
-const OffersScreen: React.FC<OffersScreenProps> = ({ navigation }) => {
-  const [offers, setOffers] = useState<Offer[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-
-  useEffect(() => {
-    fetchOffers();
-  }, []);
-
-  const fetchOffers = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await ApiService.getOffers();
-      
-      if (error) {
-        console.error('Error fetching offers:', error);
-        return;
-      }
-
-      setOffers(data || []);
-    } catch (error) {
-      console.error('Error fetching offers:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await fetchOffers();
-    setRefreshing(false);
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return '#FFA500';
-      case 'accepted':
-        return '#4CAF50';
-      case 'declined':
-        return '#F44336';
-      case 'completed':
-        return '#2196F3';
-      default:
-        return '#666';
-    }
-  };
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'pending':
-        return 'Pending';
-      case 'accepted':
-        return 'Accepted';
-      case 'declined':
-        return 'Declined';
-      case 'completed':
-        return 'Completed';
-      default:
-        return status;
-    }
-  };
-
-  const renderOffer = ({ item }: { item: Offer }) => (
+  const renderOffer = ({ item }: { item: Offer & { type: 'sent' | 'received' } }) => (
     <TouchableOpacity style={styles.offerCard}>
       <View style={styles.offerHeader}>
-        <View style={styles.userInfo}>
-          <Text style={styles.userName}>
-            {item.sender.first_name} {item.sender.last_name}
-          </Text>
-          <Text style={styles.username}>@{item.sender.username}</Text>
-        </View>
+        <Text style={styles.offerType}>
+          {item.type === 'sent' ? 'Sent Offer' : 'Received Offer'}
+        </Text>
         <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
           <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
         </View>
       </View>
-
-      {item.message && (
-        <Text style={styles.message} numberOfLines={3}>
-          {item.message}
+      
+      <View style={styles.offerContent}>
+        <Text style={styles.offerMessage} numberOfLines={2}>
+          {item.message || 'No message provided'}
         </Text>
-      )}
-
-      <View style={styles.itemsSection}>
-        <Text style={styles.sectionTitle}>Offered Items:</Text>
-        {item.offer_items
-          .filter(offerItem => offerItem.side === 'offered')
-          .map((offerItem, index) => (
-            <View key={index} style={styles.itemRow}>
-              <Text style={styles.itemTitle}>{offerItem.item.title}</Text>
-              <Text style={styles.itemValue}>${offerItem.item.estimated_value}</Text>
+        
+        {item.top_up_amount > 0 && (
+          <Text style={styles.topUpAmount}>
+            +${item.top_up_amount.toFixed(2)} cash
+          </Text>
+        )}
+        
+        <View style={styles.itemsContainer}>
+          {item.offer_items?.slice(0, 3).map((offerItem, index) => (
+            <View key={index} style={styles.itemPreview}>
+              <Text style={styles.itemTitle} numberOfLines={1}>
+                {offerItem.item.title}
+              </Text>
             </View>
           ))}
-      </View>
-
-      <View style={styles.itemsSection}>
-        <Text style={styles.sectionTitle}>Requested Items:</Text>
-        {item.offer_items
-          .filter(offerItem => offerItem.side === 'requested')
-          .map((offerItem, index) => (
-            <View key={index} style={styles.itemRow}>
-              <Text style={styles.itemTitle}>{offerItem.item.title}</Text>
-              <Text style={styles.itemValue}>${offerItem.item.estimated_value}</Text>
-            </View>
-          ))}
-      </View>
-
-      {item.top_up_amount !== 0 && (
-        <View style={styles.topUpSection}>
-          <Text style={styles.topUpText}>
-            {item.top_up_amount > 0 ? '+' : ''}${item.top_up_amount} top-up
+          {item.offer_items && item.offer_items.length > 3 && (
+            <Text style={styles.moreItems}>
+              +{item.offer_items.length - 3} more items
+            </Text>
+          )}
+        </View>
+        
+        <View style={styles.offerFooter}>
+          <Text style={styles.offerDate}>
+            {new Date(item.created_at).toLocaleDateString()}
+          </Text>
+          <Text style={styles.offerUser}>
+            {item.type === 'sent' ? 'To' : 'From'}: {item.sender?.username || item.receiver?.username}
           </Text>
         </View>
-      )}
-
-      <View style={styles.offerActions}>
-        {item.status === 'pending' && (
-          <>
-            <TouchableOpacity style={styles.acceptButton}>
-              <Text style={styles.acceptButtonText}>Accept</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.declineButton}>
-              <Text style={styles.declineButtonText}>Decline</Text>
-            </TouchableOpacity>
-          </>
-        )}
       </View>
-
-      <Text style={styles.dateText}>
-        {new Date(item.created_at).toLocaleDateString()}
-      </Text>
     </TouchableOpacity>
   );
 
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Offers</Text>
+          <Text style={styles.headerSubtitle}>
+            Manage your swap offers and proposals
+          </Text>
+        </View>
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>Loading offers...</Text>
         </View>
@@ -201,25 +94,53 @@ const OffersScreen: React.FC<OffersScreenProps> = ({ navigation }) => {
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContainer}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#007AFF']}
+            tintColor="#007AFF"
+          />
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyTitle}>No offers yet</Text>
-            <Text style={styles.emptyText}>
-              When someone makes an offer on your items, it will appear here.
+            <Text style={styles.emptySubtitle}>
+              Start browsing items to make your first offer!
             </Text>
           </View>
         }
       />
     </SafeAreaView>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8f9fa',
+  },
+  header: {
+    padding: 20,
+    paddingBottom: 10,
+    backgroundColor: '#fff',
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 5,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: '#777',
   },
   loadingContainer: {
     flex: 1,
@@ -228,163 +149,109 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: '#666',
-  },
-  header: {
-    padding: 20,
-    paddingBottom: 10,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-    marginBottom: 5,
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    color: '#666',
+    color: '#555',
   },
   listContainer: {
     padding: 20,
-    paddingTop: 10,
   },
   offerCard: {
     backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
+    borderRadius: 15,
     marginBottom: 15,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 8,
+    shadowRadius: 4,
     elevation: 3,
   },
   offerHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
   },
-  userInfo: {
-    flex: 1,
-  },
-  userName: {
+  offerType: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#1a1a1a',
-  },
-  username: {
-    fontSize: 14,
-    color: '#666',
+    fontWeight: 'bold',
+    color: '#333',
   },
   statusBadge: {
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 15,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
   statusText: {
     color: '#fff',
     fontSize: 12,
     fontWeight: 'bold',
   },
-  message: {
+  offerContent: {
+    padding: 15,
+  },
+  offerMessage: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 15,
-    lineHeight: 20,
+    marginBottom: 10,
   },
-  itemsSection: {
-    marginBottom: 15,
+  topUpAmount: {
+    fontSize: 16,
+    color: '#4CAF50',
+    fontWeight: 'bold',
+    marginBottom: 10,
   },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    marginBottom: 8,
+  itemsContainer: {
+    marginBottom: 10,
   },
-  itemRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 4,
+  itemPreview: {
+    backgroundColor: '#f8f9fa',
+    padding: 8,
+    borderRadius: 8,
+    marginBottom: 5,
   },
   itemTitle: {
     fontSize: 14,
     color: '#333',
-    flex: 1,
   },
-  itemValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#007AFF',
+  moreItems: {
+    fontSize: 12,
+    color: '#666',
+    fontStyle: 'italic',
   },
-  topUpSection: {
-    backgroundColor: '#f0f8ff',
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 15,
-  },
-  topUpText: {
-    fontSize: 14,
-    color: '#007AFF',
-    fontWeight: '500',
-    textAlign: 'center',
-  },
-  offerActions: {
+  offerFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    alignItems: 'center',
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
   },
-  acceptButton: {
-    backgroundColor: '#4CAF50',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
-    flex: 1,
-    marginRight: 10,
-  },
-  acceptButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  declineButton: {
-    backgroundColor: '#F44336',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
-    flex: 1,
-  },
-  declineButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  dateText: {
+  offerDate: {
     fontSize: 12,
-    color: '#888',
-    textAlign: 'right',
+    color: '#666',
+  },
+  offerUser: {
+    fontSize: 12,
+    color: '#007AFF',
+    fontWeight: '500',
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingTop: 50,
+    paddingVertical: 60,
   },
   emptyTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    marginBottom: 10,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
   },
-  emptyText: {
+  emptySubtitle: {
     fontSize: 14,
     color: '#666',
     textAlign: 'center',
-    lineHeight: 20,
   },
 });
 

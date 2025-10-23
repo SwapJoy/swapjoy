@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { memo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,92 +6,59 @@ import {
   TouchableOpacity,
   ScrollView,
   Image,
-  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ProfileScreenProps } from '../types/navigation';
-import { useAuth } from '../contexts/AuthContext';
-import { ApiService } from '../services/api';
+import { useProfileData } from '../hooks/useProfileData';
 
-const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
-  const { user, signOut } = useAuth();
-  const [stats, setStats] = useState({
-    itemsListed: 0,
-    itemsSwapped: 0,
-    offersReceived: 0,
-    offersSent: 0,
-  });
+const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
+  const {
+    user,
+    stats,
+    rating,
+    loading,
+    handleSignOut,
+    formatSuccessRate,
+    formatRating,
+  } = useProfileData();
 
-  useEffect(() => {
-    fetchUserStats();
-  }, []);
 
-  const fetchUserStats = async () => {
-    try {
-      // In a real app, you'd fetch user stats from the API
-      // For now, we'll use mock data
-      setStats({
-        itemsListed: 12,
-        itemsSwapped: 8,
-        offersReceived: 15,
-        offersSent: 23,
-      });
-    } catch (error) {
-      console.error('Error fetching user stats:', error);
-    }
-  };
-
-  const handleSignOut = () => {
-    Alert.alert(
-      'Sign Out',
-      'Are you sure you want to sign out?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Sign Out', style: 'destructive', onPress: signOut },
-      ]
-    );
-  };
-
-  const handleSettings = () => {
-    navigation.navigate('ProfileSettings');
-  };
-
-  const handleSearch = () => {
-    navigation.navigate('Search');
-  };
-
-  const StatCard = ({ title, value, icon }: { title: string; value: number; icon: string }) => (
-    <View style={styles.statCard}>
-      <Text style={styles.statIcon}>{icon}</Text>
+  const renderStatItem = useCallback((title: string, value: string | number, subtitle?: string) => (
+    <View style={styles.statItem}>
       <Text style={styles.statValue}>{value}</Text>
       <Text style={styles.statTitle}>{title}</Text>
+      {subtitle && <Text style={styles.statSubtitle}>{subtitle}</Text>}
     </View>
-  );
+  ), []);
 
-  const MenuItem = ({ 
-    title, 
-    subtitle, 
-    icon, 
-    onPress, 
-    showArrow = true 
-  }: { 
-    title: string; 
-    subtitle?: string; 
-    icon: string; 
-    onPress: () => void; 
-    showArrow?: boolean;
-  }) => (
-    <TouchableOpacity style={styles.menuItem} onPress={onPress}>
-      <View style={styles.menuItemLeft}>
-        <Text style={styles.menuIcon}>{icon}</Text>
-        <View style={styles.menuTextContainer}>
-          <Text style={styles.menuTitle}>{title}</Text>
-          {subtitle && <Text style={styles.menuSubtitle}>{subtitle}</Text>}
+  const renderProfileItem = useCallback((
+    icon: string,
+    title: string,
+    subtitle?: string,
+    onPress?: () => void,
+    showArrow: boolean = true
+  ) => (
+    <TouchableOpacity style={styles.profileItem} onPress={onPress}>
+      <View style={styles.profileItemLeft}>
+        <Text style={styles.profileItemIcon}>{icon}</Text>
+        <View style={styles.profileItemText}>
+          <Text style={styles.profileItemTitle}>{title}</Text>
+          {subtitle && <Text style={styles.profileItemSubtitle}>{subtitle}</Text>}
         </View>
       </View>
       {showArrow && <Text style={styles.arrow}>›</Text>}
     </TouchableOpacity>
-  );
+  ), []);
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <Text style={styles.loadingText}>Loading profile...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -101,7 +68,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
           <View style={styles.profileInfo}>
             <View style={styles.avatarContainer}>
               <Image
-                source={{ uri: 'https://via.placeholder.com/80x80' }}
+                source={{ uri: (user as any)?.profile_image_url || 'https://via.placeholder.com/100' }}
                 style={styles.avatar}
               />
             </View>
@@ -110,103 +77,56 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
                 {user?.first_name} {user?.last_name}
               </Text>
               <Text style={styles.username}>@{user?.username}</Text>
-              <Text style={styles.phone}>{user?.phone}</Text>
+              {(user as any)?.bio && (
+                <Text style={styles.bio}>{(user as any).bio}</Text>
+              )}
             </View>
           </View>
         </View>
 
         {/* Stats */}
-        <View style={styles.statsSection}>
-          <Text style={styles.sectionTitle}>Your Activity</Text>
-          <View style={styles.statsGrid}>
-            <StatCard title="Items Listed" value={stats.itemsListed} icon="📦" />
-            <StatCard title="Items Swapped" value={stats.itemsSwapped} icon="🔄" />
-            <StatCard title="Offers Received" value={stats.offersReceived} icon="📨" />
-            <StatCard title="Offers Sent" value={stats.offersSent} icon="📤" />
+        <View style={styles.statsContainer}>
+          <View style={styles.statsRow}>
+            {renderStatItem('Items Listed', stats.itemsListed)}
+            {renderStatItem('Items Swapped', stats.itemsSwapped)}
+          </View>
+          <View style={styles.statsRow}>
+            {renderStatItem('Total Offers', stats.totalOffers)}
+            {renderStatItem('Success Rate', formatSuccessRate(stats.successRate))}
           </View>
         </View>
 
-        {/* Menu Items */}
-        <View style={styles.menuSection}>
-          <Text style={styles.sectionTitle}>Account</Text>
-          
-          <MenuItem
-            title="My Items"
-            subtitle="Manage your listings"
-            icon="📦"
-            onPress={() => {}}
-          />
-          
-          <MenuItem
-            title="Favorites"
-            subtitle="Saved items"
-            icon="❤️"
-            onPress={() => {}}
-          />
-          
-          <MenuItem
-            title="Offers"
-            subtitle="Your swap offers"
-            icon="🤝"
-            onPress={() => {}}
-          />
-          
-          <MenuItem
-            title="Reviews"
-            subtitle="Your feedback"
-            icon="⭐"
-            onPress={() => {}}
-          />
+        {/* Rating */}
+        {rating.totalRatings > 0 && (
+          <View style={styles.ratingContainer}>
+            <Text style={styles.ratingTitle}>Rating</Text>
+            <View style={styles.ratingContent}>
+              <Text style={styles.ratingValue}>{formatRating(rating.averageRating)}</Text>
+              <Text style={styles.ratingStars}>★★★★★</Text>
+              <Text style={styles.ratingCount}>({rating.totalRatings} reviews)</Text>
+            </View>
+          </View>
+        )}
+
+        {/* Profile Options */}
+        <View style={styles.profileOptions}>
+          {renderProfileItem('👤', 'Edit Profile', 'Update your personal information')}
+          {renderProfileItem('🔔', 'Notifications', 'Manage your notification preferences')}
+          {renderProfileItem('🔒', 'Privacy & Security', 'Control your privacy settings')}
+          {renderProfileItem('💬', 'Help & Support', 'Get help and contact support')}
+          {renderProfileItem('ℹ️', 'About', 'App version and legal information')}
         </View>
 
-        <View style={styles.menuSection}>
-          <Text style={styles.sectionTitle}>Settings</Text>
-          
-          <MenuItem
-            title="Profile Settings"
-            subtitle="Edit your profile"
-            icon="⚙️"
-            onPress={handleSettings}
-          />
-          
-          <MenuItem
-            title="Notifications"
-            subtitle="Manage notifications"
-            icon="🔔"
-            onPress={() => {}}
-          />
-          
-          <MenuItem
-            title="Privacy"
-            subtitle="Privacy settings"
-            icon="🔒"
-            onPress={() => {}}
-          />
-          
-          <MenuItem
-            title="Help & Support"
-            subtitle="Get help"
-            icon="❓"
-            onPress={() => {}}
-          />
-        </View>
-
-        <View style={styles.menuSection}>
-          <MenuItem
-            title="Sign Out"
-            icon="🚪"
-            onPress={handleSignOut}
-            showArrow={false}
-          />
-        </View>
-
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>SwapJoy v1.0.0</Text>
+        {/* Sign Out */}
+        <View style={styles.signOutContainer}>
+          <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
+            <Text style={styles.signOutText}>Sign Out</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </SafeAreaView>
   );
-};
+});
 
 const styles = StyleSheet.create({
   container: {
@@ -216,17 +136,31 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#555',
+  },
   header: {
     backgroundColor: '#fff',
     padding: 20,
-    paddingBottom: 30,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
   },
   profileInfo: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   avatarContainer: {
-    marginRight: 20,
+    marginRight: 15,
   },
   avatar: {
     width: 80,
@@ -237,112 +171,150 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   userName: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#1a1a1a',
-    marginBottom: 5,
+    color: '#333',
+    marginBottom: 4,
   },
   username: {
     fontSize: 16,
     color: '#666',
-    marginBottom: 5,
-  },
-  phone: {
-    fontSize: 14,
-    color: '#888',
-  },
-  statsSection: {
-    padding: 20,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    marginBottom: 15,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  statCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
-    alignItems: 'center',
-    width: '48%',
-    marginBottom: 15,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  statIcon: {
-    fontSize: 24,
     marginBottom: 8,
+  },
+  bio: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 20,
+  },
+  statsContainer: {
+    backgroundColor: '#fff',
+    marginBottom: 10,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 20,
+  },
+  statItem: {
+    alignItems: 'center',
+    flex: 1,
   },
   statValue: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#1a1a1a',
-    marginBottom: 5,
+    color: '#333',
+    marginBottom: 4,
   },
   statTitle: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#666',
     textAlign: 'center',
   },
-  menuSection: {
-    marginBottom: 20,
+  statSubtitle: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 2,
   },
-  menuItem: {
+  ratingContainer: {
     backgroundColor: '#fff',
+    marginBottom: 10,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  ratingTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 10,
+  },
+  ratingContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  ratingValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+    marginRight: 10,
+  },
+  ratingStars: {
+    fontSize: 16,
+    color: '#FFD700',
+    marginRight: 10,
+  },
+  ratingCount: {
+    fontSize: 14,
+    color: '#666',
+  },
+  profileOptions: {
+    backgroundColor: '#fff',
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  profileItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 20,
+    paddingVertical: 15,
+    paddingHorizontal: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
-  menuItemLeft: {
+  profileItemLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
   },
-  menuIcon: {
+  profileItemIcon: {
     fontSize: 20,
     marginRight: 15,
-    width: 30,
+    width: 24,
+    textAlign: 'center',
   },
-  menuTextContainer: {
+  profileItemText: {
     flex: 1,
   },
-  menuTitle: {
+  profileItemTitle: {
     fontSize: 16,
-    fontWeight: '500',
-    color: '#1a1a1a',
+    color: '#333',
     marginBottom: 2,
   },
-  menuSubtitle: {
+  profileItemSubtitle: {
     fontSize: 14,
     color: '#666',
   },
   arrow: {
-    fontSize: 20,
+    fontSize: 18,
     color: '#ccc',
+    marginLeft: 10,
   },
-  footer: {
-    alignItems: 'center',
+  signOutContainer: {
     padding: 20,
-    paddingBottom: 40,
   },
-  footerText: {
-    fontSize: 12,
-    color: '#888',
+  signOutButton: {
+    backgroundColor: '#FF3B30',
+    paddingVertical: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  signOutText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
 
