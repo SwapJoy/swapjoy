@@ -160,17 +160,62 @@ export class ApiService {
       
       // Get full item details for single items
       if (singleItemIds.length > 0) {
-        const { data: fullItems, error: fullItemsError } = await client
+        console.log('API: Fetching items with IDs:', singleItemIds);
+        
+        // Fetch data separately and combine manually
+        console.log('API: Fetching items separately for IDs:', singleItemIds);
+        
+        // Get items
+        const { data: items, error: itemsError } = await client
           .from('items')
-          .select('*, item_images(image_url), users!items_user_id_fkey(username, first_name, last_name)')
+          .select('*')
           .in('id', singleItemIds);
 
-        if (!fullItemsError && fullItems) {
-          // Add similarity scores to single items
-          const itemsWithScores = fullItems.map(item => {
+        if (itemsError) {
+          console.error('API: Error fetching items:', itemsError);
+        }
+
+        if (!itemsError && items) {
+          console.log('API: Items fetched:', items.length);
+          
+          // Get images for these items
+          const { data: images, error: imagesError } = await client
+            .from('item_images')
+            .select('item_id, image_url')
+            .in('item_id', singleItemIds);
+
+          if (imagesError) {
+            console.error('API: Error fetching images:', imagesError);
+          }
+
+          // Get users for these items
+          const userIds = [...new Set(items.map(item => item.user_id))];
+          const { data: users, error: usersError } = await client
+            .from('users')
+            .select('id, username, first_name, last_name')
+            .in('id', userIds);
+
+          if (usersError) {
+            console.error('API: Error fetching users:', usersError);
+          }
+
+          console.log('API: Images fetched:', images?.length || 0);
+          console.log('API: Users fetched:', users?.length || 0);
+          
+          // Combine the data
+          const itemsWithScores = items.map(item => {
             const similarityData = uniqueItems.find((u: any) => u.id === item.id);
+            const itemImages = images?.filter(img => img.item_id === item.id) || [];
+            const itemUser = users?.find(user => user.id === item.user_id);
+            const imageUrl = itemImages[0]?.image_url || null;
+            
+            console.log('API: Item', item.title, '- imageUrl:', imageUrl, 'user:', itemUser?.username);
+            
             return {
               ...item,
+              image_url: imageUrl,
+              item_images: itemImages,
+              users: itemUser,
               similarity_score: similarityData?.similarity || 0,
               overall_score: similarityData?.overall_score || 0
             };
@@ -442,7 +487,7 @@ export class ApiService {
         return { data: null, error: 'User not found' };
       }
 
-      const query = client
+      const { data: items, error } = await client
         .from('items')
         .select('*, item_images(image_url), users!items_user_id_fkey(username, first_name, last_name)')
         .in('category_id', user.favorite_categories || [])
@@ -451,7 +496,15 @@ export class ApiService {
         .order('created_at', { ascending: false })
         .limit(limit);
 
-      return await query;
+      if (error) return { data: [], error };
+      
+      // Flatten image URLs
+      const itemsWithImages = items?.map(item => ({
+        ...item,
+        image_url: item.item_images?.[0]?.image_url || null
+      }));
+
+      return { data: itemsWithImages, error: null };
     });
   }
 
@@ -871,9 +924,14 @@ export class ApiService {
   // Get user's items for profile display
   static async getUserItems(userId: string) {
     return this.authenticatedCall(async (client) => {
+      // Get user items with images using explicit foreign key name
       const { data: items, error } = await client
         .from('items')
-        .select('*, item_images(image_url), categories(name)')
+        .select(`
+          *,
+          item_images!item_images_item_id_fkey(image_url),
+          categories!inner(name)
+        `)
         .eq('user_id', userId)
         .eq('status', 'available')
         .order('created_at', { ascending: false });
@@ -883,14 +941,22 @@ export class ApiService {
         return { data: null, error };
       }
 
-      console.log('User items:', items?.map(item => ({
+      // Flatten image URLs for easier access
+      const itemsWithImages = items?.map(item => ({
+        ...item,
+        image_url: item.item_images?.[0]?.image_url || null,
+        category_name: item.categories?.name || null
+      }));
+
+      console.log('User items:', itemsWithImages?.map(item => ({
         id: item.id,
         title: item.title,
         price: item.price,
-        condition: item.condition
+        condition: item.condition,
+        image_url: item.image_url
       })));
 
-      return { data: items, error: null };
+      return { data: itemsWithImages, error: null };
     });
   }
 

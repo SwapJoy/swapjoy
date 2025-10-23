@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { ApiService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -30,6 +30,7 @@ export const useExploreData = () => {
   const [isInitialized, setIsInitialized] = useState(false);
   const isMountedRef = useRef(true);
   const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
 
   const calculateMatchScore = useCallback((item: any, currentUser: any) => {
     // Use AI similarity score if available, otherwise fallback to manual calculation
@@ -130,7 +131,6 @@ export const useExploreData = () => {
 
   const fetchAIOffers = useCallback(async () => {
     if (!user) {
-      console.log('No user authenticated, skipping fetch');
       if (isMountedRef.current) {
         setLoading(false);
         setIsInitialized(true);
@@ -139,7 +139,6 @@ export const useExploreData = () => {
     }
 
     if (isFetching) {
-      console.log('Already fetching, skipping duplicate request');
       return;
     }
     
@@ -155,7 +154,6 @@ export const useExploreData = () => {
       }
 
       // Transform items to AIOffer format
-      console.log('Top picks data:', topPicks);
       const aiOffers: AIOffer[] = (Array.isArray(topPicks) ? topPicks : []).map((item: any) => {
         const matchScore = calculateMatchScore(item, user);
         const reason = getMatchReason(item, matchScore);
@@ -179,13 +177,15 @@ export const useExploreData = () => {
           }
         }
 
+        const imageUrl = item.image_url || item.item_images?.[0]?.image_url || 'https://via.placeholder.com/200x150';
+        
         return {
           id: item.id,
           title: item.title,
           description: item.description,
           condition: item.condition,
           estimated_value: displayValue, // Use calculated or database value
-          image_url: item.item_images?.[0]?.image_url || 'https://via.placeholder.com/200x150',
+          image_url: imageUrl,
           user: {
             id: item.users?.id || item.user_id,
             username: item.users?.username || `user_${(item.user_id || '').slice(-4)}`,
@@ -220,7 +220,7 @@ export const useExploreData = () => {
         setIsInitialized(true);
       }
     }
-  }, [user]);
+  }, [user, calculateMatchScore, getMatchReason]);
 
   useEffect(() => {
     if (user) {
@@ -249,14 +249,14 @@ export const useExploreData = () => {
   }, []);
 
   const refreshData = useCallback(() => {
-    console.log('Force refreshing explore data...');
     setLoading(true);
     setHasData(false);
     setIsInitialized(false);
     fetchAIOffers();
-  }, [fetchAIOffers]);
+  }, []);
 
-  return {
+  // Memoize the return value to prevent unnecessary re-renders
+  return useMemo(() => ({
     aiOffers,
     loading,
     isFetching,
@@ -264,5 +264,5 @@ export const useExploreData = () => {
     isInitialized,
     user,
     refreshData,
-  };
+  }), [aiOffers, loading, isFetching, hasData, isInitialized, user, refreshData]);
 };

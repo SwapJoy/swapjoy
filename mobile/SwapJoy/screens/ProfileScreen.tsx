@@ -5,11 +5,11 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ProfileScreenProps } from '../types/navigation';
 import { useProfileData } from '../hooks/useProfileData';
+import CachedImage from '../components/CachedImage';
 
 const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
   const {
@@ -68,9 +68,10 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
         <View style={styles.header}>
           <View style={styles.profileInfo}>
             <View style={styles.avatarContainer}>
-              <Image
-                source={{ uri: (user as any)?.profile_image_url || 'https://via.placeholder.com/100' }}
+              <CachedImage
+                uri={(user as any)?.profile_image_url || 'https://via.placeholder.com/100'}
                 style={styles.avatar}
+                resizeMode="cover"
               />
             </View>
             <View style={styles.userInfo}>
@@ -116,9 +117,10 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
             <View style={styles.itemsContainer}>
               {userItems.map((item) => (
                 <View key={item.id} style={styles.itemCard}>
-                  <Image
-                    source={{ uri: item.image_url || 'https://via.placeholder.com/80x80' }}
+                  <CachedImage
+                    uri={item.image_url || 'https://via.placeholder.com/80x80'}
                     style={styles.itemImage}
+                    resizeMode="cover"
                   />
                   <View style={styles.itemDetails}>
                     <Text style={styles.itemTitle} numberOfLines={1}>{item.title}</Text>

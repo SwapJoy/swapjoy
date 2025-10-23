@@ -5,14 +5,15 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  Image,
   ScrollView,
   Dimensions,
   RefreshControl,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ExploreScreenProps } from '../types/navigation';
 import { useExploreData, AIOffer } from '../hooks/useExploreData';
+import CachedImage from '../components/CachedImage';
 
 const { width } = Dimensions.get('window');
 const ITEM_WIDTH = width * 0.7;
@@ -30,9 +31,11 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
       })}
     >
       <View style={styles.imageContainer}>
-        <Image
-          source={{ uri: item.image_url || 'https://via.placeholder.com/200x150' }}
+        <CachedImage
+          uri={item.image_url || 'https://via.placeholder.com/200x150'}
           style={styles.itemImage}
+          resizeMode="cover"
+          fallbackUri="https://picsum.photos/200/150?random=1"
         />
         <View style={styles.matchScoreBadge}>
           <Text style={styles.matchScoreText}>{item.match_score}% Match</Text>
