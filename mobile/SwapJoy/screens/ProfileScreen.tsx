@@ -16,6 +16,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
     user,
     stats,
     rating,
+    userItems,
     loading,
     handleSignOut,
     formatSuccessRate,
@@ -108,6 +109,36 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
           </View>
         )}
 
+        {/* Your Items */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Your Items ({userItems.length})</Text>
+          {userItems.length > 0 ? (
+            <View style={styles.itemsContainer}>
+              {userItems.map((item) => (
+                <View key={item.id} style={styles.itemCard}>
+                  <Image
+                    source={{ uri: item.image_url || 'https://via.placeholder.com/80x80' }}
+                    style={styles.itemImage}
+                  />
+                  <View style={styles.itemDetails}>
+                    <Text style={styles.itemTitle} numberOfLines={1}>{item.title}</Text>
+                    <Text style={styles.itemPrice}>${item.price}</Text>
+                    <Text style={styles.itemCondition}>{item.condition}</Text>
+                    {item.category_name && (
+                      <Text style={styles.itemCategory}>{item.category_name}</Text>
+                    )}
+                  </View>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <View style={styles.emptyItemsContainer}>
+              <Text style={styles.emptyItemsText}>No items listed yet</Text>
+              <Text style={styles.emptyItemsSubtext}>Add items to start swapping!</Text>
+            </View>
+          )}
+        </View>
+
         {/* Profile Options */}
         <View style={styles.profileOptions}>
           {renderProfileItem('👤', 'Edit Profile', 'Update your personal information')}
@@ -115,6 +146,28 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
           {renderProfileItem('🔒', 'Privacy & Security', 'Control your privacy settings')}
           {renderProfileItem('💬', 'Help & Support', 'Get help and contact support')}
           {renderProfileItem('ℹ️', 'About', 'App version and legal information')}
+        </View>
+
+        {/* Debug: Add Sample Items */}
+        <View style={styles.section}>
+          <TouchableOpacity 
+            style={styles.addItemsButton}
+            onPress={async () => {
+              if (user?.id) {
+                try {
+                  const { ApiService } = await import('../services/api');
+                  const result = await ApiService.createSampleItems(user.id);
+                  console.log('Sample items created:', result);
+                  // Refresh the profile data
+                  window.location.reload();
+                } catch (error) {
+                  console.error('Error creating sample items:', error);
+                }
+              }
+            }}
+          >
+            <Text style={styles.addItemsButtonText}>Add Sample Items (Debug)</Text>
+          </TouchableOpacity>
         </View>
 
         {/* Sign Out */}
@@ -315,6 +368,93 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  itemsContainer: {
+    marginTop: 10,
+  },
+  itemCard: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  itemImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    marginRight: 12,
+  },
+  itemDetails: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  itemTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 4,
+  },
+  itemPrice: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#007AFF',
+    marginBottom: 4,
+  },
+  itemCondition: {
+    fontSize: 12,
+    color: '#666',
+    textTransform: 'capitalize',
+    marginBottom: 2,
+  },
+  itemCategory: {
+    fontSize: 12,
+    color: '#999',
+    fontStyle: 'italic',
+  },
+  emptyItemsContainer: {
+    alignItems: 'center',
+    padding: 20,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 10,
+    marginTop: 10,
+  },
+  emptyItemsText: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 5,
+  },
+  emptyItemsSubtext: {
+    fontSize: 14,
+    color: '#999',
+  },
+  addItemsButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  addItemsButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  section: {
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 10,
   },
 });
 

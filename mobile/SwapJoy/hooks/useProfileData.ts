@@ -15,6 +15,17 @@ export interface UserRating {
   totalRatings: number;
 }
 
+export interface UserItem {
+  id: string;
+  title: string;
+  description: string;
+  price: number;
+  condition: string;
+  image_url?: string;
+  category_name?: string;
+  created_at: string;
+}
+
 export const useProfileData = () => {
   const { user, signOut } = useAuth();
   const [stats, setStats] = useState<UserStats>({
@@ -27,6 +38,7 @@ export const useProfileData = () => {
     averageRating: 0,
     totalRatings: 0,
   });
+  const [userItems, setUserItems] = useState<UserItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   const handleSignOut = useCallback(() => {
@@ -88,6 +100,22 @@ export const useProfileData = () => {
             totalRatings: ratingData.total_ratings || 0,
           });
         }
+
+        // Get user items
+        const { data: itemsData } = await ApiService.getUserItems(user.id);
+        if (itemsData) {
+          const formattedItems = itemsData.map((item: any) => ({
+            id: item.id,
+            title: item.title,
+            description: item.description,
+            price: item.price,
+            condition: item.condition,
+            image_url: item.item_images?.[0]?.image_url,
+            category_name: item.categories?.name,
+            created_at: item.created_at,
+          }));
+          setUserItems(formattedItems);
+        }
       } catch (error) {
         console.error('Error fetching profile data:', error);
       } finally {
@@ -102,6 +130,7 @@ export const useProfileData = () => {
     user,
     stats,
     rating,
+    userItems,
     loading,
     handleSignOut,
     formatSuccessRate,

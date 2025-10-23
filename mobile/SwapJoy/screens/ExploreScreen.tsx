@@ -8,6 +8,7 @@ import {
   Image,
   ScrollView,
   Dimensions,
+  RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ExploreScreenProps } from '../types/navigation';
@@ -17,12 +18,16 @@ const { width } = Dimensions.get('window');
 const ITEM_WIDTH = width * 0.7;
 
 const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
-  const { aiOffers, loading, hasData, isInitialized, user } = useExploreData();
+  const { aiOffers, loading, hasData, isInitialized, user, refreshData } = useExploreData();
 
   const renderAIOffer = useCallback(({ item }: { item: AIOffer }) => (
     <TouchableOpacity
       style={styles.offerCard}
-      onPress={() => (navigation as any).navigate('ItemDetails', { itemId: item.id })}
+      onPress={() => (navigation as any).navigate('ItemDetails', { 
+        itemId: item.id, 
+        isBundle: item.is_bundle || false,
+        bundleItems: item.bundle_items || null 
+      })}
     >
       <View style={styles.imageContainer}>
         <Image
@@ -32,10 +37,22 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
         <View style={styles.matchScoreBadge}>
           <Text style={styles.matchScoreText}>{item.match_score}% Match</Text>
         </View>
+        {item.is_bundle && (
+          <View style={styles.bundleBadge}>
+            <Text style={styles.bundleBadgeText}>Bundle</Text>
+          </View>
+        )}
       </View>
       <View style={styles.offerDetails}>
         <Text style={styles.offerTitle} numberOfLines={1}>{item.title}</Text>
-        <Text style={styles.offerValue}>Est. Value: ${item.estimated_value.toFixed(2)}</Text>
+        <Text style={styles.offerValue}>
+          {item.is_bundle ? 'Bundle Value' : 'Price'}: ${(item.price || item.estimated_value || 0).toFixed(2)}
+        </Text>
+        {item.is_bundle && item.bundle_items && (
+          <Text style={styles.bundleItems} numberOfLines={1}>
+            {item.bundle_items.map(bundleItem => bundleItem.title).join(' + ')}
+          </Text>
+        )}
         <Text style={styles.matchReason} numberOfLines={1}>{item.reason}</Text>
         <View style={styles.userInfo}>
           <Text style={styles.userName}>
@@ -69,7 +86,18 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.scrollView} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={loading}
+            onRefresh={refreshData}
+            colors={['#007AFF']}
+            tintColor="#007AFF"
+          />
+        }
+      >
         <View style={styles.header}>
           <Text style={styles.headerTitle}>AI-Powered Matches</Text>
           <Text style={styles.headerSubtitle}>
@@ -258,6 +286,26 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     lineHeight: 20,
+  },
+  bundleBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: '#ff6b35',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  bundleBadgeText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  bundleItems: {
+    fontSize: 12,
+    color: '#666',
+    fontStyle: 'italic',
+    marginTop: 2,
   },
 });
 
