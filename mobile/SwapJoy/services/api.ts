@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { AuthService } from './auth';
+import { RedisCache } from './redisCache';
 
 export class ApiService {
   // Get authenticated Supabase client
@@ -65,7 +66,11 @@ export class ApiService {
 
   // AI-Powered Vector-Based Recommendations
   static async getTopPicksForUser(userId: string, limit: number = 10) {
-    return this.authenticatedCall(async (client) => {
+    // Use Redis caching for expensive AI recommendations (graceful fallback if not available)
+    return RedisCache.cache(
+      'top-picks',
+      [userId, limit],
+      () => this.authenticatedCall(async (client) => {
       // Get user's items to find similar matches
       const { data: userItems, error: userItemsError } = await client
         .from('items')
@@ -240,7 +245,9 @@ export class ApiService {
 
       // Fallback if no vector matches found
       return this.getFallbackRecommendations(client, userId, limit);
-    });
+    }),
+    600 // 10 minutes cache TTL for AI recommendations
+    );
   }
 
   // Ensure we always return a valid response
@@ -705,7 +712,11 @@ export class ApiService {
 
   // User Stats - Ultra Simple Version
   static async getUserStats(userId: string) {
-    return this.authenticatedCall(async (client) => {
+    // Cache user stats for 5 minutes
+    return RedisCache.cache(
+      'user-stats',
+      [userId],
+      () => this.authenticatedCall(async (client) => {
       console.log('ApiService: Getting user stats for user:', userId);
       
       // Just get items count - simplest possible query
@@ -730,12 +741,18 @@ export class ApiService {
         data: result,
         error: null,
       };
-    });
+    }),
+    300 // 5 minutes cache TTL for user stats
+    );
   }
 
   // User Ratings - Ultra Simple Version
   static async getUserRatings(userId: string) {
-    return this.authenticatedCall(async (client) => {
+    // Cache user ratings for 5 minutes
+    return RedisCache.cache(
+      'user-ratings',
+      [userId],
+      () => this.authenticatedCall(async (client) => {
       console.log('ApiService: Getting user ratings for user:', userId);
       
       // Just return default values for now - no complex queries
@@ -750,9 +767,28 @@ export class ApiService {
         data: result,
         error: null,
       };
-    });
+    }),
+    300 // 5 minutes cache TTL for user ratings
+    );
   }
 
+
+  // Cache invalidation methods
+  static async invalidateUserCache(userId: string) {
+    try {
+      await Promise.all([
+        RedisCache.delete('user-stats', userId),
+        RedisCache.delete('user-ratings', userId),
+        RedisCache.invalidatePattern(`top-picks:${userId}:*`),
+        RedisCache.invalidatePattern(`similar-cost:${userId}:*`),
+        RedisCache.invalidatePattern(`similar-categories:${userId}:*`),
+        RedisCache.invalidatePattern(`recently-added:${userId}:*`),
+      ]);
+      console.log('Cache invalidated for user:', userId);
+    } catch (error) {
+      console.error('Error invalidating cache:', error);
+    }
+  }
 
   // Create sample items for specific user
   static async createSampleItemsForUser(userId: string = '04274bdc-38e0-43ef-9873-344ee59bf0bf') {

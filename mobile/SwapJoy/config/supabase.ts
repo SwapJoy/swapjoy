@@ -7,3 +7,6 @@ export const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiO
 // 1. Go to Settings > API
 // 2. Copy the Project URL and anon public key
 // Twilio recovery code - RG2HLNVDWDH6BFHA4U5HWRL1
+// Token - sbp_f9bb83745df2722dc795127db7674aa3a28d245c
+// UPSTASH_REDIS_REST_URL="https://destined-tortoise-35128.upstash.io"
+// UPSTASH_REDIS_REST_TOKEN="AYk4AAIncDEzNDQyOWI0NTQ2ZDc0MWYyYjVlYTNlZjViMjlmZDJhZHAxMzUxMjg"
