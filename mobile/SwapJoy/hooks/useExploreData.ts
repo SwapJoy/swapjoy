@@ -147,7 +147,7 @@ export const useExploreData = () => {
       setIsFetching(true);
       
       // Fetch items from "Top Picks" section (favorite categories)
-      const { data: topPicks, error: topPicksError } = await ApiService.getTopPicksForUser(user.id, 10);
+      const { data: topPicks, error: topPicksError } = await ApiService.getTopPicksForUserSafe(user.id, 10);
       
       if (topPicksError) {
         console.error('Error fetching top picks:', topPicksError);
@@ -155,7 +155,8 @@ export const useExploreData = () => {
       }
 
       // Transform items to AIOffer format
-      const aiOffers: AIOffer[] = (topPicks || []).map((item: any) => {
+      console.log('Top picks data:', topPicks);
+      const aiOffers: AIOffer[] = (Array.isArray(topPicks) ? topPicks : []).map((item: any) => {
         const matchScore = calculateMatchScore(item, user);
         const reason = getMatchReason(item, matchScore);
         
@@ -187,8 +188,8 @@ export const useExploreData = () => {
           image_url: item.item_images?.[0]?.image_url || 'https://via.placeholder.com/200x150',
           user: {
             id: item.users?.id || item.user_id,
-            username: item.users?.username || `user_${item.user_id.slice(-4)}`,
-            first_name: item.users?.first_name || `User ${item.user_id.slice(-4)}`,
+            username: item.users?.username || `user_${(item.user_id || '').slice(-4)}`,
+            first_name: item.users?.first_name || `User ${(item.user_id || '').slice(-4)}`,
             last_name: item.users?.last_name || '',
           },
           match_score: matchScore,
@@ -208,10 +209,15 @@ export const useExploreData = () => {
       }
     } catch (error) {
       console.error('Error fetching AI offers:', error);
+      if (isMountedRef.current) {
+        setAiOffers([]);
+        setHasData(false);
+      }
     } finally {
       if (isMountedRef.current) {
         setLoading(false);
         setIsFetching(false);
+        setIsInitialized(true);
       }
     }
   }, [user]);

@@ -94,9 +94,10 @@ export class ApiService {
       console.log('Total user items value:', totalUserValue);
       
       // Find similar items using vector similarity
-      const allRecommendations = [];
+      const allRecommendations: any[] = [];
       
-      for (const userItem of userItems) {
+      try {
+        for (const userItem of userItems) {
         // Use total value for better matching
         const minValue = Math.max(0, totalUserValue * 0.3); // 30% of total value
         const maxValue = totalUserValue * 1.5; // Up to 1.5x total value
@@ -111,7 +112,7 @@ export class ApiService {
           exclude_user_id: userId
         });
 
-        if (!similarError && similarItems) {
+        if (!similarError && similarItems && Array.isArray(similarItems)) {
           // Filter out items that are too expensive
           const filteredItems = similarItems.filter((item: any) => 
             parseFloat(item.price) <= maxValue
@@ -127,45 +128,91 @@ export class ApiService {
           }));
           
           allRecommendations.push(...enhancedItems);
+        } else {
+          console.log(`No similar items found for ${userItem.title} or error occurred:`, similarError);
         }
+        }
+      } catch (error) {
+        console.error('Error processing user items for recommendations:', error);
       }
 
       // Generate virtual bundles from user's items
-      const virtualBundles = await this.generateVirtualBundles(client, userItems, userId, limit, totalUserValue);
-      allRecommendations.push(...virtualBundles);
+      try {
+        const virtualBundles = await this.generateVirtualBundles(client, userItems, userId, limit, totalUserValue);
+        console.log(`Generated ${virtualBundles.length} virtual bundles`);
+        if (virtualBundles && Array.isArray(virtualBundles)) {
+          allRecommendations.push(...virtualBundles);
+        }
+      } catch (error) {
+        console.error('Error generating virtual bundles:', error);
+      }
 
       // Remove duplicates and sort by overall score
-      const uniqueItems = this.deduplicateAndSort(allRecommendations);
+      const uniqueItems = this.deduplicateAndSort(allRecommendations || []);
       
-      // Get full item details for top recommendations
-      if (uniqueItems.length > 0) {
-        const itemIds = uniqueItems.slice(0, limit).map((item: any) => item.id);
-        
+      // Separate bundles from single items
+      const bundles = uniqueItems.filter((item: any) => item.is_bundle);
+      const singleItemIds = uniqueItems
+        .filter((item: any) => !item.is_bundle)
+        .map((item: any) => item.id);
+      
+      const finalResults = [];
+      
+      // Get full item details for single items
+      if (singleItemIds.length > 0) {
         const { data: fullItems, error: fullItemsError } = await client
           .from('items')
           .select('*, item_images(image_url), users!items_user_id_fkey(username, first_name, last_name)')
-          .in('id', itemIds);
+          .in('id', singleItemIds);
 
         if (!fullItemsError && fullItems) {
-          // Add similarity scores to the results
+          // Add similarity scores to single items
           const itemsWithScores = fullItems.map(item => {
             const similarityData = uniqueItems.find((u: any) => u.id === item.id);
-            
-            
             return {
               ...item,
               similarity_score: similarityData?.similarity || 0,
               overall_score: similarityData?.overall_score || 0
             };
           });
-
-          return { data: itemsWithScores, error: null };
+          finalResults.push(...itemsWithScores);
         }
+      }
+      
+      // Add bundles directly (they already have all needed data)
+      finalResults.push(...bundles);
+      
+      console.log(`Final results: ${finalResults.length} items (${finalResults.filter(r => r.is_bundle).length} bundles, ${finalResults.filter(r => !r.is_bundle).length} single items)`);
+      
+      // Sort by overall score and limit results
+      const sortedResults = finalResults
+        .sort((a, b) => (b.overall_score || 0) - (a.overall_score || 0))
+        .slice(0, limit);
+
+      if (sortedResults.length > 0) {
+        return { data: sortedResults, error: null };
       }
 
       // Fallback if no vector matches found
       return this.getFallbackRecommendations(client, userId, limit);
     });
+  }
+
+  // Ensure we always return a valid response
+  static async getTopPicksForUserSafe(userId: string, limit: number = 10) {
+    try {
+      const result = await this.getTopPicksForUser(userId, limit);
+      return {
+        data: Array.isArray(result?.data) ? result.data : [],
+        error: result?.error || null
+      };
+    } catch (error) {
+      console.error('Error in getTopPicksForUserSafe:', error);
+      return {
+        data: [],
+        error: error
+      };
+    }
   }
 
   // Fallback method for when vector search fails
@@ -293,40 +340,74 @@ export class ApiService {
         exclude_user_id: userId
       });
 
-      if (!error1 && !error2 && similarItems1 && similarItems2) {
-        // Create bundles by combining similar items
-        for (const itemA of similarItems1.slice(0, 2)) {
-          for (const itemB of similarItems2.slice(0, 2)) {
-            if (itemA.id !== itemB.id) {
-              const bundleTotalValue = parseFloat(itemA.price) + parseFloat(itemB.price);
-              const bundleDiscount = Math.min(bundleTotalValue * 0.1, 100);
-              const bundleValue = bundleTotalValue - bundleDiscount;
+      if (error1) {
+        console.error(`Error finding similar items for ${item1.title}:`, error1);
+      }
+      if (error2) {
+        console.error(`Error finding similar items for ${item2.title}:`, error2);
+      }
 
-              // Only create bundles within reasonable price range (80% to 120% of your total value)
-              if (bundleValue >= userTotalValue * 0.8 && bundleValue <= userTotalValue * 1.2) {
-                const bundle = {
-                  id: `bundle_${itemA.id}_${itemB.id}`,
-                  title: `${itemA.title} + ${itemB.title}`,
-                  description: `Bundle: ${itemA.title} and ${itemB.title}`,
-                  price: bundleValue,
-                  is_bundle: true,
-                  bundle_items: [itemA, itemB],
-                  similarity_score: (itemA.similarity + itemB.similarity) / 2,
-                  overall_score: (itemA.similarity + itemB.similarity) / 2 + 0.1,
-                  category_id: itemA.category_id,
-                  user_id: itemA.user_id, // Use the first item's owner
-                  created_at: new Date().toISOString(),
-                  status: 'available'
-                };
+      if (!error1 && !error2 && similarItems1 && similarItems2 && similarItems1.length > 0 && similarItems2.length > 0) {
+        console.log(`Found ${similarItems1.length} similar items for ${item1.title} and ${similarItems2.length} for ${item2.title}`);
+        // Get full details for items to create bundles
+        const allItemIds = [...(similarItems1 || []), ...(similarItems2 || [])].map(item => item.id);
+        const { data: fullItems, error: fullItemsError } = await client
+          .from('items')
+          .select('*, item_images(image_url), users!items_user_id_fkey(username, first_name, last_name)')
+          .in('id', allItemIds);
 
-                bundles.push(bundle);
+        if (!fullItemsError && fullItems && similarItems1 && similarItems2) {
+          // Create bundles by combining similar items
+          for (const itemA of (similarItems1 || []).slice(0, 2)) {
+            for (const itemB of (similarItems2 || []).slice(0, 2)) {
+              if (itemA.id !== itemB.id) {
+                const fullItemA = fullItems.find(item => item.id === itemA.id);
+                const fullItemB = fullItems.find(item => item.id === itemB.id);
+                
+                if (fullItemA && fullItemB) {
+                  const bundleTotalValue = parseFloat(itemA.price) + parseFloat(itemB.price);
+                  const bundleDiscount = Math.min(bundleTotalValue * 0.1, 100);
+                  const bundleValue = bundleTotalValue - bundleDiscount;
+
+                  // Only create bundles within reasonable price range (80% to 120% of your total value)
+                  if (bundleValue >= userTotalValue * 0.8 && bundleValue <= userTotalValue * 1.2) {
+                    const bundle = {
+                      id: `bundle_${itemA.id}_${itemB.id}`,
+                      title: `${itemA.title} + ${itemB.title}`,
+                      description: `Bundle: ${itemA.title} and ${itemB.title}`,
+                      price: bundleValue,
+                      estimated_value: bundleValue, // For compatibility
+                      is_bundle: true,
+                      bundle_items: [fullItemA, fullItemB],
+                      similarity_score: (itemA.similarity + itemB.similarity) / 2,
+                      overall_score: (itemA.similarity + itemB.similarity) / 2 + 0.1,
+                      match_score: Math.round(((itemA.similarity + itemB.similarity) / 2 + 0.1) * 100),
+                      reason: `Great bundle match! Similar to your ${userItems.find(ui => ui.category_id === itemA.category_id)?.title || 'items'}`,
+                      category_id: itemA.category_id,
+                      user_id: itemA.user_id,
+                      user: fullItemA.user || {
+                        first_name: 'Bundle',
+                        last_name: 'Owner',
+                        username: 'bundle_owner'
+                      },
+                      image_url: fullItemA.item_images?.[0]?.image_url || fullItemB.item_images?.[0]?.image_url || 'https://via.placeholder.com/200x150',
+                      created_at: new Date().toISOString(),
+                      status: 'available'
+                    };
+
+                    bundles.push(bundle);
+                  }
+                }
               }
             }
           }
         }
+      } else {
+        console.log(`No similar items found for bundle creation between ${item1.title} and ${item2.title}`);
       }
     }
 
+    console.log(`Generated ${bundles.length} bundles total`);
     return bundles;
   }
 
