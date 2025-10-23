@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Alert } from 'react-native';
-import { supabase } from '../lib/supabase';
+import { AuthService } from '../services/auth';
 import { PhoneSignInFormData, AuthResponse } from '../types/auth';
 
 export const usePhoneSignIn = () => {
@@ -40,7 +40,7 @@ export const usePhoneSignIn = () => {
   const sendOTP = async (formData: PhoneSignInFormData): Promise<AuthResponse> => {
     const validationError = validatePhoneNumber(formData.phone);
     if (validationError) {
-      return { user: null, error: validationError };
+      return { user: null, session: null, error: validationError };
     }
 
     const formattedPhone = formatPhoneNumber(formData.phone);
@@ -48,41 +48,18 @@ export const usePhoneSignIn = () => {
 
     setIsLoading(true);
     try {
-      // Try Supabase phone auth first
-      const { data, error } = await supabase.auth.signInWithOtp({
-        phone: formattedPhone,
-      });
+      const { error } = await AuthService.signInWithOTP(formattedPhone);
 
       if (error) {
-        console.error('Supabase OTP Error:', error);
-        
-        // If it's a geo-blocking or SMS provider error, fall back to custom solution
-        if (error.message.includes('blocked') || 
-            error.message.includes('Geo-Permissions') || 
-            error.message.includes('Invalid From Number') ||
-            error.message.includes('Twilio') ||
-            error.message.includes('sms_send_failed')) {
-          
-          console.log('SMS provider blocked, using fallback method');
-          
-          // For now, simulate successful OTP sending
-          // In production, call your custom SMS Edge Function here
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          
-          // Store the phone number for verification (you could use localStorage or a simple in-memory store)
-          // In a real app, you'd store this in a database or cache
-          console.log('OTP sent via fallback method - use code 1234 for testing');
-          return { user: null, error: null };
-        }
-        
-        return { user: null, error: error.message };
+        console.error('OTP Error:', error);
+        return { user: null, session: null, error: error };
       }
 
-      console.log('OTP sent successfully via Supabase');
-      return { user: null, error: null };
+      console.log('OTP sent successfully');
+      return { user: null, session: null, error: null };
     } catch (error: any) {
       console.error('Unexpected error:', error);
-      return { user: null, error: 'Failed to send OTP. Please try again.' };
+      return { user: null, session: null, error: 'Failed to send OTP. Please try again.' };
     } finally {
       setIsLoading(false);
     }

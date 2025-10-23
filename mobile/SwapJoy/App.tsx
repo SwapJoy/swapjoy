@@ -1,60 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import AppNavigator from './navigation/AppNavigator';
-import { supabase } from './lib/supabase';
-import { User } from './types/auth';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 
-export default function App() {
-  const [isLoading, setIsLoading] = useState(true);
-  const [user, setUser] = useState<User | null>(null);
-
-  useEffect(() => {
-    // Check if user is already signed in
-    const checkUser = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (session?.user) {
-          const userData: User = {
-            id: session.user.id,
-            phone: session.user.phone,
-            email: session.user.email,
-            username: session.user.user_metadata?.username,
-            first_name: session.user.user_metadata?.first_name,
-            last_name: session.user.user_metadata?.last_name,
-          };
-          setUser(userData);
-        }
-      } catch (error) {
-        console.error('Error checking user session:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    checkUser();
-
-    // Listen to auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        const userData: User = {
-          id: session.user.id,
-          phone: session.user.phone,
-          email: session.user.email,
-          username: session.user.user_metadata?.username,
-          first_name: session.user.user_metadata?.first_name,
-          last_name: session.user.user_metadata?.last_name,
-        };
-        setUser(userData);
-      } else {
-        setUser(null);
-      }
-      setIsLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
+function AppContent() {
+  const { isLoading } = useAuth();
 
   if (isLoading) {
     return (
@@ -71,6 +22,14 @@ export default function App() {
       <AppNavigator />
       <StatusBar style="auto" />
     </>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 

@@ -11,6 +11,7 @@ import {
   Platform,
 } from 'react-native';
 import { useOTPVerification } from '../hooks/useOTPVerification';
+import { useAuth } from '../contexts/AuthContext';
 import { OTPVerificationScreenProps } from '../types/navigation';
 
 const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({ 
@@ -20,6 +21,7 @@ const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
   const { phone } = route.params;
   const [otpCode, setOtpCode] = useState('');
   const inputRef = useRef<TextInput>(null);
+  const { signIn } = useAuth();
   
   const { 
     isLoading, 
@@ -30,10 +32,12 @@ const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
   } = useOTPVerification(phone);
 
   const handleVerifyOTPPress = async () => {
-    const { success, user } = await handleVerifyOTP({ code: otpCode });
+    const { success, user, session, error } = await handleVerifyOTP({ code: otpCode });
     
-    if (success && user) {
-      navigation.navigate('Main', { user });
+    if (success && user && session) {
+      // The auth context will automatically handle the state update
+      // Navigation will be handled by the AppNavigator based on auth state
+      console.log('User authenticated successfully:', user);
     }
   };
 

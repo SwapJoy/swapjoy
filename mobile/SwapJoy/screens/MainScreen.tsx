@@ -1,18 +1,15 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
 import { MainScreenProps } from '../types/navigation';
-import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 
 const MainScreen: React.FC<MainScreenProps> = ({ navigation, route }) => {
-  const { user } = route.params;
+  const { user, signOut } = useAuth();
 
   const handleSignOut = async () => {
     try {
-      await supabase.auth.signOut();
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Onboarding' }],
-      });
+      await signOut();
+      // Navigation will be handled automatically by AppNavigator
     } catch (error) {
       console.error('Sign out error:', error);
     }
@@ -23,11 +20,11 @@ const MainScreen: React.FC<MainScreenProps> = ({ navigation, route }) => {
       <View style={styles.content}>
         <Text style={styles.welcome}>Welcome to SwapJoy!</Text>
         <Text style={styles.userInfo}>
-          Hello, {user.first_name || 'User'}!
+          Hello, {user?.first_name || 'User'}!
         </Text>
-        <Text style={styles.userInfo}>Phone: {user.phone}</Text>
-        <Text style={styles.userInfo}>Username: {user.username}</Text>
-        <Text style={styles.userInfo}>User ID: {user.id}</Text>
+        <Text style={styles.userInfo}>Phone: {user?.phone}</Text>
+        <Text style={styles.userInfo}>Username: {user?.username}</Text>
+        <Text style={styles.userInfo}>User ID: {user?.id}</Text>
 
         <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
           <Text style={styles.signOutButtonText}>Sign Out</Text>
