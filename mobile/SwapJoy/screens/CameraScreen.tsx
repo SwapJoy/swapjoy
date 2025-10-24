@@ -125,13 +125,13 @@ const CameraScreen: React.FC = () => {
             }}
           >
             <View style={styles.imagePlaceholder}>
-              <Ionicons name="image-outline" size={20} color="#fff" />
+              <Ionicons name="images-outline" size={20} color="#fff" />
             </View>
           </TouchableOpacity>
 
-          {/* Main Capture Button */}
+          {/* Capture Button */}
           <TouchableOpacity
-            style={[styles.captureButton, isCapturing && styles.captureButtonActive]}
+            style={styles.captureButton}
             onPress={takePicture}
             disabled={isCapturing}
           >
@@ -177,21 +177,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
-    backgroundColor: '#000',
+    backgroundColor: '#f5f5f5',
   },
   permissionTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#fff',
-    marginTop: 20,
+    color: '#333',
     marginBottom: 10,
     textAlign: 'center',
   },
   permissionText: {
     fontSize: 16,
-    color: '#ccc',
+    color: '#666',
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: 24,
     marginBottom: 30,
   },
   permissionButton: {
@@ -259,9 +258,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 4,
     borderColor: '#fff',
-  },
-  captureButtonActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.6)',
   },
   captureButtonInner: {
     width: 60,
