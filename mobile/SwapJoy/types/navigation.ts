@@ -10,6 +10,7 @@ export type RootStackParamList = {
   };
   MainTabs: undefined;
   CreateListing: undefined;
+  AddItem: undefined;
   ItemDetails: {
     itemId: string;
   };
@@ -73,4 +74,9 @@ export type ProfileSettingsScreenProps = {
 export type SearchScreenProps = {
   navigation: NavigationProp<RootStackParamList, 'Search'>;
 };
+
+export type AddItemScreenProps = {
+  navigation: NavigationProp<RootStackParamList, 'AddItem'>;
+};
+
 

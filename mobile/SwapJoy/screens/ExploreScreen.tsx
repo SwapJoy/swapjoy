@@ -21,6 +21,7 @@ const ITEM_WIDTH = width * 0.7;
 const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
   const { aiOffers, loading, hasData, isInitialized, user, refreshData } = useExploreData();
 
+
   const renderAIOffer = useCallback(({ item }: { item: AIOffer }) => (
     <TouchableOpacity
       style={styles.offerCard}
@@ -88,26 +89,19 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView 
-        style={styles.scrollView} 
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={loading}
-            onRefresh={refreshData}
-            colors={['#007AFF']}
-            tintColor="#007AFF"
-          />
-        }
-      >
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>AI-Powered Matches</Text>
-          <Text style={styles.headerSubtitle}>
-            Personalized recommendations just for you
-          </Text>
-        </View>
-
+    <ScrollView 
+      style={styles.scrollView} 
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={loading}
+          onRefresh={refreshData}
+          colors={['#007AFF']}
+          tintColor="#007AFF"
+        />
+      }
+    >
+        
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Top Matches</Text>
           <FlatList
@@ -141,7 +135,6 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
           </View>
         </View>
       </ScrollView>
-    </SafeAreaView>
   );
 });
 

@@ -8,8 +8,9 @@ import { useAuth } from '../contexts/AuthContext';
 import OnboardingScreen from '../screens/OnboardingScreen';
 import PhoneSignInScreen from '../screens/PhoneSignInScreen';
 import OTPVerificationScreen from '../screens/OTPVerificationScreen';
-import MainTabNavigator from './MainTabNavigator';
+import MainPageContainer from '../screens/MainPageContainer';
 import CreateListingScreen from '../screens/CreateListingScreen';
+import AddItemScreen from '../screens/AddItemScreen';
 import ItemDetailsScreen from '../screens/ItemDetailsScreen';
 import ProfileSettingsScreen from '../screens/ProfileSettingsScreen';
 import SearchScreen from '../screens/SearchScreen';
@@ -71,13 +72,22 @@ const AppNavigator: React.FC = () => {
           <>
             <Stack.Screen 
               name="MainTabs" 
-              component={MainTabNavigator} 
+              component={MainPageContainer} 
               options={{ headerShown: false }}
             />
             <Stack.Screen 
               name="CreateListing" 
               component={CreateListingScreen}
               options={{ title: 'Create Listing' }}
+            />
+            <Stack.Screen 
+              name="AddItem" 
+              component={AddItemScreen}
+              options={{ 
+                title: 'Add Item',
+                headerShown: false,
+                presentation: 'modal',
+              }}
             />
             <Stack.Screen 
               name="ItemDetails" 

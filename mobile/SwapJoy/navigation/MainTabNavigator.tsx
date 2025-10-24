@@ -10,7 +10,11 @@ import ProfileScreen from '../screens/ProfileScreen';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
-const MainTabNavigator: React.FC = () => {
+interface MainTabNavigatorProps {
+  onNavigateToAdd?: () => void;
+}
+
+const MainTabNavigator: React.FC<MainTabNavigatorProps> = ({ onNavigateToAdd }) => {
   return (
     <Tab.Navigator
       screenOptions={{
@@ -41,8 +45,8 @@ const MainTabNavigator: React.FC = () => {
               marginLeft: 16,
             }}
             onPress={() => {
-              if (navigation) {
-                (navigation as any).navigate('CreateListing');
+              if (onNavigateToAdd) {
+                onNavigateToAdd();
               }
             }}
           >
