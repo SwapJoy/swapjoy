@@ -78,7 +78,7 @@ Supabase Storage for images and files:
 ```typescript
 // Upload item image
 const { data, error } = await supabase.storage
-  .from('item-images')
+  .from('images')
   .upload(`${userId}/${itemId}/${filename}`, file, {
     cacheControl: '3600',
     upsert: false
@@ -86,13 +86,13 @@ const { data, error } = await supabase.storage
 
 // Get public URL
 const { data: { publicUrl } } = supabase.storage
-  .from('item-images')
+  .from('images')
   .getPublicUrl(filePath)
 ```
 
 **Storage Buckets:**
 - `profile-images`: User profile pictures
-- `item-images`: Item listing photos
+- `images`: Item listing photos
 - `chat-attachments`: Message attachments (future)
 
 ### 4. Real-time Subscriptions
@@ -346,7 +346,7 @@ serve(async (req) => {
   
   // Download image
   const { data: imageData } = await supabase.storage
-    .from('item-images')
+    .from('images')
     .download(imagePath)
   
   // Generate thumbnail, optimize, strip metadata
@@ -355,7 +355,7 @@ serve(async (req) => {
   
   // Upload processed versions
   await supabase.storage
-    .from('item-images')
+    .from('images')
     .upload(`${imagePath}-thumb`, thumbnail)
   
   return new Response(JSON.stringify({ success: true }))

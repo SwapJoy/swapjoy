@@ -7,12 +7,15 @@ import {
   Dimensions,
   Alert,
   Platform,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
+import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { ScrollView } from 'react-native-gesture-handler';
+import { DraftManager } from '../services/draftManager';
 
 const { width, height } = Dimensions.get('window');
 
@@ -25,6 +28,7 @@ const CameraScreenTest: React.FC<CameraScreenTestProps> = ({ onNavigateToMain })
   const [permission, requestPermission] = useCameraPermissions();
   const [cameraType, setCameraType] = useState<CameraType>('back');
   const [isCapturing, setIsCapturing] = useState(false);
+  const [capturedPhotos, setCapturedPhotos] = useState<string[]>([]);
   const cameraRef = useRef<CameraView>(null);
 
   const takePicture = async () => {
@@ -36,13 +40,62 @@ const CameraScreenTest: React.FC<CameraScreenTestProps> = ({ onNavigateToMain })
           base64: false,
         });
         console.log('Photo taken:', photo.uri);
-        (navigation as any).navigate('AddItem');
+        setCapturedPhotos([...capturedPhotos, photo.uri]);
       } catch (error) {
         console.error('Error taking picture:', error);
         Alert.alert('Error', 'Failed to take picture. Please try again.');
       } finally {
         setIsCapturing(false);
       }
+    }
+  };
+
+  const selectFromGallery = async () => {
+    try {
+      // Request media library permissions
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission Required',
+          'Please grant permission to access your photo library.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsMultipleSelection: true,
+        quality: 0.8,
+        allowsEditing: false,
+      });
+
+      if (!result.canceled && result.assets) {
+        const newUris = result.assets.map((asset) => asset.uri);
+        setCapturedPhotos([...capturedPhotos, ...newUris]);
+      }
+    } catch (error) {
+      console.error('Error selecting from gallery:', error);
+      Alert.alert('Error', 'Failed to select photos. Please try again.');
+    }
+  };
+
+  const handleNext = async () => {
+    if (capturedPhotos.length === 0) {
+      Alert.alert('No Photos', 'Please take at least one photo to continue.');
+      return;
+    }
+
+    try {
+      // Create draft and navigate to form
+      const draft = await DraftManager.createDraft(capturedPhotos);
+      (navigation as any).navigate('ItemDetailsForm', {
+        draftId: draft.id,
+        imageUris: capturedPhotos,
+      });
+    } catch (error) {
+      console.error('Error creating draft:', error);
+      Alert.alert('Error', 'Failed to create draft. Please try again.');
     }
   };
 
@@ -85,9 +138,8 @@ const CameraScreenTest: React.FC<CameraScreenTestProps> = ({ onNavigateToMain })
         zoom={0}
       />
       
-      {/* Top Controls - X button on the right */}
+      {/* Top Controls - X on left, Next on right */}
       <View style={styles.topControls}>
-        <View style={styles.topSpacer} />
         <TouchableOpacity
           style={styles.topButton}
           onPress={() => {
@@ -100,18 +152,24 @@ const CameraScreenTest: React.FC<CameraScreenTestProps> = ({ onNavigateToMain })
         >
           <Ionicons name="close" size={24} color="#fff" />
         </TouchableOpacity>
+
+        {capturedPhotos.length > 0 && (
+          <TouchableOpacity
+            style={[styles.topButton, styles.nextButton]}
+            onPress={handleNext}
+          >
+            <Text style={styles.nextButtonText}>Next</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Bottom Controls - Side buttons and Capture */}
       <View style={styles.bottomControls}>
         {/* Left Side Button */}
-        <TouchableOpacity
-          style={styles.sideButton}
-          onPress={() => {
-            // TODO: Handle gallery selection
-            console.log('Gallery pressed');
-          }}
-        >
+          <TouchableOpacity
+            style={styles.sideButton}
+            onPress={selectFromGallery}
+          >
           <View style={styles.imagePlaceholder}>
             <Ionicons name="image-outline" size={20} color="#fff" />
           </View>
@@ -158,12 +216,10 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: 20,
     zIndex: 1,
-  },
-  topSpacer: {
-    flex: 1,
   },
   topButton: {
     width: 44,
@@ -172,6 +228,16 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  nextButton: {
+    width: 'auto',
+    paddingHorizontal: 20,
+    backgroundColor: '#007AFF',
+  },
+  nextButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   bottomControls: {
     position: 'absolute',

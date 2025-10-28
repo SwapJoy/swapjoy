@@ -546,22 +546,43 @@ export class ApiService {
   static async createItem(itemData: {
     title: string;
     description: string;
-    category_id?: string;
+    category_id?: string | null;
     condition: string;
-    estimated_value?: number;
+    price?: number;
+    currency?: string;
     location_lat?: number;
     location_lng?: number;
   }) {
     return this.authenticatedCall(async (client) => {
+      // Get current user
+      const user = await AuthService.getCurrentUser();
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
       return await client
         .from('items')
-        .insert(itemData)
+        .insert({
+          user_id: user.id,
+          ...itemData,
+          status: 'available',
+        })
         .select()
         .single();
     });
   }
 
-  static async updateItem(itemId: string, updates: any) {
+  static async updateItem(itemId: string, updates: Partial<{
+    title: string;
+    description: string;
+    category_id: string | null;
+    condition: string;
+    price: number;
+    currency: string;
+    status: string;
+    location_lat: number | null;
+    location_lng: number | null;
+  }>) {
     return this.authenticatedCall(async (client) => {
       return await client
         .from('items')
@@ -1369,5 +1390,60 @@ export class ApiService {
         error: error
       };
     }
+  }
+
+  // ==================== ADDITIONAL ITEM METHODS ====================
+
+  /**
+   * Get all categories
+   */
+  static async getCategories() {
+    return RedisCache.cache(
+      'categories-v2', // Changed cache key to bypass old cached error
+      [],
+      () => this.authenticatedCall(async (client) => {
+        return await client
+          .from('categories')
+          .select('*')
+          .eq('is_active', true)
+          .order('name', { ascending: true });
+      }),
+      3600 // Cache for 1 hour
+    );
+  }
+
+  /**
+   * Create item images (batch insert)
+   */
+  static async createItemImages(images: Array<{
+    item_id: string;
+    image_url: string;
+    sort_order: number;
+    is_primary: boolean;
+  }>) {
+    return this.authenticatedCall(async (client) => {
+      return await client
+        .from('item_images')
+        .insert(images)
+        .select();
+    });
+  }
+
+  /**
+   * Get item by ID with relations
+   */
+  static async getItemById(itemId: string) {
+    return this.authenticatedCall(async (client) => {
+      return await client
+        .from('items')
+        .select(`
+          *,
+          category:categories(name, slug),
+          user:users(id, username, first_name, last_name, profile_image_url),
+          images:item_images(id, image_url, thumbnail_url, sort_order, is_primary)
+        `)
+        .eq('id', itemId)
+        .single();
+    });
   }
 }

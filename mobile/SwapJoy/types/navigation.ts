@@ -11,6 +11,14 @@ export type RootStackParamList = {
   MainTabs: undefined;
   CreateListing: undefined;
   AddItem: undefined;
+  Camera: undefined;
+  ItemDetailsForm: {
+    draftId: string;
+    imageUris: string[];
+  };
+  ItemPreview: {
+    draftId: string;
+  };
   ItemDetails: {
     itemId: string;
   };
@@ -77,6 +85,20 @@ export type SearchScreenProps = {
 
 export type AddItemScreenProps = {
   navigation: NavigationProp<RootStackParamList, 'AddItem'>;
+};
+
+export type CameraScreenProps = {
+  navigation: NavigationProp<RootStackParamList, 'Camera'>;
+};
+
+export type ItemDetailsFormScreenProps = {
+  navigation: NavigationProp<RootStackParamList, 'ItemDetailsForm'>;
+  route: RouteProp<RootStackParamList, 'ItemDetailsForm'>;
+};
+
+export type ItemPreviewScreenProps = {
+  navigation: NavigationProp<RootStackParamList, 'ItemPreview'>;
+  route: RouteProp<RootStackParamList, 'ItemPreview'>;
 };
 
 

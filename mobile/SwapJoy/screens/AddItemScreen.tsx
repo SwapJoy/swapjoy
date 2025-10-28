@@ -47,8 +47,7 @@ const AddItemScreen: React.FC<AddItemScreenProps> = ({ navigation }) => {
         <TouchableOpacity
           style={styles.startButton}
           onPress={() => {
-            // TODO: Navigate to actual create listing flow
-            console.log('Start creating listing...');
+            navigation.navigate('Camera');
           }}
         >
           <Text style={styles.startButtonText}>Start Creating</Text>

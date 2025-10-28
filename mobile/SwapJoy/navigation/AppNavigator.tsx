@@ -11,6 +11,9 @@ import OTPVerificationScreen from '../screens/OTPVerificationScreen';
 import MainPageContainer from '../screens/MainPageContainer';
 import CreateListingScreen from '../screens/CreateListingScreen';
 import AddItemScreen from '../screens/AddItemScreen';
+import CameraScreen from '../screens/CameraScreen';
+import ItemDetailsFormScreen from '../screens/ItemDetailsFormScreen';
+import ItemPreviewScreen from '../screens/ItemPreviewScreen';
 import ItemDetailsScreen from '../screens/ItemDetailsScreen';
 import ProfileSettingsScreen from '../screens/ProfileSettingsScreen';
 import SearchScreen from '../screens/SearchScreen';
@@ -87,6 +90,31 @@ const AppNavigator: React.FC = () => {
                 title: 'Add Item',
                 headerShown: false,
                 presentation: 'modal',
+              }}
+            />
+            <Stack.Screen 
+              name="Camera" 
+              component={CameraScreen}
+              options={{ 
+                title: 'Camera',
+                headerShown: false,
+                presentation: 'fullScreenModal',
+              }}
+            />
+            <Stack.Screen 
+              name="ItemDetailsForm" 
+              component={ItemDetailsFormScreen}
+              options={{ 
+                title: 'Item Details',
+                headerShown: false,
+              }}
+            />
+            <Stack.Screen 
+              name="ItemPreview" 
+              component={ItemPreviewScreen}
+              options={{ 
+                title: 'Preview',
+                headerShown: false,
               }}
             />
             <Stack.Screen 
