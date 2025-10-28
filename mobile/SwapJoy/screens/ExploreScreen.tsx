@@ -1,4 +1,5 @@
 import React, { useCallback, memo, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -40,6 +41,14 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
     ]);
     setRefreshing(false);
   }, [refreshTopPicks, refreshRecent, refreshCategories, refreshOthers]);
+
+  // Refresh data when screen comes into focus (e.g., after adding a new item)
+  useFocusEffect(
+    useCallback(() => {
+      console.log('ExploreScreen focused - refreshing recently listed items');
+      refreshRecent();
+    }, [refreshRecent])
+  );
 
   const loading = topPicksLoading && recentLoading && categoriesLoading && othersLoading;
 

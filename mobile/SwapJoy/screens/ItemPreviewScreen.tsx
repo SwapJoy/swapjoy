@@ -136,6 +136,18 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
       // Delete draft
       await DraftManager.deleteDraft(draftId);
 
+      // Note: Embedding generation is now handled automatically by database trigger
+      console.log('Item created - embedding will be generated automatically by trigger');
+
+      // Invalidate recently listed cache so new item appears immediately
+      try {
+        const { RedisCache } = await import('../services/redisCache');
+        await RedisCache.invalidatePattern('recently-listed*');
+        console.log('Cache invalidated for recently-listed items');
+      } catch (error) {
+        console.warn('Failed to invalidate cache:', error);
+      }
+
       // Show success and navigate
       Alert.alert(
         'Success!',

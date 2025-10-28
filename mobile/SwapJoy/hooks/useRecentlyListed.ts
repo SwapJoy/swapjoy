@@ -45,6 +45,12 @@ export const useRecentlyListed = (limit: number = 10) => {
 
       const { data, error: fetchError } = await ApiService.getRecentlyListedSafe(user.id, limit);
 
+      console.log('API response in useRecentlyListed:', {
+        dataCount: data?.length || 0,
+        error: fetchError,
+        firstItems: data?.slice(0, 3).map(item => ({ id: item.id, title: item.title }))
+      });
+
       if (fetchError) {
         console.error('Error fetching recently listed items:', fetchError);
         if (isMountedRef.current) {
@@ -79,6 +85,10 @@ export const useRecentlyListed = (limit: number = 10) => {
       });
 
       if (isMountedRef.current) {
+        console.log('Setting transformed items:', {
+          count: transformedItems.length,
+          items: transformedItems.slice(0, 3).map(item => ({ id: item.id, title: item.title }))
+        });
         setItems(transformedItems);
         hasFetchedRef.current = true;
       }
@@ -95,8 +105,9 @@ export const useRecentlyListed = (limit: number = 10) => {
     }
   }, [user?.id, limit]);
 
+  // Fetch data whenever user or limit changes
   useEffect(() => {
-    if (user && !hasFetchedRef.current) {
+    if (user) {
       fetchRecentItems();
     }
   }, [user?.id, limit]);

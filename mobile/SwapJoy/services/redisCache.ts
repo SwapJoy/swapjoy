@@ -82,16 +82,19 @@ export class RedisCache {
     prefix: string,
     keyParams: any[],
     fetchFn: () => Promise<T>,
-    ttl: number = this.DEFAULT_TTL
+    ttl: number = this.DEFAULT_TTL,
+    bypassCache: boolean = false
   ): Promise<T> {
-    // Try to get from cache first
-    const cached = await this.get<T>(prefix, ...keyParams);
-    if (cached !== null) {
-      console.log(`Cache hit for ${prefix}:`, keyParams);
-      return cached;
+    // Try to get from cache first (unless bypassed)
+    if (!bypassCache) {
+      const cached = await this.get<T>(prefix, ...keyParams);
+      if (cached !== null) {
+        console.log(`Cache hit for ${prefix}:`, keyParams);
+        return cached;
+      }
     }
 
-    // Cache miss, fetch data
+    // Cache miss or bypassed, fetch data
     console.log(`Cache miss for ${prefix}:`, keyParams);
     const data = await fetchFn();
     

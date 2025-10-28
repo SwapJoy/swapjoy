@@ -1066,118 +1066,121 @@ export class ApiService {
    * Uses AI similarity scores when available
    */
   static async getRecentlyListed(userId: string, limit: number = 10) {
-    return RedisCache.cache(
-      'recently-listed',
-      [userId, limit],
-      () => this.authenticatedCall(async (client) => {
-        // Calculate date for one month ago
-        const oneMonthAgo = new Date();
-        oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+    // Bypass cache for recently listed to always get fresh data
+    return this.authenticatedCall(async (client) => {
+      // Calculate date for one month ago
+      const oneMonthAgo = new Date();
+      oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
 
-        // Get user's items to calculate similarity
-        const { data: userItems, error: userItemsError } = await client
-          .from('items')
-          .select('id, embedding, price, title, description, category_id')
-          .eq('user_id', userId)
-          .eq('status', 'available')
-          .not('embedding', 'is', null);
+      // Get user's items to calculate similarity
+      const { data: userItems, error: userItemsError } = await client
+        .from('items')
+        .select('id, embedding, price, title, description, category_id')
+        .eq('user_id', userId)
+        .eq('status', 'available')
+        .not('embedding', 'is', null);
 
-        if (userItemsError || !userItems || userItems.length === 0) {
-          // Fallback: just get recent items without AI scoring
-          const { data, error } = await client
-            .from('items')
-            .select('*, item_images(image_url), users!items_user_id_fkey(username, first_name, last_name)')
-            .eq('status', 'available')
-            .neq('user_id', userId)
-            .gte('created_at', oneMonthAgo.toISOString())
-            .order('created_at', { ascending: false })
-            .limit(limit);
-
-          return { data, error };
-        }
-
-        // Get user's favorite categories for additional filtering
-        const { data: user } = await client
-          .from('users')
-          .select('favorite_categories')
-          .eq('id', userId)
-          .single();
-
-        const favoriteCategories = user?.favorite_categories || [];
-
-        // Get recent items
-        let query = client
+      if (userItemsError || !userItems || userItems.length === 0) {
+        // Fallback: just get recent items without AI scoring
+        console.log('Fetching recently listed items (no AI scoring)...');
+        const { data, error } = await client
           .from('items')
           .select('*, item_images(image_url), users!items_user_id_fkey(username, first_name, last_name)')
           .eq('status', 'available')
           .neq('user_id', userId)
-          .gte('created_at', oneMonthAgo.toISOString());
-
-        // Apply category filter if user has favorite categories
-        if (favoriteCategories.length > 0) {
-          query = query.in('category_id', favoriteCategories);
-        }
-
-        const { data: recentItems, error } = await query
+          .gte('created_at', oneMonthAgo.toISOString())
           .order('created_at', { ascending: false })
-          .limit(limit * 3); // Get more items to sort by relevance
+          .limit(limit);
 
-        if (error || !recentItems) {
-          return { data: null, error };
-        }
+        console.log('Recently listed items fetched:', {
+          count: data?.length || 0,
+          error: error,
+          itemIds: data?.map(item => item.id).slice(0, 5)
+        });
 
-        // Calculate similarity scores for recent items
-        const itemsWithScores = await Promise.all(
-          recentItems.map(async (item) => {
-            if (!item.embedding) {
-              return { ...item, similarity_score: 0.5, overall_score: 0.5 };
+        return { data, error };
+      }
+
+      // Get user's favorite categories for additional filtering
+      const { data: user } = await client
+        .from('users')
+        .select('favorite_categories')
+        .eq('id', userId)
+        .single();
+
+      const favoriteCategories = user?.favorite_categories || [];
+
+      // Get recent items
+      let query = client
+        .from('items')
+        .select('*, item_images(image_url), users!items_user_id_fkey(username, first_name, last_name)')
+        .eq('status', 'available')
+        .neq('user_id', userId)
+        .gte('created_at', oneMonthAgo.toISOString());
+
+      // Apply category filter if user has favorite categories
+      if (favoriteCategories.length > 0) {
+        query = query.in('category_id', favoriteCategories);
+      }
+
+      const { data: recentItems, error } = await query
+        .order('created_at', { ascending: false })
+        .limit(limit * 3); // Get more items to sort by relevance
+
+      if (error || !recentItems) {
+        return { data: null, error };
+      }
+
+      // Calculate similarity scores for recent items
+      const itemsWithScores = await Promise.all(
+        recentItems.map(async (item) => {
+          if (!item.embedding) {
+            return { ...item, similarity_score: 0.5, overall_score: 0.5 };
+          }
+
+          // Calculate average similarity to user's items
+          let totalSimilarity = 0;
+          let count = 0;
+
+          for (const userItem of userItems) {
+            if (!userItem.embedding) continue;
+
+            const { data: simResult } = await client.rpc('match_items_cosine', {
+              query_embedding: userItem.embedding,
+              match_threshold: 0.1,
+              match_count: 1,
+              target_item_id: item.id
+            });
+
+            if (simResult && simResult.length > 0) {
+              totalSimilarity += simResult[0].similarity || 0;
+              count++;
             }
+          }
 
-            // Calculate average similarity to user's items
-            let totalSimilarity = 0;
-            let count = 0;
+          const avgSimilarity = count > 0 ? totalSimilarity / count : 0.5;
+          
+          // Boost score for more recent items
+          const daysSinceCreated = (Date.now() - new Date(item.created_at).getTime()) / (1000 * 60 * 60 * 24);
+          const recencyBoost = Math.max(0, (30 - daysSinceCreated) / 30) * 0.2; // Up to 0.2 boost
 
-            for (const userItem of userItems) {
-              if (!userItem.embedding) continue;
+          const overallScore = avgSimilarity + recencyBoost;
 
-              const { data: simResult } = await client.rpc('match_items_cosine', {
-                query_embedding: userItem.embedding,
-                match_threshold: 0.1,
-                match_count: 1,
-                target_item_id: item.id
-              });
+          return {
+            ...item,
+            similarity_score: avgSimilarity,
+            overall_score: Math.min(1, overallScore)
+          };
+        })
+      );
 
-              if (simResult && simResult.length > 0) {
-                totalSimilarity += simResult[0].similarity || 0;
-                count++;
-              }
-            }
+      // Sort by overall score and limit
+      const sortedItems = itemsWithScores
+        .sort((a, b) => (b.overall_score || 0) - (a.overall_score || 0))
+        .slice(0, limit);
 
-            const avgSimilarity = count > 0 ? totalSimilarity / count : 0.5;
-            
-            // Boost score for more recent items
-            const daysSinceCreated = (Date.now() - new Date(item.created_at).getTime()) / (1000 * 60 * 60 * 24);
-            const recencyBoost = Math.max(0, (30 - daysSinceCreated) / 30) * 0.2; // Up to 0.2 boost
-
-            const overallScore = avgSimilarity + recencyBoost;
-
-            return {
-              ...item,
-              similarity_score: avgSimilarity,
-              overall_score: Math.min(1, overallScore)
-            };
-          })
-        );
-
-        // Sort by overall score and limit
-        const sortedItems = itemsWithScores
-          .sort((a, b) => (b.overall_score || 0) - (a.overall_score || 0))
-          .slice(0, limit);
-
-        return { data: sortedItems, error: null };
-      }),
-      300 // 5 minutes cache TTL
-    );
+      return { data: sortedItems, error: null };
+    });
   }
 
   /**
@@ -1398,18 +1401,14 @@ export class ApiService {
    * Get all categories
    */
   static async getCategories() {
-    return RedisCache.cache(
-      'categories-v2', // Changed cache key to bypass old cached error
-      [],
-      () => this.authenticatedCall(async (client) => {
-        return await client
-          .from('categories')
-          .select('*')
-          .eq('is_active', true)
-          .order('name', { ascending: true });
-      }),
-      3600 // Cache for 1 hour
-    );
+    // Bypass cache for categories to always get fresh data
+    return this.authenticatedCall(async (client) => {
+      return await client
+        .from('categories')
+        .select('*')
+        .eq('is_active', true)
+        .order('name', { ascending: true });
+    });
   }
 
   /**
