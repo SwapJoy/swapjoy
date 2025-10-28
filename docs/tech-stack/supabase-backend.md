@@ -318,7 +318,115 @@ const { data: nearbyItems } = await supabase.rpc('get_nearby_items', {
 
 ## Edge Functions Use Cases
 
-### 1. Send Push Notifications
+### 1. Generate AI Embeddings (Implemented) ✅
+
+**Purpose:** Automatically generate OpenAI embeddings for semantic item search when items are created or updated.
+
+```typescript
+// supabase/functions/generate-embedding/index.ts
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+serve(async (req) => {
+  // SECURITY: Internal-only function, protected by custom header
+  const internalSecret = req.headers.get('x-internal-secret');
+  if (internalSecret !== Deno.env.get('INTERNAL_FUNCTION_SECRET')) {
+    return new Response('Unauthorized', { status: 401 });
+  }
+
+  const supabaseClient = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  );
+
+  const { itemId } = await req.json();
+
+  // Fetch item details
+  const { data: item } = await supabaseClient
+    .from('items')
+    .select('title, description, category_id')
+    .eq('id', itemId)
+    .single();
+
+  // Get category name for context
+  const { data: category } = await supabaseClient
+    .from('categories')
+    .select('name')
+    .eq('id', item.category_id)
+    .single();
+
+  // Create text for embedding
+  const text = `${item.title}. ${item.description}. Category: ${category?.name || ''}`;
+
+  // Generate embedding using OpenAI
+  const openaiResponse = await fetch('https://api.openai.com/v1/embeddings', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      input: text,
+      model: 'text-embedding-ada-002',
+    }),
+  });
+
+  const { data } = await openaiResponse.json();
+  const embedding = data[0].embedding;
+
+  // Store embedding in database
+  await supabaseClient
+    .from('items')
+    .update({ embedding })
+    .eq('id', itemId);
+
+  return new Response(JSON.stringify({ success: true }));
+});
+```
+
+**Database Trigger:**
+```sql
+-- Automatically call Edge Function when item is created or updated
+CREATE OR REPLACE FUNCTION trigger_generate_embedding()
+RETURNS trigger AS $$
+DECLARE
+  request_id bigint;
+BEGIN
+  SELECT INTO request_id net.http_post(
+    url := 'https://YOUR_PROJECT_REF.supabase.co/functions/v1/generate-embedding',
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'x-internal-secret', 'YOUR_SECRET_HERE'
+    ),
+    body := jsonb_build_object('itemId', NEW.id::text)
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER on_item_insert_generate_embedding
+  AFTER INSERT ON items
+  FOR EACH ROW
+  EXECUTE FUNCTION trigger_generate_embedding();
+
+CREATE TRIGGER on_item_update_generate_embedding
+  AFTER UPDATE OF title, description, category_id ON items
+  FOR EACH ROW
+  WHEN (
+    OLD.title IS DISTINCT FROM NEW.title OR 
+    OLD.description IS DISTINCT FROM NEW.description OR 
+    OLD.category_id IS DISTINCT FROM NEW.category_id
+  )
+  EXECUTE FUNCTION trigger_generate_embedding();
+```
+
+**Security:**
+- Function is **internal-only** (not publicly accessible)
+- Protected by custom `x-internal-secret` header
+- JWT verification disabled (triggers don't send JWT)
+- Uses service role key for database access
+
+### 2. Send Push Notifications (Future)
 ```typescript
 // supabase/functions/send-push-notification/index.ts
 serve(async (req) => {
@@ -338,7 +446,7 @@ serve(async (req) => {
 })
 ```
 
-### 2. Process Image Uploads
+### 3. Process Image Uploads (Future)
 ```typescript
 // supabase/functions/process-image/index.ts
 serve(async (req) => {
@@ -362,23 +470,179 @@ serve(async (req) => {
 })
 ```
 
-### 3. Match Algorithm
-```typescript
-// supabase/functions/find-matches/index.ts
-serve(async (req) => {
-  const { userId } = await req.json()
-  
-  // Complex matching logic
-  const matches = await findSmartMatches(userId)
-  
-  // Store matches
-  await supabase
-    .from('recommended_matches')
-    .insert(matches)
-  
-  return new Response(JSON.stringify({ matches }))
-})
+## AI & Vector Search (pgvector)
+
+### Overview
+
+SwapJoy uses **pgvector** extension for semantic search and AI-powered item matching using OpenAI embeddings.
+
+### Setup
+
+```sql
+-- Enable pgvector extension
+CREATE EXTENSION IF NOT EXISTS vector;
+
+-- Add embedding column to items table
+ALTER TABLE items ADD COLUMN embedding vector(1536);
+
+-- Create HNSW index for fast similarity search
+CREATE INDEX idx_items_embedding ON items 
+USING hnsw (embedding vector_cosine_ops);
 ```
+
+### Embedding Generation
+
+Embeddings are automatically generated when:
+- A new item is created
+- An existing item's title, description, or category is updated
+
+**Process:**
+1. Database trigger fires on INSERT/UPDATE
+2. Trigger calls `generate-embedding` Edge Function via `pg_net`
+3. Edge Function fetches item details and category
+4. Creates text: `"${title}. ${description}. Category: ${category}"`
+5. Calls OpenAI API to generate embedding (1536 dimensions)
+6. Stores embedding in `items.embedding` column
+
+### Semantic Search
+
+```typescript
+// Find similar items based on embedding similarity
+const { data: similarItems } = await supabase.rpc('match_items', {
+  query_embedding: userItemEmbedding,
+  match_threshold: 0.7,  // Minimum similarity (0-1)
+  match_count: 10
+});
+```
+
+**Database Function:**
+```sql
+CREATE OR REPLACE FUNCTION match_items(
+  query_embedding vector(1536),
+  match_threshold float,
+  match_count int
+)
+RETURNS TABLE (
+  id uuid,
+  title text,
+  description text,
+  similarity float
+) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT
+    items.id,
+    items.title,
+    items.description,
+    1 - (items.embedding <=> query_embedding) AS similarity
+  FROM items
+  WHERE 
+    items.status = 'available'
+    AND 1 - (items.embedding <=> query_embedding) > match_threshold
+  ORDER BY items.embedding <=> query_embedding
+  LIMIT match_count;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+### AI-Powered Recommendations
+
+**Recently Listed (Relevance Sort):**
+
+```typescript
+// Get recently listed items sorted by relevance to user's items
+const { data } = await ApiService.getRecentlyListed(userId, 10);
+```
+
+**Algorithm:**
+1. Fetch user's items with embeddings
+2. Get recent items from the last 30 days
+3. Calculate average cosine similarity between user's items and each recent item
+4. Boost score for more recent items (up to 20%)
+5. Sort by overall score (similarity + recency boost)
+6. Filter by user's favorite categories (if set)
+
+**Implementation:**
+```typescript
+// Calculate similarity scores for recent items
+const itemsWithScores = await Promise.all(
+  recentItems.map(async (item) => {
+    // Calculate average similarity to user's items
+    let totalSimilarity = 0;
+    for (const userItem of userItems) {
+      const { data } = await supabase.rpc('match_items_cosine', {
+        query_embedding: userItem.embedding,
+        target_item_id: item.id
+      });
+      totalSimilarity += data[0].similarity || 0;
+    }
+    const avgSimilarity = totalSimilarity / userItems.length;
+    
+    // Add recency boost
+    const daysSinceCreated = (Date.now() - new Date(item.created_at).getTime()) 
+      / (1000 * 60 * 60 * 24);
+    const recencyBoost = Math.max(0, (30 - daysSinceCreated) / 30) * 0.2;
+    
+    return {
+      ...item,
+      similarity_score: avgSimilarity,
+      overall_score: Math.min(1, avgSimilarity + recencyBoost)
+    };
+  })
+);
+
+// Sort by overall score
+const sortedItems = itemsWithScores
+  .sort((a, b) => b.overall_score - a.overall_score)
+  .slice(0, limit);
+```
+
+### Vector Operations
+
+pgvector supports three distance operators:
+
+| Operator | Description | Use Case |
+|----------|-------------|----------|
+| `<->` | L2 distance (Euclidean) | General similarity |
+| `<#>` | Inner product | Magnitude-aware |
+| `<=>` | Cosine distance | Direction-based (used in SwapJoy) |
+
+**Why Cosine Distance?**
+- Measures angle between vectors (not magnitude)
+- Better for text embeddings (OpenAI uses normalized vectors)
+- Range: 0 (identical) to 2 (opposite)
+- Similarity = 1 - cosine_distance
+
+### Performance Optimization
+
+**HNSW Index:**
+```sql
+-- Hierarchical Navigable Small World index
+CREATE INDEX idx_items_embedding ON items 
+USING hnsw (embedding vector_cosine_ops)
+WITH (m = 16, ef_construction = 64);
+```
+
+**Parameters:**
+- `m = 16`: Number of connections per layer (higher = more accurate, slower build)
+- `ef_construction = 64`: Size of dynamic candidate list (higher = more accurate)
+
+**Query Performance:**
+- Without index: O(n) - scans all rows
+- With HNSW index: O(log n) - approximate nearest neighbors
+- Typical query time: < 50ms for 10K items
+
+### Cost Considerations
+
+**OpenAI API Costs (text-embedding-ada-002):**
+- $0.0001 per 1K tokens
+- Average item: ~100 tokens = $0.00001 per embedding
+- 10,000 items = $0.10
+
+**Storage:**
+- Each embedding: 1536 dimensions × 4 bytes = 6.144 KB
+- 10,000 items: ~60 MB
+- Negligible compared to image storage
 
 ## Authentication Flow
 

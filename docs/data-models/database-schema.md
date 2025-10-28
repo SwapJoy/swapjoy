@@ -122,6 +122,10 @@ CREATE TABLE cities (
 Items listed for swapping.
 
 ```sql
+-- Enable required extensions
+CREATE EXTENSION IF NOT EXISTS vector;
+CREATE EXTENSION IF NOT EXISTS pg_net;
+
 CREATE TABLE items (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -132,15 +136,15 @@ CREATE TABLE items (
   category_id UUID REFERENCES categories(id),
   
   -- Condition & Value
-  condition VARCHAR(50) NOT NULL, -- new, like_new, good, fair, poor
-  estimated_value DECIMAL(10, 2),
+  condition VARCHAR(50) NOT NULL CHECK (condition IN ('new', 'like_new', 'good', 'fair', 'poor')),
+  price DECIMAL(10, 2), -- Renamed from estimated_value
   currency VARCHAR(3) DEFAULT 'USD', -- ISO 4217: USD, EUR, GBP, JPY, etc.
   
   -- AI/Vector Embeddings (Supabase pgvector)
   embedding vector(1536), -- OpenAI ada-002 embeddings for semantic search
   
   -- Status (replaced is_active with status field)
-  status VARCHAR(50) DEFAULT 'available', 
+  status VARCHAR(50) DEFAULT 'available' CHECK (status IN ('available', 'pending', 'swapped', 'hidden', 'deleted')),
   -- available: active and visible
   -- pending: offer accepted, swap in progress
   -- swapped: item has been swapped
@@ -153,29 +157,84 @@ CREATE TABLE items (
   
   -- Timestamps
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  
-  -- Indexes
-  INDEX idx_user_id (user_id),
-  INDEX idx_category (category_id),
-  INDEX idx_status (status),
-  INDEX idx_location (location_lat, location_lng),
-  INDEX idx_created_at (created_at),
-  FULLTEXT INDEX idx_search (title, description)
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Indexes
+CREATE INDEX idx_items_user_id ON items(user_id);
+CREATE INDEX idx_items_category ON items(category_id);
+CREATE INDEX idx_items_status ON items(status);
+CREATE INDEX idx_items_location ON items(location_lat, location_lng);
+CREATE INDEX idx_items_created_at ON items(created_at DESC);
+
 -- Create vector index for similarity search (HNSW - fast and efficient)
-CREATE INDEX ON items USING hnsw (embedding vector_cosine_ops);
+CREATE INDEX idx_items_embedding ON items USING hnsw (embedding vector_cosine_ops);
+
+-- Enable Row Level Security
+ALTER TABLE items ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies
+CREATE POLICY "Items are viewable by everyone"
+  ON items FOR SELECT
+  USING (status = 'available');
+
+CREATE POLICY "Users can insert their own items"
+  ON items FOR INSERT
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can update their own items"
+  ON items FOR UPDATE
+  USING (auth.uid() = user_id);
+
+CREATE POLICY "Users can delete their own items"
+  ON items FOR DELETE
+  USING (auth.uid() = user_id);
+
+-- Trigger function to generate embeddings via Edge Function
+CREATE OR REPLACE FUNCTION trigger_generate_embedding()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  request_id bigint;
+BEGIN
+  SELECT INTO request_id net.http_post(
+    url := 'https://YOUR_PROJECT_REF.supabase.co/functions/v1/generate-embedding',
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'x-internal-secret', 'YOUR_INTERNAL_FUNCTION_SECRET'
+    ),
+    body := jsonb_build_object('itemId', NEW.id::text)
+  );
+  
+  RETURN NEW;
+END;
+$$;
+
+-- Trigger on INSERT to generate embeddings for new items
+CREATE TRIGGER on_item_insert_generate_embedding
+  AFTER INSERT ON items
+  FOR EACH ROW
+  EXECUTE FUNCTION trigger_generate_embedding();
+
+-- Trigger on UPDATE to regenerate embeddings when relevant fields change
+CREATE TRIGGER on_item_update_generate_embedding
+  AFTER UPDATE OF title, description, category_id ON items
+  FOR EACH ROW
+  WHEN (
+    OLD.title IS DISTINCT FROM NEW.title OR 
+    OLD.description IS DISTINCT FROM NEW.description OR 
+    OLD.category_id IS DISTINCT FROM NEW.category_id
+  )
+  EXECUTE FUNCTION trigger_generate_embedding();
 
 -- Notes:
--- 1. Removed: brand, model, year, dimensions, weight, color (simplified for MVP)
--- 2. Removed: is_active (now part of status field)
--- 3. Removed: city varchar and city_id (just coordinates, cities table for UI only)
--- 4. Removed: looking_for, open_to_offers (not needed for MVP)
--- 5. Removed: view_count, favorite_count, offer_count (moved to item_metrics)
--- 6. Removed: swapped_at (status change handles this)
--- 7. Removed: max_discount_amount (similarity score handles value tolerance)
--- 8. Cities table exists for UI dropdown, but items don't reference it
+-- 1. Renamed: estimated_value → price
+-- 2. Added: CHECK constraints for condition and status
+-- 3. Added: RLS policies for secure access
+-- 4. Added: Triggers for automatic embedding generation
+-- 5. Requires: vector extension for embeddings, pg_net for HTTP requests
 ```
 
 ### 4. Item Images
@@ -188,13 +247,53 @@ CREATE TABLE item_images (
   
   image_url TEXT NOT NULL,
   thumbnail_url TEXT,
-  display_order INTEGER DEFAULT 0,
+  sort_order INTEGER DEFAULT 0, -- Renamed from display_order
   is_primary BOOLEAN DEFAULT FALSE,
   
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  
-  INDEX idx_item_id (item_id)
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Indexes
+CREATE INDEX idx_item_images_item_id ON item_images(item_id);
+CREATE INDEX idx_item_images_sort_order ON item_images(item_id, sort_order);
+
+-- Enable Row Level Security
+ALTER TABLE item_images ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies
+CREATE POLICY "Item images are viewable by everyone"
+  ON item_images FOR SELECT
+  USING (true);
+
+CREATE POLICY "Users can insert images for their own items"
+  ON item_images FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM items
+      WHERE items.id = item_images.item_id
+      AND items.user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Users can update images for their own items"
+  ON item_images FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM items
+      WHERE items.id = item_images.item_id
+      AND items.user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Users can delete images for their own items"
+  ON item_images FOR DELETE
+  USING (
+    EXISTS (
+      SELECT 1 FROM items
+      WHERE items.id = item_images.item_id
+      AND items.user_id = auth.uid()
+    )
+  );
 ```
 
 ### 5. Item Metrics
@@ -240,17 +339,31 @@ CREATE TABLE categories (
   slug VARCHAR(100) UNIQUE NOT NULL,
   description TEXT,
   icon_url TEXT,
-  display_order INTEGER DEFAULT 0,
+  sort_order INTEGER DEFAULT 0, -- Renamed from display_order
   is_active BOOLEAN DEFAULT TRUE,
   
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  
-  INDEX idx_slug (slug),
-  INDEX idx_display_order (display_order)
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Example categories: Electronics, Clothing, Books, Furniture, Sports, Toys, etc.
+-- Indexes
+CREATE INDEX idx_categories_slug ON categories(slug);
+CREATE INDEX idx_categories_sort_order ON categories(sort_order);
+CREATE INDEX idx_categories_is_active ON categories(is_active);
+
+-- Example categories
+INSERT INTO categories (name, slug, description, sort_order, is_active) VALUES
+  ('Electronics', 'electronics', 'Phones, laptops, cameras, and other electronic devices', 1, true),
+  ('Clothing', 'clothing', 'Shirts, pants, shoes, and accessories', 2, true),
+  ('Books', 'books', 'Fiction, non-fiction, textbooks, and magazines', 3, true),
+  ('Furniture', 'furniture', 'Tables, chairs, sofas, and home furnishings', 4, true),
+  ('Sports', 'sports', 'Sports equipment, bikes, and fitness gear', 5, true),
+  ('Toys & Games', 'toys-games', 'Toys, board games, and video games', 6, true),
+  ('Home & Garden', 'home-garden', 'Home decor, tools, and garden equipment', 7, true),
+  ('Art & Collectibles', 'art-collectibles', 'Artwork, antiques, and collectible items', 8, true),
+  ('Musical Instruments', 'musical-instruments', 'Guitars, keyboards, drums, and other instruments', 9, true),
+  ('Other', 'other', 'Everything else', 10, true)
+ON CONFLICT (slug) DO NOTHING;
 ```
 
 ### 7. Offers
