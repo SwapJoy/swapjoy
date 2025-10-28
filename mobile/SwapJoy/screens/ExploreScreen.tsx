@@ -1,4 +1,4 @@
-import React, { useCallback, memo } from 'react';
+import React, { useCallback, memo, useState } from 'react';
 import {
   View,
   Text,
@@ -8,18 +8,40 @@ import {
   ScrollView,
   Dimensions,
   RefreshControl,
-  Image,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ExploreScreenProps } from '../types/navigation';
 import { useExploreData, AIOffer } from '../hooks/useExploreData';
+import { useRecentlyListed } from '../hooks/useRecentlyListed';
+import { useTopCategories } from '../hooks/useTopCategories';
+import { useOtherItems } from '../hooks/useOtherItems';
 import CachedImage from '../components/CachedImage';
 
 const { width } = Dimensions.get('window');
 const ITEM_WIDTH = width * 0.7;
+const GRID_ITEM_WIDTH = (width - 60) / 2; // 2 columns with margins
 
 const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
-  const { aiOffers, loading, hasData, isInitialized, user, refreshData } = useExploreData();
+  const { aiOffers, loading: topPicksLoading, hasData, isInitialized, user, refreshData: refreshTopPicks } = useExploreData();
+  const { items: recentItems, loading: recentLoading, refresh: refreshRecent } = useRecentlyListed(10);
+  const { categories: topCategories, loading: categoriesLoading, refresh: refreshCategories } = useTopCategories(6);
+  const { items: otherItems, pagination, loading: othersLoading, loadingMore, loadMore, refresh: refreshOthers } = useOtherItems(10);
+  
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await Promise.all([
+      refreshTopPicks(),
+      refreshRecent(),
+      refreshCategories(),
+      refreshOthers()
+    ]);
+    setRefreshing(false);
+  }, [refreshTopPicks, refreshRecent, refreshCategories, refreshOthers]);
+
+  const loading = topPicksLoading && recentLoading && categoriesLoading && othersLoading;
 
 
   const renderAIOffer = useCallback(({ item }: { item: AIOffer }) => (
@@ -68,6 +90,66 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
     </TouchableOpacity>
   ), [navigation]);
 
+  const renderRecentItem = useCallback(({ item }: { item: any }) => (
+    <TouchableOpacity
+      style={styles.recentCard}
+      onPress={() => (navigation as any).navigate('ItemDetails', { itemId: item.id })}
+    >
+      <CachedImage
+        uri={item.image_url || 'https://via.placeholder.com/200x150'}
+        style={styles.recentImage}
+        resizeMode="cover"
+        fallbackUri="https://picsum.photos/200/150?random=2"
+      />
+      <View style={styles.recentDetails}>
+        <Text style={styles.recentTitle} numberOfLines={1}>{item.title}</Text>
+        <Text style={styles.recentPrice}>${(item.price || item.estimated_value || 0).toFixed(2)}</Text>
+        <Text style={styles.recentCondition}>{item.condition}</Text>
+      </View>
+    </TouchableOpacity>
+  ), [navigation]);
+
+  const renderCategory = useCallback(({ item }: { item: any }) => (
+    <TouchableOpacity
+      style={styles.categoryCard}
+      onPress={() => {
+        // TODO: Navigate to category items screen
+        console.log('Category pressed:', item.name);
+      }}
+    >
+      <Text style={styles.categoryName}>{item.name}</Text>
+      <Text style={styles.categoryCount}>{item.item_count} items</Text>
+    </TouchableOpacity>
+  ), []);
+
+  const renderGridItem = useCallback(({ item, index }: { item: any; index: number }) => (
+    <TouchableOpacity
+      style={[styles.gridItem, index % 2 === 0 ? styles.gridItemLeft : styles.gridItemRight]}
+      onPress={() => (navigation as any).navigate('ItemDetails', { itemId: item.id })}
+    >
+      <CachedImage
+        uri={item.image_url || 'https://via.placeholder.com/200x150'}
+        style={styles.gridImage}
+        resizeMode="cover"
+        fallbackUri="https://picsum.photos/200/150?random=3"
+      />
+      <View style={styles.gridDetails}>
+        <Text style={styles.gridTitle} numberOfLines={2}>{item.title}</Text>
+        <Text style={styles.gridPrice}>${(item.price || item.estimated_value || 0).toFixed(2)}</Text>
+        <Text style={styles.gridCondition} numberOfLines={1}>{item.condition}</Text>
+      </View>
+    </TouchableOpacity>
+  ), [navigation]);
+
+  const renderFooter = useCallback(() => {
+    if (!loadingMore) return null;
+    return (
+      <View style={styles.footerLoader}>
+        <ActivityIndicator size="small" color="#007AFF" />
+      </View>
+    );
+  }, [loadingMore]);
+
   if (!user) {
     return (
       <SafeAreaView style={styles.container}>
@@ -89,52 +171,104 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
   }
 
   return (
-    <ScrollView 
-      style={styles.scrollView} 
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={loading}
-          onRefresh={refreshData}
-          colors={['#007AFF']}
-          tintColor="#007AFF"
-        />
-      }
-    >
-        
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Top Matches</Text>
-          <FlatList
-            data={aiOffers}
-            renderItem={renderAIOffer}
-            keyExtractor={(item) => item.id}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.horizontalList}
-            snapToInterval={ITEM_WIDTH + 20}
-            decelerationRate="fast"
-            removeClippedSubviews={true}
-            maxToRenderPerBatch={5}
-            windowSize={10}
-            initialNumToRender={3}
-            getItemLayout={(data, index) => ({
-              length: ITEM_WIDTH + 20,
-              offset: (ITEM_WIDTH + 20) * index,
-              index,
-            })}
-          />
-        </View>
+    <View style={styles.container}>
+      <FlatList
+        data={otherItems}
+        renderItem={renderGridItem}
+        keyExtractor={(item) => item.id}
+        numColumns={2}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.mainContent}
+        ListHeaderComponent={
+          <>
+            {/* Top Matches Section */}
+            {aiOffers.length > 0 && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Top Matches</Text>
+                <FlatList
+                  data={aiOffers}
+                  renderItem={renderAIOffer}
+                  keyExtractor={(item) => item.id}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.horizontalList}
+                  snapToInterval={ITEM_WIDTH + 20}
+                  decelerationRate="fast"
+                  removeClippedSubviews={true}
+                  maxToRenderPerBatch={5}
+                  windowSize={10}
+                  initialNumToRender={3}
+                  getItemLayout={(data, index) => ({
+                    length: ITEM_WIDTH + 20,
+                    offset: (ITEM_WIDTH + 20) * index,
+                    index,
+                  })}
+                />
+              </View>
+            )}
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>How it works</Text>
-          <View style={styles.infoCard}>
-            <Text style={styles.infoText}>
-              Our AI analyzes your preferences, location, and item history to find the perfect swap matches.
-              Each recommendation includes a match score and reason why it's perfect for you.
-            </Text>
-          </View>
-        </View>
-      </ScrollView>
+            {/* Recently Listed Section */}
+            {recentItems.length > 0 && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Recently Listed</Text>
+                <Text style={styles.sectionSubtitle}>New items from the last month</Text>
+                <FlatList
+                  data={recentItems}
+                  renderItem={renderRecentItem}
+                  keyExtractor={(item) => item.id}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.horizontalList}
+                  snapToInterval={ITEM_WIDTH * 0.8 + 15}
+                  decelerationRate="fast"
+                />
+              </View>
+            )}
+
+            {/* Top Categories Section */}
+            {topCategories.length > 0 && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Top Categories</Text>
+                <View style={styles.categoriesGrid}>
+                  {topCategories.map((category) => (
+                    <TouchableOpacity
+                      key={category.id}
+                      style={styles.categoryCard}
+                      onPress={() => {
+                        // TODO: Navigate to category items
+                        console.log('Category pressed:', category.name);
+                      }}
+                    >
+                      <Text style={styles.categoryName}>{category.name}</Text>
+                      <Text style={styles.categoryCount}>{category.item_count} items</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {/* Others Section Header */}
+            {otherItems.length > 0 && (
+              <View style={[styles.section, styles.othersHeader]}>
+                <Text style={styles.sectionTitle}>Explore More</Text>
+                <Text style={styles.sectionSubtitle}>Discover all available items</Text>
+              </View>
+            )}
+          </>
+        }
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={renderFooter}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#007AFF']}
+            tintColor="#007AFF"
+          />
+        }
+      />
+    </View>
   );
 });
 
@@ -142,6 +276,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8f9fa',
+  },
+  mainContent: {
+    paddingBottom: 20,
   },
   scrollView: {
     flex: 1,
@@ -192,11 +329,20 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 2,
   },
+  othersHeader: {
+    marginBottom: 5,
+  },
   sectionTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 15,
+  },
+  sectionSubtitle: {
+    fontSize: 14,
+    color: '#777',
+    marginTop: -10,
+    marginBottom: 10,
   },
   horizontalList: {
     paddingVertical: 10,
@@ -302,6 +448,121 @@ const styles = StyleSheet.create({
     color: '#666',
     fontStyle: 'italic',
     marginTop: 2,
+  },
+  // Recently Listed Styles
+  recentCard: {
+    width: ITEM_WIDTH * 0.8,
+    marginRight: 15,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  recentImage: {
+    width: '100%',
+    height: 140,
+  },
+  recentDetails: {
+    padding: 12,
+  },
+  recentTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 4,
+  },
+  recentPrice: {
+    fontSize: 15,
+    color: '#007AFF',
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  recentCondition: {
+    fontSize: 12,
+    color: '#777',
+    textTransform: 'capitalize',
+  },
+  // Category Styles
+  categoriesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: -5,
+  },
+  categoryCard: {
+    width: (width - 70) / 3, // 3 columns
+    margin: 5,
+    padding: 15,
+    backgroundColor: '#f0f7ff',
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  categoryName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  categoryCount: {
+    fontSize: 12,
+    color: '#007AFF',
+  },
+  // Grid Styles (2 columns)
+  gridItem: {
+    width: GRID_ITEM_WIDTH,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  gridItemLeft: {
+    marginLeft: 20,
+    marginRight: 10,
+  },
+  gridItemRight: {
+    marginLeft: 10,
+    marginRight: 20,
+  },
+  gridImage: {
+    width: '100%',
+    height: 150,
+  },
+  gridDetails: {
+    padding: 10,
+  },
+  gridTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 4,
+    height: 35,
+  },
+  gridPrice: {
+    fontSize: 14,
+    color: '#007AFF',
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  gridCondition: {
+    fontSize: 11,
+    color: '#777',
+    textTransform: 'capitalize',
+  },
+  footerLoader: {
+    width: '100%',
+    paddingVertical: 20,
+    alignItems: 'center',
   },
 });
 

@@ -8,6 +8,7 @@ export interface AIOffer {
   description: string;
   condition: string;
   estimated_value: number;
+  price?: number;
   image_url: string;
   user: {
     id: string;
@@ -29,7 +30,7 @@ export const useExploreData = () => {
   const [hasData, setHasData] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const isMountedRef = useRef(true);
-  const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hasFetchedRef = useRef(false);
 
 
   const calculateMatchScore = useCallback((item: any, currentUser: any) => {
@@ -206,6 +207,7 @@ export const useExploreData = () => {
         setAiOffers(aiOffers);
         setHasData(true);
         setIsInitialized(true);
+        hasFetchedRef.current = true;
       }
     } catch (error) {
       console.error('Error fetching AI offers:', error);
@@ -220,27 +222,13 @@ export const useExploreData = () => {
         setIsInitialized(true);
       }
     }
-  }, [user, calculateMatchScore, getMatchReason]);
+  }, [user?.id, calculateMatchScore, getMatchReason]);
 
   useEffect(() => {
-    if (user) {
-      // Clear any existing timeout
-      if (fetchTimeoutRef.current) {
-        clearTimeout(fetchTimeoutRef.current);
-      }
-      
-      // Debounce the fetch
-      fetchTimeoutRef.current = setTimeout(() => {
-        fetchAIOffers();
-      }, 100);
+    if (user && !hasFetchedRef.current) {
+      fetchAIOffers();
     }
-    
-    return () => {
-      if (fetchTimeoutRef.current) {
-        clearTimeout(fetchTimeoutRef.current);
-      }
-    };
-  }, [user, fetchAIOffers]);
+  }, [user?.id]);
 
   useEffect(() => {
     return () => {
@@ -248,12 +236,13 @@ export const useExploreData = () => {
     };
   }, []);
 
-  const refreshData = useCallback(() => {
+  const refreshData = useCallback(async () => {
+    hasFetchedRef.current = false;
     setLoading(true);
     setHasData(false);
     setIsInitialized(false);
-    fetchAIOffers();
-  }, []);
+    await fetchAIOffers();
+  }, [fetchAIOffers]);
 
   // Memoize the return value to prevent unnecessary re-renders
   return useMemo(() => ({

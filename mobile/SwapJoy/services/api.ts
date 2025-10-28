@@ -413,8 +413,8 @@ export class ApiService {
           for (const itemA of (similarItems1 || []).slice(0, 2)) {
             for (const itemB of (similarItems2 || []).slice(0, 2)) {
               if (itemA.id !== itemB.id) {
-                const fullItemA = fullItems.find(item => item.id === itemA.id);
-                const fullItemB = fullItems.find(item => item.id === itemB.id);
+                const fullItemA = fullItems.find((item: any) => item.id === itemA.id);
+                const fullItemB = fullItems.find((item: any) => item.id === itemB.id);
                 
                 if (fullItemA && fullItemB) {
                   const bundleTotalValue = parseFloat(itemA.price) + parseFloat(itemB.price);
@@ -866,10 +866,10 @@ export class ApiService {
 
       if (itemsError || !availableItems || availableItems.length === 0) {
         console.log('No available items found to assign');
-        return { data: { message: 'No available items found' }, error: null };
+        return { data: null, error: 'No available items found' };
       }
 
-      const results = [];
+      const results: Array<{item: string; success: boolean; error?: string; price?: any}> = [];
       
       for (const item of availableItems) {
         const { error: updateError } = await client
@@ -886,7 +886,7 @@ export class ApiService {
         }
       }
 
-      return { data: results, error: null };
+      return { data: results as any, error: null };
     });
   }
 
@@ -1034,5 +1034,340 @@ export class ApiService {
 
       return { data: { results, processed: itemsWithoutEmbeddings.length, message: 'Embeddings processed' }, error: null };
     });
+  }
+
+  // ============================
+  // HOME SCREEN SECTION ENDPOINTS
+  // ============================
+
+  /**
+   * Get recently listed items from the last month, sorted by relevance
+   * Uses AI similarity scores when available
+   */
+  static async getRecentlyListed(userId: string, limit: number = 10) {
+    return RedisCache.cache(
+      'recently-listed',
+      [userId, limit],
+      () => this.authenticatedCall(async (client) => {
+        // Calculate date for one month ago
+        const oneMonthAgo = new Date();
+        oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+
+        // Get user's items to calculate similarity
+        const { data: userItems, error: userItemsError } = await client
+          .from('items')
+          .select('id, embedding, price, title, description, category_id')
+          .eq('user_id', userId)
+          .eq('status', 'available')
+          .not('embedding', 'is', null);
+
+        if (userItemsError || !userItems || userItems.length === 0) {
+          // Fallback: just get recent items without AI scoring
+          const { data, error } = await client
+            .from('items')
+            .select('*, item_images(image_url), users!items_user_id_fkey(username, first_name, last_name)')
+            .eq('status', 'available')
+            .neq('user_id', userId)
+            .gte('created_at', oneMonthAgo.toISOString())
+            .order('created_at', { ascending: false })
+            .limit(limit);
+
+          return { data, error };
+        }
+
+        // Get user's favorite categories for additional filtering
+        const { data: user } = await client
+          .from('users')
+          .select('favorite_categories')
+          .eq('id', userId)
+          .single();
+
+        const favoriteCategories = user?.favorite_categories || [];
+
+        // Get recent items
+        let query = client
+          .from('items')
+          .select('*, item_images(image_url), users!items_user_id_fkey(username, first_name, last_name)')
+          .eq('status', 'available')
+          .neq('user_id', userId)
+          .gte('created_at', oneMonthAgo.toISOString());
+
+        // Apply category filter if user has favorite categories
+        if (favoriteCategories.length > 0) {
+          query = query.in('category_id', favoriteCategories);
+        }
+
+        const { data: recentItems, error } = await query
+          .order('created_at', { ascending: false })
+          .limit(limit * 3); // Get more items to sort by relevance
+
+        if (error || !recentItems) {
+          return { data: null, error };
+        }
+
+        // Calculate similarity scores for recent items
+        const itemsWithScores = await Promise.all(
+          recentItems.map(async (item) => {
+            if (!item.embedding) {
+              return { ...item, similarity_score: 0.5, overall_score: 0.5 };
+            }
+
+            // Calculate average similarity to user's items
+            let totalSimilarity = 0;
+            let count = 0;
+
+            for (const userItem of userItems) {
+              if (!userItem.embedding) continue;
+
+              const { data: simResult } = await client.rpc('match_items_cosine', {
+                query_embedding: userItem.embedding,
+                match_threshold: 0.1,
+                match_count: 1,
+                target_item_id: item.id
+              });
+
+              if (simResult && simResult.length > 0) {
+                totalSimilarity += simResult[0].similarity || 0;
+                count++;
+              }
+            }
+
+            const avgSimilarity = count > 0 ? totalSimilarity / count : 0.5;
+            
+            // Boost score for more recent items
+            const daysSinceCreated = (Date.now() - new Date(item.created_at).getTime()) / (1000 * 60 * 60 * 24);
+            const recencyBoost = Math.max(0, (30 - daysSinceCreated) / 30) * 0.2; // Up to 0.2 boost
+
+            const overallScore = avgSimilarity + recencyBoost;
+
+            return {
+              ...item,
+              similarity_score: avgSimilarity,
+              overall_score: Math.min(1, overallScore)
+            };
+          })
+        );
+
+        // Sort by overall score and limit
+        const sortedItems = itemsWithScores
+          .sort((a, b) => (b.overall_score || 0) - (a.overall_score || 0))
+          .slice(0, limit);
+
+        return { data: sortedItems, error: null };
+      }),
+      300 // 5 minutes cache TTL
+    );
+  }
+
+  /**
+   * Get recently listed items (safe wrapper)
+   */
+  static async getRecentlyListedSafe(userId: string, limit: number = 10) {
+    try {
+      const result = await this.getRecentlyListed(userId, limit);
+      return {
+        data: Array.isArray(result?.data) ? result.data : [],
+        error: result?.error || null
+      };
+    } catch (error) {
+      console.error('Error in getRecentlyListedSafe:', error);
+      return {
+        data: [],
+        error: error
+      };
+    }
+  }
+
+  /**
+   * Get top categories based on item count and user activity
+   */
+  static async getTopCategories(userId: string, limit: number = 6) {
+    return RedisCache.cache(
+      'top-categories',
+      [userId, limit],
+      () => this.authenticatedCall(async (client) => {
+        // Get all categories with item counts
+        const { data: categories, error: categoriesError } = await client
+          .from('categories')
+          .select('id, name, description')
+          .order('name');
+
+        if (categoriesError || !categories) {
+          return { data: null, error: categoriesError };
+        }
+
+        // Get item counts per category (available items only)
+        const categoriesWithCounts = await Promise.all(
+          categories.map(async (category) => {
+            const { count } = await client
+              .from('items')
+              .select('id', { count: 'exact', head: true })
+              .eq('category_id', category.id)
+              .eq('status', 'available')
+              .neq('user_id', userId);
+
+            return {
+              ...category,
+              item_count: count || 0
+            };
+          })
+        );
+
+        // Sort by item count and get top categories
+        const topCategories = categoriesWithCounts
+          .filter(cat => cat.item_count > 0)
+          .sort((a, b) => b.item_count - a.item_count)
+          .slice(0, limit);
+
+        return { data: topCategories, error: null };
+      }),
+      600 // 10 minutes cache TTL
+    );
+  }
+
+  /**
+   * Get top categories (safe wrapper)
+   */
+  static async getTopCategoriesSafe(userId: string, limit: number = 6) {
+    try {
+      const result = await this.getTopCategories(userId, limit);
+      return {
+        data: Array.isArray(result?.data) ? result.data : [],
+        error: result?.error || null
+      };
+    } catch (error) {
+      console.error('Error in getTopCategoriesSafe:', error);
+      return {
+        data: [],
+        error: error
+      };
+    }
+  }
+
+  /**
+   * Get other items for vertical scrolling grid with pagination
+   * 2 columns, 10 items per page
+   */
+  static async getOtherItems(userId: string, page: number = 1, limit: number = 10) {
+    return this.authenticatedCall(async (client) => {
+      const offset = (page - 1) * limit;
+
+      // Get total count first
+      const { count: totalCount } = await client
+        .from('items')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'available')
+        .neq('user_id', userId);
+
+      // Get items with pagination
+      const { data, error } = await client
+        .from('items')
+        .select('*, item_images(image_url), users!items_user_id_fkey(username, first_name, last_name)')
+        .eq('status', 'available')
+        .neq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1);
+
+      if (error) {
+        return { data: null, error };
+      }
+
+      return {
+        data: {
+          items: data || [],
+          pagination: {
+            page,
+            limit,
+            total: totalCount || 0,
+            totalPages: Math.ceil((totalCount || 0) / limit),
+            hasMore: (page * limit) < (totalCount || 0)
+          }
+        },
+        error: null
+      };
+    });
+  }
+
+  /**
+   * Get other items (safe wrapper)
+   */
+  static async getOtherItemsSafe(userId: string, page: number = 1, limit: number = 10) {
+    try {
+      const result = await this.getOtherItems(userId, page, limit);
+      return {
+        data: result?.data || { items: [], pagination: { page, limit, total: 0, totalPages: 0, hasMore: false } },
+        error: result?.error || null
+      };
+    } catch (error) {
+      console.error('Error in getOtherItemsSafe:', error);
+      return {
+        data: { items: [], pagination: { page, limit, total: 0, totalPages: 0, hasMore: false } },
+        error: error
+      };
+    }
+  }
+
+  /**
+   * Get items by category ID with pagination
+   */
+  static async getItemsByCategory(userId: string, categoryId: string, page: number = 1, limit: number = 10) {
+    return this.authenticatedCall(async (client) => {
+      const offset = (page - 1) * limit;
+
+      // Get total count first
+      const { count: totalCount } = await client
+        .from('items')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'available')
+        .eq('category_id', categoryId)
+        .neq('user_id', userId);
+
+      // Get items with pagination
+      const { data, error } = await client
+        .from('items')
+        .select('*, item_images(image_url), users!items_user_id_fkey(username, first_name, last_name)')
+        .eq('status', 'available')
+        .eq('category_id', categoryId)
+        .neq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1);
+
+      if (error) {
+        return { data: null, error };
+      }
+
+      return {
+        data: {
+          items: data || [],
+          pagination: {
+            page,
+            limit,
+            total: totalCount || 0,
+            totalPages: Math.ceil((totalCount || 0) / limit),
+            hasMore: (page * limit) < (totalCount || 0)
+          }
+        },
+        error: null
+      };
+    });
+  }
+
+  /**
+   * Get items by category (safe wrapper)
+   */
+  static async getItemsByCategorySafe(userId: string, categoryId: string, page: number = 1, limit: number = 10) {
+    try {
+      const result = await this.getItemsByCategory(userId, categoryId, page, limit);
+      return {
+        data: result?.data || { items: [], pagination: { page, limit, total: 0, totalPages: 0, hasMore: false } },
+        error: result?.error || null
+      };
+    } catch (error) {
+      console.error('Error in getItemsByCategorySafe:', error);
+      return {
+        data: { items: [], pagination: { page, limit, total: 0, totalPages: 0, hasMore: false } },
+        error: error
+      };
+    }
   }
 }
