@@ -1433,16 +1433,68 @@ export class ApiService {
    */
   static async getItemById(itemId: string) {
     return this.authenticatedCall(async (client) => {
-      return await client
+      // First get the item
+      const { data: item, error: itemError } = await client
         .from('items')
-        .select(`
-          *,
-          category:categories(name, slug),
-          user:users(id, username, first_name, last_name, profile_image_url),
-          images:item_images(id, image_url, thumbnail_url, sort_order, is_primary)
-        `)
+        .select('*')
         .eq('id', itemId)
         .single();
+
+      if (itemError || !item) {
+        return { data: null, error: itemError };
+      }
+
+      // Then get related data separately
+      let category = null;
+      let user = null;
+      let images: any[] = [];
+      
+      // Get category if category_id exists
+      if (item.category_id) {
+        try {
+          const { data: categoryData } = await client
+            .from('categories')
+            .select('name')
+            .eq('id', item.category_id)
+            .single();
+          category = categoryData;
+        } catch (error) {
+          console.log('Error fetching category:', error);
+        }
+      }
+
+      // Get user
+      try {
+        const { data: userData } = await client
+          .from('users')
+          .select('id, username, first_name, last_name, profile_image_url')
+          .eq('id', item.user_id)
+          .single();
+        user = userData;
+      } catch (error) {
+        console.log('Error fetching user:', error);
+      }
+
+      // Get images
+      try {
+        const { data: imagesData } = await client
+          .from('item_images')
+          .select('id, image_url, thumbnail_url, sort_order, is_primary')
+          .eq('item_id', itemId);
+        images = imagesData || [];
+      } catch (error) {
+        console.log('Error fetching images:', error);
+      }
+
+      return {
+        data: {
+          ...item,
+          category,
+          user,
+          images,
+        },
+        error: null,
+      };
     });
   }
 }

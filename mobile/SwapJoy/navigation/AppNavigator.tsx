@@ -17,6 +17,7 @@ import ItemPreviewScreen from '../screens/ItemPreviewScreen';
 import ItemDetailsScreen from '../screens/ItemDetailsScreen';
 import ProfileSettingsScreen from '../screens/ProfileSettingsScreen';
 import SearchScreen from '../screens/SearchScreen';
+import BundleItemsScreen from '../screens/BundleItemsScreen';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -50,24 +51,32 @@ const AppNavigator: React.FC = () => {
             color: '#000',
           },
           headerTitleAlign: 'center',
-          headerLeft: ({ navigation }) => (
-            <TouchableOpacity
-              style={{
-                width: 32,
-                height: 32,
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginLeft: 16,
-              }}
-              onPress={() => {
-                if (navigation) {
-                  navigation.goBack();
-                }
-              }}
-            >
-              <Ionicons name="arrow-back" size={24} color="#007AFF" />
-            </TouchableOpacity>
-          ),
+          headerLeft: ({ navigation, onPress: _onPress, ...props }) => {
+            // Use default behavior by calling the default back handler
+            const handlePress = () => {
+              if (_onPress) {
+                _onPress();
+              } else if (navigation.canGoBack()) {
+                navigation.goBack();
+              }
+            };
+            
+            return (
+              <TouchableOpacity
+                style={{
+                  width: 44,
+                  height: 44,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginLeft: Platform.OS === 'ios' ? 4 : 8,
+                }}
+                onPress={handlePress}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="arrow-back" size={24} color="#007AFF" />
+              </TouchableOpacity>
+            );
+          },
         }}
       >
         {isAuthenticated ? (
@@ -120,7 +129,18 @@ const AppNavigator: React.FC = () => {
             <Stack.Screen 
               name="ItemDetails" 
               component={ItemDetailsScreen}
-              options={{ title: 'Item Details' }}
+              options={{ 
+                title: 'Item Details',
+                headerBackTitleVisible: false,
+              }}
+            />
+            <Stack.Screen 
+              name="BundleItems" 
+              component={BundleItemsScreen}
+              options={({ route }) => ({ 
+                title: (route.params as any).title || 'Bundle',
+                headerBackTitleVisible: false,
+              })}
             />
             <Stack.Screen 
               name="ProfileSettings" 

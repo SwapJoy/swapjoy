@@ -22,6 +22,12 @@ export type RootStackParamList = {
   ItemDetails: {
     itemId: string;
   };
+  BundleItems: {
+    bundleId: string;
+    title: string;
+    ownerId: string;
+    bundleItems: Array<any>;
+  };
   ProfileSettings: undefined;
   Search: undefined;
 };
@@ -73,6 +79,11 @@ export type CreateListingScreenProps = {
 export type ItemDetailsScreenProps = {
   navigation: NavigationProp<RootStackParamList, 'ItemDetails'>;
   route: RouteProp<RootStackParamList, 'ItemDetails'>;
+};
+
+export type BundleItemsScreenProps = {
+  navigation: NavigationProp<RootStackParamList, 'BundleItems'>;
+  route: RouteProp<RootStackParamList, 'BundleItems'>;
 };
 
 export type ProfileSettingsScreenProps = {

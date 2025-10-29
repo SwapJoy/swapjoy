@@ -56,11 +56,18 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
   const renderAIOffer = useCallback(({ item }: { item: AIOffer }) => (
     <TouchableOpacity
       style={styles.offerCard}
-      onPress={() => (navigation as any).navigate('ItemDetails', { 
-        itemId: item.id, 
-        isBundle: item.is_bundle || false,
-        bundleItems: item.bundle_items || null 
-      })}
+      onPress={() => {
+        if (item.is_bundle && item.bundle_items) {
+          (navigation as any).navigate('BundleItems', {
+            bundleId: item.id,
+            title: item.title,
+            ownerId: item.user?.id,
+            bundleItems: item.bundle_items,
+          });
+        } else {
+          (navigation as any).navigate('ItemDetails', { itemId: item.id });
+        }
+      }}
     >
       <View style={styles.imageContainer}>
         <CachedImage
