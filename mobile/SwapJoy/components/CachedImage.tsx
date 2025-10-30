@@ -1,5 +1,8 @@
 import React from 'react';
-import { View, StyleSheet, ActivityIndicator, Image } from 'react-native';
+import { View, StyleSheet, ActivityIndicator, Image, ImageURISource } from 'react-native';
+
+// Track URIs we have already loaded to avoid re-showing loader/flicker across mounts
+const loadedUriSet = new Set<string>();
 
 interface CachedImageProps {
   uri: string;
@@ -8,6 +11,7 @@ interface CachedImageProps {
   resizeMode?: 'contain' | 'cover' | 'stretch' | 'center';
   showLoader?: boolean;
   fallbackUri?: string;
+  defaultSource?: number | ImageURISource; // RN typing
 }
 
 const CachedImage: React.FC<CachedImageProps> = React.memo(({
@@ -16,46 +20,54 @@ const CachedImage: React.FC<CachedImageProps> = React.memo(({
   placeholder = 'https://via.placeholder.com/200x150?text=Loading...',
   resizeMode = 'cover',
   showLoader = true,
-  fallbackUri = 'https://via.placeholder.com/200x150?text=No+Image'
+  fallbackUri = 'https://via.placeholder.com/200x150?text=No+Image',
+  defaultSource,
 }) => {
-  const [isLoading, setIsLoading] = React.useState(true);
+  const previouslyLoaded = React.useMemo(() => loadedUriSet.has(uri), [uri]);
+  const [isLoading, setIsLoading] = React.useState(!previouslyLoaded);
   const [hasError, setHasError] = React.useState(false);
-  const [imageLoaded, setImageLoaded] = React.useState(false);
+  const [imageLoaded, setImageLoaded] = React.useState(previouslyLoaded);
 
-  // Reset loading state when URI changes
+  // Only reset when URI truly changes; if this URI was seen before, keep as loaded to avoid flicker
   React.useEffect(() => {
-    setIsLoading(true);
+    const seen = loadedUriSet.has(uri);
+    setIsLoading(!seen);
     setHasError(false);
-    setImageLoaded(false);
+    setImageLoaded(seen);
   }, [uri]);
 
   const handleLoadStart = () => {
-    setIsLoading(true);
-    setHasError(false);
+    if (!loadedUriSet.has(uri)) {
+      setIsLoading(true);
+      setHasError(false);
+    }
   };
 
   const handleLoadEnd = () => {
+    loadedUriSet.add(uri);
     setIsLoading(false);
     setImageLoaded(true);
   };
 
-  const handleError = (error: any) => {
+  const handleError = () => {
     setIsLoading(false);
     setHasError(true);
     setImageLoaded(false);
   };
 
-  const imageUri = hasError ? fallbackUri : uri;
+  const imageUri = hasError ? fallbackUri : uri || placeholder;
+  const source = React.useMemo(() => ({ uri: imageUri } as ImageURISource), [imageUri]);
 
   return (
     <View style={[styles.container, style]}>
       <Image
-        source={{ uri: imageUri }}
-        style={[styles.image, style]}
+        source={source}
+        style={styles.image}
         resizeMode={resizeMode}
         onLoadStart={handleLoadStart}
         onLoadEnd={handleLoadEnd}
         onError={handleError}
+        defaultSource={defaultSource as any}
       />
       {isLoading && showLoader && !imageLoaded && (
         <View style={styles.loaderContainer}>
@@ -72,8 +84,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   image: {
-    width: '100%',
-    height: '100%',
+    ...StyleSheet.absoluteFillObject,
+    width: undefined,
+    height: undefined,
   },
   loaderContainer: {
     position: 'absolute',
@@ -83,7 +96,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    backgroundColor: 'rgba(255, 255, 255, 0.0)',
   },
 });
 

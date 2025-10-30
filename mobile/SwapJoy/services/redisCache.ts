@@ -2,7 +2,7 @@ import { supabase } from '../lib/supabase';
 
 export class RedisCache {
   private static readonly CACHE_PREFIX = 'swapjoy:';
-  private static readonly DEFAULT_TTL = 300; // 5 minutes
+  private static readonly DEFAULT_TTL = 300; // 5 minutes in seconds
 
   // Generate cache key
   private static getCacheKey(prefix: string, ...params: any[]): string {
@@ -36,13 +36,13 @@ export class RedisCache {
   static async set<T>(
     prefix: string, 
     value: T, 
-    ttl: number = this.DEFAULT_TTL,
     ...params: any[]
   ): Promise<boolean> {
     try {
+      const ttl: number = this.DEFAULT_TTL
       const key = this.getCacheKey(prefix, ...params);
       const { error } = await supabase.functions.invoke('redis-set', {
-        body: { key, value, ttl }
+        body: { key, value, ttl, ttlSeconds: ttl }
       });
 
       if (error) {
@@ -82,7 +82,6 @@ export class RedisCache {
     prefix: string,
     keyParams: any[],
     fetchFn: () => Promise<T>,
-    ttl: number = this.DEFAULT_TTL,
     bypassCache: boolean = false
   ): Promise<T> {
     // Try to get from cache first (unless bypassed)
@@ -100,7 +99,7 @@ export class RedisCache {
     
     // Try to store in cache (will fail silently if Edge Functions not deployed)
     try {
-      await this.set(prefix, data, ttl, ...keyParams);
+      await this.set(prefix, data, ...keyParams);
     } catch (error) {
       console.warn('Cache set failed (Edge Functions not deployed), continuing without cache:', error);
     }

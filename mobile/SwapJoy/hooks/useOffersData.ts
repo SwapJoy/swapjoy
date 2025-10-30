@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { ApiService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -15,7 +15,8 @@ export interface Offer {
 
 export const useOffersData = () => {
   const { user } = useAuth();
-  const [offers, setOffers] = useState<Offer[]>([]);
+  const [sentOffers, setSentOffers] = useState<Offer[]>([]);
+  const [receivedOffers, setReceivedOffers] = useState<Offer[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -24,27 +25,27 @@ export const useOffersData = () => {
 
     try {
       setLoading(true);
-      const { data: sentOffers, error: sentError } = await ApiService.getOffers(user.id, 'sent');
-      const { data: receivedOffers, error: receivedError } = await ApiService.getOffers(user.id, 'received');
+      const [{ data: sent, error: sentError }, { data: received, error: receivedError }] = await Promise.all([
+        ApiService.getOffers(user.id, 'sent'),
+        ApiService.getOffers(user.id, 'received'),
+      ]);
 
       if (sentError || receivedError) {
         console.error('Error fetching offers:', sentError || receivedError);
         return;
       }
 
-      // Combine and sort offers
-      const allOffers = [
-        ...(sentOffers || []).map((offer: any) => ({ ...offer, type: 'sent' })),
-        ...(receivedOffers || []).map((offer: any) => ({ ...offer, type: 'received' }))
-      ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      const sortedSent = (Array.isArray(sent) ? sent : []).slice().sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      const sortedReceived = (Array.isArray(received) ? received : []).slice().sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-      setOffers(allOffers);
+      setSentOffers(sortedSent);
+      setReceivedOffers(sortedReceived);
     } catch (error) {
       console.error('Error fetching offers:', error);
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user?.id]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -86,8 +87,13 @@ export const useOffersData = () => {
     }
   }, []);
 
+  // stable memoized references
+  const memoSent = useMemo(() => sentOffers, [sentOffers]);
+  const memoReceived = useMemo(() => receivedOffers, [receivedOffers]);
+
   return {
-    offers,
+    sentOffers: memoSent,
+    receivedOffers: memoReceived,
     loading,
     refreshing,
     onRefresh,

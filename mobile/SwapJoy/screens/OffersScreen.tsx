@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import React, { memo, useMemo, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,19 +6,25 @@ import {
   FlatList,
   TouchableOpacity,
   RefreshControl,
+  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { OffersScreenProps } from '../types/navigation';
 import { useOffersData, Offer } from '../hooks/useOffersData';
 
-const OffersScreen: React.FC<OffersScreenProps> = memo(() => {
-  const { offers, loading, refreshing, onRefresh, getStatusColor, getStatusText } = useOffersData();
+const { width } = Dimensions.get('window');
 
-  const renderOffer = ({ item }: { item: Offer & { type: 'sent' | 'received' } }) => (
+const OffersScreen: React.FC<OffersScreenProps> = memo(() => {
+  const { sentOffers, receivedOffers, loading, refreshing, onRefresh, getStatusColor, getStatusText } = useOffersData();
+  const [activeTab, setActiveTab] = useState<'sent' | 'received'>('sent');
+
+  const data = activeTab === 'sent' ? sentOffers : receivedOffers;
+
+  const OfferRow = React.memo(({ item }: { item: Offer }) => (
     <TouchableOpacity style={styles.offerCard}>
       <View style={styles.offerHeader}>
         <Text style={styles.offerType}>
-          {item.type === 'sent' ? 'Sent Offer' : 'Received Offer'}
+          {activeTab === 'sent' ? 'Sent Offer' : 'Received Offer'}
         </Text>
         <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
           <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
@@ -30,17 +36,17 @@ const OffersScreen: React.FC<OffersScreenProps> = memo(() => {
           {item.message || 'No message provided'}
         </Text>
         
-        {item.top_up_amount > 0 && (
+        {!!item.top_up_amount && item.top_up_amount !== 0 && (
           <Text style={styles.topUpAmount}>
-            +${item.top_up_amount.toFixed(2)} cash
+            {item.top_up_amount > 0 ? `+$${item.top_up_amount.toFixed(2)} cash` : `They add $${Math.abs(item.top_up_amount).toFixed(2)}`}
           </Text>
         )}
         
         <View style={styles.itemsContainer}>
-          {item.offer_items?.slice(0, 3).map((offerItem, index) => (
+          {item.offer_items?.slice(0, 3).map((offerItem: any, index: number) => (
             <View key={index} style={styles.itemPreview}>
               <Text style={styles.itemTitle} numberOfLines={1}>
-                {offerItem.item.title}
+                {offerItem.item?.title || 'Item'}
               </Text>
             </View>
           ))}
@@ -56,12 +62,21 @@ const OffersScreen: React.FC<OffersScreenProps> = memo(() => {
             {new Date(item.created_at).toLocaleDateString()}
           </Text>
           <Text style={styles.offerUser}>
-            {item.type === 'sent' ? 'To' : 'From'}: {item.sender?.username || item.receiver?.username}
+            {activeTab === 'sent' ? `To: ${item.receiver?.username}` : `From: ${item.sender?.username}`}
           </Text>
         </View>
       </View>
     </TouchableOpacity>
-  );
+  ), (prev, next) => (
+    prev.item.id === next.item.id &&
+    prev.item.status === next.item.status &&
+    prev.item.top_up_amount === next.item.top_up_amount &&
+    (prev.item.offer_items?.length || 0) === (next.item.offer_items?.length || 0)
+  ));
+
+  const renderOffer = useCallback(({ item }: { item: Offer }) => (
+    <OfferRow item={item} />
+  ), []);
 
   if (loading) {
     return (
@@ -86,12 +101,22 @@ const OffersScreen: React.FC<OffersScreenProps> = memo(() => {
         <Text style={styles.headerSubtitle}>
           Manage your swap offers and proposals
         </Text>
+
+        {/* Tabs */}
+        <View style={styles.tabsRow}>
+          <TouchableOpacity style={[styles.tabBtn, activeTab === 'sent' && styles.tabBtnActive]} onPress={() => setActiveTab('sent')}>
+            <Text style={[styles.tabText, activeTab === 'sent' && styles.tabTextActive]}>Sent</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.tabBtn, activeTab === 'received' && styles.tabBtnActive]} onPress={() => setActiveTab('received')}>
+            <Text style={[styles.tabText, activeTab === 'received' && styles.tabTextActive]}>Received</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <FlatList
-        data={offers}
+        data={data}
         renderItem={renderOffer}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item: any) => item.id}
         contentContainerStyle={styles.listContainer}
         refreshControl={
           <RefreshControl
@@ -101,11 +126,15 @@ const OffersScreen: React.FC<OffersScreenProps> = memo(() => {
             tintColor="#007AFF"
           />
         }
+        initialNumToRender={10}
+        windowSize={10}
+        maxToRenderPerBatch={10}
+        removeClippedSubviews={false}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyTitle}>No offers yet</Text>
+            <Text style={styles.emptyTitle}>No {activeTab === 'sent' ? 'sent' : 'received'} offers</Text>
             <Text style={styles.emptySubtitle}>
-              Start browsing items to make your first offer!
+              {activeTab === 'sent' ? 'Send an offer to get the conversation started.' : `You'll see offers from others here.`}
             </Text>
           </View>
         }
@@ -141,6 +170,29 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     fontSize: 14,
     color: '#777',
+  },
+  tabsRow: {
+    flexDirection: 'row',
+    marginTop: 12,
+    backgroundColor: '#f0f4ff',
+    borderRadius: 10,
+    padding: 4,
+  },
+  tabBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  tabBtnActive: {
+    backgroundColor: '#007AFF',
+  },
+  tabText: {
+    color: '#007AFF',
+    fontWeight: '600',
+  },
+  tabTextActive: {
+    color: '#fff',
   },
   loadingContainer: {
     flex: 1,

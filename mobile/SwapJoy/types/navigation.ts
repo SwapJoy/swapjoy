@@ -30,6 +30,23 @@ export type RootStackParamList = {
   };
   ProfileSettings: undefined;
   Search: undefined;
+  // Offer flow
+  OfferCreate: {
+    receiverId: string;
+    requestedItems: Array<{ id: string; title?: string; price?: number; image_url?: string; item_images?: Array<{ image_url: string }>; condition?: string }>;
+    contextTitle?: string; // e.g., bundle title or item title
+  };
+  OfferPreview: {
+    receiverId: string;
+    offeredItemIds: string[];
+    requestedItemIds: string[];
+    topUpAmount: number; // signed (+ add money, - request money)
+    message?: string;
+    summary: {
+      offered: Array<{ id: string; title?: string; price?: number; image_url?: string; item_images?: Array<{ image_url: string }> }>;
+      requested: Array<{ id: string; title?: string; price?: number; image_url?: string; item_images?: Array<{ image_url: string }> }>;
+    };
+  };
 };
 
 export type MainTabParamList = {
@@ -84,6 +101,17 @@ export type ItemDetailsScreenProps = {
 export type BundleItemsScreenProps = {
   navigation: NavigationProp<RootStackParamList, 'BundleItems'>;
   route: RouteProp<RootStackParamList, 'BundleItems'>;
+};
+
+// Offer screens
+export type OfferCreateScreenProps = {
+  navigation: NavigationProp<RootStackParamList, 'OfferCreate'>;
+  route: RouteProp<RootStackParamList, 'OfferCreate'>;
+};
+
+export type OfferPreviewScreenProps = {
+  navigation: NavigationProp<RootStackParamList, 'OfferPreview'>;
+  route: RouteProp<RootStackParamList, 'OfferPreview'>;
 };
 
 export type ProfileSettingsScreenProps = {

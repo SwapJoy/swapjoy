@@ -57,8 +57,12 @@ const BundleItemsScreen: React.FC<BundleItemsScreenProps> = ({ navigation, route
           <TouchableOpacity
             style={styles.offerButton}
             onPress={() => {
-              // Placeholder for offer flow
-              console.log('Offer on bundle pressed');
+              const sameOwnerItems = bundleItems.filter((it: any) => (it.user_id || it.user?.id) === ownerId);
+              (navigation as any).navigate('OfferCreate', {
+                receiverId: ownerId,
+                requestedItems: sameOwnerItems,
+                contextTitle: title,
+              });
             }}
           >
             <Text style={styles.offerText}>Offer</Text>

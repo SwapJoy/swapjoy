@@ -65,7 +65,7 @@ export class ApiService {
   }
 
   // AI-Powered Vector-Based Recommendations
-  static async getTopPicksForUser(userId: string, limit: number = 10) {
+  static async getTopPicksForUser(userId: string, limit: number = 10, options?: { bypassCache?: boolean }) {
     // Use Redis caching for expensive AI recommendations (graceful fallback if not available)
     return RedisCache.cache(
       'top-picks',
@@ -220,7 +220,12 @@ export class ApiService {
               ...item,
               image_url: imageUrl,
               item_images: itemImages,
-              users: itemUser,
+              user: itemUser ? { // ensure consistent 'user' shape
+                id: itemUser.id,
+                username: itemUser.username,
+                first_name: itemUser.first_name,
+                last_name: itemUser.last_name,
+              } : { id: item.user_id },
               similarity_score: similarityData?.similarity || 0,
               overall_score: similarityData?.overall_score || 0
             };
@@ -231,6 +236,69 @@ export class ApiService {
       
       // Add bundles directly (they already have all needed data)
       finalResults.push(...bundles);
+      
+      // Fallback: also construct bundles from owners who have multiple items (single-owner bundles)
+      try {
+        const { data: ownerItems } = await client
+          .from('items')
+          .select('id, title, price, user_id, item_images(image_url)')
+          .eq('status', 'available')
+          .neq('user_id', userId)
+          .limit(120);
+
+        if (Array.isArray(ownerItems) && ownerItems.length > 0) {
+          const byOwner: Record<string, any[]> = {};
+          for (const it of ownerItems) {
+            if (!byOwner[it.user_id]) byOwner[it.user_id] = [];
+            byOwner[it.user_id].push(it);
+          }
+
+          let constructed = 0;
+          for (const [owner, itemsArr] of Object.entries(byOwner)) {
+            if (constructed >= 5) break;
+            if ((itemsArr as any[]).length < 2) continue;
+
+            // Sort by price desc to build stronger value bundles
+            const sorted = [...(itemsArr as any[])].sort((a, b) => (b.price || 0) - (a.price || 0));
+            const topPairs = sorted.slice(0, 4); // take top 4 to mix pairs
+            for (let i = 0; i < topPairs.length - 1 && constructed < 5; i++) {
+              const a = topPairs[i];
+              const b = topPairs[i + 1];
+              if (!a || !b) continue;
+
+              const bundleTotalValue = (parseFloat(a.price) || 0) + (parseFloat(b.price) || 0);
+              const bundleDiscount = Math.min(bundleTotalValue * 0.1, 100);
+              const bundleValue = bundleTotalValue - bundleDiscount;
+              const imageUrl = a.item_images?.[0]?.image_url || b.item_images?.[0]?.image_url || null;
+
+              const bundle = {
+                id: `owner_bundle_${owner}_${a.id}_${b.id}`,
+                title: `${a.title} + ${b.title}`,
+                description: `Bundle: ${a.title} and ${b.title}`,
+                price: bundleValue,
+                estimated_value: bundleValue,
+                is_bundle: true,
+                bundle_items: [a, b],
+                similarity_score: 0.6, // heuristic baseline
+                overall_score: 0.65, // slight boost to surface
+                match_score: Math.round(0.65 * 100),
+                reason: 'Same owner bundle - good combined value',
+                category_id: null,
+                user_id: owner,
+                user: { id: owner },
+                image_url: imageUrl,
+                created_at: new Date().toISOString(),
+                status: 'available'
+              };
+
+              finalResults.push(bundle);
+              constructed++;
+            }
+          }
+        }
+      } catch (e) {
+        console.log('Owner bundle fallback failed:', e);
+      }
       
       console.log(`Final results: ${finalResults.length} items (${finalResults.filter(r => r.is_bundle).length} bundles, ${finalResults.filter(r => !r.is_bundle).length} single items)`);
       
@@ -246,14 +314,14 @@ export class ApiService {
       // Fallback if no vector matches found
       return this.getFallbackRecommendations(client, userId, limit);
     }),
-    600 // 10 minutes cache TTL for AI recommendations
+    options?.bypassCache === true
     );
   }
 
   // Ensure we always return a valid response
-  static async getTopPicksForUserSafe(userId: string, limit: number = 10) {
+  static async getTopPicksForUserSafe(userId: string, limit: number = 10, options?: { bypassCache?: boolean }) {
     try {
-      const result = await this.getTopPicksForUser(userId, limit);
+      const result = await this.getTopPicksForUser(userId, limit, options);
       return {
         data: Array.isArray(result?.data) ? result.data : [],
         error: result?.error || null
@@ -357,7 +425,7 @@ export class ApiService {
     }
 
     const bundles = [];
-    const maxBundles = Math.min(3, Math.floor(limit / 3)); // Generate up to 3 bundles
+    const maxBundles = Math.min(5, Math.floor(limit / 2)); // Generate up to 5 bundles
 
     // Create bundles by combining user's items
     for (let i = 0; i < Math.min(maxBundles, userItems.length - 1); i++) {
@@ -376,59 +444,61 @@ export class ApiService {
       const bundleValue = totalValue - bundleDiscount;
 
       // Find similar items that could be bundled together
-      const { data: similarItems1, error: error1 } = await client.rpc('match_items', {
+      const { data: similarItems1 } = await client.rpc('match_items', {
         query_embedding: item1.embedding,
-        match_threshold: 0.6,
-        match_count: 3,
-        min_value: item1.price * 0.5,
+        match_threshold: 0.5,
+        match_count: 5,
+        min_value: (item1.price || 0) * 0.4,
         exclude_user_id: userId
       });
 
-      const { data: similarItems2, error: error2 } = await client.rpc('match_items', {
+      const { data: similarItems2 } = await client.rpc('match_items', {
         query_embedding: item2.embedding,
-        match_threshold: 0.6,
-        match_count: 3,
-        min_value: item2.price * 0.5,
+        match_threshold: 0.5,
+        match_count: 5,
+        min_value: (item2.price || 0) * 0.4,
         exclude_user_id: userId
       });
 
-      if (error1) {
-        console.error(`Error finding similar items for ${item1.title}:`, error1);
-      }
-      if (error2) {
-        console.error(`Error finding similar items for ${item2.title}:`, error2);
-      }
-
-      if (!error1 && !error2 && similarItems1 && similarItems2 && similarItems1.length > 0 && similarItems2.length > 0) {
-        console.log(`Found ${similarItems1.length} similar items for ${item1.title} and ${similarItems2.length} for ${item2.title}`);
+      if (similarItems1 && similarItems2 && similarItems1.length > 0 && similarItems2.length > 0) {
         // Get full details for items to create bundles
-        const allItemIds = [...(similarItems1 || []), ...(similarItems2 || [])].map(item => item.id);
-        const { data: fullItems, error: fullItemsError } = await client
+        const allItemIds = [...(similarItems1 || []), ...(similarItems2 || [])].map((it: any) => it.id);
+        const { data: fullItems } = await client
           .from('items')
-          .select('*, item_images(image_url), users!items_user_id_fkey(username, first_name, last_name)')
+          .select('*, item_images(image_url)')
           .in('id', allItemIds);
 
-        if (!fullItemsError && fullItems && similarItems1 && similarItems2) {
+        if (fullItems) {
           // Create bundles by combining similar items
-          for (const itemA of (similarItems1 || []).slice(0, 2)) {
-            for (const itemB of (similarItems2 || []).slice(0, 2)) {
+          for (const itemA of (similarItems1 || []).slice(0, 3)) {
+            for (const itemB of (similarItems2 || []).slice(0, 3)) {
               if (itemA.id !== itemB.id) {
-                const fullItemA = fullItems.find((item: any) => item.id === itemA.id);
-                const fullItemB = fullItems.find((item: any) => item.id === itemB.id);
+                const fullItemA = fullItems.find((it: any) => it.id === itemA.id);
+                const fullItemB = fullItems.find((it: any) => it.id === itemB.id);
                 
                 if (fullItemA && fullItemB) {
-                  const bundleTotalValue = parseFloat(itemA.price) + parseFloat(itemB.price);
-                  const bundleDiscount = Math.min(bundleTotalValue * 0.1, 100);
-                  const bundleValue = bundleTotalValue - bundleDiscount;
+                  // Only bundle items from the same owner
+                  if (fullItemA.user_id !== fullItemB.user_id) {
+                    continue;
+                  }
 
-                  // Only create bundles within reasonable price range (80% to 120% of your total value)
-                  if (bundleValue >= userTotalValue * 0.8 && bundleValue <= userTotalValue * 1.2) {
+                  const bundleTotalValue = parseFloat(itemA.price) + parseFloat(itemB.price);
+                  const bundleDiscount2 = Math.min(bundleTotalValue * 0.1, 100);
+                  const bundleValue2 = bundleTotalValue - bundleDiscount2;
+
+                  // Relaxed price range (60% to 160% of your total value)
+                  if (bundleValue2 >= userTotalValue * 0.6 && bundleValue2 <= userTotalValue * 1.6) {
+                    const bundleOwnerId = fullItemA.user_id;
+                    const imageA = fullItemA.item_images?.[0]?.image_url;
+                    const imageB = fullItemB.item_images?.[0]?.image_url;
+                    const imageUrl = imageA || imageB || 'https://via.placeholder.com/200x150';
+
                     const bundle = {
                       id: `bundle_${itemA.id}_${itemB.id}`,
                       title: `${itemA.title} + ${itemB.title}`,
                       description: `Bundle: ${itemA.title} and ${itemB.title}`,
-                      price: bundleValue,
-                      estimated_value: bundleValue, // For compatibility
+                      price: bundleValue2,
+                      estimated_value: bundleValue2,
                       is_bundle: true,
                       bundle_items: [fullItemA, fullItemB],
                       similarity_score: (itemA.similarity + itemB.similarity) / 2,
@@ -436,26 +506,22 @@ export class ApiService {
                       match_score: Math.round(((itemA.similarity + itemB.similarity) / 2 + 0.1) * 100),
                       reason: `Great bundle match! Similar to your ${userItems.find(ui => ui.category_id === itemA.category_id)?.title || 'items'}`,
                       category_id: itemA.category_id,
-                      user_id: itemA.user_id,
-                      user: fullItemA.user || {
-                        first_name: 'Bundle',
-                        last_name: 'Owner',
-                        username: 'bundle_owner'
-                      },
-                      image_url: fullItemA.item_images?.[0]?.image_url || fullItemB.item_images?.[0]?.image_url || 'https://via.placeholder.com/200x150',
+                      user_id: bundleOwnerId,
+                      user: { id: bundleOwnerId },
+                      image_url: imageUrl,
                       created_at: new Date().toISOString(),
                       status: 'available'
                     };
 
                     bundles.push(bundle);
+                    if (bundles.length >= maxBundles) break;
                   }
                 }
               }
             }
+            if (bundles.length >= maxBundles) break;
           }
         }
-      } else {
-        console.log(`No similar items found for bundle creation between ${item1.title} and ${item2.title}`);
       }
     }
 
@@ -602,9 +668,9 @@ export class ApiService {
     });
   }
 
-  static async getOffers() {
+  static async getOffers(userId?: string, type?: 'sent' | 'received') {
     return this.authenticatedCall(async (client) => {
-      return await client
+      let query = client
         .from('offers')
         .select(`
           *,
@@ -616,6 +682,15 @@ export class ApiService {
           )
         `)
         .order('created_at', { ascending: false });
+
+      if (userId && type === 'sent') {
+        query = query.eq('sender_id', userId);
+      } else if (userId && type === 'received') {
+        query = query.eq('receiver_id', userId);
+      }
+
+      const { data, error } = await query;
+      return { data, error } as any;
     });
   }
 
@@ -629,18 +704,62 @@ export class ApiService {
     }>;
   }) {
     return this.authenticatedCall(async (client) => {
+      // Ensure we have the authenticated user for RLS
+      const user = await AuthService.getCurrentUser();
+      if (!user?.id) {
+        return { data: null, error: { message: 'Not authenticated' } } as any;
+      }
+
+      // Separate item ids by side for validation
+      const offeredIds = offerData.offer_items.filter(i => i.side === 'offered').map(i => i.item_id);
+      const requestedIds = offerData.offer_items.filter(i => i.side === 'requested').map(i => i.item_id);
+      const distinctIds = Array.from(new Set([...offeredIds, ...requestedIds]));
+
+      // Fetch items owners once
+      const { data: itemsMeta, error: itemsMetaError } = await client
+        .from('items')
+        .select('id, user_id')
+        .in('id', distinctIds);
+      if (itemsMetaError) {
+        return { data: null, error: itemsMetaError } as any;
+      }
+      if (!itemsMeta || itemsMeta.length !== distinctIds.length) {
+        return { data: null, error: { message: 'Some items not found' } } as any;
+      }
+
+      const idToOwner: Record<string, string> = {};
+      (itemsMeta || []).forEach((it: any) => { idToOwner[it.id] = it.user_id; });
+
+      // Validate offered: must belong to sender
+      const invalidOffered = offeredIds.filter(id => idToOwner[id] !== user.id);
+      if (invalidOffered.length > 0) {
+        return { data: null, error: { message: 'Offered items must belong to you' } } as any;
+      }
+
+      // Derive receiver from requested items' owner; must be a single owner
+      const requestedOwnerIds = Array.from(new Set(requestedIds.map(id => idToOwner[id]))).filter(Boolean);
+      if (requestedOwnerIds.length !== 1) {
+        return { data: null, error: { message: 'Requested items must belong to a single user' } } as any;
+      }
+      const derivedReceiverId = requestedOwnerIds[0];
+      if (derivedReceiverId === user.id) {
+        return { data: null, error: { message: 'Cannot send offer to yourself' } } as any;
+      }
+
+      // Create offer with derived receiver id
       const { data: offer, error: offerError } = await client
         .from('offers')
         .insert({
-          receiver_id: offerData.receiver_id,
+          sender_id: user.id,
+          receiver_id: derivedReceiverId,
           message: offerData.message,
           top_up_amount: offerData.top_up_amount || 0,
         })
         .select()
         .single();
 
-      if (offerError) {
-        return { data: null, error: offerError };
+      if (offerError || !offer) {
+        return { data: null, error: offerError || { message: 'Failed to create offer' } } as any;
       }
 
       // Insert offer items
@@ -656,7 +775,11 @@ export class ApiService {
         .select();
 
       if (itemsError) {
-        return { data: null, error: itemsError };
+        // Best-effort cleanup if items insert fails
+        try {
+          await client.from('offers').delete().eq('id', offer.id);
+        } catch {}
+        return { data: null, error: itemsError } as any;
       }
 
       return { data: { ...offer, offer_items: offerItems }, error: null };
@@ -763,7 +886,7 @@ export class ApiService {
         error: null,
       };
     }),
-    300 // 5 minutes cache TTL for user stats
+    true // allow bypass flag as needed by caller (no TTL param anymore)
     );
   }
 
@@ -789,7 +912,7 @@ export class ApiService {
         error: null,
       };
     }),
-    300 // 5 minutes cache TTL for user ratings
+    true // allow bypass flag as needed by caller (no TTL param anymore)
     );
   }
 
@@ -1245,7 +1368,7 @@ export class ApiService {
 
         return { data: topCategories, error: null };
       }),
-      600 // 10 minutes cache TTL
+      true // no TTL param; caller controls bypass if needed
     );
   }
 

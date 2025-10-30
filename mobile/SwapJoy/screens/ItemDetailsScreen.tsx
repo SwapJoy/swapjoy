@@ -120,8 +120,20 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
           <TouchableOpacity
             style={styles.offerButton}
             onPress={() => {
-              // Placeholder for offer flow
-              console.log('Offer on item pressed');
+              (navigation as any).navigate('OfferCreate', {
+                receiverId: item.user.id,
+                requestedItems: [
+                  {
+                    id: item.id,
+                    title: item.title,
+                    price: item.price || item.estimated_value,
+                    image_url: item.image_url,
+                    item_images: item.images || item.item_images || [],
+                    condition: item.condition,
+                  },
+                ],
+                contextTitle: item.title,
+              });
             }}
           >
             <Text style={styles.offerText}>Offer</Text>

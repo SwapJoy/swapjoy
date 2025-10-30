@@ -31,6 +31,7 @@ export const useExploreData = () => {
   const [isInitialized, setIsInitialized] = useState(false);
   const isMountedRef = useRef(true);
   const hasFetchedRef = useRef(false);
+  const forceBypassRef = useRef(false);
 
 
   const calculateMatchScore = useCallback((item: any, currentUser: any) => {
@@ -145,9 +146,11 @@ export const useExploreData = () => {
     
     try {
       setIsFetching(true);
-      
+
+      const bypassCache = forceBypassRef.current || hasFetchedRef.current;
       // Fetch items from "Top Picks" section (favorite categories)
-      const { data: topPicks, error: topPicksError } = await ApiService.getTopPicksForUserSafe(user.id, 10);
+      const { data: topPicks, error: topPicksError } = await ApiService.getTopPicksForUserSafe(user.id, 10, { bypassCache });
+      forceBypassRef.current = false;
       
       if (topPicksError) {
         console.error('Error fetching top picks:', topPicksError);
@@ -188,10 +191,10 @@ export const useExploreData = () => {
           estimated_value: displayValue, // Use calculated or database value
           image_url: imageUrl,
           user: {
-            id: item.users?.id || item.user_id,
-            username: item.users?.username || `user_${(item.user_id || '').slice(-4)}`,
-            first_name: item.users?.first_name || `User ${(item.user_id || '').slice(-4)}`,
-            last_name: item.users?.last_name || '',
+            id: item.users?.id || item.user?.id || item.user_id,
+            username: item.users?.username || item.user?.username || `user_${(item.user_id || '').slice(-4)}`,
+            first_name: item.users?.first_name || item.user?.first_name || `User ${(item.user_id || '').slice(-4)}`,
+            last_name: item.users?.last_name || item.user?.last_name || '',
           },
           match_score: matchScore,
           reason: reason,
@@ -200,11 +203,19 @@ export const useExploreData = () => {
         };
       });
 
+      // Safety filter: drop bundles whose items have mixed owners
+      const filteredOffers = aiOffers.filter((o) => {
+        if (!o.is_bundle || !Array.isArray(o.bundle_items) || o.bundle_items.length === 0) return true;
+        const ownerId = o.user?.id;
+        if (!ownerId) return false;
+        return o.bundle_items.every((bi: any) => (bi.user_id || bi.user?.id) === ownerId);
+      });
+
       // Sort by match score (highest first)
-      aiOffers.sort((a, b) => b.match_score - a.match_score);
+      filteredOffers.sort((a, b) => b.match_score - a.match_score);
 
       if (isMountedRef.current) {
-        setAiOffers(aiOffers);
+        setAiOffers(filteredOffers);
         setHasData(true);
         setIsInitialized(true);
         hasFetchedRef.current = true;
@@ -222,7 +233,7 @@ export const useExploreData = () => {
         setIsInitialized(true);
       }
     }
-  }, [user?.id, calculateMatchScore, getMatchReason]);
+  }, [user?.id, calculateMatchScore, getMatchReason, isFetching]);
 
   useEffect(() => {
     if (user && !hasFetchedRef.current) {
@@ -237,7 +248,7 @@ export const useExploreData = () => {
   }, []);
 
   const refreshData = useCallback(async () => {
-    hasFetchedRef.current = false;
+    forceBypassRef.current = true;
     setLoading(true);
     setHasData(false);
     setIsInitialized(false);

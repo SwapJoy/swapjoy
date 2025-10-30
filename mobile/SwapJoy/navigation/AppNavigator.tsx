@@ -18,6 +18,8 @@ import ItemDetailsScreen from '../screens/ItemDetailsScreen';
 import ProfileSettingsScreen from '../screens/ProfileSettingsScreen';
 import SearchScreen from '../screens/SearchScreen';
 import BundleItemsScreen from '../screens/BundleItemsScreen';
+import OfferCreateScreen from '../screens/OfferCreateScreen';
+import OfferPreviewScreen from '../screens/OfferPreviewScreen';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -141,6 +143,16 @@ const AppNavigator: React.FC = () => {
                 title: (route.params as any).title || 'Bundle',
                 headerBackTitleVisible: false,
               })}
+            />
+            <Stack.Screen 
+              name="OfferCreate" 
+              component={OfferCreateScreen}
+              options={{ title: 'Create Offer' }}
+            />
+            <Stack.Screen 
+              name="OfferPreview" 
+              component={OfferPreviewScreen}
+              options={{ title: 'Preview Offer' }}
             />
             <Stack.Screen 
               name="ProfileSettings" 
