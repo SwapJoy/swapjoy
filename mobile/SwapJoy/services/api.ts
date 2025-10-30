@@ -32,9 +32,15 @@ export class ApiService {
   // Example authenticated API methods
   static async getProfile() {
     return this.authenticatedCall(async (client) => {
+      // Ensure we fetch the row for the authenticated user only
+      const currentUser = await AuthService.getCurrentUser();
+      if (!currentUser?.id) {
+        return { data: null, error: { message: 'Not authenticated' } } as any;
+      }
       return await client
         .from('users')
         .select('*')
+        .eq('id', currentUser.id)
         .single();
     });
   }
@@ -856,37 +862,58 @@ export class ApiService {
 
   // User Stats - Ultra Simple Version
   static async getUserStats(userId: string) {
-    // Cache user stats for 5 minutes
+    // Cache user stats; compute counts for items and offers
     return RedisCache.cache(
       'user-stats',
       [userId],
       () => this.authenticatedCall(async (client) => {
-      console.log('ApiService: Getting user stats for user:', userId);
-      
-      // Just get items count - simplest possible query
-      const { data: items, error: itemsError } = await client
-        .from('items')
-        .select('id')
-        .eq('user_id', userId);
+        console.log('ApiService: Getting user stats for user:', userId);
 
-      console.log('ApiService: Items result:', { items, itemsError });
+        // Items listed count
+        const { data: items, error: itemsError } = await client
+          .from('items')
+          .select('id')
+          .eq('user_id', userId);
 
-      // Return simple stats - don't try to get offers data yet
-      const result = {
-        items_listed: items?.length || 0,
-        items_swapped: 0, // Simplified for now
-        total_offers: 0,   // Simplified for now
-        success_rate: 0,   // Simplified for now
-      };
+        // Offers sent count
+        const { count: sentOffers } = await client
+          .from('offers')
+          .select('id', { count: 'exact', head: true })
+          .eq('sender_id', userId);
 
-      console.log('ApiService: Returning stats:', result);
+        // Offers received count
+        const { count: receivedOffers } = await client
+          .from('offers')
+          .select('id', { count: 'exact', head: true })
+          .eq('receiver_id', userId);
 
-      return {
-        data: result,
-        error: null,
-      };
-    }),
-    true // allow bypass flag as needed by caller (no TTL param anymore)
+        // Successful swaps: offers with status accepted where user involved
+        const { count: successfulSwaps } = await client
+          .from('offers')
+          .select('id', { count: 'exact', head: true })
+          .eq('status', 'accepted')
+          .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`);
+
+        const totalOffers = (sentOffers || 0) + (receivedOffers || 0);
+        const successRate = totalOffers > 0 ? Math.round(((successfulSwaps || 0) / totalOffers) * 100) : 0;
+
+        const result = {
+          items_listed: items?.length || 0,
+          items_swapped: successfulSwaps || 0,
+          total_offers: totalOffers,
+          sent_offers: sentOffers || 0,
+          received_offers: receivedOffers || 0,
+          success_rate: successRate,
+        } as any;
+
+        console.log('ApiService: Returning stats:', result);
+
+        return {
+          data: result,
+          error: null,
+        };
+      }),
+      true
     );
   }
 
@@ -1137,6 +1164,65 @@ export class ApiService {
       })));
 
       return { data: itemsWithImages, error: null };
+    });
+  }
+
+  // Explicit helpers for published and draft items
+  static async getUserPublishedItems(userId: string) {
+    return this.authenticatedCall(async (client) => {
+      const { data: items, error } = await client
+        .from('items')
+        .select(`*, item_images!item_images_item_id_fkey(image_url)`) 
+        .eq('user_id', userId)
+        .eq('status', 'available')
+        .order('created_at', { ascending: false });
+
+      if (error) return { data: null, error } as any;
+
+      const itemsWithImages = items?.map(item => ({
+        ...item,
+        image_url: item.item_images?.[0]?.image_url || null,
+      }));
+
+      return { data: itemsWithImages, error: null } as any;
+    });
+  }
+
+  static async getUserDraftItems(userId: string) {
+    return this.authenticatedCall(async (client) => {
+      const { data: items, error } = await client
+        .from('items')
+        .select(`*, item_images!item_images_item_id_fkey(image_url)`) 
+        .eq('user_id', userId)
+        .eq('status', 'draft')
+        .order('updated_at', { ascending: false });
+
+      if (error) return { data: null, error } as any;
+
+      const itemsWithImages = items?.map(item => ({
+        ...item,
+        image_url: item.item_images?.[0]?.image_url || null,
+      }));
+
+      return { data: itemsWithImages, error: null } as any;
+    });
+  }
+
+  static async getSavedItems() {
+    return this.authenticatedCall(async (client) => {
+      const { data, error } = await client
+        .from('favorites')
+        .select(`id, item:items(*, item_images(image_url))`)
+        .order('created_at', { ascending: false });
+
+      if (error) return { data: null, error } as any;
+
+      const flattened = (data || []).map((fav: any) => ({
+        ...fav.item,
+        image_url: fav.item?.item_images?.[0]?.image_url || null,
+      }));
+
+      return { data: flattened, error: null } as any;
     });
   }
 
@@ -1524,14 +1610,26 @@ export class ApiService {
    * Get all categories
    */
   static async getCategories() {
-    // Bypass cache for categories to always get fresh data
-    return this.authenticatedCall(async (client) => {
-      return await client
-        .from('categories')
-        .select('*')
-        .eq('is_active', true)
-        .order('name', { ascending: true });
-    });
+    // Cached categories for performance
+    return RedisCache.cache(
+      'all-categories',
+      ['active'],
+      () => this.authenticatedCall(async (client) => {
+        return await client
+          .from('categories')
+          .select('id, name, description, is_active')
+          .eq('is_active', true)
+          .order('name', { ascending: true });
+      }),
+      true
+    );
+  }
+
+  static async getCategoryIdToNameMap() {
+    const { data } = await this.getCategories();
+    const map: Record<string, string> = {};
+    (data || []).forEach((c: any) => { if (c?.id) map[c.id] = c.name || String(c.id); });
+    return map;
   }
 
   /**

@@ -95,9 +95,8 @@ const OffersScreen: React.FC<OffersScreenProps> = memo(() => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Offers</Text>
         <Text style={styles.headerSubtitle}>
           Manage your swap offers and proposals
         </Text>
@@ -139,7 +138,7 @@ const OffersScreen: React.FC<OffersScreenProps> = memo(() => {
           </View>
         }
       />
-    </SafeAreaView>
+    </View>
   );
 });
 

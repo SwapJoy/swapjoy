@@ -7,6 +7,8 @@ export interface UserStats {
   itemsListed: number;
   itemsSwapped: number;
   totalOffers: number;
+  sentOffers?: number;
+  receivedOffers?: number;
   successRate: number;
 }
 
@@ -28,6 +30,9 @@ export interface UserItem {
 
 export const useProfileData = () => {
   const { user, signOut } = useAuth();
+  const [profile, setProfile] = useState<any>(null);
+  const [favoriteCategories, setFavoriteCategories] = useState<string[]>([]);
+  const [favoriteCategoryNames, setFavoriteCategoryNames] = useState<string[]>([]);
   const [stats, setStats] = useState<UserStats>({
     itemsListed: 0,
     itemsSwapped: 0,
@@ -39,6 +44,8 @@ export const useProfileData = () => {
     totalRatings: 0,
   });
   const [userItems, setUserItems] = useState<UserItem[]>([]);
+  const [savedItems, setSavedItems] = useState<UserItem[]>([]);
+  const [draftItems, setDraftItems] = useState<UserItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   const handleSignOut = useCallback(() => {
@@ -88,9 +95,30 @@ export const useProfileData = () => {
             itemsListed: statsData.items_listed || 0,
             itemsSwapped: statsData.items_swapped || 0,
             totalOffers: statsData.total_offers || 0,
+            sentOffers: (statsData as any).sent_offers || 0,
+            receivedOffers: (statsData as any).received_offers || 0,
             successRate: statsData.success_rate || 0,
           });
         }
+
+        // Get profile (username, names, bio, favorites)
+        const { data: profileData } = await ApiService.getProfile();
+        if (profileData) {
+          const casted: any = profileData as any;
+          setProfile(casted);
+          setFavoriteCategories(Array.isArray(casted.favorite_categories) ? casted.favorite_categories : []);
+        }
+
+        // Build favorite category names map
+        try {
+          const idToName = await ApiService.getCategoryIdToNameMap();
+          if (Array.isArray((profileData as any)?.favorite_categories)) {
+            const names = (profileData as any).favorite_categories
+              .map((id: string) => idToName[id])
+              .filter(Boolean);
+            setFavoriteCategoryNames(names);
+          }
+        } catch {}
 
         // Get user ratings
         const { data: ratingData } = await ApiService.getUserRatings(user.id);
@@ -101,20 +129,52 @@ export const useProfileData = () => {
           });
         }
 
-        // Get user items
-        const { data: itemsData } = await ApiService.getUserItems(user.id);
-        if (itemsData) {
-          const formattedItems = itemsData.map((item: any) => ({
+        // Get published items
+        const { data: published } = await ApiService.getUserPublishedItems(user.id);
+        if (published) {
+          const list = (published as any[]) || [];
+          const formatted = list.map((item: any) => ({
             id: item.id,
             title: item.title,
             description: item.description,
             price: item.price,
             condition: item.condition,
-            image_url: item.item_images?.[0]?.image_url,
-            category_name: item.categories?.name,
+            image_url: item.image_url,
             created_at: item.created_at,
           }));
-          setUserItems(formattedItems);
+          setUserItems(formatted);
+        }
+
+        // Get saved (favorites)
+        const { data: saved } = await ApiService.getSavedItems();
+        if (saved) {
+          const list = (saved as any[]) || [];
+          const formatted = list.map((item: any) => ({
+            id: item.id,
+            title: item.title,
+            description: item.description,
+            price: item.price,
+            condition: item.condition,
+            image_url: item.image_url,
+            created_at: item.created_at,
+          }));
+          setSavedItems(formatted);
+        }
+
+        // Get drafts
+        const { data: drafts } = await ApiService.getUserDraftItems(user.id);
+        if (drafts) {
+          const list = (drafts as any[]) || [];
+          const formatted = list.map((item: any) => ({
+            id: item.id,
+            title: item.title,
+            description: item.description,
+            price: item.price,
+            condition: item.condition,
+            image_url: item.image_url,
+            created_at: item.updated_at || item.created_at,
+          }));
+          setDraftItems(formatted);
         }
       } catch (error) {
         console.error('Error fetching profile data:', error);
@@ -128,9 +188,14 @@ export const useProfileData = () => {
 
   return {
     user,
+    profile,
     stats,
     rating,
     userItems,
+    savedItems,
+    draftItems,
+    favoriteCategories,
+    favoriteCategoryNames,
     loading,
     handleSignOut,
     formatSuccessRate,

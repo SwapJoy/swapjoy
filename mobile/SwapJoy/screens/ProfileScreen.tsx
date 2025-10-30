@@ -1,27 +1,49 @@
-import React, { memo, useCallback } from 'react';
+import React, { memo, useCallback, useMemo, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ProfileScreenProps } from '../types/navigation';
 import { useProfileData } from '../hooks/useProfileData';
 import CachedImage from '../components/CachedImage';
+import { useNavigation } from '@react-navigation/native';
+import { FlatList, Dimensions } from 'react-native';
 
 const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
+  const navigation = useNavigation<any>();
   const {
     user,
+    profile,
     stats,
     rating,
     userItems,
+    savedItems,
+    draftItems,
     loading,
     handleSignOut,
     formatSuccessRate,
     formatRating,
+    favoriteCategories,
+    favoriteCategoryNames,
   } = useProfileData();
+
+  const [activeTab, setActiveTab] = useState<'published' | 'saved' | 'drafts'>('published');
+  const gridData = useMemo(() => {
+    if (activeTab === 'published') return userItems;
+    if (activeTab === 'saved') return savedItems;
+    return draftItems;
+  }, [activeTab, userItems, savedItems, draftItems]);
+
+  const numColumns = 3;
+  const screenWidth = Dimensions.get('window').width;
+  const gridSpacing = 2;
+  const itemSize = useMemo(() => {
+    const horizontalPadding = 0;
+    return Math.floor((screenWidth - horizontalPadding - gridSpacing * (numColumns - 1)) / numColumns);
+  }, [screenWidth]);
 
 
   const renderStatItem = useCallback((title: string, value: string | number, subtitle?: string) => (
@@ -32,24 +54,23 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
     </View>
   ), []);
 
-  const renderProfileItem = useCallback((
-    icon: string,
-    title: string,
-    subtitle?: string,
-    onPress?: () => void,
-    showArrow: boolean = true
-  ) => (
-    <TouchableOpacity style={styles.profileItem} onPress={onPress}>
-      <View style={styles.profileItemLeft}>
-        <Text style={styles.profileItemIcon}>{icon}</Text>
-        <View style={styles.profileItemText}>
-          <Text style={styles.profileItemTitle}>{title}</Text>
-          {subtitle && <Text style={styles.profileItemSubtitle}>{subtitle}</Text>}
-        </View>
+  // removed unused renderProfileItem helper
+
+  const renderGridItem = useCallback(({ item }: { item: any }) => (
+    <View style={[styles.gridItem, { width: itemSize, height: itemSize * 1.7 }]}> 
+      <CachedImage
+        uri={item.image_url || 'https://via.placeholder.com/300?text=No+Image'}
+        style={styles.gridImage}
+        resizeMode="cover"
+      />
+      <View style={styles.gridMetaBar}>
+        <Text style={styles.gridMetaText} numberOfLines={1}>{item.title || 'Untitled'}</Text>
+        {typeof item.price !== 'undefined' && item.price !== null && (
+          <Text style={styles.gridMetaPrice}>${Number(item.price).toFixed(0)}</Text>
+        )}
       </View>
-      {showArrow && <Text style={styles.arrow}>›</Text>}
-    </TouchableOpacity>
-  ), []);
+    </View>
+  ), [itemSize]);
 
   if (loading) {
     return (
@@ -62,124 +83,131 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.profileInfo}>
-            <View style={styles.avatarContainer}>
-              <CachedImage
-                uri={(user as any)?.profile_image_url || 'https://via.placeholder.com/100'}
-                style={styles.avatar}
-                resizeMode="cover"
-              />
+    <View style={styles.container}>
+      <FlatList
+        data={gridData}
+        keyExtractor={(it) => it.id}
+        numColumns={3}
+        renderItem={renderGridItem}
+        columnWrapperStyle={{ justifyContent: 'space-between', marginBottom: 2 }}
+        contentContainerStyle={styles.gridList}
+        showsVerticalScrollIndicator={false}
+        ListHeaderComponent={(
+          <View>
+            {/* Header */}
+            <View style={styles.header}>
+              <View style={styles.profileInfo}>
+                <View style={styles.avatarContainer}>
+                  <CachedImage
+                    uri={
+                      (profile as any)?.profile_image_url ||
+                      (user as any)?.profile_image_url ||
+                      (user as any)?.user_metadata?.avatar_url ||
+                      'https://via.placeholder.com/100?text=Avatar'
+                    }
+                    style={styles.avatar}
+                    resizeMode="cover"
+                  />
+                </View>
+                <View style={styles.userInfo}>
+                  <Text style={styles.userName}>
+                    {profile?.first_name || (user as any)?.user_metadata?.first_name || ''} {profile?.last_name || (user as any)?.user_metadata?.last_name || ''}
+                  </Text>
+                  {(
+                    profile?.username ||
+                    (user as any)?.user_metadata?.username ||
+                    (user as any)?.email?.split?.('@')?.[0]
+                  ) && (
+                    <Text style={styles.username}>@
+                      {profile?.username || (user as any)?.user_metadata?.username || (user as any)?.email?.split?.('@')?.[0]}
+                    </Text>
+                  )}
+                  {(profile?.bio) && (
+                    <Text style={styles.bio}>{profile.bio}</Text>
+                  )}
+                </View>
+              </View>
             </View>
-            <View style={styles.userInfo}>
-              <Text style={styles.userName}>
-                {user?.first_name} {user?.last_name}
-              </Text>
-              <Text style={styles.username}>@{user?.username}</Text>
-              {(user as any)?.bio && (
-                <Text style={styles.bio}>{(user as any).bio}</Text>
+
+            {/* Favorite Categories Section - centered and below header */}
+            {Array.isArray(favoriteCategoryNames) && favoriteCategoryNames.length > 0 && (
+              <View style={styles.favSection}>
+                <View style={styles.favChipsContainerCentered}>
+                  {favoriteCategoryNames.slice(0, 10).map((name) => (
+                    <View key={name} style={styles.favChip}>
+                      <Text style={styles.favChipText}>{name}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {/* Stats */}
+            <View style={styles.statsContainer}>
+              <View style={styles.statsRow}>
+                {renderStatItem('Items Listed', stats.itemsListed)}
+                {renderStatItem('Items Swapped', stats.itemsSwapped)}
+              </View>
+              <View style={styles.statsRow}>
+                {renderStatItem('Sent Offers', (stats as any).sentOffers ?? Math.floor((stats.totalOffers || 0) / 2))}
+                {renderStatItem('Received Offers', (stats as any).receivedOffers ?? Math.ceil((stats.totalOffers || 0) / 2))}
+              </View>
+              <View style={styles.statsRow}>
+                {renderStatItem('Success Rate', formatSuccessRate(stats.successRate))}
+                {renderStatItem('Total Offers', stats.totalOffers)}
+              </View>
+            </View>
+
+            {/* Rating */}
+            {rating.totalRatings > 0 && (
+              <View style={styles.ratingContainer}>
+                <Text style={styles.ratingTitle}>Rating</Text>
+                <View style={styles.ratingContent}>
+                  <Text style={styles.ratingValue}>{formatRating(rating.averageRating)}</Text>
+                  <Text style={styles.ratingStars}>★★★★★</Text>
+                  <Text style={styles.ratingCount}>({rating.totalRatings} reviews)</Text>
+                </View>
+              </View>
+            )}
+
+            {/* Tabs */}
+            <View style={styles.section}>
+              <View style={styles.tabsWrapper}>
+                <View style={styles.tabsContainer}>
+                <TouchableOpacity
+                  onPress={() => setActiveTab('published')}
+              style={[styles.tabButton, activeTab === 'published' && styles.tabButtonActive]}
+                >
+              <Text style={[styles.tabText, activeTab === 'published' && styles.tabTextActive]}>Published</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setActiveTab('saved')}
+              style={[styles.tabButton, activeTab === 'saved' && styles.tabButtonActive]}
+                >
+              <Text style={[styles.tabText, activeTab === 'saved' && styles.tabTextActive]}>Saved</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setActiveTab('drafts')}
+              style={[styles.tabButton, activeTab === 'drafts' && styles.tabButtonActive]}
+                >
+              <Text style={[styles.tabText, activeTab === 'drafts' && styles.tabTextActive]}>Drafts</Text>
+                </TouchableOpacity>
+                </View>
+              </View>
+
+              {gridData.length === 0 && (
+                <View style={styles.emptyItemsContainer}>
+                  <Text style={styles.emptyItemsText}>No items to display</Text>
+                  <Text style={styles.emptyItemsSubtext}>
+                    {activeTab === 'published' ? 'Publish items to show here.' : activeTab === 'saved' ? 'Save items to view them here.' : 'Your draft items will appear here.'}
+                  </Text>
+                </View>
               )}
             </View>
           </View>
-        </View>
-
-        {/* Stats */}
-        <View style={styles.statsContainer}>
-          <View style={styles.statsRow}>
-            {renderStatItem('Items Listed', stats.itemsListed)}
-            {renderStatItem('Items Swapped', stats.itemsSwapped)}
-          </View>
-          <View style={styles.statsRow}>
-            {renderStatItem('Total Offers', stats.totalOffers)}
-            {renderStatItem('Success Rate', formatSuccessRate(stats.successRate))}
-          </View>
-        </View>
-
-        {/* Rating */}
-        {rating.totalRatings > 0 && (
-          <View style={styles.ratingContainer}>
-            <Text style={styles.ratingTitle}>Rating</Text>
-            <View style={styles.ratingContent}>
-              <Text style={styles.ratingValue}>{formatRating(rating.averageRating)}</Text>
-              <Text style={styles.ratingStars}>★★★★★</Text>
-              <Text style={styles.ratingCount}>({rating.totalRatings} reviews)</Text>
-            </View>
-          </View>
         )}
-
-        {/* Your Items */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Your Items ({userItems.length})</Text>
-          {userItems.length > 0 ? (
-            <View style={styles.itemsContainer}>
-              {userItems.map((item) => (
-                <View key={item.id} style={styles.itemCard}>
-                  <CachedImage
-                    uri={item.image_url || 'https://via.placeholder.com/80x80'}
-                    style={styles.itemImage}
-                    resizeMode="cover"
-                  />
-                  <View style={styles.itemDetails}>
-                    <Text style={styles.itemTitle} numberOfLines={1}>{item.title}</Text>
-                    <Text style={styles.itemPrice}>${item.price}</Text>
-                    <Text style={styles.itemCondition}>{item.condition}</Text>
-                    {item.category_name && (
-                      <Text style={styles.itemCategory}>{item.category_name}</Text>
-                    )}
-                  </View>
-                </View>
-              ))}
-            </View>
-          ) : (
-            <View style={styles.emptyItemsContainer}>
-              <Text style={styles.emptyItemsText}>No items listed yet</Text>
-              <Text style={styles.emptyItemsSubtext}>Add items to start swapping!</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Profile Options */}
-        <View style={styles.profileOptions}>
-          {renderProfileItem('👤', 'Edit Profile', 'Update your personal information')}
-          {renderProfileItem('🔔', 'Notifications', 'Manage your notification preferences')}
-          {renderProfileItem('🔒', 'Privacy & Security', 'Control your privacy settings')}
-          {renderProfileItem('💬', 'Help & Support', 'Get help and contact support')}
-          {renderProfileItem('ℹ️', 'About', 'App version and legal information')}
-        </View>
-
-        {/* Debug: Add Sample Items */}
-        <View style={styles.section}>
-          <TouchableOpacity 
-            style={styles.addItemsButton}
-            onPress={async () => {
-              if (user?.id) {
-                try {
-                  const { ApiService } = await import('../services/api');
-                  const result = await ApiService.createSampleItems(user.id);
-                  console.log('Sample items created:', result);
-                  // Refresh the profile data
-                  window.location.reload();
-                } catch (error) {
-                  console.error('Error creating sample items:', error);
-                }
-              }
-            }}
-          >
-            <Text style={styles.addItemsButtonText}>Add Sample Items (Debug)</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Sign Out */}
-        <View style={styles.signOutContainer}>
-          <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
-            <Text style={styles.signOutText}>Sign Out</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+      />
+    </View>
   );
 });
 
@@ -248,7 +276,6 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
-    shadowRadius: 3,
     elevation: 2,
   },
   statsRow: {
@@ -377,19 +404,13 @@ const styles = StyleSheet.create({
   itemCard: {
     flexDirection: 'row',
     backgroundColor: '#fff',
-    borderRadius: 10,
     padding: 12,
     marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
     elevation: 2,
   },
   itemImage: {
     width: 80,
     height: 80,
-    borderRadius: 8,
     marginRight: 12,
   },
   itemDetails: {
@@ -457,6 +478,97 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 10,
+  },
+  tabsWrapper: {
+    marginHorizontal: -20, // cancel section horizontal padding to stretch full width
+  },
+  tabsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5EA',
+  },
+  tabButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  tabButtonActive: {
+    borderBottomColor: '#007AFF',
+  },
+  tabText: {
+    color: '#8E8E93',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  tabTextActive: {
+    color: '#007AFF',
+    fontWeight: '700',
+  },
+  gridList: {
+    paddingTop: 6,
+  },
+  gridItem: {
+    backgroundColor: '#fff',
+    overflow: 'hidden',
+  },
+  gridImage: {
+    width: '100%',
+    height: '100%',
+  },
+  gridMetaBar: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 24,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 6,
+  },
+  gridMetaText: {
+    color: '#fff',
+    fontSize: 11,
+    flex: 1,
+    marginRight: 6,
+  },
+  gridMetaPrice: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  favChipsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 8,
+  },
+  favSection: {
+    paddingHorizontal: 12,
+    paddingBottom: 8,
+  },
+  favChipsContainerCentered: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+  },
+  favChip: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: '#f0f4ff',
+    borderRadius: 12,
+    marginRight: 6,
+    marginBottom: 6,
+  },
+  favChipText: {
+    color: '#3b6cff',
+    fontSize: 12,
+    fontWeight: '600',
   },
 });
 

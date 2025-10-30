@@ -17,7 +17,7 @@ interface MainTabNavigatorProps {
 const MainTabNavigator: React.FC<MainTabNavigatorProps> = ({ onNavigateToAdd }) => {
   return (
     <Tab.Navigator
-      screenOptions={{
+      screenOptions={({ route, navigation }) => ({
         headerShown: true,
         headerStyle: {
           backgroundColor: '#fff',
@@ -35,7 +35,7 @@ const MainTabNavigator: React.FC<MainTabNavigatorProps> = ({ onNavigateToAdd }) 
           color: '#000',
         },
         headerTitleAlign: 'center',
-        headerLeft: ({ navigation }) => (
+        headerLeft: () => (
           <TouchableOpacity
             style={{
               width: 32,
@@ -53,8 +53,8 @@ const MainTabNavigator: React.FC<MainTabNavigatorProps> = ({ onNavigateToAdd }) 
             <Ionicons name="add" size={24} color="#007AFF" />
           </TouchableOpacity>
         ),
-        headerRight: ({ route, navigation }) => {
-          const isProfile = route?.name === 'Profile';
+        headerRight: () => {
+          const isProfile = route.name === 'Profile';
           return (
             <TouchableOpacity
               style={{
@@ -65,12 +65,10 @@ const MainTabNavigator: React.FC<MainTabNavigatorProps> = ({ onNavigateToAdd }) 
                 marginRight: 16,
               }}
               onPress={() => {
-                if (navigation) {
-                  if (isProfile) {
-                    (navigation as any).navigate('ProfileSettings');
-                  } else {
-                    (navigation as any).navigate('Search');
-                  }
+                if (isProfile) {
+                  (navigation as any).navigate('ProfileSettings');
+                } else {
+                  (navigation as any).navigate('Search');
                 }
               }}
             >
@@ -105,7 +103,7 @@ const MainTabNavigator: React.FC<MainTabNavigatorProps> = ({ onNavigateToAdd }) 
         tabBarIconStyle: {
           marginTop: Platform.OS === 'ios' ? 2 : 0,
         },
-      }}
+      })}
     >
       <Tab.Screen
         name="Explore"
