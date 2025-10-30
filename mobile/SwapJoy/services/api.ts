@@ -1172,17 +1172,42 @@ export class ApiService {
     return this.authenticatedCall(async (client) => {
       const { data: items, error } = await client
         .from('items')
-        .select(`*, item_images!item_images_item_id_fkey(image_url)`) 
+        .select(`id, title, description, price, condition, created_at`) 
         .eq('user_id', userId)
         .eq('status', 'available')
         .order('created_at', { ascending: false });
 
       if (error) return { data: null, error } as any;
 
-      const itemsWithImages = items?.map(item => ({
-        ...item,
-        image_url: item.item_images?.[0]?.image_url || null,
-      }));
+      const ids = (items || []).map((it: any) => it.id);
+      let imagesByItem: Record<string, any[]> = {};
+      if (ids.length) {
+        const { data: images } = await client
+          .from('item_images')
+          .select('item_id, image_url, sort_order, is_primary')
+          .in('item_id', ids);
+        console.log('getUserPublishedItems: fetched images count =', images?.length || 0, 'for items =', ids.length);
+        (images || []).forEach((img: any) => {
+          if (!imagesByItem[img.item_id]) imagesByItem[img.item_id] = [];
+          imagesByItem[img.item_id].push(img);
+        });
+        // prefer primary, then lowest sort_order
+        Object.keys(imagesByItem).forEach(k => {
+          imagesByItem[k] = imagesByItem[k]
+            .sort((a, b) => (b.is_primary === true ? 1 : 0) - (a.is_primary === true ? 1 : 0) || (a.sort_order || 0) - (b.sort_order || 0));
+        });
+      }
+
+      const itemsWithImages = (items || []).map((item: any) => {
+        const firstImg = imagesByItem[item.id]?.[0];
+        const chosenUrl = firstImg?.image_url || firstImg?.thumbnail_url || null;
+        return {
+          ...item,
+          image_url: chosenUrl,
+        };
+      });
+
+      console.log('getUserPublishedItems: sample mapped', itemsWithImages.slice(0, 12).map((it: any) => ({ id: it.id, image_url: it.image_url })));
 
       return { data: itemsWithImages, error: null } as any;
     });
@@ -1192,17 +1217,41 @@ export class ApiService {
     return this.authenticatedCall(async (client) => {
       const { data: items, error } = await client
         .from('items')
-        .select(`*, item_images!item_images_item_id_fkey(image_url)`) 
+        .select(`id, title, description, price, condition, created_at, updated_at`) 
         .eq('user_id', userId)
         .eq('status', 'draft')
         .order('updated_at', { ascending: false });
 
       if (error) return { data: null, error } as any;
 
-      const itemsWithImages = items?.map(item => ({
-        ...item,
-        image_url: item.item_images?.[0]?.image_url || null,
-      }));
+      const ids = (items || []).map((it: any) => it.id);
+      let imagesByItem: Record<string, any[]> = {};
+      if (ids.length) {
+        const { data: images } = await client
+          .from('item_images')
+          .select('item_id, image_url, sort_order, is_primary')
+          .in('item_id', ids);
+        console.log('getUserDraftItems: fetched images count =', images?.length || 0, 'for items =', ids.length);
+        (images || []).forEach((img: any) => {
+          if (!imagesByItem[img.item_id]) imagesByItem[img.item_id] = [];
+          imagesByItem[img.item_id].push(img);
+        });
+        Object.keys(imagesByItem).forEach(k => {
+          imagesByItem[k] = imagesByItem[k]
+            .sort((a, b) => (b.is_primary === true ? 1 : 0) - (a.is_primary === true ? 1 : 0) || (a.sort_order || 0) - (b.sort_order || 0));
+        });
+      }
+
+      const itemsWithImages = (items || []).map((item: any) => {
+        const firstImg = imagesByItem[item.id]?.[0];
+        const chosenUrl = firstImg?.image_url || firstImg?.thumbnail_url || null;
+        return {
+          ...item,
+          image_url: chosenUrl,
+        };
+      });
+
+      console.log('getUserDraftItems: sample mapped', itemsWithImages.slice(0, 12).map((it: any) => ({ id: it.id, image_url: it.image_url })));
 
       return { data: itemsWithImages, error: null } as any;
     });

@@ -59,9 +59,11 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
   const renderGridItem = useCallback(({ item }: { item: any }) => (
     <View style={[styles.gridItem, { width: itemSize, height: itemSize * 1.7 }]}> 
       <CachedImage
-        uri={item.image_url || 'https://via.placeholder.com/300?text=No+Image'}
+        uri={item.image_url || ''}
         style={styles.gridImage}
         resizeMode="cover"
+        fallbackUri={'https://via.placeholder.com/300?text=No+Image'}
+        defaultSource={require('../assets/icon.png')}
       />
       <View style={styles.gridMetaBar}>
         <Text style={styles.gridMetaText} numberOfLines={1}>{item.title || 'Untitled'}</Text>

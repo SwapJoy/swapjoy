@@ -143,6 +143,7 @@ export const useProfileData = () => {
             created_at: item.created_at,
           }));
           setUserItems(formatted);
+          console.log('useProfileData: published first 12', formatted.slice(0, 12).map(i => ({ id: i.id, image_url: i.image_url })));
         }
 
         // Get saved (favorites)
