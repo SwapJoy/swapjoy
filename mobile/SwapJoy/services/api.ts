@@ -869,13 +869,13 @@ export class ApiService {
       () => this.authenticatedCall(async (client) => {
         console.log('ApiService: Getting user stats for user:', userId);
 
-        // Items listed count
+        // Items listed count (simple aggregate; exact count is fine for UI)
         const { data: items, error: itemsError } = await client
           .from('items')
           .select('id')
           .eq('user_id', userId);
 
-        // Offers sent count
+        // Offers sent count (count-only head query)
         const { count: sentOffers } = await client
           .from('offers')
           .select('id', { count: 'exact', head: true })
@@ -887,7 +887,7 @@ export class ApiService {
           .select('id', { count: 'exact', head: true })
           .eq('receiver_id', userId);
 
-        // Successful swaps: offers with status accepted where user involved
+        // Successful swaps: offers accepted where user is sender or receiver
         const { count: successfulSwaps } = await client
           .from('offers')
           .select('id', { count: 'exact', head: true })
@@ -1191,7 +1191,7 @@ export class ApiService {
           if (!imagesByItem[img.item_id]) imagesByItem[img.item_id] = [];
           imagesByItem[img.item_id].push(img);
         });
-        // prefer primary, then lowest sort_order
+        // Prefer primary, then lowest sort_order for deterministic cover image
         Object.keys(imagesByItem).forEach(k => {
           imagesByItem[k] = imagesByItem[k]
             .sort((a, b) => (b.is_primary === true ? 1 : 0) - (a.is_primary === true ? 1 : 0) || (a.sort_order || 0) - (b.sort_order || 0));
@@ -1659,7 +1659,7 @@ export class ApiService {
    * Get all categories
    */
   static async getCategories() {
-    // Cached categories for performance
+    // Cached categories for performance (used for favorite category chips and filters)
     return RedisCache.cache(
       'all-categories',
       ['active'],

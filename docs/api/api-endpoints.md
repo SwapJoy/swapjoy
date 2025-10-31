@@ -1,82 +1,6 @@
-# API Endpoints
+# Data Access and Service Methods
 
-## Base URL
-```
-Production: https://api.swapjoy.com/v1
-Staging: https://api-staging.swapjoy.com/v1
-Development: http://localhost:3000/v1
-```
-
-## Authentication
-All authenticated endpoints require:
-```
-Authorization: Bearer <jwt_token>
-```
-
-## Response Format
-```json
-{
-  "success": true,
-  "data": { ... },
-  "message": "Optional message",
-  "pagination": {
-    "page": 1,
-    "limit": 20,
-    "total": 100,
-    "totalPages": 5
-  }
-}
-```
-
-## Error Response
-```json
-{
-  "success": false,
-  "error": {
-    "code": "ERROR_CODE",
-    "message": "Human readable message",
-    "details": []
-  }
-}
-```
-
----
-
-## 1. Authentication Endpoints
-
-### POST /auth/register
-Register a new user with phone number.
-
-**Request:**
-```json
-{
-  "phone": "+1234567890",
-  "password": "SecurePass123!",
-  "firstName": "John",
-  "lastName": "Doe",
-  "username": "john_doe"
-}
-```
-
-**Response:** `201 Created`
-```json
-{
-  "success": true,
-  "data": {
-    "user": {
-      "id": "uuid",
-      "phone": "+1234567890",
-      "firstName": "John",
-      "lastName": "Doe",
-      "username": "john_doe"
-    },
-    "tokens": {
-      "accessToken": "jwt_token",
-      "refreshToken": "refresh_token"
-    }
-  }
-}
-```
+This app uses Supabase client queries (tables, RPC) wrapped by service methods instead of a traditional REST API. Below are the key service methods and sources.
 
 ### POST /auth/login
 Login with phone number and password.
@@ -164,75 +88,17 @@ Verify phone number (if needed).
 
 ---
 
-## Future Authentication Endpoints (Not in MVP)
-
-### POST /auth/oauth/google
-Google OAuth login.
-
-**Request:**
-```json
-{
-  "idToken": "google_id_token"
-}
-```
-
-### POST /auth/oauth/apple
-Apple Sign In.
-
-### POST /auth/oauth/facebook
-Facebook OAuth login.
-
-### POST /auth/email/register
-Email registration (future).
-
-### POST /auth/email/login
-Email login (future).
-
-### POST /auth/verify-email
-Verify email address (future).
+## Users
+- getProfile(): `users` (single row by current auth user id)
+- updateProfile(): `users` update for profile fields
 
 ---
 
-## 2. User Endpoints
-
-### GET /users/me
-Get current user profile.
-
-**Response:** `200 OK`
-```json
-{
-  "success": true,
-  "data": {
-    "id": "uuid",
-    "phone": "+1234567890",
-    "firstName": "John",
-    "lastName": "Doe",
-    "username": "john_doe",
-    "bio": "Love swapping!",
-    "profileImageUrl": "https://...",
-    "location": {
-      "lat": 37.7749,
-      "lng": -122.4194,
-      "city": "San Francisco",
-      "state": "CA",
-      "country": "USA"
-    },
-    "preferences": {
-      "preferredRadiusKm": 50.00,
-      "manualLocation": {
-        "lat": 37.7849,
-        "lng": -122.4094
-      }
-    },
-    "stats": {
-      "totalSwaps": 15,
-      "rating": 4.8,
-      "ratingCount": 12
-    },
-    "createdAt": "2024-01-15T10:00:00Z"
-  }
-}
-```
+## Items
+- getItems(): `items`
+- getUserPublishedItems(userId): `items` + separate `item_images` fetch; choose primary > lowest `sort_order` > thumbnail
+- getUserDraftItems(userId): same as above with status=draft
+- createItem(), updateItem(), deleteItem(): writes on `items`
 
 ### PUT /users/me
 Update current user profile.
@@ -316,10 +182,10 @@ Get location preferences.
 
 ---
 
-## 3. Item Endpoints
-
-### GET /items
-Get items with filters.
+## Offers
+- getOffers(userId, type): `offers` + `offer_items` join
+- createOffer(): inserts into `offers` and `offer_items`
+- updateOfferStatus(): updates `offers.status`
 
 **Query Params:**
 - category: uuid
@@ -418,10 +284,9 @@ Get similar items.
 
 ---
 
-## 4. Offer Endpoints
-
-### GET /offers
-Get user's offers (sent and received).
+## Favorites and Notifications
+- getFavorites(), addToFavorites(), removeFromFavorites(): `favorites`
+- getNotifications(), markNotificationAsRead(): `notifications`
 
 **Query Params:**
 - type: sent|received
@@ -531,10 +396,8 @@ Cancel an offer.
 
 ---
 
-## 5. Messaging Endpoints
-
-### GET /conversations
-Get user's conversations.
+## Aggregations and AI
+- getTopPicksForUser(), getRecentlyListed(), getSimilarCostItems(), getSimilarCategoryItems(): combines Supabase and RPC
 
 **Response:** `200 OK`
 ```json
@@ -607,7 +470,9 @@ Mark conversation as read.
 
 ---
 
-## 6. Search Endpoints
+## Categories
+- getCategories(): cached `all-categories` list in Redis
+- getCategoryIdToNameMap(): convenience mapper for ID→name
 
 ### GET /search
 Global search.
@@ -638,10 +503,11 @@ Get search suggestions/autocomplete.
 ---
 
 
-## 7. Category Endpoints
-
-### GET /categories
-Get all categories.
+## Caching (Redis)
+- `all-categories` (active)
+- `user-stats:<user_id>`
+- `user-ratings:<user_id>`
+- Recommendation-related keys (see code)
 
 **Response:** `200 OK`
 ```json
@@ -670,10 +536,8 @@ Get items in a category.
 
 ---
 
-## 8. Favorite Endpoints
-
-### GET /favorites
-Get user's favorites.
+## Notes
+- See `mobile/SwapJoy/services/api.ts` for method-level query shapes and mapping decisions
 
 ### POST /favorites
 Add item to favorites.

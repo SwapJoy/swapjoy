@@ -25,3 +25,21 @@ Create a sustainable, community-driven platform that promotes reuse and reduces 
 4. No monetary transactions
 5. Smart matching algorithm
 
+## Profile Experience
+- Circle avatar, full name, username, bio
+- Favorite categories shown as centered chips (category names)
+- Tabs: Published, Saved, Drafts (3-column grid; minimal UI; active underlined)
+- Header gear icon → Settings (Edit Profile, Notifications, Privacy & Security, Help & Support, About)
+
+## Data Flow
+- Supabase tables: users, items, item_images, offers, offer_items, favorites, categories
+- Redis-backed caching for shared/expensive queries
+  - `all-categories` (active categories; used for ID→name mapping)
+  - `user-stats:<user_id>` (simple aggregate stats)
+  - `user-ratings:<user_id>`
+
+## Notable Logic
+- User stats: items listed; offers sent/received; accepted offers; success rate
+- Item images: primary preferred; then lowest `sort_order`; fallback to thumbnail
+- Profile values pulled from users row; fallbacks to auth metadata for missing fields
+

@@ -1,5 +1,37 @@
 # Documentation Update Summary
 
+Date: 2025-10-30
+
+Scope covered in this update:
+
+- Profile screen UI and logic updates
+  - Circle avatar, full name, username, bio pulled from `users` row, with fallbacks to auth metadata
+  - Favorite categories displayed as centered chips; category IDs mapped to names via cached categories
+  - Minimal tabs (Published, Saved, Drafts) with 3-column grid; active tab underline; edge-to-edge
+  - Grid tiles: taller aspect, minimal overlay (title + price), resilient image fallback
+  - Header gear icon on Profile routes to Settings screen
+  - Settings screen contains: Edit Profile, Notifications, Privacy & Security, Help & Support, About, Sign Out
+
+- Data and caching
+  - User stats include items listed, items swapped (accepted offers), sent/received offers, success rate
+  - Published/Drafts item image selection prefers primary image, then lowest `sort_order`, with fallback to thumbnail
+  - Categories cached in Redis (`all-categories`) and used for ID→name mapping
+
+- Resolved issues
+  - Removed nested VirtualizedList warning by using a top-level FlatList with header/footer
+  - Fixed initial items without images by fetching images separately and applying primary/sort ordering and placeholder fallback
+  - Ensured gear icon shows on Profile tab, search elsewhere
+
+Files updated (see individual docs for details):
+
+- `docs/overview.md`
+- `docs/api/api-endpoints.md`
+- `docs/tech-stack/supabase-backend.md`
+- `docs/features/core-features.md`
+- Code comments: `mobile/SwapJoy/services/api.ts`, `mobile/SwapJoy/hooks/useProfileData.ts`, `mobile/SwapJoy/screens/ProfileScreen.tsx`, `mobile/SwapJoy/navigation/MainTabNavigator.tsx`, `mobile/SwapJoy/components/CachedImage.tsx`
+
+# Documentation Update Summary
+
 **Date:** October 28, 2025  
 **Status:** ✅ Complete
 

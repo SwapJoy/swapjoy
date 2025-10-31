@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, StyleSheet, ActivityIndicator, Image, ImageURISource } from 'react-native';
+import { View, ActivityIndicator, Image, ImageURISource } from 'react-native';
+import { styles } from './CachedImage.styles';
 
 // Track URIs we have already loaded to avoid re-showing loader/flicker across mounts
 const loadedUriSet = new Set<string>();
@@ -55,7 +56,8 @@ const CachedImage: React.FC<CachedImageProps> = React.memo(({
     setImageLoaded(false);
   };
 
-  const imageUri = hasError ? fallbackUri : uri || placeholder;
+  // If no uri provided, use placeholder; on error, use fallbackUri
+  const imageUri = hasError ? fallbackUri : (uri || placeholder);
   const source = React.useMemo(() => ({ uri: imageUri } as ImageURISource), [imageUri]);
 
   return (
@@ -76,28 +78,6 @@ const CachedImage: React.FC<CachedImageProps> = React.memo(({
       )}
     </View>
   );
-});
-
-const styles = StyleSheet.create({
-  container: {
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  image: {
-    ...StyleSheet.absoluteFillObject,
-    width: undefined,
-    height: undefined,
-  },
-  loaderContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.0)',
-  },
 });
 
 CachedImage.displayName = 'CachedImage';

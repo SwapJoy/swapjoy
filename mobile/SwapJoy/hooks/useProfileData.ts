@@ -109,7 +109,7 @@ export const useProfileData = () => {
           setFavoriteCategories(Array.isArray(casted.favorite_categories) ? casted.favorite_categories : []);
         }
 
-        // Build favorite category names map
+        // Build favorite category names from cached categories (ID→name mapping)
         try {
           const idToName = await ApiService.getCategoryIdToNameMap();
           if (Array.isArray((profileData as any)?.favorite_categories)) {
@@ -129,7 +129,7 @@ export const useProfileData = () => {
           });
         }
 
-        // Get published items
+        // Get published items (image cover selected per primary/sort_order, fallback to thumbnail)
         const { data: published } = await ApiService.getUserPublishedItems(user.id);
         if (published) {
           const list = (published as any[]) || [];

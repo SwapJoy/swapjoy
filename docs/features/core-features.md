@@ -8,14 +8,12 @@
 - Profile creation and management
 - Email verification
 
-### User Profile
-- Personal information (name, bio, location)
-- Profile picture
-- User rating/reputation system
-- Swap history
-- Wishlist/wanted items
-- Collection of owned items
-- Verification badges
+### User Profile (MVP)
+- Circle avatar, full name, username, bio
+- Favorite categories as centered chips (category names)
+- Minimal tabs: Published, Saved, Drafts (3-col grid)
+- Active tab highlighted with underline; full-width tab bar
+- Gear icon → Settings (Edit Profile, Notifications, Privacy & Security, Help & Support, About)
 
 ## 2. Item Management
 ### Item Listing

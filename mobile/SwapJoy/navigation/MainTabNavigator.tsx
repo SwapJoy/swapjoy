@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text, Platform, TouchableOpacity } from 'react-native';
+import { TouchableOpacity } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MainTabParamList } from '../types/navigation';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,6 +7,7 @@ import ExploreScreen from '../screens/ExploreScreen';
 import OffersScreen from '../screens/OffersScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import { styles, colors } from './MainTabNavigator.styles';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
@@ -19,51 +20,26 @@ const MainTabNavigator: React.FC<MainTabNavigatorProps> = ({ onNavigateToAdd }) 
     <Tab.Navigator
       screenOptions={({ route, navigation }) => ({
         headerShown: true,
-        headerStyle: {
-          backgroundColor: '#fff',
-          borderBottomWidth: Platform.OS === 'ios' ? 0.5 : 1,
-          borderBottomColor: Platform.OS === 'ios' ? '#C6C6C8' : '#E0E0E0',
-          shadowColor: Platform.OS === 'ios' ? '#000' : '#000',
-          shadowOffset: Platform.OS === 'ios' ? { width: 0, height: 0.5 } : { width: 0, height: 2 },
-          shadowOpacity: Platform.OS === 'ios' ? 0.1 : 0.1,
-          shadowRadius: Platform.OS === 'ios' ? 0 : 2,
-          elevation: Platform.OS === 'android' ? 4 : 0,
-        },
-        headerTitleStyle: {
-          fontSize: Platform.OS === 'ios' ? 17 : 20,
-          fontWeight: Platform.OS === 'ios' ? '600' : '500',
-          color: '#000',
-        },
+        headerStyle: styles.headerStyle,
+        headerTitleStyle: styles.headerTitleStyle,
         headerTitleAlign: 'center',
         headerLeft: () => (
           <TouchableOpacity
-            style={{
-              width: 32,
-              height: 32,
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginLeft: 16,
-            }}
+            style={styles.headerButtonContainer}
             onPress={() => {
               if (onNavigateToAdd) {
                 onNavigateToAdd();
               }
             }}
           >
-            <Ionicons name="add" size={24} color="#007AFF" />
+            <Ionicons name="add" size={24} color={colors.primary} />
           </TouchableOpacity>
         ),
         headerRight: () => {
           const isProfile = route.name === 'Profile';
           return (
             <TouchableOpacity
-              style={{
-                width: 32,
-                height: 32,
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginRight: 16,
-              }}
+              style={styles.headerRightButtonContainer}
               onPress={() => {
                 if (isProfile) {
                   (navigation as any).navigate('ProfileSettings');
@@ -75,34 +51,16 @@ const MainTabNavigator: React.FC<MainTabNavigatorProps> = ({ onNavigateToAdd }) 
               <Ionicons 
                 name={isProfile ? "settings-outline" : "search-outline"} 
                 size={24} 
-                color="#007AFF" 
+                color={colors.primary} 
               />
             </TouchableOpacity>
           );
         },
-        tabBarStyle: {
-          backgroundColor: '#fff',
-          borderTopWidth: Platform.OS === 'ios' ? 0.5 : 1,
-          borderTopColor: Platform.OS === 'ios' ? '#C6C6C8' : '#E0E0E0',
-          paddingBottom: Platform.OS === 'ios' ? 20 : 8,
-          paddingTop: Platform.OS === 'ios' ? 8 : 8,
-          height: Platform.OS === 'ios' ? 83 : 60,
-          shadowColor: Platform.OS === 'ios' ? '#000' : '#000',
-          shadowOffset: Platform.OS === 'ios' ? { width: 0, height: -0.5 } : { width: 0, height: 2 },
-          shadowOpacity: Platform.OS === 'ios' ? 0.1 : 0.1,
-          shadowRadius: Platform.OS === 'ios' ? 0 : 2,
-          elevation: Platform.OS === 'android' ? 8 : 0,
-        },
-        tabBarActiveTintColor: '#007AFF',
-        tabBarInactiveTintColor: '#8E8E93',
-        tabBarLabelStyle: {
-          fontSize: Platform.OS === 'ios' ? 10 : 12,
-          fontWeight: Platform.OS === 'ios' ? '500' : '500',
-          marginTop: Platform.OS === 'ios' ? 2 : 0,
-        },
-        tabBarIconStyle: {
-          marginTop: Platform.OS === 'ios' ? 2 : 0,
-        },
+        tabBarStyle: styles.tabBarStyle,
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.inactive,
+        tabBarLabelStyle: styles.tabBarLabelStyle,
+        tabBarIconStyle: styles.tabBarIconStyle,
       })}
     >
       <Tab.Screen

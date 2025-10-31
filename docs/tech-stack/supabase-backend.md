@@ -725,9 +725,25 @@ CREATE INDEX idx_offers_receiver ON offers(receiver_id, status);
 
 ### Caching Strategy
 - Supabase has built-in caching
-- Use React Query for client-side caching
-- Cache static data (categories)
+- Use React Query for client-side caching (if/when added)
+- Redis keys in use (mobile `RedisCache` wrapper):
+  - `all-categories` – cached list of active categories for ID→name mapping
+  - `user-stats:<user_id>` – items listed, offers (sent/received), accepted, success rate
+  - `user-ratings:<user_id>` – average rating and count
+  - Recommendation caches for Top Picks/Similar flows (see `ApiService`)
 - CDN for images via Supabase Storage
+
+### Item Images Selection
+
+- Images are fetched separately from `item_images` to ensure consistent ordering and fallback
+  1. Prefer `is_primary = true`
+  2. Next, lowest `sort_order`
+  3. Fallback to `thumbnail_url` when `image_url` is null
+
+### Profile Values
+
+- Profile header reads from `users` row
+- Fallbacks to auth metadata for missing fields (first name, last name, username, avatar)
 
 ## Monitoring & Analytics
 
