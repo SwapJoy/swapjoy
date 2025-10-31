@@ -16,6 +16,7 @@ import { ItemPreviewScreenProps } from '../types/navigation';
 import { DraftManager } from '../services/draftManager';
 import { ApiService } from '../services/api';
 import { ItemDraft, Category } from '../types/item';
+import { formatCurrency } from '../utils';
 
 const { width } = Dimensions.get('window');
 
@@ -243,7 +244,7 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
           <View style={styles.titleSection}>
             <Text style={styles.title}>{draft.title}</Text>
             <Text style={styles.price}>
-              ${parseFloat(draft.price).toFixed(2)}
+              {formatCurrency(parseFloat(draft.price), draft.currency)}
             </Text>
           </View>
 
@@ -290,7 +291,7 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Price</Text>
               <Text style={styles.infoValue}>
-                ${parseFloat(draft.price).toFixed(2)} {draft.currency}
+                {formatCurrency(parseFloat(draft.price), draft.currency)}
               </Text>
             </View>
           </View>

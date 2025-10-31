@@ -12,6 +12,7 @@ import CachedImage from '../components/CachedImage';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { FlatList, Dimensions, Alert } from 'react-native';
 import { ApiService } from '../services/api';
+import { formatCurrency } from '../utils';
 
 const FollowButton: React.FC<{ targetUserId: string }> = ({ targetUserId }) => {
   const [loading, setLoading] = useState(false);
@@ -141,7 +142,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
       <View style={styles.gridMetaBar}>
         <Text style={styles.gridMetaText} numberOfLines={1}>{item.title || 'Untitled'}</Text>
         {typeof item.price !== 'undefined' && item.price !== null && (
-          <Text style={styles.gridMetaPrice}>${Number(item.price).toFixed(0)}</Text>
+          <Text style={styles.gridMetaPrice}>{formatCurrency(Number(item.price), item.currency || 'USD').replace(/\.00$/, '')}</Text>
         )}
       </View>
     </TouchableOpacity>

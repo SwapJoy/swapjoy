@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { OfferPreviewScreenProps } from '../types/navigation';
 import CachedImage from '../components/CachedImage';
 import { ApiService } from '../services/api';
+import { formatCurrency } from '../utils';
 
 const OfferPreviewScreen: React.FC<OfferPreviewScreenProps> = ({ navigation, route }) => {
   const { receiverId, offeredItemIds, requestedItemIds, topUpAmount, message, summary } = route.params;
@@ -51,7 +52,7 @@ const OfferPreviewScreen: React.FC<OfferPreviewScreenProps> = ({ navigation, rou
       />
       <View style={{ flex: 1 }}>
         <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
-        <Text style={styles.price}>${(item.price || 0).toFixed(2)}</Text>
+        <Text style={styles.price}>{formatCurrency(item.price || 0, item.currency || 'USD')}</Text>
       </View>
     </View>
   );

@@ -22,6 +22,7 @@ export interface UserItem {
   title: string;
   description: string;
   price: number;
+  currency?: string;
   condition: string;
   image_url?: string;
   category_name?: string;
@@ -137,6 +138,7 @@ export const useProfileData = (targetUserId?: string) => {
             title: item.title,
             description: item.description,
             price: item.price,
+            currency: item.currency,
             condition: item.condition,
             image_url: item.image_url,
             created_at: item.created_at,
@@ -158,6 +160,7 @@ export const useProfileData = (targetUserId?: string) => {
               title: item.title,
               description: item.description,
               price: item.price,
+              currency: item.currency,
               condition: item.condition,
               image_url: item.image_url,
               created_at: item.created_at,
@@ -171,6 +174,7 @@ export const useProfileData = (targetUserId?: string) => {
               title: item.title,
               description: item.description,
               price: item.price,
+              currency: item.currency,
               condition: item.condition,
               image_url: item.image_url,
               created_at: item.updated_at || item.created_at,

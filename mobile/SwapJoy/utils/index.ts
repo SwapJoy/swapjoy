@@ -3,11 +3,35 @@
 /**
  * Format a number as currency
  */
-export const formatCurrency = (amount: number): string => {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
+export const formatCurrency = (amount: number, currencyCode: string = 'USD'): string => {
+  // Get currency symbol mapping
+  const currencySymbols: { [key: string]: string } = {
+    'USD': '$',
+    'EUR': '€',
+    'GEL': '₾',
+  };
+  
+  const symbol = currencySymbols[currencyCode] || currencyCode;
+  
+  // Format number with currency symbol
+  const formatted = new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(amount);
+  
+  return `${symbol}${formatted}`;
+};
+
+/**
+ * Get currency symbol for a currency code
+ */
+export const getCurrencySymbol = (currencyCode: string): string => {
+  const currencySymbols: { [key: string]: string } = {
+    'USD': '$',
+    'EUR': '€',
+    'GEL': '₾',
+  };
+  return currencySymbols[currencyCode] || currencyCode;
 };
 
 /**

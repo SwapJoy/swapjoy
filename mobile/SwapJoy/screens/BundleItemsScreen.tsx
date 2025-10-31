@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { BundleItemsScreenProps } from '../types/navigation';
 import CachedImage from '../components/CachedImage';
 import { useAuth } from '../contexts/AuthContext';
+import { formatCurrency } from '../utils';
 
 const { width } = Dimensions.get('window');
 
@@ -30,7 +31,7 @@ const BundleItemsScreen: React.FC<BundleItemsScreenProps> = ({ navigation, route
       />
       <View style={styles.details}>
         <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
-        <Text style={styles.price}>${(item.price || item.estimated_value || 0).toFixed(2)}</Text>
+        <Text style={styles.price}>{formatCurrency(item.price || item.estimated_value || 0, item.currency || 'USD')}</Text>
         {item.condition ? (
           <Text style={styles.condition} numberOfLines={1}>{item.condition}</Text>
         ) : null}

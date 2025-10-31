@@ -21,6 +21,7 @@ import { DraftManager } from '../services/draftManager';
 import { ImageUploadService } from '../services/imageUpload';
 import { ApiService } from '../services/api';
 import { ItemDraft, ItemCondition, Category } from '../types/item';
+import { getCurrencySymbol } from '../utils';
 
 const { width } = Dimensions.get('window');
 
@@ -30,6 +31,12 @@ const CONDITIONS: { value: ItemCondition; label: string; icon: string }[] = [
   { value: 'good', label: 'Good', icon: 'thumbs-up' },
   { value: 'fair', label: 'Fair', icon: 'hand-left' },
   { value: 'poor', label: 'Poor', icon: 'hand-right' },
+];
+
+const CURRENCIES: { code: string; label: string; symbol: string }[] = [
+  { code: 'USD', label: 'US Dollar', symbol: '$' },
+  { code: 'EUR', label: 'Euro', symbol: '€' },
+  { code: 'GEL', label: 'Georgian Lari', symbol: '₾' },
 ];
 
 const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
@@ -44,11 +51,13 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
   const [category, setCategory] = useState<string | null>(null);
   const [condition, setCondition] = useState<ItemCondition | null>(null);
   const [price, setPrice] = useState('');
+  const [currency, setCurrency] = useState<string>('USD');
   
   const [categories, setCategories] = useState<Category[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [showConditionPicker, setShowConditionPicker] = useState(false);
+  const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
   
   const [uploading, setUploading] = useState(false);
   const [allUploaded, setAllUploaded] = useState(false);
@@ -74,6 +83,7 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
         setCategory(loadedDraft.category_id);
         setCondition(loadedDraft.condition);
         setPrice(loadedDraft.price);
+        setCurrency(loadedDraft.currency || 'USD');
       }
 
       // Load categories
@@ -180,6 +190,12 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
     saveDraft({ condition: cond });
   };
 
+  const handleCurrencySelect = (curr: string) => {
+    setCurrency(curr);
+    setShowCurrencyPicker(false);
+    saveDraft({ currency: curr });
+  };
+
   const handleValueChange = (text: string) => {
     // Allow only numbers and decimal point
     const filtered = text.replace(/[^0-9.]/g, '');
@@ -221,6 +237,7 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
       category_id: category,
       condition,
       price: price,
+      currency: currency,
     });
 
     // Navigate to preview
@@ -235,6 +252,7 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
       category_id: category,
       condition,
       price: price,
+      currency: currency,
     });
     navigation.goBack();
   };
@@ -396,13 +414,29 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
               </TouchableOpacity>
             </View>
 
+            {/* Currency */}
+            <View style={styles.fieldContainer}>
+              <Text style={styles.fieldLabel}>
+                Currency <Text style={styles.required}>*</Text>
+              </Text>
+              <TouchableOpacity
+                style={styles.pickerButton}
+                onPress={() => setShowCurrencyPicker(true)}
+              >
+                <Text style={styles.pickerButtonText}>
+                  {CURRENCIES.find(c => c.code === currency)?.label || 'Select Currency'}
+                </Text>
+                <Ionicons name="chevron-down" size={20} color="#666" />
+              </TouchableOpacity>
+            </View>
+
             {/* Price */}
             <View style={styles.fieldContainer}>
               <Text style={styles.fieldLabel}>
                 Price <Text style={styles.required}>*</Text>
               </Text>
               <View style={styles.valueInputContainer}>
-                <Text style={styles.currencySymbol}>$</Text>
+                <Text style={styles.currencySymbol}>{getCurrencySymbol(currency)}</Text>
                 <TextInput
                   style={[styles.textInput, styles.valueInput]}
                   placeholder="0.00"
@@ -493,6 +527,45 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
                       <Text style={styles.modalItemText}>{cond.label}</Text>
                     </View>
                     {condition === cond.value && (
+                      <Ionicons name="checkmark" size={24} color="#007AFF" />
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Currency Picker Modal */}
+        <Modal
+          visible={showCurrencyPicker}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setShowCurrencyPicker(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Select Currency</Text>
+                <TouchableOpacity onPress={() => setShowCurrencyPicker(false)}>
+                  <Ionicons name="close" size={24} color="#666" />
+                </TouchableOpacity>
+              </View>
+              <ScrollView>
+                {CURRENCIES.map((curr) => (
+                  <TouchableOpacity
+                    key={curr.code}
+                    style={[
+                      styles.modalItem,
+                      currency === curr.code && styles.modalItemSelected,
+                    ]}
+                    onPress={() => handleCurrencySelect(curr.code)}
+                  >
+                    <View style={styles.conditionItem}>
+                      <Text style={styles.modalItemText}>{curr.symbol}</Text>
+                      <Text style={styles.modalItemText}>{curr.label}</Text>
+                    </View>
+                    {currency === curr.code && (
                       <Ionicons name="checkmark" size={24} color="#007AFF" />
                     )}
                   </TouchableOpacity>

@@ -5,6 +5,7 @@ import CachedImage from '../components/CachedImage';
 import { OfferCreateScreenProps } from '../types/navigation';
 import { useAuth } from '../contexts/AuthContext';
 import { ApiService } from '../services/api';
+import { formatCurrency } from '../utils';
 
 const { width } = Dimensions.get('window');
 
@@ -93,7 +94,7 @@ const OfferCreateScreen: React.FC<OfferCreateScreenProps> = ({ navigation, route
       />
       <View style={{ flex: 1 }}>
         <Text style={styles.reqTitle} numberOfLines={1}>{item.title}</Text>
-        <Text style={styles.reqPrice}>${(item.price || 0).toFixed(2)}</Text>
+        <Text style={styles.reqPrice}>{formatCurrency(item.price || 0, item.currency || 'USD')}</Text>
       </View>
     </View>
   );
@@ -115,7 +116,7 @@ const OfferCreateScreen: React.FC<OfferCreateScreenProps> = ({ navigation, route
           />
           <View style={{ flex: 1 }}>
             <Text style={styles.myItemTitle} numberOfLines={1}>{item.title}</Text>
-            <Text style={styles.myItemMeta}>${(item.price || 0).toFixed(2)} • {item.condition || 'unknown'}</Text>
+            <Text style={styles.myItemMeta}>{formatCurrency(item.price || 0, item.currency || 'USD')} • {item.condition || 'unknown'}</Text>
           </View>
           <View style={[styles.checkbox, selected && styles.checkboxOn]} />
         </TouchableOpacity>

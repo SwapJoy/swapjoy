@@ -9,6 +9,7 @@ export interface OtherItem {
   condition: string;
   estimated_value?: number;
   price?: number;
+  currency?: string;
   image_url: string;
   user: {
     id: string;
@@ -56,6 +57,7 @@ export const useOtherItems = (initialLimit: number = 10) => {
       condition: item.condition,
       estimated_value: displayPrice,
       price: displayPrice,
+      currency: item.currency || 'USD',
       image_url: imageUrl,
       user: {
         id: item.users?.id || item.user_id,

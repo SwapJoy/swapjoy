@@ -5,6 +5,7 @@ import { ItemDetailsScreenProps } from '../types/navigation';
 import CachedImage from '../components/CachedImage';
 import { ApiService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import { formatCurrency } from '../utils';
 
 const { width } = Dimensions.get('window');
 
@@ -90,7 +91,7 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
             return (
               <View style={styles.details}>
                 <Text style={styles.itemTitle}>{item.title}</Text>
-                <Text style={styles.price}>${(item.price || item.estimated_value || 0).toFixed(2)}</Text>
+                <Text style={styles.price}>{formatCurrency(item.price || item.estimated_value || 0, item.currency || 'USD')}</Text>
                 {item.category?.name ? (
                   <Text style={styles.meta}>Category: {item.category.name}</Text>
                 ) : null}

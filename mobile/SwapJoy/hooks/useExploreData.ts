@@ -9,6 +9,7 @@ export interface AIOffer {
   condition: string;
   estimated_value: number;
   price?: number;
+  currency?: string;
   image_url: string;
   user: {
     id: string;
@@ -189,6 +190,8 @@ export const useExploreData = () => {
           description: item.description,
           condition: item.condition,
           estimated_value: displayValue, // Use calculated or database value
+          price: item.price || item.estimated_value || 0,
+          currency: item.currency || 'USD',
           image_url: imageUrl,
           user: {
             id: item.users?.id || item.user?.id || item.user_id,

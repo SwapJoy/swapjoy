@@ -18,6 +18,7 @@ import { useRecentlyListed } from '../hooks/useRecentlyListed';
 import { useTopCategories } from '../hooks/useTopCategories';
 import { useOtherItems } from '../hooks/useOtherItems';
 import CachedImage from '../components/CachedImage';
+import { formatCurrency } from '../utils';
 
 const { width } = Dimensions.get('window');
 const ITEM_WIDTH = width * 0.7;
@@ -88,7 +89,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
       <View style={styles.offerDetails}>
         <Text style={styles.offerTitle} numberOfLines={1}>{item.title}</Text>
         <Text style={styles.offerValue}>
-          {item.is_bundle ? 'Bundle Value' : 'Price'}: ${(item.price || item.estimated_value || 0).toFixed(2)}
+          {item.is_bundle ? 'Bundle Value' : 'Price'}: {formatCurrency(item.price || item.estimated_value || 0, item.currency || 'USD')}
         </Text>
         {item.is_bundle && item.bundle_items && (
           <Text style={styles.bundleItems} numberOfLines={1}>
@@ -119,7 +120,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
       />
       <View style={styles.recentDetails}>
         <Text style={styles.recentTitle} numberOfLines={1}>{item.title}</Text>
-        <Text style={styles.recentPrice}>${(item.price || item.estimated_value || 0).toFixed(2)}</Text>
+        <Text style={styles.recentPrice}>{formatCurrency(item.price || item.estimated_value || 0, item.currency || 'USD')}</Text>
         <Text style={styles.recentCondition}>{item.condition}</Text>
       </View>
     </TouchableOpacity>
@@ -151,7 +152,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
       />
       <View style={styles.gridDetails}>
         <Text style={styles.gridTitle} numberOfLines={2}>{item.title}</Text>
-        <Text style={styles.gridPrice}>${(item.price || item.estimated_value || 0).toFixed(2)}</Text>
+        <Text style={styles.gridPrice}>{formatCurrency(item.price || item.estimated_value || 0, item.currency || 'USD')}</Text>
         <Text style={styles.gridCondition} numberOfLines={1}>{item.condition}</Text>
       </View>
     </TouchableOpacity>

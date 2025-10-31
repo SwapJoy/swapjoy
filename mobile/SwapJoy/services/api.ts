@@ -90,7 +90,7 @@ export class ApiService {
       // Get user's items to find similar matches
       const { data: userItems, error: userItemsError } = await client
         .from('items')
-        .select('id, embedding, price, title, description, category_id')
+        .select('id, embedding, price, currency, title, description, category_id')
         .eq('user_id', userId)
         .eq('status', 'available')
         .not('embedding', 'is', null);
@@ -110,34 +110,53 @@ export class ApiService {
 
       const favoriteCategories = user?.favorite_categories || [];
 
-      // Calculate total value of user's items
-      const totalUserValue = userItems.reduce((sum, item) => sum + parseFloat(item.price), 0);
-      console.log('Total user items value:', totalUserValue);
+      // Get exchange rates once
+      const { data: rates } = await client.from('currencies').select('code, rate');
+      const rateMap: { [key: string]: number } = {};
+      rates?.forEach((r: any) => { rateMap[r.code] = parseFloat(r.rate); });
+
+      // Calculate total value of user's items (all converted to GEL for comparison)
+      let totalUserValueGEL = 0;
+      let userCurrency = 'USD'; // Default
+      
+      for (const item of userItems) {
+        if (item.price && item.currency) {
+          userCurrency = item.currency;
+          const rate = rateMap[item.currency] || 1;
+          totalUserValueGEL += parseFloat(item.price) * rate;
+        }
+      }
+      
+      console.log('Total user items value in GEL:', totalUserValueGEL, userCurrency);
       
       // Find similar items using vector similarity
       const allRecommendations: any[] = [];
       
       try {
         for (const userItem of userItems) {
-        // Use total value for better matching
-        const minValue = Math.max(0, totalUserValue * 0.3); // 30% of total value
-        const maxValue = totalUserValue * 1.5; // Up to 1.5x total value
+        // Use total value for better matching (values converted to GEL in SQL)
+        const minValue = Math.max(0, totalUserValueGEL * 0.3); // 30% of total value
+        const maxValue = totalUserValueGEL * 1.5; // Up to 1.5x total value
         
-        console.log(`Searching for items similar to ${userItem.title} ($${userItem.price}) with value range $${minValue}-$${maxValue}`);
+        console.log(`Searching for items similar to ${userItem.title} (${userItem.currency}${userItem.price}) with value range ${minValue}-${maxValue} GEL`);
         
         const { data: similarItems, error: similarError } = await client.rpc('match_items', {
           query_embedding: userItem.embedding,
           match_threshold: 0.6, // 60% similarity threshold
           match_count: Math.ceil(limit / userItems.length),
           min_value: minValue,
+          user_currency: userItem.currency || 'USD',
           exclude_user_id: userId
         });
 
         if (!similarError && similarItems && Array.isArray(similarItems)) {
-          // Filter out items that are too expensive
-          const filteredItems = similarItems.filter((item: any) => 
-            parseFloat(item.price) <= maxValue
-          );
+          // Filter out items that are too expensive (SQL already does conversion, but double-check)
+          const filteredItems = similarItems.filter((item: any) => {
+            // Convert item price to GEL for comparison
+            const itemRate = rateMap[item.currency] || 1;
+            const itemPriceGEL = parseFloat(item.price || 0) * itemRate;
+            return itemPriceGEL <= maxValue;
+          });
           
           console.log(`Found ${filteredItems.length} items within price range for ${userItem.title}`);
           
@@ -159,7 +178,7 @@ export class ApiService {
 
       // Generate virtual bundles from user's items
       try {
-        const virtualBundles = await this.generateVirtualBundles(client, userItems, userId, limit, totalUserValue);
+        const virtualBundles = await this.generateVirtualBundles(client, userItems, userId, limit, totalUserValueGEL, rateMap);
         console.log(`Generated ${virtualBundles.length} virtual bundles`);
         if (virtualBundles && Array.isArray(virtualBundles)) {
           allRecommendations.push(...virtualBundles);
@@ -435,7 +454,7 @@ export class ApiService {
   }
 
   // Generate virtual bundles from user's items
-  static async generateVirtualBundles(client: any, userItems: any[], userId: string, limit: number, userTotalValue: number) {
+  static async generateVirtualBundles(client: any, userItems: any[], userId: string, limit: number, userTotalValue: number, rateMap: { [key: string]: number }) {
     if (userItems.length < 2) {
       return []; // Need at least 2 items to create bundles
     }
@@ -454,17 +473,23 @@ export class ApiService {
         item2.embedding
       ]);
 
-      // Calculate bundle value and discount
-      const totalValue = (item1.price || 0) + (item2.price || 0);
-      const bundleDiscount = Math.min(totalValue * 0.1, 100); // 10% discount, max $100
-      const bundleValue = totalValue - bundleDiscount;
+      // Calculate bundle value and discount (convert both to GEL first)
+      const item1Rate = rateMap[item1.currency] || 1;
+      const item2Rate = rateMap[item2.currency] || 1;
+      const totalValueGEL = (item1.price || 0) * item1Rate + (item2.price || 0) * item2Rate;
+      const bundleDiscount = Math.min(totalValueGEL * 0.1, 271); // 10% discount, max 271 GEL (~$100)
+      const bundleValue = totalValueGEL - bundleDiscount;
 
       // Find similar items that could be bundled together
+      const item1PriceGEL = (item1.price || 0) * item1Rate;
+      const item2PriceGEL = (item2.price || 0) * item2Rate;
+      
       const { data: similarItems1 } = await client.rpc('match_items', {
         query_embedding: item1.embedding,
         match_threshold: 0.5,
         match_count: 5,
-        min_value: (item1.price || 0) * 0.4,
+        min_value: item1PriceGEL * 0.4,
+        user_currency: item1.currency || 'USD',
         exclude_user_id: userId
       });
 
@@ -472,7 +497,8 @@ export class ApiService {
         query_embedding: item2.embedding,
         match_threshold: 0.5,
         match_count: 5,
-        min_value: (item2.price || 0) * 0.4,
+        min_value: item2PriceGEL * 0.4,
+        user_currency: item2.currency || 'USD',
         exclude_user_id: userId
       });
 
@@ -498,11 +524,14 @@ export class ApiService {
                     continue;
                   }
 
-                  const bundleTotalValue = parseFloat(itemA.price) + parseFloat(itemB.price);
-                  const bundleDiscount2 = Math.min(bundleTotalValue * 0.1, 100);
-                  const bundleValue2 = bundleTotalValue - bundleDiscount2;
+                  // Convert both prices to GEL for comparison
+                  const itemARate = rateMap[itemA.currency] || 1;
+                  const itemBRate = rateMap[itemB.currency] || 1;
+                  const bundleTotalValueGEL = parseFloat(itemA.price) * itemARate + parseFloat(itemB.price) * itemBRate;
+                  const bundleDiscount2 = Math.min(bundleTotalValueGEL * 0.1, 271); // 10% discount, max 271 GEL
+                  const bundleValue2 = bundleTotalValueGEL - bundleDiscount2;
 
-                  // Relaxed price range (60% to 160% of your total value)
+                  // Relaxed price range (60% to 160% of your total value in GEL)
                   if (bundleValue2 >= userTotalValue * 0.6 && bundleValue2 <= userTotalValue * 1.6) {
                     const bundleOwnerId = fullItemA.user_id;
                     const imageA = fullItemA.item_images?.[0]?.image_url;
@@ -1182,7 +1211,7 @@ export class ApiService {
     return this.authenticatedCall(async (client) => {
       const { data: items, error } = await client
         .from('items')
-        .select(`id, title, description, price, condition, created_at`) 
+        .select(`id, title, description, price, currency, condition, created_at`) 
         .eq('user_id', userId)
         .eq('status', 'available')
         .order('created_at', { ascending: false });
@@ -1227,7 +1256,7 @@ export class ApiService {
     return this.authenticatedCall(async (client) => {
       const { data: items, error } = await client
         .from('items')
-        .select(`id, title, description, price, condition, created_at, updated_at`) 
+        .select(`id, title, description, price, currency, condition, created_at, updated_at`) 
         .eq('user_id', userId)
         .eq('status', 'draft')
         .order('updated_at', { ascending: false });
