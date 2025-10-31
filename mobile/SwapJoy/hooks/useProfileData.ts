@@ -28,7 +28,7 @@ export interface UserItem {
   created_at: string;
 }
 
-export const useProfileData = () => {
+export const useProfileData = (targetUserId?: string) => {
   const { user, signOut } = useAuth();
   const [profile, setProfile] = useState<any>(null);
   const [favoriteCategories, setFavoriteCategories] = useState<string[]>([]);
@@ -83,45 +83,47 @@ export const useProfileData = () => {
       return;
     }
 
-    console.log('ProfileScreen: Fetching data for user:', user.id);
+    const viewedUserId = targetUserId || user.id;
+    const isSelf = !targetUserId || targetUserId === user.id;
     setLoading(true);
 
     const fetchData = async () => {
       try {
-        // Get user stats
-        const { data: statsData } = await ApiService.getUserStats(user.id);
+        // Parallelize main calls
+        const [statsRes, profileRes, ratingRes, publishedRes] = await Promise.all([
+          ApiService.getUserStats(viewedUserId),
+          isSelf ? ApiService.getProfile() : ApiService.getUserProfileById(viewedUserId),
+          ApiService.getUserRatings(viewedUserId),
+          ApiService.getUserPublishedItems(viewedUserId),
+        ]);
+
+        const statsData: any = statsRes?.data;
+        const profileData: any = profileRes?.data;
+        const ratingData: any = ratingRes?.data;
+        const published: any[] = (publishedRes?.data as any[]) || [];
+
         if (statsData) {
           setStats({
             itemsListed: statsData.items_listed || 0,
             itemsSwapped: statsData.items_swapped || 0,
             totalOffers: statsData.total_offers || 0,
-            sentOffers: (statsData as any).sent_offers || 0,
-            receivedOffers: (statsData as any).received_offers || 0,
+            sentOffers: statsData.sent_offers || 0,
+            receivedOffers: statsData.received_offers || 0,
             successRate: statsData.success_rate || 0,
           });
         }
 
-        // Get profile (username, names, bio, favorites)
-        const { data: profileData } = await ApiService.getProfile();
         if (profileData) {
-          const casted: any = profileData as any;
-          setProfile(casted);
-          setFavoriteCategories(Array.isArray(casted.favorite_categories) ? casted.favorite_categories : []);
+          setProfile(profileData);
+          const fav = Array.isArray(profileData.favorite_categories) ? profileData.favorite_categories : [];
+          setFavoriteCategories(fav);
+          try {
+            const idToName = await ApiService.getCategoryIdToNameMap();
+            const names = fav.map((id: string) => idToName[id]).filter(Boolean);
+            setFavoriteCategoryNames(names);
+          } catch {}
         }
 
-        // Build favorite category names from cached categories (ID→name mapping)
-        try {
-          const idToName = await ApiService.getCategoryIdToNameMap();
-          if (Array.isArray((profileData as any)?.favorite_categories)) {
-            const names = (profileData as any).favorite_categories
-              .map((id: string) => idToName[id])
-              .filter(Boolean);
-            setFavoriteCategoryNames(names);
-          }
-        } catch {}
-
-        // Get user ratings
-        const { data: ratingData } = await ApiService.getUserRatings(user.id);
         if (ratingData) {
           setRating({
             averageRating: ratingData.average_rating || 0,
@@ -129,11 +131,8 @@ export const useProfileData = () => {
           });
         }
 
-        // Get published items (image cover selected per primary/sort_order, fallback to thumbnail)
-        const { data: published } = await ApiService.getUserPublishedItems(user.id);
         if (published) {
-          const list = (published as any[]) || [];
-          const formatted = list.map((item: any) => ({
+          const formatted = published.map((item: any) => ({
             id: item.id,
             title: item.title,
             description: item.description,
@@ -143,39 +142,44 @@ export const useProfileData = () => {
             created_at: item.created_at,
           }));
           setUserItems(formatted);
-          console.log('useProfileData: published first 12', formatted.slice(0, 12).map(i => ({ id: i.id, image_url: i.image_url })));
         }
 
-        // Get saved (favorites)
-        const { data: saved } = await ApiService.getSavedItems();
-        if (saved) {
-          const list = (saved as any[]) || [];
-          const formatted = list.map((item: any) => ({
-            id: item.id,
-            title: item.title,
-            description: item.description,
-            price: item.price,
-            condition: item.condition,
-            image_url: item.image_url,
-            created_at: item.created_at,
-          }));
-          setSavedItems(formatted);
-        }
+        if (isSelf) {
+          const [savedRes, draftsRes] = await Promise.all([
+            ApiService.getSavedItems(),
+            ApiService.getUserDraftItems(user.id),
+          ]);
+          const saved: any[] = (savedRes?.data as any[]) || [];
+          const drafts: any[] = (draftsRes?.data as any[]) || [];
 
-        // Get drafts
-        const { data: drafts } = await ApiService.getUserDraftItems(user.id);
-        if (drafts) {
-          const list = (drafts as any[]) || [];
-          const formatted = list.map((item: any) => ({
-            id: item.id,
-            title: item.title,
-            description: item.description,
-            price: item.price,
-            condition: item.condition,
-            image_url: item.image_url,
-            created_at: item.updated_at || item.created_at,
-          }));
-          setDraftItems(formatted);
+          if (saved) {
+            const formattedSaved = saved.map((item: any) => ({
+              id: item.id,
+              title: item.title,
+              description: item.description,
+              price: item.price,
+              condition: item.condition,
+              image_url: item.image_url,
+              created_at: item.created_at,
+            }));
+            setSavedItems(formattedSaved);
+          }
+
+          if (drafts) {
+            const formattedDrafts = drafts.map((item: any) => ({
+              id: item.id,
+              title: item.title,
+              description: item.description,
+              price: item.price,
+              condition: item.condition,
+              image_url: item.image_url,
+              created_at: item.updated_at || item.created_at,
+            }));
+            setDraftItems(formattedDrafts);
+          }
+        } else {
+          setSavedItems([]);
+          setDraftItems([]);
         }
       } catch (error) {
         console.error('Error fetching profile data:', error);
@@ -185,7 +189,7 @@ export const useProfileData = () => {
     };
 
     fetchData();
-  }, [user?.id]); // Only depend on user.id
+  }, [user?.id, targetUserId]);
 
   return {
     user,

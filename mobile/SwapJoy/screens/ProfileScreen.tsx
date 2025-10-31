@@ -1,4 +1,4 @@
-import React, { memo, useCallback, useMemo, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -9,11 +9,74 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ProfileScreenProps } from '../types/navigation';
 import { useProfileData } from '../hooks/useProfileData';
 import CachedImage from '../components/CachedImage';
-import { useNavigation } from '@react-navigation/native';
-import { FlatList, Dimensions } from 'react-native';
+import { useNavigation, useRoute } from '@react-navigation/native';
+import { FlatList, Dimensions, Alert } from 'react-native';
+import { ApiService } from '../services/api';
+
+const FollowButton: React.FC<{ targetUserId: string }> = ({ targetUserId }) => {
+  const [loading, setLoading] = useState(false);
+  const [isFollowing, setIsFollowing] = useState<boolean>(false);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const { data } = await ApiService.isFollowing(targetUserId);
+      if (mounted) setIsFollowing(Boolean(data));
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [targetUserId]);
+
+  const toggleFollow = async () => {
+    if (loading) return;
+    setLoading(true);
+    try {
+      if (isFollowing) {
+        const { error } = await ApiService.unfollowUser(targetUserId);
+        if (error) {
+          Alert.alert('Error', error.message || 'Failed to unfollow.');
+        } else {
+          setIsFollowing(false);
+        }
+      } else {
+        const { error } = await ApiService.followUser(targetUserId);
+        if (error) {
+          Alert.alert('Error', error.message || 'Failed to follow.');
+        } else {
+          setIsFollowing(true);
+        }
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <TouchableOpacity
+      onPress={toggleFollow}
+      activeOpacity={0.8}
+      style={[
+        styles.followButton,
+        isFollowing ? styles.followButtonFollowing : styles.followButtonPrimary,
+      ]}
+    >
+      <Text
+        style={[
+          styles.followButtonText,
+          isFollowing ? styles.followButtonTextFollowing : styles.followButtonTextPrimary,
+        ]}
+      >
+        {loading ? 'Please wait…' : isFollowing ? 'Unfollow' : 'Follow'}
+      </Text>
+    </TouchableOpacity>
+  );
+};
 
 const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
+  const viewedUserId: string | undefined = (route as any)?.name === 'UserProfile' ? (route as any)?.params?.userId : undefined;
   const {
     user,
     profile,
@@ -28,14 +91,20 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
     formatRating,
     favoriteCategories,
     favoriteCategoryNames,
-  } = useProfileData();
+  } = useProfileData(viewedUserId);
+
+  const isViewingOtherUser = Boolean(viewedUserId && user?.id !== viewedUserId);
 
   const [activeTab, setActiveTab] = useState<'published' | 'saved' | 'drafts'>('published');
+  useEffect(() => {
+    if (isViewingOtherUser) setActiveTab('published');
+  }, [isViewingOtherUser]);
   const gridData = useMemo(() => {
+    if (isViewingOtherUser) return userItems;
     if (activeTab === 'published') return userItems;
     if (activeTab === 'saved') return savedItems;
     return draftItems;
-  }, [activeTab, userItems, savedItems, draftItems]);
+  }, [activeTab, userItems, savedItems, draftItems, isViewingOtherUser]);
 
   const numColumns = 3;
   const screenWidth = Dimensions.get('window').width;
@@ -57,7 +126,11 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
   // removed unused renderProfileItem helper
 
   const renderGridItem = useCallback(({ item }: { item: any }) => (
-    <View style={[styles.gridItem, { width: itemSize, height: itemSize * 1.7 }]}> 
+    <TouchableOpacity
+      activeOpacity={0.8}
+      onPress={() => navigation.navigate('ItemDetails', { itemId: item.id })}
+      style={[styles.gridItem, { width: itemSize, height: itemSize * 1.7 }]}
+    > 
       <CachedImage
         uri={item.image_url || ''}
         style={styles.gridImage}
@@ -71,7 +144,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
           <Text style={styles.gridMetaPrice}>${Number(item.price).toFixed(0)}</Text>
         )}
       </View>
-    </View>
+    </TouchableOpacity>
   ), [itemSize]);
 
   if (loading) {
@@ -94,6 +167,16 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
         columnWrapperStyle={{ justifyContent: 'space-between', marginBottom: 2 }}
         contentContainerStyle={styles.gridList}
         showsVerticalScrollIndicator={false}
+        initialNumToRender={18}
+        windowSize={7}
+        removeClippedSubviews
+        maxToRenderPerBatch={24}
+        updateCellsBatchingPeriod={50}
+        getItemLayout={(_, index) => {
+          const row = Math.floor(index / 3);
+          const rowHeight = itemSize * 1.7 + 2; // item height + spacing
+          return { length: rowHeight, offset: row * rowHeight, index };
+        }}
         ListHeaderComponent={(
           <View>
             {/* Header */}
@@ -130,6 +213,13 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
                 </View>
               </View>
             </View>
+
+            {/* Follow button (other users only) */}
+            {isViewingOtherUser && (
+              <View style={styles.followContainer}> 
+                <FollowButton targetUserId={viewedUserId!} />
+              </View>
+            )}
 
             {/* Favorite Categories Section - centered and below header */}
             {Array.isArray(favoriteCategoryNames) && favoriteCategoryNames.length > 0 && (
@@ -172,40 +262,42 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
               </View>
             )}
 
-            {/* Tabs */}
-            <View style={styles.section}>
-              <View style={styles.tabsWrapper}>
-                <View style={styles.tabsContainer}>
-                <TouchableOpacity
-                  onPress={() => setActiveTab('published')}
-              style={[styles.tabButton, activeTab === 'published' && styles.tabButtonActive]}
-                >
-              <Text style={[styles.tabText, activeTab === 'published' && styles.tabTextActive]}>Published</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => setActiveTab('saved')}
-              style={[styles.tabButton, activeTab === 'saved' && styles.tabButtonActive]}
-                >
-              <Text style={[styles.tabText, activeTab === 'saved' && styles.tabTextActive]}>Saved</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => setActiveTab('drafts')}
-              style={[styles.tabButton, activeTab === 'drafts' && styles.tabButtonActive]}
-                >
-              <Text style={[styles.tabText, activeTab === 'drafts' && styles.tabTextActive]}>Drafts</Text>
-                </TouchableOpacity>
+            {/* Tabs (hide for other users) */}
+            {!isViewingOtherUser && (
+              <View style={styles.section}>
+                <View style={styles.tabsWrapper}>
+                  <View style={styles.tabsContainer}>
+                    <TouchableOpacity
+                      onPress={() => setActiveTab('published')}
+                      style={[styles.tabButton, activeTab === 'published' && styles.tabButtonActive]}
+                    >
+                      <Text style={[styles.tabText, activeTab === 'published' && styles.tabTextActive]}>Published</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => setActiveTab('saved')}
+                      style={[styles.tabButton, activeTab === 'saved' && styles.tabButtonActive]}
+                    >
+                      <Text style={[styles.tabText, activeTab === 'saved' && styles.tabTextActive]}>Saved</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => setActiveTab('drafts')}
+                      style={[styles.tabButton, activeTab === 'drafts' && styles.tabButtonActive]}
+                    >
+                      <Text style={[styles.tabText, activeTab === 'drafts' && styles.tabTextActive]}>Drafts</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
-              </View>
 
-              {gridData.length === 0 && (
-                <View style={styles.emptyItemsContainer}>
-                  <Text style={styles.emptyItemsText}>No items to display</Text>
-                  <Text style={styles.emptyItemsSubtext}>
-                    {activeTab === 'published' ? 'Publish items to show here.' : activeTab === 'saved' ? 'Save items to view them here.' : 'Your draft items will appear here.'}
-                  </Text>
-                </View>
-              )}
-            </View>
+                {gridData.length === 0 && (
+                  <View style={styles.emptyItemsContainer}>
+                    <Text style={styles.emptyItemsText}>No items to display</Text>
+                    <Text style={styles.emptyItemsSubtext}>
+                      {activeTab === 'published' ? 'Publish items to show here.' : activeTab === 'saved' ? 'Save items to view them here.' : 'Your draft items will appear here.'}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
           </View>
         )}
       />
@@ -544,6 +636,33 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 11,
     fontWeight: '700',
+  },
+  followContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: 8,
+  },
+  followButton: {
+    borderRadius: 10,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  followButtonPrimary: {
+    backgroundColor: '#007AFF',
+  },
+  followButtonFollowing: {
+    backgroundColor: '#F2F2F7',
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
+  },
+  followButtonText: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  followButtonTextPrimary: {
+    color: '#fff',
+  },
+  followButtonTextFollowing: {
+    color: '#111',
   },
   favChipsContainer: {
     flexDirection: 'row',

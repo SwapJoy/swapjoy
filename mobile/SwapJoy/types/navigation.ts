@@ -28,6 +28,9 @@ export type RootStackParamList = {
     ownerId: string;
     bundleItems: Array<any>;
   };
+  UserProfile: {
+    userId: string;
+  };
   ProfileSettings: undefined;
   Search: undefined;
   // Offer flow

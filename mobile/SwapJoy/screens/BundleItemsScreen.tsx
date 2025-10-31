@@ -43,6 +43,15 @@ const BundleItemsScreen: React.FC<BundleItemsScreenProps> = ({ navigation, route
       <View style={styles.infoSection}> 
         <Text style={styles.bundleTitle} numberOfLines={2}>{title}</Text>
         <Text style={styles.bundleSubtitle}>Bundle includes {bundleItems.length} items</Text>
+        {ownerId ? (
+          <TouchableOpacity
+            style={{ marginTop: 8 }}
+            onPress={() => (navigation as any).navigate('UserProfile', { userId: ownerId })}
+            activeOpacity={0.8}
+          >
+            <Text style={{ color: '#007AFF', fontWeight: '600' }}>View seller profile</Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
 
       <FlatList

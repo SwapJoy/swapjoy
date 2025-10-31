@@ -100,12 +100,16 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
                 <Text style={styles.description}>{item.description}</Text>
 
                 {item.user ? (
-                  <View style={styles.sellerBox}>
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    style={styles.sellerBox}
+                    onPress={() => (navigation as any).navigate('UserProfile', { userId: item.user.id })}
+                  >
                     <Text style={styles.sellerTitle}>Seller</Text>
                     <Text style={styles.sellerName}>
                       {item.user.first_name} {item.user.last_name} @{item.user.username}
                     </Text>
-                  </View>
+                  </TouchableOpacity>
                 ) : null}
               </View>
             );

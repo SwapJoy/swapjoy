@@ -45,6 +45,16 @@ export class ApiService {
     });
   }
 
+  static async getUserProfileById(userId: string) {
+    return this.authenticatedCall(async (client) => {
+      return await client
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single();
+    });
+  }
+
   static async updateProfile(updates: Partial<{
     username: string;
     first_name: string;
@@ -1272,6 +1282,57 @@ export class ApiService {
       }));
 
       return { data: flattened, error: null } as any;
+    });
+  }
+
+  // ==================== FOLLOWS ====================
+  static async isFollowing(targetUserId: string) {
+    return this.authenticatedCall(async (client) => {
+      const me = await AuthService.getCurrentUser();
+      if (!me?.id) {
+        return { data: false as any, error: { message: 'Not authenticated' } } as any;
+      }
+      const { data, error } = await client
+        .from('user_follows')
+        .select('id')
+        .eq('follower_id', me.id)
+        .eq('following_id', targetUserId)
+        .maybeSingle();
+      if (error) return { data: false as any, error } as any;
+      return { data: Boolean(data), error: null } as any;
+    });
+  }
+
+  static async followUser(targetUserId: string) {
+    return this.authenticatedCall(async (client) => {
+      const me = await AuthService.getCurrentUser();
+      if (!me?.id) {
+        return { data: null, error: { message: 'Not authenticated' } } as any;
+      }
+      if (me.id === targetUserId) {
+        return { data: null, error: { message: 'Cannot follow yourself' } } as any;
+      }
+      const { data, error } = await client
+        .from('user_follows')
+        .insert({ follower_id: me.id, following_id: targetUserId })
+        .select()
+        .single();
+      return { data, error } as any;
+    });
+  }
+
+  static async unfollowUser(targetUserId: string) {
+    return this.authenticatedCall(async (client) => {
+      const me = await AuthService.getCurrentUser();
+      if (!me?.id) {
+        return { data: null, error: { message: 'Not authenticated' } } as any;
+      }
+      const { error } = await client
+        .from('user_follows')
+        .delete()
+        .eq('follower_id', me.id)
+        .eq('following_id', targetUserId);
+      return { data: { success: !error } as any, error } as any;
     });
   }
 

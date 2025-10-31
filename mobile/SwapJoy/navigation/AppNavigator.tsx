@@ -20,6 +20,7 @@ import SearchScreen from '../screens/SearchScreen';
 import BundleItemsScreen from '../screens/BundleItemsScreen';
 import OfferCreateScreen from '../screens/OfferCreateScreen';
 import OfferPreviewScreen from '../screens/OfferPreviewScreen';
+import ProfileScreen from '../screens/ProfileScreen';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -133,6 +134,14 @@ const AppNavigator: React.FC = () => {
               component={ItemDetailsScreen}
               options={{ 
                 title: 'Item Details',
+                headerBackTitleVisible: false,
+              }}
+            />
+            <Stack.Screen
+              name="UserProfile"
+              component={ProfileScreen}
+              options={{
+                title: 'Profile',
                 headerBackTitleVisible: false,
               }}
             />
