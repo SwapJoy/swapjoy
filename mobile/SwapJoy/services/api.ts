@@ -1298,17 +1298,67 @@ export class ApiService {
 
   static async getSavedItems() {
     return this.authenticatedCall(async (client) => {
-      const { data, error } = await client
+      // First, get favorites with item IDs
+      const { data: favorites, error: favoritesError } = await client
         .from('favorites')
-        .select(`id, item:items(*, item_images(image_url))`)
+        .select('id, item_id, created_at')
         .order('created_at', { ascending: false });
 
-      if (error) return { data: null, error } as any;
+      if (favoritesError || !favorites || favorites.length === 0) {
+        return { data: [], error: favoritesError } as any;
+      }
 
-      const flattened = (data || []).map((fav: any) => ({
-        ...fav.item,
-        image_url: fav.item?.item_images?.[0]?.image_url || null,
-      }));
+      const itemIds = favorites.map((fav: any) => fav.item_id);
+
+      // Fetch items and images in parallel for better performance
+      const [itemsResult, imagesResult] = await Promise.all([
+        client
+          .from('items')
+          .select('id, title, description, price, currency, condition, created_at')
+          .in('id', itemIds),
+        client
+          .from('item_images')
+          .select('item_id, image_url, sort_order, is_primary')
+          .in('item_id', itemIds)
+      ]);
+
+      if (itemsResult.error) {
+        return { data: null, error: itemsResult.error } as any;
+      }
+
+      const items = itemsResult.data || [];
+      const images = imagesResult.data || [];
+
+      // Group images by item_id and sort to get the first image
+      const imagesByItem: Record<string, any[]> = {};
+      images.forEach((img: any) => {
+        if (!imagesByItem[img.item_id]) imagesByItem[img.item_id] = [];
+        imagesByItem[img.item_id].push(img);
+      });
+
+      // Sort images: prefer primary, then lowest sort_order
+      Object.keys(imagesByItem).forEach(k => {
+        imagesByItem[k] = imagesByItem[k]
+          .sort((a, b) => 
+            (b.is_primary === true ? 1 : 0) - (a.is_primary === true ? 1 : 0) || 
+            (a.sort_order || 0) - (b.sort_order || 0)
+          );
+      });
+
+      // Map items with their first image, preserving favorites order
+      const itemMap = new Map(items.map((item: any) => [item.id, item]));
+      const flattened = favorites
+        .map((fav: any) => {
+          const item = itemMap.get(fav.item_id);
+          if (!item) return null;
+          const firstImg = imagesByItem[fav.item_id]?.[0];
+          const chosenUrl = firstImg?.image_url || firstImg?.thumbnail_url || null;
+          return {
+            ...item,
+            image_url: chosenUrl,
+          };
+        })
+        .filter(Boolean);
 
       return { data: flattened, error: null } as any;
     });

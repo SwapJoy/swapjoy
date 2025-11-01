@@ -1,9 +1,11 @@
-import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
+  ActivityIndicator,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ProfileScreenProps } from '../types/navigation';
@@ -74,6 +76,126 @@ const FollowButton: React.FC<{ targetUserId: string }> = ({ targetUserId }) => {
   );
 };
 
+// Skeleton loader component
+const SkeletonLoader: React.FC<{ width?: number | string; height?: number; style?: any; borderRadius?: number }> = ({ 
+  width = '100%', 
+  height = 16, 
+  style,
+  borderRadius = 4 
+}) => {
+  const animatedValue = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(animatedValue, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(animatedValue, {
+          toValue: 0,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
+  }, [animatedValue]);
+
+  const opacity = animatedValue.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.3, 0.7],
+  });
+
+  return (
+    <Animated.View
+      style={[
+        {
+          width,
+          height,
+          backgroundColor: '#E1E9EE',
+          borderRadius,
+          opacity,
+        },
+        style,
+      ]}
+    />
+  );
+};
+
+// Profile Header Skeleton
+const ProfileHeaderSkeleton = memo(() => (
+  <View style={styles.header}>
+    <View style={styles.profileInfo}>
+      <View style={styles.avatarContainer}>
+        <SkeletonLoader width={80} height={80} borderRadius={40} />
+      </View>
+      <View style={styles.userInfo}>
+        <SkeletonLoader width="70%" height={24} style={{ marginBottom: 8 }} />
+        <SkeletonLoader width="50%" height={18} style={{ marginBottom: 8 }} />
+        <SkeletonLoader width="90%" height={16} />
+      </View>
+    </View>
+  </View>
+));
+
+// Stats Skeleton
+const StatsSkeleton = memo(() => (
+  <View style={styles.statsContainer}>
+    <View style={styles.statsRow}>
+      <View style={styles.statItem}>
+        <SkeletonLoader width={60} height={28} style={{ marginBottom: 4 }} />
+        <SkeletonLoader width={80} height={14} />
+      </View>
+      <View style={styles.statItem}>
+        <SkeletonLoader width={60} height={28} style={{ marginBottom: 4 }} />
+        <SkeletonLoader width={80} height={14} />
+      </View>
+    </View>
+    <View style={styles.statsRow}>
+      <View style={styles.statItem}>
+        <SkeletonLoader width={60} height={28} style={{ marginBottom: 4 }} />
+        <SkeletonLoader width={80} height={14} />
+      </View>
+      <View style={styles.statItem}>
+        <SkeletonLoader width={60} height={28} style={{ marginBottom: 4 }} />
+        <SkeletonLoader width={80} height={14} />
+      </View>
+    </View>
+    <View style={styles.statsRow}>
+      <View style={styles.statItem}>
+        <SkeletonLoader width={60} height={28} style={{ marginBottom: 4 }} />
+        <SkeletonLoader width={80} height={14} />
+      </View>
+      <View style={styles.statItem}>
+        <SkeletonLoader width={60} height={28} style={{ marginBottom: 4 }} />
+        <SkeletonLoader width={80} height={14} />
+      </View>
+    </View>
+  </View>
+));
+
+// Grid Items Skeleton
+const GridItemsSkeleton = memo(() => {
+  const numColumns = 3;
+  const screenWidth = Dimensions.get('window').width;
+  const gridSpacing = 2;
+  const itemSize = Math.floor((screenWidth - gridSpacing * (numColumns - 1)) / numColumns);
+  const skeletonItems = Array.from({ length: 6 }, (_, i) => i);
+
+  return (
+    <View style={styles.gridList}>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+        {skeletonItems.map((item) => (
+          <View key={item} style={{ width: itemSize, height: itemSize * 1.7, marginBottom: 2 }}>
+            <SkeletonLoader width="100%" height="100%" borderRadius={0} />
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+});
+
 const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
@@ -86,7 +208,13 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
     userItems,
     savedItems,
     draftItems,
-    loading,
+    loadingProfile,
+    loadingMetrics,
+    loadingPublishedItems,
+    loadingSavedItems,
+    loadingDraftItems,
+    loadSavedItems,
+    loadDraftItems,
     handleSignOut,
     formatSuccessRate,
     formatRating,
@@ -100,12 +228,30 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
   useEffect(() => {
     if (isViewingOtherUser) setActiveTab('published');
   }, [isViewingOtherUser]);
+
+  // Load items when tab changes (lazy loading)
+  useEffect(() => {
+    if (!isViewingOtherUser && activeTab === 'saved') {
+      loadSavedItems();
+    } else if (!isViewingOtherUser && activeTab === 'drafts') {
+      loadDraftItems();
+    }
+  }, [activeTab, isViewingOtherUser, loadSavedItems, loadDraftItems]);
+
   const gridData = useMemo(() => {
     if (isViewingOtherUser) return userItems;
     if (activeTab === 'published') return userItems;
     if (activeTab === 'saved') return savedItems;
     return draftItems;
   }, [activeTab, userItems, savedItems, draftItems, isViewingOtherUser]);
+
+  // Get loading state for current tab
+  const isLoadingCurrentTab = useMemo(() => {
+    if (isViewingOtherUser) return loadingPublishedItems;
+    if (activeTab === 'published') return loadingPublishedItems;
+    if (activeTab === 'saved') return loadingSavedItems;
+    return loadingDraftItems;
+  }, [activeTab, isViewingOtherUser, loadingPublishedItems, loadingSavedItems, loadingDraftItems]);
 
   const numColumns = 3;
   const screenWidth = Dimensions.get('window').width;
@@ -146,17 +292,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
         )}
       </View>
     </TouchableOpacity>
-  ), [itemSize]);
-
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading profile...</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
+  ), [itemSize, navigation]);
 
   return (
     <View style={styles.container}>
@@ -181,39 +317,43 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
         ListHeaderComponent={(
           <View>
             {/* Header */}
-            <View style={styles.header}>
-              <View style={styles.profileInfo}>
-                <View style={styles.avatarContainer}>
-                  <CachedImage
-                    uri={
-                      (profile as any)?.profile_image_url ||
-                      (user as any)?.profile_image_url ||
-                      (user as any)?.user_metadata?.avatar_url ||
-                      'https://via.placeholder.com/100?text=Avatar'
-                    }
-                    style={styles.avatar}
-                    resizeMode="cover"
-                  />
-                </View>
-                <View style={styles.userInfo}>
-                  <Text style={styles.userName}>
-                    {profile?.first_name || (user as any)?.user_metadata?.first_name || ''} {profile?.last_name || (user as any)?.user_metadata?.last_name || ''}
-                  </Text>
-                  {(
-                    profile?.username ||
-                    (user as any)?.user_metadata?.username ||
-                    (user as any)?.email?.split?.('@')?.[0]
-                  ) && (
-                    <Text style={styles.username}>@
-                      {profile?.username || (user as any)?.user_metadata?.username || (user as any)?.email?.split?.('@')?.[0]}
+            {loadingProfile ? (
+              <ProfileHeaderSkeleton />
+            ) : (
+              <View style={styles.header}>
+                <View style={styles.profileInfo}>
+                  <View style={styles.avatarContainer}>
+                    <CachedImage
+                      uri={
+                        (profile as any)?.profile_image_url ||
+                        (user as any)?.profile_image_url ||
+                        (user as any)?.user_metadata?.avatar_url ||
+                        'https://via.placeholder.com/100?text=Avatar'
+                      }
+                      style={styles.avatar}
+                      resizeMode="cover"
+                    />
+                  </View>
+                  <View style={styles.userInfo}>
+                    <Text style={styles.userName}>
+                      {profile?.first_name || (user as any)?.user_metadata?.first_name || ''} {profile?.last_name || (user as any)?.user_metadata?.last_name || ''}
                     </Text>
-                  )}
-                  {(profile?.bio) && (
-                    <Text style={styles.bio}>{profile.bio}</Text>
-                  )}
+                    {(
+                      profile?.username ||
+                      (user as any)?.user_metadata?.username ||
+                      (user as any)?.email?.split?.('@')?.[0]
+                    ) && (
+                      <Text style={styles.username}>@
+                        {profile?.username || (user as any)?.user_metadata?.username || (user as any)?.email?.split?.('@')?.[0]}
+                      </Text>
+                    )}
+                    {(profile?.bio) && (
+                      <Text style={styles.bio}>{profile.bio}</Text>
+                    )}
+                  </View>
                 </View>
               </View>
-            </View>
+            )}
 
             {/* Follow button (other users only) */}
             {isViewingOtherUser && (
@@ -236,23 +376,27 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
             )}
 
             {/* Stats */}
-            <View style={styles.statsContainer}>
-              <View style={styles.statsRow}>
-                {renderStatItem('Items Listed', stats.itemsListed)}
-                {renderStatItem('Items Swapped', stats.itemsSwapped)}
+            {loadingMetrics ? (
+              <StatsSkeleton />
+            ) : (
+              <View style={styles.statsContainer}>
+                <View style={styles.statsRow}>
+                  {renderStatItem('Items Listed', stats.itemsListed)}
+                  {renderStatItem('Items Swapped', stats.itemsSwapped)}
+                </View>
+                <View style={styles.statsRow}>
+                  {renderStatItem('Sent Offers', (stats as any).sentOffers ?? Math.floor((stats.totalOffers || 0) / 2))}
+                  {renderStatItem('Received Offers', (stats as any).receivedOffers ?? Math.ceil((stats.totalOffers || 0) / 2))}
+                </View>
+                <View style={styles.statsRow}>
+                  {renderStatItem('Success Rate', formatSuccessRate(stats.successRate))}
+                  {renderStatItem('Total Offers', stats.totalOffers)}
+                </View>
               </View>
-              <View style={styles.statsRow}>
-                {renderStatItem('Sent Offers', (stats as any).sentOffers ?? Math.floor((stats.totalOffers || 0) / 2))}
-                {renderStatItem('Received Offers', (stats as any).receivedOffers ?? Math.ceil((stats.totalOffers || 0) / 2))}
-              </View>
-              <View style={styles.statsRow}>
-                {renderStatItem('Success Rate', formatSuccessRate(stats.successRate))}
-                {renderStatItem('Total Offers', stats.totalOffers)}
-              </View>
-            </View>
+            )}
 
             {/* Rating */}
-            {rating.totalRatings > 0 && (
+            {!loadingMetrics && rating.totalRatings > 0 && (
               <View style={styles.ratingContainer}>
                 <Text style={styles.ratingTitle}>Rating</Text>
                 <View style={styles.ratingContent}>
@@ -289,18 +433,28 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
                   </View>
                 </View>
 
-                {gridData.length === 0 && (
+                {isLoadingCurrentTab ? (
+                  <View style={styles.loadingItemsContainer}>
+                    <ActivityIndicator size="large" color="#007AFF" />
+                    <Text style={styles.loadingItemsText}>Loading items...</Text>
+                  </View>
+                ) : gridData.length === 0 ? (
                   <View style={styles.emptyItemsContainer}>
                     <Text style={styles.emptyItemsText}>No items to display</Text>
                     <Text style={styles.emptyItemsSubtext}>
                       {activeTab === 'published' ? 'Publish items to show here.' : activeTab === 'saved' ? 'Save items to view them here.' : 'Your draft items will appear here.'}
                     </Text>
                   </View>
-                )}
+                ) : null}
               </View>
             )}
           </View>
         )}
+        ListEmptyComponent={
+          isLoadingCurrentTab ? (
+            <GridItemsSkeleton />
+          ) : null
+        }
       />
     </View>
   );
@@ -550,6 +704,18 @@ const styles = StyleSheet.create({
   emptyItemsSubtext: {
     fontSize: 14,
     color: '#999',
+  },
+  loadingItemsContainer: {
+    alignItems: 'center',
+    padding: 40,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 10,
+    marginTop: 10,
+  },
+  loadingItemsText: {
+    marginTop: 10,
+    fontSize: 14,
+    color: '#666',
   },
   addItemsButton: {
     backgroundColor: '#007AFF',
