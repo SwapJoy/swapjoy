@@ -61,7 +61,7 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
   const images = (item.images || []).sort((a: any, b: any) => (a.sort_order || 0) - (b.sort_order || 0));
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <FlatList
         data={[{ key: 'header' }, { key: 'details' }, { key: 'spacer' }]}
         keyExtractor={(i) => i.key}
@@ -145,7 +145,7 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
           </TouchableOpacity>
         </View>
       )}
-    </SafeAreaView>
+    </View>
   );
 };
 
