@@ -4,12 +4,8 @@ import { ApiService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 
 export interface UserStats {
-  itemsListed: number;
-  itemsSwapped: number;
-  totalOffers: number;
-  sentOffers?: number;
-  receivedOffers?: number;
-  successRate: number;
+  sentOffers: number;
+  receivedOffers: number;
 }
 
 export interface UserRating {
@@ -35,10 +31,12 @@ export const useProfileData = (targetUserId?: string) => {
   const [favoriteCategories, setFavoriteCategories] = useState<string[]>([]);
   const [favoriteCategoryNames, setFavoriteCategoryNames] = useState<string[]>([]);
   const [stats, setStats] = useState<UserStats>({
-    itemsListed: 0,
-    itemsSwapped: 0,
-    totalOffers: 0,
-    successRate: 0,
+    sentOffers: 0,
+    receivedOffers: 0,
+  });
+  const [followCounts, setFollowCounts] = useState({
+    followers: 0,
+    following: 0,
   });
   const [rating, setRating] = useState<UserRating>({
     averageRating: 0,
@@ -51,6 +49,7 @@ export const useProfileData = (targetUserId?: string) => {
   // Separate loading states for each section
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [loadingMetrics, setLoadingMetrics] = useState(true);
+  const [loadingFollowCounts, setLoadingFollowCounts] = useState(true);
   const [loadingPublishedItems, setLoadingPublishedItems] = useState(true);
   const [loadingSavedItems, setLoadingSavedItems] = useState(false);
   const [loadingDraftItems, setLoadingDraftItems] = useState(false);
@@ -154,12 +153,8 @@ export const useProfileData = (targetUserId?: string) => {
 
         if (statsData) {
           setStats({
-            itemsListed: statsData.items_listed || 0,
-            itemsSwapped: statsData.items_swapped || 0,
-            totalOffers: statsData.total_offers || 0,
             sentOffers: statsData.sent_offers || 0,
             receivedOffers: statsData.received_offers || 0,
-            successRate: statsData.success_rate || 0,
           });
         }
 
@@ -173,6 +168,35 @@ export const useProfileData = (targetUserId?: string) => {
         console.error('Error fetching metrics:', error);
       } finally {
         setLoadingMetrics(false);
+      }
+    })();
+  }, [user?.id, targetUserId]);
+
+  // Fetch follow counts independently
+  useEffect(() => {
+    if (!user) {
+      setLoadingFollowCounts(false);
+      return;
+    }
+
+    const viewedUserId = targetUserId || user.id;
+    setLoadingFollowCounts(true);
+
+    (async () => {
+      try {
+        const countsRes = await ApiService.getFollowCounts(viewedUserId);
+        const countsData: any = countsRes?.data;
+
+        if (countsData) {
+          setFollowCounts({
+            followers: countsData.followers || 0,
+            following: countsData.following || 0,
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching follow counts:', error);
+      } finally {
+        setLoadingFollowCounts(false);
       }
     })();
   }, [user?.id, targetUserId]);
@@ -302,8 +326,10 @@ export const useProfileData = (targetUserId?: string) => {
     draftItems,
     favoriteCategories,
     favoriteCategoryNames,
+    followCounts,
     loadingProfile,
     loadingMetrics,
+    loadingFollowCounts,
     loadingPublishedItems,
     loadingSavedItems,
     loadingDraftItems,

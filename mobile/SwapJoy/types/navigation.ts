@@ -31,6 +31,10 @@ export type RootStackParamList = {
   UserProfile: {
     userId: string;
   };
+  FollowersFollowing: {
+    userId: string;
+    initialTab?: 'followers' | 'following';
+  };
   ProfileSettings: undefined;
   Search: undefined;
   // Offer flow

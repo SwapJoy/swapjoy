@@ -21,6 +21,7 @@ import BundleItemsScreen from '../screens/BundleItemsScreen';
 import OfferCreateScreen from '../screens/OfferCreateScreen';
 import OfferPreviewScreen from '../screens/OfferPreviewScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import FollowersFollowingScreen from '../screens/FollowersFollowingScreen';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -172,6 +173,11 @@ const AppNavigator: React.FC = () => {
               name="Search" 
               component={SearchScreen}
               options={{ title: 'Search' }}
+            />
+            <Stack.Screen 
+              name="FollowersFollowing" 
+              component={FollowersFollowingScreen}
+              options={{ title: 'Followers & Following' }}
             />
           </>
         ) : (

@@ -899,20 +899,14 @@ export class ApiService {
     });
   }
 
-  // User Stats - Ultra Simple Version
+  // User Stats - Simplified: Only Sent and Received Offers
   static async getUserStats(userId: string) {
-    // Cache user stats; compute counts for items and offers
+    // Cache user stats; compute counts for offers
     return RedisCache.cache(
       'user-stats',
       [userId],
       () => this.authenticatedCall(async (client) => {
         console.log('ApiService: Getting user stats for user:', userId);
-
-        // Items listed count (simple aggregate; exact count is fine for UI)
-        const { data: items, error: itemsError } = await client
-          .from('items')
-          .select('id')
-          .eq('user_id', userId);
 
         // Offers sent count (count-only head query)
         const { count: sentOffers } = await client
@@ -926,23 +920,9 @@ export class ApiService {
           .select('id', { count: 'exact', head: true })
           .eq('receiver_id', userId);
 
-        // Successful swaps: offers accepted where user is sender or receiver
-        const { count: successfulSwaps } = await client
-          .from('offers')
-          .select('id', { count: 'exact', head: true })
-          .eq('status', 'accepted')
-          .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`);
-
-        const totalOffers = (sentOffers || 0) + (receivedOffers || 0);
-        const successRate = totalOffers > 0 ? Math.round(((successfulSwaps || 0) / totalOffers) * 100) : 0;
-
         const result = {
-          items_listed: items?.length || 0,
-          items_swapped: successfulSwaps || 0,
-          total_offers: totalOffers,
           sent_offers: sentOffers || 0,
           received_offers: receivedOffers || 0,
-          success_rate: successRate,
         } as any;
 
         console.log('ApiService: Returning stats:', result);
@@ -1412,6 +1392,124 @@ export class ApiService {
         .eq('follower_id', me.id)
         .eq('following_id', targetUserId);
       return { data: { success: !error } as any, error } as any;
+    });
+  }
+
+  // Get followers and following counts
+  static async getFollowCounts(userId: string) {
+    return this.authenticatedCall(async (client) => {
+      const [followersCount, followingCount] = await Promise.all([
+        client
+          .from('user_follows')
+          .select('id', { count: 'exact', head: true })
+          .eq('following_id', userId),
+        client
+          .from('user_follows')
+          .select('id', { count: 'exact', head: true })
+          .eq('follower_id', userId),
+      ]);
+
+      return {
+        data: {
+          followers: followersCount.count || 0,
+          following: followingCount.count || 0,
+        },
+        error: null,
+      } as any;
+    });
+  }
+
+  // Get followers list
+  static async getFollowers(userId: string) {
+    return this.authenticatedCall(async (client) => {
+      // First get the follow relationships
+      const { data: follows, error: followsError } = await client
+        .from('user_follows')
+        .select('id, follower_id, created_at')
+        .eq('following_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (followsError || !follows || follows.length === 0) {
+        return { data: [], error: followsError } as any;
+      }
+
+      const followerIds = follows.map((f: any) => f.follower_id);
+
+      // Get user details in parallel
+      const { data: users, error: usersError } = await client
+        .from('users')
+        .select('id, username, first_name, last_name, profile_image_url')
+        .in('id', followerIds);
+
+      if (usersError) {
+        return { data: null, error: usersError } as any;
+      }
+
+      // Map follows to users maintaining order
+      const userMap = new Map((users || []).map((u: any) => [u.id, u]));
+      const followers = follows
+        .map((follow: any) => {
+          const user = userMap.get(follow.follower_id);
+          if (!user) return null;
+          return {
+            id: user.id,
+            username: user.username,
+            first_name: user.first_name,
+            last_name: user.last_name,
+            profile_image_url: user.profile_image_url,
+            followed_at: follow.created_at,
+          };
+        })
+        .filter(Boolean);
+
+      return { data: followers, error: null } as any;
+    });
+  }
+
+  // Get following list
+  static async getFollowing(userId: string) {
+    return this.authenticatedCall(async (client) => {
+      // First get the follow relationships
+      const { data: follows, error: followsError } = await client
+        .from('user_follows')
+        .select('id, following_id, created_at')
+        .eq('follower_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (followsError || !follows || follows.length === 0) {
+        return { data: [], error: followsError } as any;
+      }
+
+      const followingIds = follows.map((f: any) => f.following_id);
+
+      // Get user details in parallel
+      const { data: users, error: usersError } = await client
+        .from('users')
+        .select('id, username, first_name, last_name, profile_image_url')
+        .in('id', followingIds);
+
+      if (usersError) {
+        return { data: null, error: usersError } as any;
+      }
+
+      // Map follows to users maintaining order
+      const userMap = new Map((users || []).map((u: any) => [u.id, u]));
+      const following = follows
+        .map((follow: any) => {
+          const user = userMap.get(follow.following_id);
+          if (!user) return null;
+          return {
+            id: user.id,
+            username: user.username,
+            first_name: user.first_name,
+            last_name: user.last_name,
+            profile_image_url: user.profile_image_url,
+            followed_at: follow.created_at,
+          };
+        })
+        .filter(Boolean);
+
+      return { data: following, error: null } as any;
     });
   }
 

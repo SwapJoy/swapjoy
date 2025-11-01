@@ -152,26 +152,6 @@ const StatsSkeleton = memo(() => (
         <SkeletonLoader width={80} height={14} />
       </View>
     </View>
-    <View style={styles.statsRow}>
-      <View style={styles.statItem}>
-        <SkeletonLoader width={60} height={28} style={{ marginBottom: 4 }} />
-        <SkeletonLoader width={80} height={14} />
-      </View>
-      <View style={styles.statItem}>
-        <SkeletonLoader width={60} height={28} style={{ marginBottom: 4 }} />
-        <SkeletonLoader width={80} height={14} />
-      </View>
-    </View>
-    <View style={styles.statsRow}>
-      <View style={styles.statItem}>
-        <SkeletonLoader width={60} height={28} style={{ marginBottom: 4 }} />
-        <SkeletonLoader width={80} height={14} />
-      </View>
-      <View style={styles.statItem}>
-        <SkeletonLoader width={60} height={28} style={{ marginBottom: 4 }} />
-        <SkeletonLoader width={80} height={14} />
-      </View>
-    </View>
   </View>
 ));
 
@@ -208,8 +188,10 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
     userItems,
     savedItems,
     draftItems,
+    followCounts,
     loadingProfile,
     loadingMetrics,
+    loadingFollowCounts,
     loadingPublishedItems,
     loadingSavedItems,
     loadingDraftItems,
@@ -381,17 +363,31 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
             ) : (
               <View style={styles.statsContainer}>
                 <View style={styles.statsRow}>
-                  {renderStatItem('Items Listed', stats.itemsListed)}
-                  {renderStatItem('Items Swapped', stats.itemsSwapped)}
+                  {renderStatItem('Sent Offers', stats.sentOffers)}
+                  {renderStatItem('Received Offers', stats.receivedOffers)}
                 </View>
-                <View style={styles.statsRow}>
-                  {renderStatItem('Sent Offers', (stats as any).sentOffers ?? Math.floor((stats.totalOffers || 0) / 2))}
-                  {renderStatItem('Received Offers', (stats as any).receivedOffers ?? Math.ceil((stats.totalOffers || 0) / 2))}
-                </View>
-                <View style={styles.statsRow}>
-                  {renderStatItem('Success Rate', formatSuccessRate(stats.successRate))}
-                  {renderStatItem('Total Offers', stats.totalOffers)}
-                </View>
+              </View>
+            )}
+
+            {/* Followers & Following */}
+            {!loadingFollowCounts && (
+              <View style={styles.followCountsContainer}>
+                <TouchableOpacity
+                  style={styles.followCountItem}
+                  onPress={() => navigation.navigate('FollowersFollowing', { userId: viewedUserId || user?.id, initialTab: 'followers' })}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.followCountValue}>{followCounts.followers}</Text>
+                  <Text style={styles.followCountLabel}>Followers</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.followCountItem}
+                  onPress={() => navigation.navigate('FollowersFollowing', { userId: viewedUserId || user?.id, initialTab: 'following' })}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.followCountValue}>{followCounts.following}</Text>
+                  <Text style={styles.followCountLabel}>Following</Text>
+                </TouchableOpacity>
               </View>
             )}
 
@@ -857,6 +853,34 @@ const styles = StyleSheet.create({
     color: '#3b6cff',
     fontSize: 12,
     fontWeight: '600',
+  },
+  followCountsContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    marginBottom: 10,
+    paddingVertical: 20,
+    paddingHorizontal: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  followCountItem: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  followCountValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 4,
+  },
+  followCountLabel: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
   },
 });
 
