@@ -698,6 +698,20 @@ export class ApiService {
               byOwner[it.user_id].push(it);
             }
 
+            // Fetch user data for all bundle owners
+            const ownerIds = Object.keys(byOwner);
+            const { data: bundleOwners } = await client
+              .from('users')
+              .select('id, username, first_name, last_name')
+              .in('id', ownerIds);
+
+            const ownerMap: Record<string, any> = {};
+            if (bundleOwners) {
+              bundleOwners.forEach((owner: any) => {
+                ownerMap[owner.id] = owner;
+              });
+            }
+
             let constructed = 0;
             for (const [owner, itemsArr] of Object.entries(byOwner)) {
               if (constructed >= 5) break;
@@ -716,6 +730,9 @@ export class ApiService {
                 const bundleValue = bundleTotalValue - bundleDiscount;
                 const imageUrl = a.item_images?.[0]?.image_url || b.item_images?.[0]?.image_url || null;
 
+                // Get full user data for the bundle owner
+                const bundleOwner = ownerMap[owner];
+
                 console.log(`[OWNER-BUNDLE] Creating bundle: "${a.title}" (${a.price}) + "${b.title}" (${b.price}) = Total: ${bundleTotalValue}, Discount: ${bundleDiscount}, Display Price: ${bundleTotalValue}`);
 
                 const bundle = {
@@ -733,7 +750,12 @@ export class ApiService {
                   reason: 'Same owner bundle - good combined value',
                   category_id: null,
                   user_id: owner,
-                  user: { id: owner },
+                  user: bundleOwner ? {
+                    id: bundleOwner.id,
+                    username: bundleOwner.username,
+                    first_name: bundleOwner.first_name,
+                    last_name: bundleOwner.last_name,
+                  } : { id: owner },
                   image_url: imageUrl,
                   created_at: new Date().toISOString(),
                   status: 'available'
@@ -999,6 +1021,20 @@ export class ApiService {
         
         console.log(`[BUNDLES] Grouped items by ${Object.keys(itemsByOwner).length} owners`);
         
+        // Fetch user data for all bundle owners
+        const ownerIds = Object.keys(itemsByOwner);
+        const { data: bundleOwners } = await client
+          .from('users')
+          .select('id, username, first_name, last_name')
+          .in('id', ownerIds);
+
+        const ownerMap: Record<string, any> = {};
+        if (bundleOwners) {
+          bundleOwners.forEach((owner: any) => {
+            ownerMap[owner.id] = owner;
+          });
+        }
+        
         const bundles: any[] = [];
         const maxBundles = Math.min(5, Math.floor(limit / 2));
         
@@ -1006,6 +1042,9 @@ export class ApiService {
         for (const [ownerId, ownerItems] of Object.entries(itemsByOwner)) {
           if (bundles.length >= maxBundles) break;
           if (ownerItems.length < 2) continue;
+          
+          // Get full user data for the bundle owner
+          const bundleOwner = ownerMap[ownerId];
           
           // Try combinations of items from this owner
           for (let i = 0; i < ownerItems.length - 1 && bundles.length < maxBundles; i++) {
@@ -1096,7 +1135,12 @@ export class ApiService {
                 reason: `Great bundle match! Similar to your items`,
                 category_id: itemA.category_id,
                 user_id: ownerId,
-                user: { id: ownerId },
+                user: bundleOwner ? {
+                  id: bundleOwner.id,
+                  username: bundleOwner.username,
+                  first_name: bundleOwner.first_name,
+                  last_name: bundleOwner.last_name,
+                } : { id: ownerId },
                 image_url: itemA.item_images?.[0]?.image_url || itemB.item_images?.[0]?.image_url || null,
                 created_at: new Date().toISOString(),
                 status: 'available'
@@ -1266,6 +1310,9 @@ export class ApiService {
                     const imageB = fullItemB.item_images?.[0]?.image_url;
                     const imageUrl = imageA || imageB || 'https://via.placeholder.com/200x150';
 
+                    // Get full user data for the bundle owner
+                    const bundleOwner = ownerMap[bundleOwnerId];
+
                     // Convert bundleTotalValueGEL back to original currency for display
                     // Determine currency from items (prefer USD if mixed)
                     const bundleCurrency2 = itemA.currency || itemB.currency || 'USD';
@@ -1287,7 +1334,12 @@ export class ApiService {
                       reason: `Great bundle match! Similar to your ${userItems.find(ui => ui.category_id === itemA.category_id)?.title || 'items'}`,
                       category_id: itemA.category_id,
                       user_id: bundleOwnerId,
-                      user: { id: bundleOwnerId },
+                      user: bundleOwner ? {
+                        id: bundleOwner.id,
+                        username: bundleOwner.username,
+                        first_name: bundleOwner.first_name,
+                        last_name: bundleOwner.last_name,
+                      } : { id: bundleOwnerId },
                       image_url: imageUrl,
                       created_at: new Date().toISOString(),
                       status: 'available'
