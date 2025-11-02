@@ -473,8 +473,8 @@ export class ApiService {
           limit, 
           totalUserValueGEL, 
           rateMap,
-          favoriteCategories.length > 0 ? favoriteCategories : null, // Always pass favorite categories if available
-          weights // Always pass weights to respect category_score
+          strictCategoryFilter ? favoriteCategories : null, // Pass favorite categories if strict mode
+          strictCategoryFilter ? weights : null // Pass weights if strict mode
         );
         console.log(`[BUNDLES] Generated ${virtualBundles.length} virtual bundles`);
         if (virtualBundles && Array.isArray(virtualBundles)) {
@@ -716,15 +716,12 @@ export class ApiService {
                 const bundleValue = bundleTotalValue - bundleDiscount;
                 const imageUrl = a.item_images?.[0]?.image_url || b.item_images?.[0]?.image_url || null;
 
-                console.log(`[OWNER-BUNDLE] Creating bundle: "${a.title}" (${a.price}) + "${b.title}" (${b.price}) = Total: ${bundleTotalValue}, Discount: ${bundleDiscount}, Display Price: ${bundleTotalValue}`);
-
                 const bundle = {
                   id: `owner_bundle_${owner}_${a.id}_${b.id}`,
                   title: `${a.title} + ${b.title}`,
                   description: `Bundle: ${a.title} and ${b.title}`,
-                  price: bundleTotalValue, // Display full total price (not discounted)
-                  estimated_value: bundleTotalValue, // Display full total price (not discounted)
-                  currency: a.currency || b.currency || 'USD', // Add currency field
+                  price: bundleValue,
+                  estimated_value: bundleValue,
                   is_bundle: true,
                   bundle_items: [a, b],
                   similarity_score: 0.6, // heuristic baseline
@@ -754,58 +751,55 @@ export class ApiService {
       console.log(`Final results: ${finalResults.length} items (${finalResults.filter(r => r.is_bundle).length} bundles, ${finalResults.filter(r => !r.is_bundle).length} single items)`);
       console.log(`Favorite category items in final results: ${finalResults.filter((r: any) => r.is_favorite_category || r.from_favorite_category || (r.category_id && favoriteCategories.includes(r.category_id))).length}`);
       
-      // Sort by weighted overall_score (includes all weighted factors: similarity, category, price, location)
-      // The weighted score already accounts for category_score, price_score, location weights
+      // PRODUCTION-READY: Sort by weighted overall_score (relevance) - most relevant first
+      // The overall_score is calculated by SQL function using your weights:
+      // - similarity_weight (embeddings similarity)
+      // - category_score_weight (favorite category match)
+      // - price_score_weight (price similarity)
+      // - location_score_weight (distance)
+      // Higher overall_score = more relevant to you based on your weight settings
       const sortedResults = finalResults.sort((a, b) => {
-        // Primary sort: weighted overall_score (descending)
-        const scoreDiff = (b.overall_score || 0) - (a.overall_score || 0);
+        // Primary sort: weighted overall_score (descending) - most relevant first
+        const scoreA = a.overall_score || 0;
+        const scoreB = b.overall_score || 0;
+        const scoreDiff = scoreB - scoreA;
         
-        // Secondary sort: prioritize single items over bundles (if scores are close)
+        // If scores are very close (< 0.01), use secondary criteria
         if (Math.abs(scoreDiff) < 0.01) {
+          // Secondary sort 1: Prioritize favorite category items
+          const aIsFavorite = a.is_favorite_category || a.from_favorite_category || 
+                             (a.category_id && favoriteCategories.includes(a.category_id));
+          const bIsFavorite = b.is_favorite_category || b.from_favorite_category || 
+                             (b.category_id && favoriteCategories.includes(b.category_id));
+          
+          if (aIsFavorite && !bIsFavorite) return -1; // Favorite items first
+          if (!aIsFavorite && bIsFavorite) return 1;
+          
+          // Secondary sort 2: Prioritize single items over bundles (if both/neither are favorite)
           if (a.is_bundle && !b.is_bundle) return 1;
           if (!a.is_bundle && b.is_bundle) return -1;
+          
+          // Tertiary sort: Higher similarity if everything else is equal
+          const similarityDiff = (b.similarity_score || b.similarity || 0) - (a.similarity_score || a.similarity || 0);
+          if (Math.abs(similarityDiff) > 0.001) return similarityDiff;
         }
         
+        // Primary: sort by overall_score (most relevant first)
         return scoreDiff;
+      });
+      
+      console.log(`[SORTING] Sorted ${sortedResults.length} items by overall_score (relevance)`);
+      console.log(`[SORTING] Top 5 most relevant items:`);
+      sortedResults.slice(0, 5).forEach((item: any, idx: number) => {
+        console.log(`  ${idx + 1}. ${item.title || item.id} - score: ${item.overall_score?.toFixed(4) || 0}, similarity: ${(item.similarity_score || item.similarity || 0).toFixed(4)}, category_match: ${(item.category_match_score || 0).toFixed(4)}`);
       });
       
       console.log(`After sorting - Total items: ${sortedResults.length}, Favorite category items: ${sortedResults.filter((r: any) => r.is_favorite_category || r.from_favorite_category || (r.category_id && favoriteCategories.includes(r.category_id))).length}`);
       console.log(`Favorite category item IDs after sorting: ${sortedResults.filter((r: any) => r.is_favorite_category || r.from_favorite_category || (r.category_id && favoriteCategories.includes(r.category_id))).map((r: any) => r.id).join(', ')}`);
       
-      // CRITICAL: Filter to only include items/bundles that have swap suggestions
-      // This ensures Top Picks only shows items the user can actually swap for
-      console.log(`[TOP-PICKS-FILTER] Checking ${sortedResults.length} items/bundles for swap suggestions...`);
-      const suggestionChecks = await Promise.all(
-        sortedResults.map(async (item: any) => {
-          if (item.is_bundle && item.bundle_items) {
-            // For bundles, create bundleData structure
-            const bundleData = {
-              bundle_items: item.bundle_items.map((bi: any) => ({
-                id: bi.id || bi.item?.id || bi.item_id,
-                embedding: bi.embedding
-              })),
-              price: item.price || item.estimated_value || 0,
-              currency: item.currency || 'USD'
-            };
-            const hasSuggestions = await this.checkSwapSuggestions(client, item.id, userId, bundleData);
-            console.log(`[TOP-PICKS-FILTER] Bundle ${item.id} (${item.title}): ${hasSuggestions.length > 0 ? 'HAS suggestions' : 'NO suggestions'}`);
-            return { item, hasSuggestions: hasSuggestions.length > 0 };
-          } else {
-            // For single items
-            const hasSuggestions = await this.checkSwapSuggestions(client, item.id, userId);
-            console.log(`[TOP-PICKS-FILTER] Item ${item.id} (${item.title}): ${hasSuggestions.length > 0 ? 'HAS suggestions' : 'NO suggestions'}`);
-            return { item, hasSuggestions: hasSuggestions.length > 0 };
-          }
-        })
-      );
-      
-      const itemsWithSuggestions = suggestionChecks
-        .filter(check => check.hasSuggestions)
-        .map(check => check.item);
-      
-      console.log(`[TOP-PICKS-FILTER] Filtered from ${sortedResults.length} to ${itemsWithSuggestions.length} items/bundles with suggestions`);
-      
-      const filteredResults = itemsWithSuggestions;
+      // SQL function already filtered and scored items based on weights
+      // No need for additional post-processing filtering
+      const filteredResults = sortedResults;
       
       // Limit results (already sorted by weighted overall_score)
       const limitedResults = filteredResults.slice(0, limit);
@@ -819,11 +813,52 @@ export class ApiService {
         console.log(`  ${index + 1}. ${item.title || item.id} - isFavorite: ${isFav}, isBundle: ${item.is_bundle || false}, score: ${item.overall_score || 0}`);
       });
 
-      if (limitedResults.length > 0) {
-        return { data: limitedResults, error: null };
+      // PRODUCTION-READY: Filter items to only show those with valid swap suggestions
+      // If an item has no suggestions, it shouldn't appear in Top Picks
+      // Check suggestions for all items in parallel for better performance
+      console.log(`[TOP-PICKS-FILTER] Filtering ${limitedResults.length} items to only those with swap suggestions...`);
+      
+      const suggestionChecks = limitedResults.map(async (item) => {
+        try {
+          // Check if this item/bundle has swap suggestions
+          const bundleData = item.is_bundle && item.bundle_items ? {
+            bundle_items: item.bundle_items,
+            price: item.price || item.estimated_value || 0,
+            currency: item.currency || 'USD'
+          } : undefined;
+          
+          // Call getSwapSuggestions with client directly (internal call)
+          const suggestions = await this.checkSwapSuggestions(
+            client,
+            item.id,
+            userId,
+            bundleData
+          );
+          
+          return { item, hasSuggestions: suggestions && suggestions.length > 0, suggestionCount: suggestions?.length || 0 };
+        } catch (error: any) {
+          console.warn(`[TOP-PICKS-FILTER] Error checking suggestions for item ${item.id}:`, error.message);
+          return { item, hasSuggestions: false, suggestionCount: 0 };
+        }
+      });
+      
+      const results = await Promise.all(suggestionChecks);
+      const itemsWithSuggestions = results
+        .filter(result => result.hasSuggestions)
+        .map(result => {
+          console.log(`[TOP-PICKS-FILTER] Item ${result.item.id} (${result.item.title || result.item.id}) has ${result.suggestionCount} suggestions - including`);
+          return result.item;
+        });
+      
+      const excludedCount = results.filter(r => !r.hasSuggestions).length;
+      console.log(`[TOP-PICKS-FILTER] Filtered from ${limitedResults.length} to ${itemsWithSuggestions.length} items with suggestions (excluded ${excludedCount} items without suggestions)`);
+      
+      if (itemsWithSuggestions.length > 0) {
+        return { data: itemsWithSuggestions, error: null };
       }
 
-      // Fallback if no vector matches found
+      // If no items with suggestions, fallback to category-based recommendations
+      console.log('[TOP-PICKS-FILTER] No items with suggestions found, using fallback');
       return this.getFallbackRecommendations(client, userId, limit);
     }),
     options?.bypassCache === true
@@ -966,153 +1001,6 @@ export class ApiService {
     favoriteCategories: string[] | null = null, // Optional: filter bundles to favorite categories
     weights: RecommendationWeights | null = null // Optional: use weights for filtering
   ) {
-    console.log(`[BUNDLES] Starting bundle generation - userItems: ${userItems.length}, userTotalValue: ${userTotalValue.toFixed(2)} GEL, favoriteCategories: ${favoriteCategories?.length || 0}`);
-    
-    // NEW APPROACH: If we have favorite categories, directly find items in those categories
-    // and create bundles from items owned by the same person
-    if (favoriteCategories && favoriteCategories.length > 0) {
-      console.log(`[BUNDLES] Using category-based bundle generation for categories: ${favoriteCategories.join(', ')}`);
-      
-      // Get all items in favorite categories
-      const { data: categoryItems, error: categoryError } = await client
-        .from('items')
-        .select('id, title, price, currency, category_id, user_id, embedding, item_images(image_url)')
-        .in('category_id', favoriteCategories)
-        .eq('status', 'available')
-        .neq('user_id', userId)
-        .not('embedding', 'is', null)
-        .limit(200); // Get more items to find bundle combinations
-      
-      if (categoryError || !categoryItems || categoryItems.length < 2) {
-        console.log(`[BUNDLES] Category-based approach: Found ${categoryItems?.length || 0} items (need at least 2)`);
-      } else {
-        console.log(`[BUNDLES] Category-based approach: Found ${categoryItems.length} items in favorite categories`);
-        
-        // Group items by owner
-        const itemsByOwner: Record<string, any[]> = {};
-        for (const item of categoryItems) {
-          if (!itemsByOwner[item.user_id]) {
-            itemsByOwner[item.user_id] = [];
-          }
-          itemsByOwner[item.user_id].push(item);
-        }
-        
-        console.log(`[BUNDLES] Grouped items by ${Object.keys(itemsByOwner).length} owners`);
-        
-        const bundles: any[] = [];
-        const maxBundles = Math.min(5, Math.floor(limit / 2));
-        
-        // Create bundles from items owned by the same person
-        for (const [ownerId, ownerItems] of Object.entries(itemsByOwner)) {
-          if (bundles.length >= maxBundles) break;
-          if (ownerItems.length < 2) continue;
-          
-          // Try combinations of items from this owner
-          for (let i = 0; i < ownerItems.length - 1 && bundles.length < maxBundles; i++) {
-            for (let j = i + 1; j < ownerItems.length && bundles.length < maxBundles; j++) {
-              const itemA = ownerItems[i];
-              const itemB = ownerItems[j];
-              
-              // Convert prices to GEL
-              const itemARate = rateMap[itemA.currency] || 1;
-              const itemBRate = rateMap[itemB.currency] || 1;
-              const bundleTotalValueGEL = parseFloat(itemA.price || 0) * itemARate + parseFloat(itemB.price || 0) * itemBRate;
-              const bundleDiscount = Math.min(bundleTotalValueGEL * 0.1, 271);
-              const bundleValue2 = bundleTotalValueGEL - bundleDiscount;
-              
-              // Check price range
-              const minPrice = userTotalValue * 0.6;
-              const maxPrice = userTotalValue * 1.6;
-              const priceFilterPass = weights && weights.price_score === 0 
-                ? true 
-                : bundleValue2 >= minPrice && bundleValue2 <= maxPrice;
-              
-              if (!priceFilterPass) {
-                console.log(`[BUNDLES] Skipping bundle: "${itemA.title}" + "${itemB.title}" - price ${bundleValue2.toFixed(2)} GEL outside range [${minPrice.toFixed(2)}, ${maxPrice.toFixed(2)}]`);
-                continue;
-              }
-              
-              // Calculate similarity to user's items (optional - use for scoring)
-              let avgSimilarity = 0.6; // Default baseline
-              if (userItems.length > 0 && itemA.embedding && itemB.embedding) {
-                try {
-                  // Try to average embeddings if both are arrays
-                  const embA = Array.isArray(itemA.embedding) ? itemA.embedding : null;
-                  const embB = Array.isArray(itemB.embedding) ? itemB.embedding : null;
-                  
-                  if (embA && embB && embA.length > 0 && embB.length > 0 && embA.length === embB.length) {
-                    const bundleEmbedding = this.averageEmbeddings([embA, embB]);
-                    
-                    if (bundleEmbedding.length > 0) {
-                      const similarities: number[] = [];
-                      for (const userItem of userItems) {
-                        if (userItem.embedding && Array.isArray(userItem.embedding) && userItem.embedding.length === bundleEmbedding.length) {
-                          // Calculate cosine similarity
-                          let dotProduct = 0;
-                          let norm1 = 0;
-                          let norm2 = 0;
-                          for (let k = 0; k < bundleEmbedding.length; k++) {
-                            dotProduct += bundleEmbedding[k] * userItem.embedding[k];
-                            norm1 += bundleEmbedding[k] * bundleEmbedding[k];
-                            norm2 += userItem.embedding[k] * userItem.embedding[k];
-                          }
-                          const denominator = Math.sqrt(norm1) * Math.sqrt(norm2);
-                          if (denominator > 0) {
-                            const cosineSimilarity = Math.max(-1, Math.min(1, dotProduct / denominator));
-                            similarities.push(cosineSimilarity);
-                          }
-                        }
-                      }
-                      if (similarities.length > 0) {
-                        avgSimilarity = similarities.reduce((a, b) => a + b, 0) / similarities.length;
-                      }
-                    }
-                  }
-                } catch (e) {
-                  console.warn(`[BUNDLES] Error calculating similarity:`, e);
-                }
-              }
-              
-              console.log(`[BUNDLES] Creating bundle: "${itemA.title}" + "${itemB.title}" - total price: ${bundleTotalValueGEL.toFixed(2)} GEL (discount: ${bundleDiscount.toFixed(2)}), similarity: ${avgSimilarity.toFixed(3)}`);
-              
-              // Convert bundleTotalValueGEL back to original currency for display
-              // Determine currency from items (prefer USD if mixed)
-              const bundleCurrency = itemA.currency || itemB.currency || 'USD';
-              const bundleRate = rateMap[bundleCurrency] || 1;
-              const bundlePriceUSD = bundleTotalValueGEL / bundleRate; // Convert GEL back to display currency
-              
-              const bundle = {
-                id: `bundle_${itemA.id}_${itemB.id}`,
-                title: `${itemA.title} + ${itemB.title}`,
-                description: `Bundle: ${itemA.title} and ${itemB.title}`,
-                price: bundlePriceUSD, // Display full total price in original currency (not discounted)
-                estimated_value: bundlePriceUSD, // Display full total price in original currency (not discounted)
-                currency: bundleCurrency,
-                is_bundle: true,
-                bundle_items: [itemA, itemB],
-                similarity_score: avgSimilarity,
-                overall_score: avgSimilarity + 0.1,
-                match_score: Math.round((avgSimilarity + 0.1) * 100),
-                reason: `Great bundle match! Similar to your items`,
-                category_id: itemA.category_id,
-                user_id: ownerId,
-                user: { id: ownerId },
-                image_url: itemA.item_images?.[0]?.image_url || itemB.item_images?.[0]?.image_url || null,
-                created_at: new Date().toISOString(),
-                status: 'available'
-              };
-              
-              bundles.push(bundle);
-            }
-          }
-        }
-        
-        console.log(`[BUNDLES] Category-based generation: Created ${bundles.length} bundles`);
-        return bundles;
-      }
-    }
-    
-    // FALLBACK: Original approach - find similar items to user's items
     if (userItems.length < 2) {
       return []; // Need at least 2 items to create bundles
     }
@@ -1266,19 +1154,12 @@ export class ApiService {
                     const imageB = fullItemB.item_images?.[0]?.image_url;
                     const imageUrl = imageA || imageB || 'https://via.placeholder.com/200x150';
 
-                    // Convert bundleTotalValueGEL back to original currency for display
-                    // Determine currency from items (prefer USD if mixed)
-                    const bundleCurrency2 = itemA.currency || itemB.currency || 'USD';
-                    const bundleRate2 = rateMap[bundleCurrency2] || 1;
-                    const bundlePriceUSD2 = bundleTotalValueGEL / bundleRate2; // Convert GEL back to display currency
-                    
                     const bundle = {
                       id: `bundle_${itemA.id}_${itemB.id}`,
                       title: `${itemA.title} + ${itemB.title}`,
                       description: `Bundle: ${itemA.title} and ${itemB.title}`,
-                      price: bundlePriceUSD2, // Display full total price in original currency (not discounted)
-                      estimated_value: bundlePriceUSD2, // Display full total price in original currency (not discounted)
-                      currency: bundleCurrency2,
+                      price: bundleValue2,
+                      estimated_value: bundleValue2,
                       is_bundle: true,
                       bundle_items: [fullItemA, fullItemB],
                       similarity_score: (itemA.similarity + itemB.similarity) / 2,
@@ -2672,422 +2553,6 @@ export class ApiService {
   }
 
   /**
-   * Get swap suggestions for a recommended item or bundle
-   * Returns user's items (single items or bundles) that could be swapped for the target item/bundle
-   * @param targetItemId - The recommended item ID (what user wants to get)
-   * @param userId - The user ID (who wants to swap)
-   * @param limit - Maximum number of suggestions to return (default: 5)
-   * @param bundleData - Optional: Bundle data if target is a bundle { bundle_items: [...], price: number, currency: string }
-   * @returns Promise with data and error properties
-   */
-  static async getSwapSuggestions(
-    targetItemId: string, 
-    userId: string, 
-    limit: number = 5,
-    bundleData?: { bundle_items?: Array<{ id: string; embedding?: number[] }>; price?: number; currency?: string }
-  ) {
-    return this.authenticatedCall(async (client) => {
-      const suggestions = await this.getSwapSuggestionsInternal(client, targetItemId, userId, limit, bundleData);
-      return { data: suggestions, error: null };
-    });
-  }
-
-  /**
-   * Quick check if an item/bundle has any swap suggestions (used for filtering Top Picks)
-   * Returns array of suggestions (max 1), or empty array if none found
-   */
-  private static async checkSwapSuggestions(
-    client: any,
-    targetItemId: string,
-    userId: string,
-    bundleData?: { bundle_items?: Array<{ id: string; embedding?: number[] }>; price?: number; currency?: string }
-  ): Promise<any[]> {
-    // Quick check: only fetch 1 suggestion to see if any exist
-    return this.getSwapSuggestionsInternal(client, targetItemId, userId, 1, bundleData);
-  }
-
-  /**
-   * Internal implementation of getSwapSuggestions
-   * Returns array of suggestions directly (no wrapper)
-   */
-  private static async getSwapSuggestionsInternal(
-    client: any,
-    targetItemId: string,
-    userId: string,
-    limit: number,
-    bundleData?: { bundle_items?: Array<{ id: string; embedding?: number[] }>; price?: number; currency?: string }
-  ): Promise<any[]> {
-    console.log(`[SWAP-SUGGESTIONS] Getting swap suggestions for ${bundleData ? 'bundle' : 'item'} ${targetItemId} for user ${userId}`);
-    
-    // Get exchange rates for currency conversion
-    const { data: rates } = await client.from('currencies').select('code, rate');
-    const rateMap: { [key: string]: number } = {};
-    rates?.forEach((r: any) => { rateMap[r.code] = parseFloat(r.rate); });
-
-    let targetEmbeddingArray: number[] | null = null;
-    let targetPriceGEL: number = 0;
-    let targetCurrency: string = 'USD';
-
-    // Validate that targetItemId is a valid UUID (not a bundle ID)
-    const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetItemId);
-    
-    if (bundleData && bundleData.bundle_items && bundleData.bundle_items.length > 0) {
-      // Handle bundle: calculate embedding from bundle items
-      console.log(`[SWAP-SUGGESTIONS] Processing bundle with ${bundleData.bundle_items.length} items`);
-      
-      // Get full item details for bundle items (including embeddings)
-      const bundleItemIds: string[] = [];
-      console.log(`[SWAP-SUGGESTIONS] Bundle data structure:`, JSON.stringify(bundleData.bundle_items.map((bi: any) => ({ 
-        id: bi.id, 
-        item_id: (bi as any).item?.id, 
-        item_id2: (bi as any).item_id,
-        hasEmbedding: !!bi.embedding
-      }))));
-      
-      for (const bundleItem of bundleData.bundle_items) {
-        // Try multiple ways to extract the item ID
-        const itemId = bundleItem.id || 
-                      (bundleItem as any).item?.id || 
-                      (bundleItem as any).item_id ||
-                      (bundleItem as any).item_id ||
-                      (typeof bundleItem === 'string' ? bundleItem : null);
-        
-        console.log(`[SWAP-SUGGESTIONS] Bundle item structure:`, bundleItem, `Extracted ID:`, itemId);
-        
-        if (itemId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(itemId)) {
-          bundleItemIds.push(itemId);
-        } else {
-          console.warn(`[SWAP-SUGGESTIONS] Invalid or missing item ID in bundle item:`, bundleItem);
-        }
-      }
-
-      console.log(`[SWAP-SUGGESTIONS] Extracted ${bundleItemIds.length} valid item IDs from ${bundleData.bundle_items.length} bundle items:`, bundleItemIds);
-
-      if (bundleItemIds.length === 0) {
-        console.warn('[SWAP-SUGGESTIONS] No valid item IDs in bundle - cannot generate suggestions');
-        return [];
-      }
-
-      const { data: bundleItems, error: bundleError } = await client
-        .from('items')
-        .select('id, embedding, price, currency')
-        .in('id', bundleItemIds);
-
-      if (bundleError || !bundleItems || bundleItems.length === 0) {
-        console.error('[SWAP-SUGGESTIONS] Error fetching bundle items:', bundleError);
-        return [];
-      }
-
-      // Always calculate bundle total price from individual items (full price, no discount)
-      // The bundle.price is now the full total price, not discounted
-      let bundleTotalPrice = 0;
-      bundleItems.forEach((item: any) => {
-        const itemPrice = parseFloat(item.price || 0);
-        const itemCurrency = item.currency || 'USD';
-        const itemRate = rateMap[itemCurrency] || 1;
-        bundleTotalPrice += itemPrice * itemRate;
-      });
-      targetPriceGEL = bundleTotalPrice;
-      targetCurrency = bundleData.currency || 'USD';
-      console.log(`[SWAP-SUGGESTIONS] Calculated bundle price from items: ${targetPriceGEL} GEL (full total price)`);
-      
-      // Calculate bundle embedding by averaging item embeddings (if available)
-      const validEmbeddings = bundleItems
-        .map((item: any) => {
-          if (!item.embedding) return null;
-          return Array.isArray(item.embedding) ? item.embedding : null;
-        })
-        .filter((emb: any): emb is number[] => emb !== null && emb.length > 0);
-
-      if (validEmbeddings.length === 0) {
-        console.warn(`[SWAP-SUGGESTIONS] Bundle items have no valid embeddings - will use price-based matching only`);
-        targetEmbeddingArray = null; // Will use price-only matching
-      } else {
-        // Calculate average embedding for bundle
-        targetEmbeddingArray = this.averageEmbeddings(validEmbeddings);
-      }
-      
-      console.log(`[SWAP-SUGGESTIONS] Bundle total price: ${targetPriceGEL} GEL, Has embedding: ${!!targetEmbeddingArray}, Items: ${bundleItems.length}`);
-    } else if (isValidUUID) {
-      // Handle single item
-      const { data: targetItem, error: targetError } = await client
-        .from('items')
-        .select('id, title, description, price, currency, embedding, category_id')
-        .eq('id', targetItemId)
-        .single();
-
-      if (targetError || !targetItem) {
-        console.error('[SWAP-SUGGESTIONS] Error fetching target item:', targetError);
-        return [];
-      }
-
-      // Get target price even if embedding is missing (we can still suggest by price)
-      const targetPrice = parseFloat(targetItem.price || 0);
-      targetCurrency = targetItem.currency || 'USD';
-      const targetRate = rateMap[targetCurrency] || 1;
-      targetPriceGEL = targetPrice * targetRate;
-
-      if (!targetItem.embedding || !Array.isArray(targetItem.embedding)) {
-        console.warn(`[SWAP-SUGGESTIONS] Target item "${targetItem.title}" has no embedding - will use price-based matching only`);
-        targetEmbeddingArray = null; // Will use price-only matching
-      } else {
-        targetEmbeddingArray = targetItem.embedding;
-      }
-
-      console.log(`[SWAP-SUGGESTIONS] Target item: ${targetItem.title}, Price: ${targetPrice} ${targetCurrency} (${targetPriceGEL} GEL), Has embedding: ${!!targetEmbeddingArray}`);
-    } else {
-      console.warn(`[SWAP-SUGGESTIONS] Target item ID is not a valid UUID and no bundle data provided: ${targetItemId}`);
-      return [];
-    }
-
-    // If no embedding, we can still suggest based on price matching
-    if (!targetEmbeddingArray || targetEmbeddingArray.length === 0) {
-      console.log('[SWAP-SUGGESTIONS] No embedding available - will use price-based matching only');
-      // Continue to price-based matching without embedding
-    }
-
-    // Get user's available items (include items without embeddings for price-based matching)
-    const { data: userItems, error: userItemsError } = await client
-      .from('items')
-      .select('id, title, description, price, currency, embedding, category_id, item_images(image_url)')
-      .eq('user_id', userId)
-      .eq('status', 'available')
-      .order('created_at', { ascending: false });
-
-    if (userItemsError || !userItems || userItems.length === 0) {
-      console.log('[SWAP-SUGGESTIONS] No user items found');
-      return [];
-    }
-
-    console.log(`[SWAP-SUGGESTIONS] Found ${userItems.length} user items`);
-
-    // Calculate similarity for each user item
-    const itemsWithSimilarity: Array<{
-      id: string;
-      title: string;
-      description: string;
-      price: number;
-      currency: string;
-      priceGEL: number;
-      similarity: number;
-      image_url: string | null;
-      category_id: string | null;
-    }> = [];
-
-    for (const userItem of userItems) {
-      // Convert user item price to GEL
-      const userPrice = parseFloat(userItem.price || 0);
-      const userCurrency = userItem.currency || 'USD';
-      const userRate = rateMap[userCurrency] || 1;
-      const userPriceGEL = userPrice * userRate;
-
-      // Get image URL
-      const imageUrl = userItem.item_images?.[0]?.image_url || null;
-
-      let similarity = 0.5; // Default similarity if no embeddings
-
-      // Calculate similarity if both embeddings exist
-      if (targetEmbeddingArray && targetEmbeddingArray.length > 0 && userItem.embedding && Array.isArray(userItem.embedding)) {
-        // Check dimensions match
-        if (targetEmbeddingArray.length !== userItem.embedding.length) {
-          console.warn(`[SWAP-SUGGESTIONS] Skipping item ${userItem.id} - dimension mismatch`);
-          continue;
-        }
-
-        try {
-          // Calculate cosine similarity between target item and user item
-          let dotProduct = 0;
-          let norm1 = 0;
-          let norm2 = 0;
-          for (let i = 0; i < targetEmbeddingArray.length; i++) {
-            dotProduct += targetEmbeddingArray[i] * userItem.embedding[i];
-            norm1 += targetEmbeddingArray[i] * targetEmbeddingArray[i];
-            norm2 += userItem.embedding[i] * userItem.embedding[i];
-          }
-          const denominator = Math.sqrt(norm1) * Math.sqrt(norm2);
-          similarity = denominator > 0 ? Math.max(-1, Math.min(1, dotProduct / denominator)) : 0.5;
-        } catch (error: any) {
-          console.warn(`[SWAP-SUGGESTIONS] Error calculating similarity for item ${userItem.id}:`, error.message);
-          similarity = 0.5; // Use default if calculation fails
-        }
-      } else {
-        // No embedding available - use default similarity (will rely on price matching)
-        console.log(`[SWAP-SUGGESTIONS] Using default similarity (0.5) for item ${userItem.id} - embedding not available`);
-      }
-
-      itemsWithSimilarity.push({
-        id: userItem.id,
-        title: userItem.title,
-        description: userItem.description,
-        price: userPrice,
-        currency: userCurrency,
-        priceGEL: userPriceGEL,
-        similarity,
-        image_url: imageUrl,
-        category_id: userItem.category_id,
-      });
-    }
-
-    // Sort by similarity (highest first)
-    itemsWithSimilarity.sort((a, b) => b.similarity - a.similarity);
-
-    // Find suggestions: single items or bundles that match the target price (within 20% tolerance)
-    const suggestions: Array<{
-      items: Array<{
-        id: string;
-        title: string;
-        price: number;
-        currency: string;
-        priceGEL: number;
-        similarity: number;
-        image_url: string | null;
-      }>;
-      totalPriceGEL: number;
-      totalPriceUSD: number;
-      similarity: number;
-      score: number;
-    }> = [];
-
-    // Price tolerance: ±20% of target price
-    const minPriceGEL = targetPriceGEL * 0.8;
-    const maxPriceGEL = targetPriceGEL * 1.2;
-
-    // 1. Single item suggestions (exact or close match)
-    for (const item of itemsWithSimilarity.slice(0, 20)) { // Check top 20 most similar
-      if (item.priceGEL >= minPriceGEL && item.priceGEL <= maxPriceGEL) {
-        suggestions.push({
-          items: [{
-            id: item.id,
-            title: item.title,
-            price: item.price,
-            currency: item.currency,
-            priceGEL: item.priceGEL,
-            similarity: item.similarity,
-            image_url: item.image_url,
-          }],
-          totalPriceGEL: item.priceGEL,
-          totalPriceUSD: item.price,
-          similarity: item.similarity,
-          score: item.similarity * 1.0 + (1.0 - Math.abs(item.priceGEL - targetPriceGEL) / targetPriceGEL) * 0.5,
-        });
-      }
-    }
-
-    // 2. Bundle suggestions (2 items)
-    for (let i = 0; i < Math.min(15, itemsWithSimilarity.length); i++) {
-      for (let j = i + 1; j < Math.min(15, itemsWithSimilarity.length); j++) {
-        const item1 = itemsWithSimilarity[i];
-        const item2 = itemsWithSimilarity[j];
-
-        const bundlePriceGEL = item1.priceGEL + item2.priceGEL;
-        
-        if (bundlePriceGEL >= minPriceGEL && bundlePriceGEL <= maxPriceGEL) {
-          const avgSimilarity = (item1.similarity + item2.similarity) / 2;
-          const priceMatchScore = 1.0 - Math.abs(bundlePriceGEL - targetPriceGEL) / targetPriceGEL;
-          
-          suggestions.push({
-            items: [
-              {
-                id: item1.id,
-                title: item1.title,
-                price: item1.price,
-                currency: item1.currency,
-                priceGEL: item1.priceGEL,
-                similarity: item1.similarity,
-                image_url: item1.image_url,
-              },
-              {
-                id: item2.id,
-                title: item2.title,
-                price: item2.price,
-                currency: item2.currency,
-                priceGEL: item2.priceGEL,
-                similarity: item2.similarity,
-                image_url: item2.image_url,
-              },
-            ],
-            totalPriceGEL: bundlePriceGEL,
-            totalPriceUSD: item1.price + item2.price,
-            similarity: avgSimilarity,
-            score: avgSimilarity * 0.9 + priceMatchScore * 0.4,
-          });
-        }
-      }
-    }
-
-    // 3. Bundle suggestions (3 items) - only if needed
-    if (suggestions.length < limit) {
-      for (let i = 0; i < Math.min(10, itemsWithSimilarity.length); i++) {
-        for (let j = i + 1; j < Math.min(10, itemsWithSimilarity.length); j++) {
-          for (let k = j + 1; k < Math.min(10, itemsWithSimilarity.length); k++) {
-            const item1 = itemsWithSimilarity[i];
-            const item2 = itemsWithSimilarity[j];
-            const item3 = itemsWithSimilarity[k];
-
-            const bundlePriceGEL = item1.priceGEL + item2.priceGEL + item3.priceGEL;
-            
-            if (bundlePriceGEL >= minPriceGEL && bundlePriceGEL <= maxPriceGEL) {
-              const avgSimilarity = (item1.similarity + item2.similarity + item3.similarity) / 3;
-              const priceMatchScore = 1.0 - Math.abs(bundlePriceGEL - targetPriceGEL) / targetPriceGEL;
-              
-              suggestions.push({
-                items: [
-                  {
-                    id: item1.id,
-                    title: item1.title,
-                    price: item1.price,
-                    currency: item1.currency,
-                    priceGEL: item1.priceGEL,
-                    similarity: item1.similarity,
-                    image_url: item1.image_url,
-                  },
-                  {
-                    id: item2.id,
-                    title: item2.title,
-                    price: item2.price,
-                    currency: item2.currency,
-                    priceGEL: item2.priceGEL,
-                    similarity: item2.similarity,
-                    image_url: item2.image_url,
-                  },
-                  {
-                    id: item3.id,
-                    title: item3.title,
-                    price: item3.price,
-                    currency: item3.currency,
-                    priceGEL: item3.priceGEL,
-                    similarity: item3.similarity,
-                    image_url: item3.image_url,
-                  },
-                ],
-                totalPriceGEL: bundlePriceGEL,
-                totalPriceUSD: item1.price + item2.price + item3.price,
-                similarity: avgSimilarity,
-                score: avgSimilarity * 0.8 + priceMatchScore * 0.3,
-              });
-            }
-          }
-        }
-      }
-    }
-
-    // Sort by score (highest first) and limit results
-    suggestions.sort((a, b) => b.score - a.score);
-    const limitedSuggestions = suggestions.slice(0, limit);
-
-    console.log(`[SWAP-SUGGESTIONS] Found ${limitedSuggestions.length} suggestions out of ${suggestions.length} total`);
-    if (limitedSuggestions.length > 0) {
-      console.log(`[SWAP-SUGGESTIONS] Top suggestion: ${limitedSuggestions[0].items.length} items, totalPriceGEL: ${limitedSuggestions[0].totalPriceGEL}, targetPriceGEL: ${targetPriceGEL}, score: ${limitedSuggestions[0].score}`);
-    } else if (suggestions.length > 0) {
-      console.log(`[SWAP-SUGGESTIONS] Warning: ${suggestions.length} suggestions found but none within price range. Target price: ${targetPriceGEL} GEL, Range: [${minPriceGEL}, ${maxPriceGEL}]`);
-    } else {
-      console.log(`[SWAP-SUGGESTIONS] No suggestions found. Target price: ${targetPriceGEL} GEL, Range: [${minPriceGEL}, ${maxPriceGEL}], User items checked: ${itemsWithSimilarity.length}`);
-    }
-
-    return limitedSuggestions;
-  }
-
-  /**
    * Get item by ID with relations
    */
   static async getItemById(itemId: string) {
@@ -3155,5 +2620,493 @@ export class ApiService {
         error: null,
       };
     });
+  }
+
+  /**
+   * Get swap suggestions for a recommended item or bundle
+   * Returns user's items (single items or bundles) that could be swapped for the target item/bundle
+   * @param targetItemId - The recommended item ID (what user wants to get)
+   * @param userId - The user ID (who wants to swap)
+   * @param limit - Maximum number of suggestions to return (default: 5)
+   * @param bundleData - Optional: Bundle data if target is a bundle { bundle_items: [...], price: number, currency: string }
+   */
+  static async getSwapSuggestions(
+    targetItemId: string, 
+    userId: string, 
+    limit: number = 5,
+    bundleData?: { bundle_items?: Array<{ id: string; embedding?: number[] }>; price?: number; currency?: string }
+  ) {
+    return this.authenticatedCall(async (client) => {
+      const suggestions = await this.getSwapSuggestionsInternal(client, targetItemId, userId, limit, bundleData);
+      return { data: suggestions, error: null };
+    });
+  }
+
+  /**
+   * Internal implementation of getSwapSuggestions
+   * Returns array of suggestions directly (no wrapper)
+   */
+  private static async getSwapSuggestionsInternal(
+    client: any,
+    targetItemId: string,
+    userId: string,
+    limit: number,
+    bundleData?: { bundle_items?: Array<{ id: string; embedding?: number[] }>; price?: number; currency?: string }
+  ): Promise<any[]> {
+      console.log(`[SWAP-SUGGESTIONS] Getting swap suggestions for ${bundleData ? 'bundle' : 'item'} ${targetItemId} for user ${userId}`);
+      
+      // Get exchange rates for currency conversion
+      const { data: rates } = await client.from('currencies').select('code, rate');
+      const rateMap: { [key: string]: number } = {};
+      rates?.forEach((r: any) => { rateMap[r.code] = parseFloat(r.rate); });
+
+      let targetEmbeddingArray: number[] | null = null;
+      let targetPriceGEL: number = 0;
+      let targetCurrency: string = 'USD';
+
+      // Validate that targetItemId is a valid UUID (not a bundle ID)
+      const isValidUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetItemId);
+      
+      if (bundleData && bundleData.bundle_items && bundleData.bundle_items.length > 0) {
+        // Handle bundle: calculate embedding from bundle items
+        console.log(`[SWAP-SUGGESTIONS] Processing bundle with ${bundleData.bundle_items.length} items`);
+        console.log(`[SWAP-SUGGESTIONS] Bundle items structure:`, bundleData.bundle_items.map(item => ({ 
+          id: item.id, 
+          hasEmbedding: !!item.embedding 
+        })));
+        
+        // Get full item details for bundle items (including embeddings)
+        // Handle both cases: item.id (direct) or item.item?.id (nested)
+        const bundleItemIds: string[] = [];
+        for (const bundleItem of bundleData.bundle_items) {
+          // Try different possible structures
+          const itemId = bundleItem.id || 
+                        (bundleItem as any).item?.id || 
+                        (bundleItem as any).item_id ||
+                        (bundleItem as any).id;
+          
+          if (itemId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(itemId)) {
+            bundleItemIds.push(itemId);
+          }
+        }
+        
+        console.log(`[SWAP-SUGGESTIONS] Extracted ${bundleItemIds.length} valid bundle item IDs from ${bundleData.bundle_items.length} items:`, bundleItemIds);
+
+        if (bundleItemIds.length === 0) {
+          console.warn('[SWAP-SUGGESTIONS] No valid item IDs in bundle');
+          return [];
+        }
+
+        const { data: bundleItems, error: bundleError } = await client
+          .from('items')
+          .select('id, embedding, price, currency')
+          .in('id', bundleItemIds);
+
+        if (bundleError || !bundleItems || bundleItems.length === 0) {
+          console.error('[SWAP-SUGGESTIONS] Error fetching bundle items:', bundleError);
+          return [];
+        }
+
+        // Calculate bundle embedding by averaging item embeddings
+        const validEmbeddings = bundleItems
+          .map((item: any) => this.normalizeEmbedding(item.embedding))
+          .filter((emb: any): emb is number[] => emb !== null && emb.length > 0);
+
+        if (validEmbeddings.length === 0) {
+          console.warn('[SWAP-SUGGESTIONS] Bundle items have no valid embeddings');
+          return [];
+        }
+
+        // Calculate average embedding for bundle
+        targetEmbeddingArray = this.averageEmbeddings(validEmbeddings);
+        
+        // Calculate bundle total price
+        let bundleTotalPrice = 0;
+        bundleItems.forEach((item: any) => {
+          const itemPrice = parseFloat(item.price || 0);
+          const itemCurrency = item.currency || 'USD';
+          const itemRate = rateMap[itemCurrency] || 1;
+          bundleTotalPrice += itemPrice * itemRate;
+        });
+        targetPriceGEL = bundleTotalPrice;
+        targetCurrency = bundleData.currency || 'USD';
+        
+        console.log(`[SWAP-SUGGESTIONS] Bundle total price: ${targetPriceGEL} GEL (${bundleTotalPrice / (rateMap[targetCurrency] || 1)} ${targetCurrency})`);
+      } else if (isValidUUID) {
+        // Handle single item
+        const { data: targetItem, error: targetError } = await client
+          .from('items')
+          .select('id, title, description, price, currency, embedding, category_id')
+          .eq('id', targetItemId)
+          .single();
+
+        if (targetError || !targetItem) {
+          console.error('[SWAP-SUGGESTIONS] Error fetching target item:', targetError);
+          return [];
+        }
+
+        targetEmbeddingArray = this.normalizeEmbedding(targetItem.embedding);
+        if (!targetEmbeddingArray || targetEmbeddingArray.length === 0) {
+          console.warn('[SWAP-SUGGESTIONS] Target item has no embedding');
+          return [];
+        }
+
+        const targetPrice = parseFloat(targetItem.price || 0);
+        targetCurrency = targetItem.currency || 'USD';
+        const targetRate = rateMap[targetCurrency] || 1;
+        targetPriceGEL = targetPrice * targetRate;
+
+        console.log(`[SWAP-SUGGESTIONS] Target item: ${targetItem.title}, Price: ${targetPrice} ${targetCurrency} (${targetPriceGEL} GEL)`);
+      } else {
+        console.warn(`[SWAP-SUGGESTIONS] Target item ID is not a valid UUID and no bundle data provided: ${targetItemId}`);
+        return [];
+      }
+
+      if (!targetEmbeddingArray || targetEmbeddingArray.length === 0) {
+        console.error('[SWAP-SUGGESTIONS] Target has invalid embedding');
+        return [];
+      }
+
+      // Get user's available items with embeddings
+      const { data: userItems, error: userItemsError } = await client
+        .from('items')
+        .select('id, title, description, price, currency, embedding, category_id, item_images(image_url)')
+        .eq('user_id', userId)
+        .eq('status', 'available')
+        .not('embedding', 'is', null)
+        .order('created_at', { ascending: false });
+
+      if (userItemsError || !userItems || userItems.length === 0) {
+        console.log('[SWAP-SUGGESTIONS] No user items found');
+        return [];
+      }
+
+      console.log(`[SWAP-SUGGESTIONS] Found ${userItems.length} user items`);
+
+      // Calculate similarity for each user item
+      const itemsWithSimilarity: Array<{
+        id: string;
+        title: string;
+        description: string;
+        price: number;
+        currency: string;
+        priceGEL: number;
+        similarity: number;
+        image_url: string | null;
+        category_id: string | null;
+      }> = [];
+
+      for (const userItem of userItems) {
+        if (!userItem.embedding) continue;
+
+        // Normalize user item embedding to array
+        const userEmbeddingArray = this.normalizeEmbedding(userItem.embedding);
+        if (!userEmbeddingArray || userEmbeddingArray.length === 0) {
+          console.warn(`[SWAP-SUGGESTIONS] Skipping item ${userItem.id} - invalid embedding`);
+          continue;
+        }
+
+        // Check dimensions match
+        if (targetEmbeddingArray.length !== userEmbeddingArray.length) {
+          console.warn(`[SWAP-SUGGESTIONS] Skipping item ${userItem.id} - dimension mismatch (target: ${targetEmbeddingArray.length}, item: ${userEmbeddingArray.length})`);
+          continue;
+        }
+
+        try {
+          // Calculate cosine similarity between target item and user item
+          const similarity = 1 - this.cosineDistance(targetEmbeddingArray, userEmbeddingArray);
+          
+          // Convert user item price to GEL
+          const userPrice = parseFloat(userItem.price || 0);
+          const userCurrency = userItem.currency || 'USD';
+          const userRate = rateMap[userCurrency] || 1;
+          const userPriceGEL = userPrice * userRate;
+
+          // Get image URL
+          const imageUrl = userItem.item_images?.[0]?.image_url || null;
+
+          itemsWithSimilarity.push({
+            id: userItem.id,
+            title: userItem.title,
+            description: userItem.description,
+            price: userPrice,
+            currency: userCurrency,
+            priceGEL: userPriceGEL,
+            similarity,
+            image_url: imageUrl,
+            category_id: userItem.category_id,
+          });
+        } catch (error: any) {
+          console.warn(`[SWAP-SUGGESTIONS] Error calculating similarity for item ${userItem.id}:`, error.message);
+          continue;
+        }
+      }
+
+      // Sort by similarity (highest first)
+      itemsWithSimilarity.sort((a, b) => b.similarity - a.similarity);
+
+      // Find suggestions: single items or bundles that match the target price (within 20% tolerance)
+      const suggestions: Array<{
+        items: Array<{
+          id: string;
+          title: string;
+          price: number;
+          currency: string;
+          priceGEL: number;
+          similarity: number;
+          image_url: string | null;
+        }>;
+        totalPriceGEL: number;
+        totalPriceUSD: number;
+        similarity: number;
+        score: number;
+      }> = [];
+
+      // Price tolerance: ±20% of target price
+      const minPriceGEL = targetPriceGEL * 0.8;
+      const maxPriceGEL = targetPriceGEL * 1.2;
+
+      // 1. Single item suggestions (exact or close match)
+      for (const item of itemsWithSimilarity.slice(0, 20)) { // Check top 20 most similar
+        if (item.priceGEL >= minPriceGEL && item.priceGEL <= maxPriceGEL) {
+          suggestions.push({
+            items: [{
+              id: item.id,
+              title: item.title,
+              price: item.price,
+              currency: item.currency,
+              priceGEL: item.priceGEL,
+              similarity: item.similarity,
+              image_url: item.image_url,
+            }],
+            totalPriceGEL: item.priceGEL,
+            totalPriceUSD: item.price,
+            similarity: item.similarity,
+            score: item.similarity * 1.0 + (1.0 - Math.abs(item.priceGEL - targetPriceGEL) / targetPriceGEL) * 0.5, // Higher score for better price match
+          });
+        }
+      }
+
+      // 2. Bundle suggestions (2 items)
+      // Try combinations of top similar items that sum to target price
+      for (let i = 0; i < Math.min(15, itemsWithSimilarity.length); i++) {
+        for (let j = i + 1; j < Math.min(15, itemsWithSimilarity.length); j++) {
+          const item1 = itemsWithSimilarity[i];
+          const item2 = itemsWithSimilarity[j];
+
+          const bundlePriceGEL = item1.priceGEL + item2.priceGEL;
+          
+          if (bundlePriceGEL >= minPriceGEL && bundlePriceGEL <= maxPriceGEL) {
+            const avgSimilarity = (item1.similarity + item2.similarity) / 2;
+            const priceMatchScore = 1.0 - Math.abs(bundlePriceGEL - targetPriceGEL) / targetPriceGEL;
+            
+            suggestions.push({
+              items: [
+                {
+                  id: item1.id,
+                  title: item1.title,
+                  price: item1.price,
+                  currency: item1.currency,
+                  priceGEL: item1.priceGEL,
+                  similarity: item1.similarity,
+                  image_url: item1.image_url,
+                },
+                {
+                  id: item2.id,
+                  title: item2.title,
+                  price: item2.price,
+                  currency: item2.currency,
+                  priceGEL: item2.priceGEL,
+                  similarity: item2.similarity,
+                  image_url: item2.image_url,
+                },
+              ],
+              totalPriceGEL: bundlePriceGEL,
+              totalPriceUSD: item1.price + item2.price, // Approximate (may be different currencies)
+              similarity: avgSimilarity,
+              score: avgSimilarity * 0.9 + priceMatchScore * 0.4, // Slight penalty for bundles vs single items
+            });
+          }
+        }
+      }
+
+      // 3. Bundle suggestions (3 items) - only if needed
+      if (suggestions.length < limit) {
+        for (let i = 0; i < Math.min(10, itemsWithSimilarity.length); i++) {
+          for (let j = i + 1; j < Math.min(10, itemsWithSimilarity.length); j++) {
+            for (let k = j + 1; k < Math.min(10, itemsWithSimilarity.length); k++) {
+              const item1 = itemsWithSimilarity[i];
+              const item2 = itemsWithSimilarity[j];
+              const item3 = itemsWithSimilarity[k];
+
+              const bundlePriceGEL = item1.priceGEL + item2.priceGEL + item3.priceGEL;
+              
+              if (bundlePriceGEL >= minPriceGEL && bundlePriceGEL <= maxPriceGEL) {
+                const avgSimilarity = (item1.similarity + item2.similarity + item3.similarity) / 3;
+                const priceMatchScore = 1.0 - Math.abs(bundlePriceGEL - targetPriceGEL) / targetPriceGEL;
+                
+                suggestions.push({
+                  items: [
+                    {
+                      id: item1.id,
+                      title: item1.title,
+                      price: item1.price,
+                      currency: item1.currency,
+                      priceGEL: item1.priceGEL,
+                      similarity: item1.similarity,
+                      image_url: item1.image_url,
+                    },
+                    {
+                      id: item2.id,
+                      title: item2.title,
+                      price: item2.price,
+                      currency: item2.currency,
+                      priceGEL: item2.priceGEL,
+                      similarity: item2.similarity,
+                      image_url: item2.image_url,
+                    },
+                    {
+                      id: item3.id,
+                      title: item3.title,
+                      price: item3.price,
+                      currency: item3.currency,
+                      priceGEL: item3.priceGEL,
+                      similarity: item3.similarity,
+                      image_url: item3.image_url,
+                    },
+                  ],
+                  totalPriceGEL: bundlePriceGEL,
+                  totalPriceUSD: item1.price + item2.price + item3.price,
+                  similarity: avgSimilarity,
+                  score: avgSimilarity * 0.8 + priceMatchScore * 0.3, // Lower score for 3-item bundles
+                });
+              }
+            }
+          }
+        }
+      }
+
+      // Sort by score (highest first) and limit results
+      suggestions.sort((a, b) => b.score - a.score);
+      const limitedSuggestions = suggestions.slice(0, limit);
+
+      console.log(`[SWAP-SUGGESTIONS] Found ${limitedSuggestions.length} suggestions`);
+
+      return limitedSuggestions;
+    }
+
+  /**
+   * Internal method to check swap suggestions (used for filtering Top Picks)
+   * Same logic as getSwapSuggestions but accepts client directly
+   */
+  private static async checkSwapSuggestions(
+    client: any,
+    targetItemId: string,
+    userId: string,
+    bundleData?: { bundle_items?: Array<{ id: string; embedding?: number[] }>; price?: number; currency?: string }
+  ): Promise<any[]> {
+    try {
+      const suggestions = await this.getSwapSuggestionsInternal(client, targetItemId, userId, 1, bundleData);
+      return suggestions || [];
+    } catch (error: any) {
+      console.warn(`[CHECK-SUGGESTIONS] Error checking suggestions:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * Normalize embedding to array format
+   * Handles different formats from Supabase (array, vector type, etc.)
+   */
+  private static normalizeEmbedding(embedding: any): number[] | null {
+    if (!embedding) return null;
+    
+    // If already an array, return as-is
+    if (Array.isArray(embedding)) {
+      // Validate it's an array of numbers
+      const isValid = embedding.every((val) => typeof val === 'number' && !isNaN(val));
+      if (isValid) {
+        return embedding;
+      }
+    }
+    
+    // If it's a string (JSON), parse it
+    if (typeof embedding === 'string') {
+      try {
+        const parsed = JSON.parse(embedding);
+        if (Array.isArray(parsed)) {
+          return parsed;
+        }
+      } catch (e) {
+        console.warn('[normalizeEmbedding] Failed to parse string embedding:', e);
+      }
+    }
+    
+    // If it's an object with array property (Supabase vector type)
+    if (typeof embedding === 'object' && embedding !== null) {
+      // Try common property names
+      if (Array.isArray(embedding.data)) {
+        return embedding.data;
+      }
+      if (Array.isArray(embedding.embedding)) {
+        return embedding.embedding;
+      }
+      // If object has numeric keys, convert to array
+      const keys = Object.keys(embedding);
+      const numericKeys = keys.filter(k => !isNaN(Number(k)));
+      if (numericKeys.length > 0) {
+        const array = numericKeys.map(k => Number(embedding[k]));
+        return array;
+      }
+    }
+    
+    console.warn('[normalizeEmbedding] Unknown embedding format:', typeof embedding);
+    return null;
+  }
+
+  /**
+   * Calculate cosine distance between two embeddings
+   * Returns a value between 0 (identical) and 2 (opposite)
+   * Lower distance = higher similarity
+   */
+  private static cosineDistance(embedding1: number[], embedding2: number[]): number {
+    if (!embedding1 || !embedding2 || embedding1.length === 0 || embedding2.length === 0) {
+      throw new Error('Embeddings cannot be empty');
+    }
+
+    if (embedding1.length !== embedding2.length) {
+      throw new Error(`Embeddings must have the same dimension: ${embedding1.length} vs ${embedding2.length}`);
+    }
+
+    let dotProduct = 0;
+    let norm1 = 0;
+    let norm2 = 0;
+
+    for (let i = 0; i < embedding1.length; i++) {
+      const val1 = embedding1[i];
+      const val2 = embedding2[i];
+      
+      // Validate numbers
+      if (typeof val1 !== 'number' || typeof val2 !== 'number' || isNaN(val1) || isNaN(val2)) {
+        throw new Error(`Invalid embedding value at index ${i}`);
+      }
+      
+      dotProduct += val1 * val2;
+      norm1 += val1 * val1;
+      norm2 += val2 * val2;
+    }
+
+    const denominator = Math.sqrt(norm1) * Math.sqrt(norm2);
+    if (denominator === 0) {
+      // Handle zero vectors
+      return 1;
+    }
+
+    const cosineSimilarity = dotProduct / denominator;
+    
+    // Convert similarity to distance (1 - similarity)
+    // But handle edge cases where similarity might be slightly outside [-1, 1] due to floating point errors
+    const clampedSimilarity = Math.max(-1, Math.min(1, cosineSimilarity));
+    return 1 - clampedSimilarity;
   }
 }

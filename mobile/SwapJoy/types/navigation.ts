@@ -36,6 +36,7 @@ export type RootStackParamList = {
     initialTab?: 'followers' | 'following';
   };
   ProfileSettings: undefined;
+  DevRecommendationSettings: undefined;
   Search: undefined;
   // Offer flow
   OfferCreate: {
@@ -123,6 +124,10 @@ export type OfferPreviewScreenProps = {
 
 export type ProfileSettingsScreenProps = {
   navigation: NavigationProp<RootStackParamList, 'ProfileSettings'>;
+};
+
+export type DevRecommendationSettingsScreenProps = {
+  navigation: NavigationProp<RootStackParamList, 'DevRecommendationSettings'>;
 };
 
 export type SearchScreenProps = {

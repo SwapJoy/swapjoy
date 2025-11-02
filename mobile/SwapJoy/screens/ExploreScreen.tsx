@@ -1,4 +1,4 @@
-import React, { useCallback, memo, useState } from 'react';
+import React, { useCallback, memo, useState, useMemo } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
@@ -18,6 +18,7 @@ import { useRecentlyListed } from '../hooks/useRecentlyListed';
 import { useTopCategories } from '../hooks/useTopCategories';
 import { useOtherItems } from '../hooks/useOtherItems';
 import CachedImage from '../components/CachedImage';
+import SwapSuggestions from '../components/SwapSuggestions';
 import { formatCurrency } from '../utils';
 
 const { width } = Dimensions.get('window');
@@ -54,58 +55,98 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
   const loading = topPicksLoading && recentLoading && categoriesLoading && othersLoading;
 
 
-  const renderAIOffer = useCallback(({ item }: { item: AIOffer }) => (
-    <TouchableOpacity
-      style={styles.offerCard}
-      onPress={() => {
-        if (item.is_bundle && item.bundle_items) {
-          (navigation as any).navigate('BundleItems', {
-            bundleId: item.id,
-            title: item.title,
-            ownerId: item.user?.id,
-            bundleItems: item.bundle_items,
-          });
-        } else {
-          (navigation as any).navigate('ItemDetails', { itemId: item.id });
-        }
-      }}
-    >
-      <View style={styles.imageContainer}>
-        <CachedImage
-          uri={item.image_url || 'https://via.placeholder.com/200x150'}
-          style={styles.itemImage}
-          resizeMode="cover"
-          fallbackUri="https://picsum.photos/200/150?random=1"
-        />
-        <View style={styles.matchScoreBadge}>
-          <Text style={styles.matchScoreText}>{item.match_score}% Match</Text>
-        </View>
-        {item.is_bundle && (
-          <View style={styles.bundleBadge}>
-            <Text style={styles.bundleBadgeText}>Bundle</Text>
+  const renderAIOffer = useCallback(({ item }: { item: AIOffer }) => {
+    // Create bundleData outside of useMemo (can't use hooks inside callbacks)
+    // Create a stable object structure based on item properties
+    // Calculate bundle price from items (full total price, not discounted)
+    const bundleData = item.is_bundle && item.bundle_items && item.bundle_items.length > 0 ? {
+      bundle_items: item.bundle_items.map((bundleItem: any) => ({
+        id: bundleItem.id || bundleItem.item?.id || bundleItem.item_id,
+        embedding: bundleItem.embedding
+      })),
+      // Calculate full total price from bundle items (don't use discounted item.price)
+      price: item.bundle_items.reduce((sum: number, bundleItem: any) => {
+        const itemPrice = parseFloat(bundleItem.price || bundleItem.item?.price || bundleItem.item?.estimated_value || 0);
+        return sum + itemPrice;
+      }, 0),
+      currency: item.currency || item.bundle_items[0]?.currency || item.bundle_items[0]?.item?.currency || 'USD'
+    } : undefined;
+    
+    if (item.is_bundle) {
+      console.log(`[ExploreScreen] Bundle detected - id: ${item.id}, bundle_items count: ${item.bundle_items?.length || 0}, bundleData:`, bundleData ? {
+        bundle_items_count: bundleData.bundle_items?.length,
+        bundle_items_ids: bundleData.bundle_items?.map((bi: any) => bi.id),
+        price: bundleData.price
+      } : 'undefined');
+    }
+
+    return (
+      <TouchableOpacity
+        style={styles.offerCard}
+        onPress={() => {
+          if (item.is_bundle && item.bundle_items) {
+            (navigation as any).navigate('BundleItems', {
+              bundleId: item.id,
+              title: item.title,
+              ownerId: item.user?.id,
+              bundleItems: item.bundle_items,
+            });
+          } else {
+            (navigation as any).navigate('ItemDetails', { itemId: item.id });
+          }
+        }}
+      >
+        <View style={styles.imageContainer}>
+          <CachedImage
+            uri={item.image_url || 'https://via.placeholder.com/200x150'}
+            style={styles.itemImage}
+            resizeMode="cover"
+            fallbackUri="https://picsum.photos/200/150?random=1"
+          />
+          <View style={styles.matchScoreBadge}>
+            <Text style={styles.matchScoreText}>{item.match_score}% Match</Text>
           </View>
-        )}
-      </View>
-      <View style={styles.offerDetails}>
-        <Text style={styles.offerTitle} numberOfLines={1}>{item.title}</Text>
-        <Text style={styles.offerValue}>
-          {item.is_bundle ? 'Bundle Value' : 'Price'}: {formatCurrency(item.price || item.estimated_value || 0, item.currency || 'USD')}
-        </Text>
-        {item.is_bundle && item.bundle_items && (
-          <Text style={styles.bundleItems} numberOfLines={1}>
-            {item.bundle_items.map(bundleItem => bundleItem.title).join(' + ')}
-          </Text>
-        )}
-        <Text style={styles.matchReason} numberOfLines={1}>{item.reason}</Text>
-        <View style={styles.userInfo}>
-          <Text style={styles.userName}>
-            {item.user.first_name} {item.user.last_name}
-          </Text>
-          <Text style={styles.username}>@{item.user.username}</Text>
+          {item.is_bundle && (
+            <View style={styles.bundleBadge}>
+              <Text style={styles.bundleBadgeText}>Bundle</Text>
+            </View>
+          )}
         </View>
-      </View>
-    </TouchableOpacity>
-  ), [navigation]);
+        <View style={styles.offerDetails}>
+          <Text style={styles.offerTitle} numberOfLines={1}>{item.title}</Text>
+          <Text style={styles.offerValue}>
+            {item.is_bundle ? 'Bundle Value' : 'Price'}: {formatCurrency(item.price || item.estimated_value || 0, item.currency || 'USD')}
+          </Text>
+          {item.is_bundle && item.bundle_items && (
+            <Text style={styles.bundleItems} numberOfLines={1}>
+              {item.bundle_items.map(bundleItem => bundleItem.title).join(' + ')}
+            </Text>
+          )}
+          <Text style={styles.matchReason} numberOfLines={1}>{item.reason}</Text>
+          
+          {/* Swap Suggestions - show for both single items and bundles */}
+          <SwapSuggestions
+            targetItemId={item.id}
+            targetItemPrice={item.price || item.estimated_value || 0}
+            targetItemCurrency={item.currency || 'USD'}
+            bundleData={bundleData}
+            onSuggestionPress={(suggestion) => {
+              // Navigate to offer creation with these items
+              console.log('Suggestion pressed:', suggestion);
+              // TODO: Navigate to offer creation screen with suggested items
+            }}
+          />
+          
+          <View style={styles.userInfo}>
+            <Text style={styles.userName}>
+              {item.user.first_name} {item.user.last_name}
+            </Text>
+            <Text style={styles.username}>@{item.user.username}</Text>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  }, [navigation]);
 
   const renderRecentItem = useCallback(({ item }: { item: any }) => (
     <TouchableOpacity

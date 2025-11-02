@@ -3,9 +3,11 @@ import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'rea
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ProfileSettingsScreenProps } from '../types/navigation';
 import { useAuth } from '../contexts/AuthContext';
+import { useNavigation } from '@react-navigation/native';
 
-const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigation }) => {
+const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigation: nav }) => {
   const { signOut } = useAuth();
+  const navigation = useNavigation<any>();
 
   const confirmSignOut = useCallback(() => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
@@ -39,6 +41,15 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigatio
         <View style={styles.card}>
           <Item icon="💬" title="Help & Support" subtitle="FAQ, contact" onPress={() => { /* navigate to help */ }} />
           <Item icon="ℹ️" title="About" subtitle="Version, terms" onPress={() => { /* navigate to about */ }} />
+        </View>
+
+        <View style={styles.card}>
+          <Item 
+            icon="🔧" 
+            title="DEV: Recommendation Weights" 
+            subtitle="Adjust Top Picks scoring parameters" 
+            onPress={() => { navigation.navigate('DevRecommendationSettings'); }} 
+          />
         </View>
 
         <View style={styles.dangerCard}>

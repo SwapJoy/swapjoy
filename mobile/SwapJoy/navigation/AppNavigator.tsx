@@ -22,6 +22,7 @@ import OfferCreateScreen from '../screens/OfferCreateScreen';
 import OfferPreviewScreen from '../screens/OfferPreviewScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import FollowersFollowingScreen from '../screens/FollowersFollowingScreen';
+import DevRecommendationSettingsScreen from '../screens/DevRecommendationSettingsScreen';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -168,6 +169,11 @@ const AppNavigator: React.FC = () => {
               name="ProfileSettings" 
               component={ProfileSettingsScreen}
               options={{ title: 'Settings' }}
+            />
+            <Stack.Screen 
+              name="DevRecommendationSettings" 
+              component={DevRecommendationSettingsScreen}
+              options={{ title: 'DEV: Recommendation Weights' }}
             />
             <Stack.Screen 
               name="Search" 
