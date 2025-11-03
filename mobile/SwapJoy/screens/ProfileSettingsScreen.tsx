@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Modal, TextInput, Keyboard } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Modal, TextInput, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ProfileSettingsScreenProps } from '../types/navigation';
 import { useAuth } from '../contexts/AuthContext';
@@ -88,45 +88,49 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigatio
           </TouchableOpacity>
         </View>
         <Modal visible={isPromptModalVisible} animationType="slide" transparent onRequestClose={() => setPromptModalVisible(false)}>
-          <View style={styles.modalOverlay}>
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
             <View style={styles.modalCard}>
-              <Text style={styles.modalTitle}>Swap Prompt</Text>
-              <Text style={styles.modalSubtitle}>Describe what you want to swap for (max {charLimit} chars)</Text>
-              <TextInput
-                style={styles.textInput}
-                placeholder="e.g., I would like to swap my items for a Fender Stratocaster..."
-                multiline
-                maxLength={charLimit}
-                value={prompt}
-                onChangeText={setPrompt}
-                textAlignVertical="top"
-              />
-              <View style={styles.modalFooter}>
-                <Text style={styles.charCount}>{prompt.length}/{charLimit}</Text>
-                <View style={styles.modalButtons}>
-                  <TouchableOpacity style={[styles.modalButton, styles.cancelBtn]} onPress={() => setPromptModalVisible(false)}>
-                    <Text style={styles.cancelText}>Cancel</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.modalButton, styles.saveBtn]}
-                    onPress={async () => {
-                      const trimmed = (prompt || '').trim();
-                      Keyboard.dismiss();
-                      setPromptModalVisible(false);
-                      try {
-                        const { error } = await UserService.updateProfile({ prompt: trimmed });
-                        if (error) throw error;
-                      } catch (e: any) {
-                        Alert.alert('Error', e?.message || 'Failed to save prompt');
-                      }
-                    }}
-                  >
-                    <Text style={styles.saveText}>Save</Text>
-                  </TouchableOpacity>
+              <ScrollView contentContainerStyle={styles.modalScroll} keyboardShouldPersistTaps="handled">
+                <Text style={styles.modalTitle}>Swap Prompt</Text>
+                <Text style={styles.modalSubtitle}>Describe what you want to swap for (max {charLimit} chars)</Text>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="e.g., I would like to swap my items for a Fender Stratocaster..."
+                  multiline
+                  maxLength={charLimit}
+                  value={prompt}
+                  onChangeText={setPrompt}
+                  textAlignVertical="top"
+                  returnKeyType="done"
+                  blurOnSubmit
+                />
+                <View style={styles.modalFooter}>
+                  <Text style={styles.charCount}>{prompt.length}/{charLimit}</Text>
+                  <View style={styles.modalButtons}>
+                    <TouchableOpacity style={[styles.modalButton, styles.cancelBtn]} onPress={() => setPromptModalVisible(false)}>
+                      <Text style={styles.cancelText}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.modalButton, styles.saveBtn]}
+                      onPress={async () => {
+                        const trimmed = (prompt || '').trim();
+                        Keyboard.dismiss();
+                        setPromptModalVisible(false);
+                        try {
+                          const { error } = await UserService.updateProfile({ prompt: trimmed });
+                          if (error) throw error;
+                        } catch (e: any) {
+                          Alert.alert('Error', e?.message || 'Failed to save prompt');
+                        }
+                      }}
+                    >
+                      <Text style={styles.saveText}>Save</Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
-              </View>
+              </ScrollView>
             </View>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
       </ScrollView>
   );
@@ -185,6 +189,7 @@ const styles = StyleSheet.create({
   dangerText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   modalCard: { backgroundColor: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 16, maxHeight: '80%' },
+  modalScroll: { paddingBottom: 24 },
   modalTitle: { fontSize: 18, fontWeight: '700', color: '#1a1a1a' },
   modalSubtitle: { fontSize: 13, color: '#707070', marginTop: 6, marginBottom: 12 },
   textInput: { minHeight: 120, maxHeight: 280, borderWidth: 1, borderColor: '#e5e5e5', borderRadius: 10, padding: 12, fontSize: 15, color: '#1a1a1a', backgroundColor: '#fafafa' },
