@@ -189,28 +189,34 @@ export class ApiService {
     bio: string;
     profile_image_url: string;
     favorite_categories?: string[];
+    prompt?: string;
   }>) {
     return this.authenticatedCall(async (client) => {
+      const currentUser = await AuthService.getCurrentUser();
+      if (!currentUser?.id) {
+        return { data: null, error: { message: 'Not authenticated' } } as any;
+      }
+
       const result = await client
         .from('users')
         .update(updates)
-        .select()
+        .eq('id', currentUser.id)
+        .select('*')
         .single();
       
-      // If favorite_categories were updated, invalidate the top-picks cache
-      if (updates.favorite_categories !== undefined && result?.data) {
-        const userId = result.data.id;
+      // Invalidate personalization caches when profile changes
+      if (result?.data) {
+        const userId = currentUser.id;
         try {
-          // Invalidate cache for top-picks for this user
           await RedisCache.invalidatePattern(`top-picks:${userId}:*`);
-          console.log(`Cache invalidated for top-picks after favorite categories update for user ${userId}`);
+          await RedisCache.invalidatePattern(`similar-categories:${userId}:*`);
+          await RedisCache.invalidatePattern(`recently-added:${userId}:*`);
         } catch (error) {
-          console.warn('Failed to invalidate cache after favorite categories update:', error);
-          // Continue even if cache invalidation fails
+          console.warn('Failed to invalidate caches after profile update:', error);
         }
       }
       
-      return result;
+      return result as any;
     });
   }
 
@@ -223,12 +229,38 @@ export class ApiService {
     });
   }
 
+  // Minimal fetch: current user's items (id, price, currency)
+  static async getMyItemsMini() {
+    return this.authenticatedCall(async (client) => {
+      const currentUser = await AuthService.getCurrentUser();
+      if (!currentUser?.id) {
+        return { data: [], error: { message: 'Not authenticated' } } as any;
+      }
+      const { data, error } = await client
+        .from('items')
+        .select('id, price, currency, title, item_images(image_url)')
+        .eq('user_id', currentUser.id)
+        .eq('status', 'available');
+      return { data: data || [], error } as any;
+    });
+  }
+
+  // Currency rates map
+  static async getRateMap() {
+    return this.authenticatedCall(async (client) => {
+      const { data, error } = await client.from('currencies').select('code, rate');
+      const rateMap: Record<string, number> = {};
+      data?.forEach((r: any) => { rateMap[r.code] = parseFloat(r.rate); });
+      return { data: rateMap, error } as any;
+    });
+  }
+
   // AI-Powered Vector-Based Recommendations
   static async getTopPicksForUser(userId: string, limit: number = 10, options?: { bypassCache?: boolean }) {
     // Use Redis caching for expensive AI recommendations (graceful fallback if not available)
     return RedisCache.cache(
       'top-picks',
-      [userId, limit],
+      [userId, limit, 'v2'],
       () => this.authenticatedCall(async (client) => {
       // Get user's items to find similar matches
       const { data: userItems, error: userItemsError } = await client
@@ -264,6 +296,42 @@ export class ApiService {
       console.log(`[SCORING] User location: lat=${userLat}, lng=${userLng}, radius=${maxRadiusKm}km`);
       console.log(`[SCORING] Category score: ${weights.category_score}, Favorite categories: ${favoriteCategories.length}`);
       
+      // Prompt/profile embedding short-circuit: use vector RPC directly when available
+      try {
+        const { data: promptTop, error: promptErr } = await client.rpc('match_items_to_user_prompt', {
+          p_user_id: userId,
+          p_match_count: Math.max(limit * 4, 40),
+          p_exclude_user: userId
+        });
+        if (!promptErr && Array.isArray(promptTop) && promptTop.length > 0) {
+          const sortedBySim = [...promptTop].sort((a: any, b: any) => (b.similarity || 0) - (a.similarity || 0));
+          const topIds = sortedBySim.slice(0, Math.max(limit * 2, 20)).map((it: any) => it.id);
+          let enriched: any[] = [];
+          if (topIds.length > 0) {
+            const { data: items } = await client
+              .from('items')
+              .select('*, item_images(image_url), users!items_user_id_fkey(id, username, first_name, last_name)')
+              .in('id', topIds);
+            const simMap: Record<string, number> = {};
+            for (const r of promptTop) simMap[r.id] = r.similarity || 0;
+            enriched = (items || []).map((it: any) => ({
+              ...it,
+              similarity_score: simMap[it.id] || 0,
+              overall_score: simMap[it.id] || 0,
+            }));
+          }
+
+          const finalByPrompt = enriched
+            .sort((a, b) => (b.similarity_score || 0) - (a.similarity_score || 0))
+            .slice(0, limit);
+          if (finalByPrompt.length > 0) {
+            return { data: finalByPrompt, error: null } as any;
+          }
+        }
+      } catch (e) {
+        console.warn('[PROMPT-SHORTCIRCUIT] Exception:', e);
+      }
+
       // If category_score >= 0.99, treat as effectively 1.0 (handles floating point precision from sliders)
       // This ensures 100% slider setting actually filters correctly
       const strictCategoryFilter = weights.category_score >= 0.99 && favoriteCategories.length > 0;
@@ -855,7 +923,7 @@ export class ApiService {
   // Ensure we always return a valid response
   static async getTopPicksForUserSafe(userId: string, limit: number = 10, options?: { bypassCache?: boolean }) {
     try {
-      const result = await this.getTopPicksForUser(userId, limit, options);
+      const result = await this.getTopPicksForUser(userId, limit, { bypassCache: true });
       return {
         data: Array.isArray(result?.data) ? result.data : [],
         error: result?.error || null
@@ -1310,8 +1378,8 @@ export class ApiService {
                     const imageB = fullItemB.item_images?.[0]?.image_url;
                     const imageUrl = imageA || imageB || 'https://via.placeholder.com/200x150';
 
-                    // Get full user data for the bundle owner
-                    const bundleOwner = ownerMap[bundleOwnerId];
+                    // Get full user data for the bundle owner (ownerMap may not be available in this scope)
+                    const bundleOwner: any = undefined;
 
                     // Convert bundleTotalValueGEL back to original currency for display
                     // Determine currency from items (prefer USD if mixed)

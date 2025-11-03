@@ -55,6 +55,11 @@ export type RootStackParamList = {
       requested: Array<{ id: string; title?: string; price?: number; image_url?: string; item_images?: Array<{ image_url: string }> }>;
     };
   };
+  SuggestionDetails: {
+    items: Array<{ id: string; title?: string; price?: number; currency?: string; image_url?: string | null }>;
+    signature: string;
+    targetTitle?: string;
+  };
 };
 
 export type MainTabParamList = {

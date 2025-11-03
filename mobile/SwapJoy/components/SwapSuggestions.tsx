@@ -7,11 +7,16 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Dimensions,
+  Modal,
 } from 'react-native';
 import CachedImage from './CachedImage';
 import { ApiService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { formatCurrency } from '../utils';
+import { findBundlesByAccuracy } from '../utils/matchSuggestions';
+import { useNavigation } from '@react-navigation/native';
+import { RootStackParamList } from '../types/navigation';
+import type { NavigationProp } from '@react-navigation/native';
 
 const { width } = Dimensions.get('window');
 const SUGGESTION_ITEM_WIDTH = width * 0.35;
@@ -57,6 +62,8 @@ const SwapSuggestions: React.FC<SwapSuggestionsProps> = ({
   const [suggestions, setSuggestions] = useState<SwapSuggestion[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [inspector, setInspector] = useState<{ visible: boolean; sig: string; items: SwapSuggestionItem[] } | null>(null);
+  const navigation = useNavigation<NavigationProp<RootStackParamList>>();
 
   // Create a stable key from bundle data to prevent infinite loops
   // Only re-run effect if bundle item IDs actually change
@@ -131,45 +138,65 @@ const SwapSuggestions: React.FC<SwapSuggestionsProps> = ({
       setLoading(true);
       setError(null);
       try {
-        const bundleInfo = bundleData ? {
-          bundle_items_count: bundleData.bundle_items?.length,
-          bundle_items_ids: bundleData.bundle_items?.map((bi: any) => bi.id),
-          bundle_items_structure: bundleData.bundle_items?.map((bi: any) => ({
-            id: bi.id,
-            item_id: (bi as any).item?.id,
-            item_id2: (bi as any).item_id,
-            hasEmbedding: !!bi.embedding
-          })),
-          price: bundleData.price,
-          currency: bundleData.currency
-        } : {};
-        console.log(`[SwapSuggestions] Fetching suggestions for ${bundleData ? 'bundle' : 'item'}: ${targetItemId}`, bundleInfo);
-        
-        const { data, error: fetchError } = await ApiService.getSwapSuggestions(
-          targetItemId,
-          user.id,
-          5, // Max 5 suggestions
-          bundleData // Pass bundle data if it's a bundle
-        );
-        
-        console.log(`[SwapSuggestions] API response - data length: ${data?.length || 0}, error: ${fetchError ? JSON.stringify(fetchError) : 'none'}`);
+        // Local compute: fetch my items + rate map in parallel
+        const [myItemsRes, ratesRes] = await Promise.all([
+          ApiService.getMyItemsMini(),
+          ApiService.getRateMap(),
+        ]);
+
+        // Dedupe my items by id to avoid duplicate bundles
+        const rawItems = (myItemsRes?.data || []) as Array<{ id: string; price: number; currency: string; title?: string; item_images?: { image_url: string }[] }>;
+        const seenItems = new Set<string>();
+        const myItems = rawItems.filter(it => {
+          if (!it?.id) return false;
+          if (seenItems.has(it.id)) return false;
+          seenItems.add(it.id);
+          return true;
+        });
+        const rates = (ratesRes?.data || {}) as Record<string, number>;
+
+        // Target price in base (USD)
+        const base = 'USD';
+        const rBase = rates[base] ?? 1;
+        const rTarget = rates[targetItemCurrency] ?? 1;
+        const targetPriceBase = (bundleData?.price ?? targetItemPrice) * (rTarget / rBase);
+
+        // Accuracy: choose moderate default (0.8) so ±20% window; could be a prop later
+        const accuracy = 0.8;
+        const bundles = findBundlesByAccuracy(targetPriceBase, myItems, rates, accuracy, { baseCurrency: base, maxItemsPerBundle: 3, maxResults: 5 });
+
+        const mapped: SwapSuggestion[] = bundles.map(b => {
+          const items = b.itemIds.map(id => myItems.find(m => m.id === id)).filter(Boolean) as any[];
+          const totalUSD = items.reduce((sum, it) => sum + (it.currency === 'USD' ? it.price : (it.price * ((rates[it.currency] ?? 1) / (rates['USD'] ?? 1)))), 0);
+          return {
+            items: items.map(it => ({
+              id: it.id,
+              title: it.title || it.id,
+              price: it.price,
+              currency: it.currency,
+              priceGEL: it.price * ((rates[it.currency] ?? 1) / (rates['GEL'] ?? 2.71)),
+              similarity: 0.5,
+              image_url: (it.item_images && it.item_images[0]?.image_url) || null,
+            })),
+            totalPriceGEL: totalUSD * (rates['GEL'] ?? 2.71) / (rates['USD'] ?? 1),
+            totalPriceUSD: totalUSD,
+            similarity: b.score,
+            score: b.score,
+          };
+        });
+
+        // Strong dedupe per target: same set of item IDs should appear only once
+        const seen = new Set<string>();
+        const unique: SwapSuggestion[] = [];
+        for (const s of mapped) {
+          const key = s.items.map(x => x.id).sort().join(',');
+          if (seen.has(key)) continue;
+          seen.add(key);
+          unique.push(s);
+        }
 
         if (!mounted) return;
-
-        if (fetchError) {
-          console.error('[SwapSuggestions] Error fetching suggestions:', fetchError);
-          setError('Failed to load suggestions');
-          setSuggestions([]);
-        } else {
-          console.log(`[SwapSuggestions] Received ${data?.length || 0} suggestions`);
-          console.log(`[SwapSuggestions] Data structure:`, JSON.stringify(data?.slice(0, 1), null, 2));
-          setSuggestions(data || []);
-          
-          // Note: hasFetchedRef is already set before the fetch starts to prevent infinite loops
-          if (!data || data.length === 0) {
-            console.log(`[SwapSuggestions] No suggestions found - this is expected if no matching items exist`);
-          }
-        }
+        setSuggestions(unique);
       } catch (err: any) {
         if (!mounted) return;
         console.error('[SwapSuggestions] Exception:', err);
@@ -227,7 +254,7 @@ const SwapSuggestions: React.FC<SwapSuggestionsProps> = ({
     // Production: return null;
   }
 
-  return (
+  const content = (
     <View style={styles.container}>
       <Text style={styles.sectionTitle}>Possible matches:</Text>
       <ScrollView
@@ -236,20 +263,29 @@ const SwapSuggestions: React.FC<SwapSuggestionsProps> = ({
         contentContainerStyle={styles.scrollContent}
         style={styles.scrollView}
       >
-        {suggestions.map((suggestion, index) => {
+        {suggestions.map((suggestion) => {
           const isBundle = suggestion.items.length > 1;
           const displayPrice = suggestion.totalPriceUSD || suggestion.totalPriceGEL;
-          const priceDiff = Math.abs(suggestion.totalPriceGEL - (targetItemPrice * 2.71)); // Convert target to GEL approx
+          const priceDiff = Math.abs(suggestion.totalPriceGEL - (targetItemPrice * 2.71));
           const priceDiffPercent = (priceDiff / (targetItemPrice * 2.71)) * 100;
+          const sig = suggestion.items.map(x => x.id).sort().join(',');
 
           return (
             <TouchableOpacity
-              key={`${suggestion.items[0].id}-${index}`}
+              key={`${sig}`}
               style={styles.suggestionCard}
-              onPress={() => onSuggestionPress?.(suggestion)}
+              onPress={() => {
+                try {
+                  onSuggestionPress?.(suggestion);
+                } catch {}
+                navigation.navigate('SuggestionDetails', {
+                  items: suggestion.items,
+                  signature: sig,
+                  targetTitle: undefined,
+                });
+              }}
               activeOpacity={0.7}
             >
-              {/* Single item or first item in bundle */}
               <View style={styles.imageContainer}>
                 <CachedImage
                   uri={suggestion.items[0].image_url || 'https://via.placeholder.com/150'}
@@ -266,31 +302,50 @@ const SwapSuggestions: React.FC<SwapSuggestionsProps> = ({
               <View style={styles.detailsContainer}>
                 {isBundle ? (
                   <>
-                    <Text style={styles.bundleTitle}>
-                      Bundle ({suggestion.items.length} items)
-                    </Text>
+                    <Text style={styles.bundleTitle}>Bundle ({suggestion.items.length} items)</Text>
                     <Text style={styles.itemTitle} numberOfLines={2}>
-                      {suggestion.items.map((item, idx) => 
-                        idx === 0 ? item.title : ` + ${item.title}`
-                      ).join('')}
+                      {suggestion.items.map((item, idx) => (idx === 0 ? item.title : ` + ${item.title}`)).join('')}
                     </Text>
                   </>
                 ) : (
-                  <Text style={styles.itemTitle} numberOfLines={1}>
-                    {suggestion.items[0].title}
-                  </Text>
+                  <Text style={styles.itemTitle} numberOfLines={1}>{suggestion.items[0].title}</Text>
                 )}
-                <Text style={styles.priceText}>
-                  {formatCurrency(displayPrice, suggestion.items[0].currency || 'USD')}
-                </Text>
-                {priceDiffPercent < 5 && (
-                  <Text style={styles.priceMatchText}>✓ Nearly equal price</Text>
-                )}
+                <Text style={styles.priceText}>{formatCurrency(displayPrice, suggestion.items[0].currency || 'USD')}</Text>
+                {priceDiffPercent < 5 && <Text style={styles.priceMatchText}>✓ Nearly equal price</Text>}
               </View>
             </TouchableOpacity>
           );
         })}
       </ScrollView>
+    </View>
+  );
+
+  return (
+    <View>
+      {content}
+      <Modal visible={!!inspector?.visible} transparent animationType="fade" onRequestClose={() => setInspector(null)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Bundle Items</Text>
+            <Text style={styles.modalSubtitle}>Signature: {inspector?.sig}</Text>
+            <View style={{ marginTop: 8 }}>
+              {(inspector?.items || []).map((it) => (
+                <View key={it.id} style={styles.row}>
+                  <CachedImage uri={it.image_url || 'https://via.placeholder.com/64'} style={styles.thumb} resizeMode="cover" />
+                  <View style={{ flex: 1, marginLeft: 8 }}>
+                    <Text style={styles.rowTitle} numberOfLines={1}>{it.title || it.id}</Text>
+                    <Text style={styles.rowId}>{it.id}</Text>
+                  </View>
+                    <Text style={styles.rowPrice}>{formatCurrency(it.price, it.currency || 'USD')}</Text>
+                </View>
+              ))}
+            </View>
+            <TouchableOpacity style={styles.closeBtn} onPress={() => setInspector(null)}>
+              <Text style={styles.closeText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -394,6 +449,17 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     paddingVertical: 10,
   },
+  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6 },
+  thumb: { width: 40, height: 40, borderRadius: 6, backgroundColor: '#eee' },
+  rowTitle: { fontSize: 13, color: '#1a1a1a', fontWeight: '600' },
+  rowId: { fontSize: 11, color: '#707070', marginTop: 2 },
+  rowPrice: { fontSize: 13, color: '#007AFF', fontWeight: '600' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center' },
+  modalCard: { backgroundColor: '#fff', borderRadius: 12, padding: 16, width: '80%' },
+  modalTitle: { fontSize: 16, fontWeight: '700', color: '#1a1a1a' },
+  modalSubtitle: { fontSize: 12, color: '#707070', marginTop: 4 },
+  closeBtn: { marginTop: 14, alignSelf: 'flex-end', backgroundColor: '#1f7ae0', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8 },
+  closeText: { color: '#fff', fontWeight: '700' },
 });
 
 export default SwapSuggestions;
