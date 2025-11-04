@@ -24,6 +24,7 @@ import ProfileScreen from '../screens/ProfileScreen';
 import FollowersFollowingScreen from '../screens/FollowersFollowingScreen';
 import DevRecommendationSettingsScreen from '../screens/DevRecommendationSettingsScreen';
 import SuggestionDetailsScreen from '../screens/SuggestionDetailsScreen';
+import OffersScreen from '../screens/OffersScreen';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -185,6 +186,11 @@ const AppNavigator: React.FC = () => {
               name="FollowersFollowing" 
               component={FollowersFollowingScreen}
               options={{ title: 'Followers & Following' }}
+            />
+            <Stack.Screen
+              name="Offers"
+              component={OffersScreen}
+              options={{ title: 'Offers' }}
             />
             <Stack.Screen 
               name="SuggestionDetails" 

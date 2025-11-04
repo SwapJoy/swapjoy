@@ -35,6 +35,10 @@ export type RootStackParamList = {
     userId: string;
     initialTab?: 'followers' | 'following';
   };
+  // Offers moved to Root stack to allow deep navigation with initial tab
+  Offers: {
+    initialTab?: 'sent' | 'received';
+  } | undefined;
   ProfileSettings: undefined;
   DevRecommendationSettings: undefined;
   Search: undefined;
@@ -64,7 +68,7 @@ export type RootStackParamList = {
 
 export type MainTabParamList = {
   Explore: undefined;
-  Offers: undefined;
+  Search: undefined;
   Notifications: undefined;
   Profile: undefined;
 };
@@ -91,7 +95,8 @@ export type ExploreScreenProps = {
 };
 
 export type OffersScreenProps = {
-  navigation: NavigationProp<MainTabParamList, 'Offers'>;
+  navigation: NavigationProp<RootStackParamList, 'Offers'>;
+  route: RouteProp<RootStackParamList, 'Offers'>;
 };
 
 export type NotificationsScreenProps = {

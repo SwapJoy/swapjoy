@@ -345,8 +345,20 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
                       <StatsSkeleton />
                     ) : (
                       <>
-                        {renderStatItem('Sent', stats.sentOffers)}
-                        {renderStatItem('Received', stats.receivedOffers)}
+                        <TouchableOpacity
+                          activeOpacity={0.7}
+                          onPress={() => navigation.navigate('Offers', { initialTab: 'sent' })}
+                          style={{ flex: 1 }}
+                        >
+                          {renderStatItem('Sent', stats.sentOffers)}
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          activeOpacity={0.7}
+                          onPress={() => navigation.navigate('Offers', { initialTab: 'received' })}
+                          style={{ flex: 1 }}
+                        >
+                          {renderStatItem('Received', stats.receivedOffers)}
+                        </TouchableOpacity>
                       </>
                     )}
                   </View>

@@ -4,7 +4,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MainTabParamList } from '../types/navigation';
 import { Ionicons } from '@expo/vector-icons';
 import ExploreScreen from '../screens/ExploreScreen';
-import OffersScreen from '../screens/OffersScreen';
+import SearchScreen from '../screens/SearchScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import { styles, colors } from './MainTabNavigator.styles';
@@ -37,22 +37,13 @@ const MainTabNavigator: React.FC<MainTabNavigatorProps> = ({ onNavigateToAdd }) 
         ),
         headerRight: () => {
           const isProfile = route.name === 'Profile';
+          if (!isProfile) return null; // remove search from top bar for non-profile
           return (
             <TouchableOpacity
               style={styles.headerRightButtonContainer}
-              onPress={() => {
-                if (isProfile) {
-                  (navigation as any).navigate('ProfileSettings');
-                } else {
-                  (navigation as any).navigate('Search');
-                }
-              }}
+              onPress={() => (navigation as any).navigate('ProfileSettings')}
             >
-              <Ionicons 
-                name={isProfile ? "settings-outline" : "search-outline"} 
-                size={24} 
-                color={colors.primary} 
-              />
+              <Ionicons name="settings-outline" size={24} color={colors.primary} />
             </TouchableOpacity>
           );
         },
@@ -77,12 +68,12 @@ const MainTabNavigator: React.FC<MainTabNavigatorProps> = ({ onNavigateToAdd }) 
         }}
       />
       <Tab.Screen
-        name="Offers"
-        component={OffersScreen}
+        name="Search"
+        component={SearchScreen}
         options={{
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons 
-              name={focused ? "swap-horizontal" : "swap-horizontal-outline"} 
+              name={focused ? "search" : "search-outline"} 
               size={size} 
               color={color} 
             />

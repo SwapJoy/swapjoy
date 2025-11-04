@@ -1,4 +1,4 @@
-import React, { memo, useMemo, useState, useCallback } from 'react';
+import React, { memo, useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -14,9 +14,9 @@ import { useOffersData, Offer } from '../hooks/useOffersData';
 
 const { width } = Dimensions.get('window');
 
-const OffersScreen: React.FC<OffersScreenProps> = memo(() => {
+const OffersScreen: React.FC<OffersScreenProps> = memo(({ route }) => {
   const { sentOffers, receivedOffers, loading, refreshing, onRefresh, getStatusColor, getStatusText } = useOffersData();
-  const [activeTab, setActiveTab] = useState<'sent' | 'received'>('sent');
+  const [activeTab, setActiveTab] = useState<'sent' | 'received'>(route?.params?.initialTab ?? 'sent');
 
   const data = activeTab === 'sent' ? sentOffers : receivedOffers;
 
@@ -78,35 +78,94 @@ const OffersScreen: React.FC<OffersScreenProps> = memo(() => {
     <OfferRow item={item} />
   ), []);
 
-  if (loading) {
+  // Lightweight shimmer
+  const SkeletonLoader: React.FC<{ width?: number | string; height?: number; borderRadius?: number; style?: any }> = ({ width = '100%', height = 16, borderRadius = 6, style }) => {
+    const animatedValue = useRef(new (require('react-native').Animated.Value)(0)).current;
+    const { Animated } = require('react-native');
+    useEffect(() => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(animatedValue, { toValue: 1, duration: 900, useNativeDriver: true }),
+          Animated.timing(animatedValue, { toValue: 0, duration: 900, useNativeDriver: true }),
+        ])
+      ).start();
+    }, [animatedValue]);
+    const opacity = animatedValue.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0.8] });
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Offers</Text>
-          <Text style={styles.headerSubtitle}>
-            Manage your swap offers and proposals
-          </Text>
+      <Animated.View
+        style={[{ width, height, borderRadius, backgroundColor: '#E1E9EE', opacity }, style]}
+      />
+    );
+  };
+
+  const OfferCardSkeleton: React.FC = () => (
+    <View style={styles.offerCard}>
+      <View style={styles.offerHeader}>
+        <SkeletonLoader width={110} height={16} />
+        <SkeletonLoader width={70} height={20} borderRadius={12} />
+      </View>
+      <View style={styles.offerContent}>
+        <SkeletonLoader width={'80%'} height={14} style={{ marginBottom: 10 }} />
+        <SkeletonLoader width={'50%'} height={16} style={{ marginBottom: 12 }} />
+        <View style={{ gap: 6 }}>
+          <SkeletonLoader width={'60%'} height={32} borderRadius={8} />
+          <SkeletonLoader width={'50%'} height={32} borderRadius={8} />
+          <SkeletonLoader width={'40%'} height={32} borderRadius={8} />
         </View>
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading offers...</Text>
+        <View style={styles.offerFooter}>
+          <SkeletonLoader width={90} height={12} />
+          <SkeletonLoader width={120} height={12} />
         </View>
-      </SafeAreaView>
+      </View>
+    </View>
+  );
+
+  if (loading) {
+    const skeletons = Array.from({ length: 6 }, (_, i) => i);
+    return (
+      <View style={styles.container}>
+        <View style={styles.tabsWrapper}>
+          <View style={styles.tabsContainer}>
+            <TouchableOpacity
+              onPress={() => setActiveTab('sent')}
+              style={[styles.tabButton, activeTab === 'sent' && styles.tabButtonActive]}
+            >
+              <Text style={[styles.tabText, activeTab === 'sent' && styles.tabTextActive]}>Sent</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setActiveTab('received')}
+              style={[styles.tabButton, activeTab === 'received' && styles.tabButtonActive]}
+            >
+              <Text style={[styles.tabText, activeTab === 'received' && styles.tabTextActive]}>Received</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <FlatList
+          data={skeletons}
+          keyExtractor={(i) => `skeleton-${i}`}
+          renderItem={() => <OfferCardSkeleton />}
+          contentContainerStyle={styles.listContainer}
+          showsVerticalScrollIndicator={false}
+        />
+      </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerSubtitle}>
-          Manage your swap offers and proposals
-        </Text>
-
-        {/* Tabs */}
-        <View style={styles.tabsRow}>
-          <TouchableOpacity style={[styles.tabBtn, activeTab === 'sent' && styles.tabBtnActive]} onPress={() => setActiveTab('sent')}>
+      <View style={styles.tabsWrapper}>
+        <View style={styles.tabsContainer}>
+          <TouchableOpacity
+            onPress={() => setActiveTab('sent')}
+            style={[styles.tabButton, activeTab === 'sent' && styles.tabButtonActive]}
+          >
             <Text style={[styles.tabText, activeTab === 'sent' && styles.tabTextActive]}>Sent</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.tabBtn, activeTab === 'received' && styles.tabBtnActive]} onPress={() => setActiveTab('received')}>
+          <TouchableOpacity
+            onPress={() => setActiveTab('received')}
+            style={[styles.tabButton, activeTab === 'received' && styles.tabButtonActive]}
+          >
             <Text style={[styles.tabText, activeTab === 'received' && styles.tabTextActive]}>Received</Text>
           </TouchableOpacity>
         </View>
@@ -147,51 +206,36 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8f9fa',
   },
-  header: {
-    padding: 20,
-    paddingBottom: 10,
+  tabsWrapper: {
     backgroundColor: '#fff',
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5EA',
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 5,
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: '#777',
-  },
-  tabsRow: {
+  tabsContainer: {
     flexDirection: 'row',
-    marginTop: 12,
-    backgroundColor: '#f0f4ff',
-    borderRadius: 10,
-    padding: 4,
-  },
-  tabBtn: {
-    flex: 1,
-    paddingVertical: 8,
     alignItems: 'center',
-    borderRadius: 8,
+    justifyContent: 'space-between',
   },
-  tabBtnActive: {
-    backgroundColor: '#007AFF',
+  tabButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  tabButtonActive: {
+    borderBottomColor: '#007AFF',
   },
   tabText: {
-    color: '#007AFF',
-    fontWeight: '600',
+    color: '#8E8E93',
+    fontSize: 15,
+    fontWeight: '500',
   },
   tabTextActive: {
-    color: '#fff',
+    color: '#007AFF',
+    fontWeight: '700',
   },
   loadingContainer: {
     flex: 1,
