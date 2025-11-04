@@ -1,13 +1,11 @@
-// Supabase Configuration
-// Replace these with your actual Supabase project URL and anon key
-export const SUPABASE_URL = 'https://glbvyusqksnoyjuztceo.supabase.co';
-export const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdsYnZ5dXNxa3Nub3lqdXp0Y2VvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk4MzMzMjYsImV4cCI6MjA3NTQwOTMyNn0.bEV-PltrYphZuISmBixGCpCG5mPP8lMtB9cgh8es1uA';
+// Supabase configuration via environment variables.
+// For Expo, set EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY.
+// Never commit secrets directly to source control.
+export const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL as string;
+export const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY as string;
 
-// You can get these from your Supabase project dashboard:
-// 1. Go to Settings > API
-// 2. Copy the Project URL and anon public key
-// Twilio recovery code - RG2HLNVDWDH6BFHA4U5HWRL1
-// Token - sbp_f9bb83745df2722dc795127db7674aa3a28d245c
-// UPSTASH_REDIS_REST_URL="https://destined-tortoise-35128.upstash.io"
-// UPSTASH_REDIS_REST_TOKEN="AYk4AAIncDEzNDQyOWI0NTQ2ZDc0MWYyYjVlYTNlZjViMjlmZDJhZHAxMzUxMjg"
-// INTERNAL_FUNCTION_SECRET = eaWEcKZVuz7CIDnlS11NUI22PZ8VF9VBuDy6/izlbtg=
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  // Fail fast in development to surface misconfiguration early.
+  // In production, these must be provided by the environment.
+  console.warn('[config/supabase] Missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_ANON_KEY');
+}

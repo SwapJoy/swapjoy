@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -10,10 +10,9 @@ import {
   Modal,
 } from 'react-native';
 import CachedImage from './CachedImage';
-import { ApiService } from '../services/api';
-import { useAuth } from '../contexts/AuthContext';
-import { formatCurrency } from '../utils';
-import { findBundlesByAccuracy, getUniqueBundlesForTarget } from '../utils/matchSuggestions';
+import { useAuth } from '@contexts/AuthContext';
+import { formatCurrency } from '@utils/index';
+import { useSwapSuggestions, type SwapSuggestion } from '@hooks/useSwapSuggestions';
 import { useNavigation } from '@react-navigation/native';
 import { RootStackParamList } from '../types/navigation';
 import type { NavigationProp } from '@react-navigation/native';
@@ -21,23 +20,7 @@ import type { NavigationProp } from '@react-navigation/native';
 const { width } = Dimensions.get('window');
 const SUGGESTION_ITEM_WIDTH = width * 0.35;
 
-interface SwapSuggestionItem {
-  id: string;
-  title: string;
-  price: number;
-  currency: string;
-  priceGEL: number;
-  similarity: number;
-  image_url: string | null;
-}
-
-interface SwapSuggestion {
-  items: SwapSuggestionItem[];
-  totalPriceGEL: number;
-  totalPriceUSD: number;
-  similarity: number;
-  score: number;
-}
+// Types are provided by the useSwapSuggestions hook
 
 interface SwapSuggestionsProps {
   targetItemId: string;
@@ -59,220 +42,18 @@ const SwapSuggestions: React.FC<SwapSuggestionsProps> = ({
   onSuggestionPress,
 }) => {
   const { user } = useAuth();
-  const [suggestions, setSuggestions] = useState<SwapSuggestion[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [inspector, setInspector] = useState<{ visible: boolean; sig: string; items: SwapSuggestionItem[] } | null>(null);
+  const { suggestions: renderSuggestions, loading, error } = useSwapSuggestions({
+    userId: user?.id,
+    targetItemId,
+    targetItemPrice,
+    targetItemCurrency,
+    bundleData,
+  });
+  const [inspector, setInspector] = useState<{ visible: boolean; sig: string; items: SwapSuggestion['items'] } | null>(null);
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
-  const lastSigSetRef = useRef<string | null>(null);
 
-  // Render-level dedupe by signature to prevent any accidental duplicates
-  const renderSuggestions = useMemo(() => {
-    const seen = new Set<string>();
-    const out: SwapSuggestion[] = [];
-    for (const s of suggestions) {
-      const key = s.items.map(x => x.id).sort().join(',');
-      if (seen.has(key)) continue;
-      seen.add(key);
-      out.push(s);
-    }
-    if (out.length !== suggestions.length) {
-      console.log(`[SwapSuggestions] Render-level dedupe removed ${suggestions.length - out.length} duplicate bundle(s)`);
-    }
-    return out;
-  }, [suggestions]);
 
-  // Create a stable key from bundle data to prevent infinite loops
-  // Only re-run effect if bundle item IDs actually change
-  const bundleKeyRef = useRef<string | null>(null);
-  const hasFetchedRef = useRef<string | null>(null); // Track which key we've already fetched for
-  const bundleKey = useMemo(() => {
-    console.log(`[SwapSuggestions] useMemo bundleKey - bundleData:`, bundleData ? `present (${bundleData.bundle_items?.length} items)` : 'missing');
-    if (!bundleData || !bundleData.bundle_items) {
-      console.log(`[SwapSuggestions] bundleKey: null (no bundleData or bundle_items)`);
-      return null;
-    }
-    // Create stable key from bundle item IDs (sorted for consistency)
-    const itemIds = bundleData.bundle_items
-      .map((item: any) => item.id || (item as any).item?.id || (item as any).item_id)
-      .filter((id: any) => id)
-      .sort()
-      .join(',');
-    console.log(`[SwapSuggestions] bundleKey calculated: ${itemIds} from ${bundleData.bundle_items.length} items`);
-    return itemIds;
-  }, [bundleData]);
-
-  useEffect(() => {
-    console.log(`[SwapSuggestions] useEffect triggered - targetItemId: ${targetItemId}, bundleData: ${bundleData ? 'present' : 'missing'}, bundleKey: ${bundleKey}, user?.id: ${user?.id}`);
-    console.log(`[SwapSuggestions] bundleData details:`, bundleData ? {
-      has_bundle_items: !!bundleData.bundle_items,
-      bundle_items_length: bundleData.bundle_items?.length,
-      bundle_items_ids: bundleData.bundle_items?.map((bi: any) => bi.id),
-      price: bundleData.price,
-      currency: bundleData.currency
-    } : 'null');
-    
-    if (!user?.id || !targetItemId) {
-      console.log(`[SwapSuggestions] Skipping fetch - missing user or targetItemId`);
-      return;
-    }
-
-    // Build a stable target key for both single items and bundles
-    const targetKey = bundleKey ? `bundle:${bundleKey}` : `single:${targetItemId}`;
-
-    // Check if we've already fetched for this exact targetKey (prevents infinite loops)
-    const previousKey = bundleKeyRef.current;
-    const hasFetchedForThisKey = hasFetchedRef.current === targetKey;
-    
-    // Update bundleKeyRef to track the current raw bundle key (for debugging/compare)
-    bundleKeyRef.current = bundleKey;
-    
-    // Skip if we've already fetched for this exact bundleKey
-    if (hasFetchedForThisKey) {
-      console.log(`[SwapSuggestions] Skipping fetch - already fetched for target key: ${targetKey}`);
-      return; // Same bundle, don't refetch
-    }
-    
-    // If bundleKey is null but we have bundleData, this means useMemo hasn't calculated it yet
-    // This shouldn't happen, but if it does, wait for next render
-    if (bundleKey === null && bundleData && bundleData.bundle_items && bundleData.bundle_items.length > 0) {
-      console.log(`[SwapSuggestions] bundleKey is null but bundleData exists - waiting for useMemo to calculate`);
-      return; // Wait for next render when bundleKey will be calculated
-    }
-    
-    // Mark as fetching immediately to prevent infinite loops
-    hasFetchedRef.current = targetKey;
-    console.log(`[SwapSuggestions] Marking as fetching for target key: ${targetKey} (to prevent loops)`);
-    
-    if (previousKey !== bundleKey) {
-      console.log(`[SwapSuggestions] Bundle key changed from ${previousKey || 'null'} to ${bundleKey || 'null'} - will fetch`);
-    } else {
-      console.log(`[SwapSuggestions] First fetch for target key: ${targetKey} - will fetch`);
-    }
-
-    let mounted = true;
-
-    const fetchSuggestions = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        // Local compute: fetch my items + rate map in parallel
-        const [myItemsRes, ratesRes] = await Promise.all([
-          ApiService.getMyItemsMini(),
-          ApiService.getRateMap(),
-        ]);
-
-        // Dedupe my items by id to avoid duplicate bundles
-        const rawItems = (myItemsRes?.data || []) as Array<{ id: string; price: number; currency: string; title?: string; item_images?: { image_url: string }[] }>;
-        const seenItems = new Set<string>();
-        const myItems = rawItems.filter(it => {
-          if (!it?.id) return false;
-          if (seenItems.has(it.id)) return false;
-          seenItems.add(it.id);
-          return true;
-        });
-        const rates = (ratesRes?.data || {}) as Record<string, number>;
-
-        // Accuracy: choose moderate default (0.8) so ±20% window; could be a prop later
-        const accuracy = 0.8;
-        const base = 'USD';
-
-        // When top-pick is a bundle, derive target from its component items; otherwise from the single item price
-        const bundles = bundleData?.bundle_items && bundleData.bundle_items.length > 0
-          ? getUniqueBundlesForTarget(accuracy, bundleData.bundle_items as any[], rates, myItems, { baseCurrency: base, maxItemsPerBundle: 3, maxResults: 5 })
-          : findBundlesByAccuracy(
-              // convert single target to base
-              (() => {
-                const rBase = rates[base] ?? 1;
-                const rTarget = rates[targetItemCurrency] ?? 1;
-                return targetItemPrice * (rTarget / rBase);
-              })(),
-              myItems,
-              rates,
-              accuracy,
-              { baseCurrency: base, maxItemsPerBundle: 3, maxResults: 5 }
-            );
-
-        const mapped: SwapSuggestion[] = bundles.map(b => {
-          // Map ids to items, then enforce per-bundle unique IDs just in case
-          const itemsRaw = b.itemIds.map(id => myItems.find(m => m.id === id)).filter(Boolean) as any[];
-          const seenIds = new Set<string>();
-          const items = itemsRaw.filter((it) => {
-            if (!it?.id) return false;
-            if (seenIds.has(it.id)) return false;
-            seenIds.add(it.id);
-            return true;
-          });
-          const totalUSD = items.reduce((sum, it) => sum + (it.currency === 'USD' ? it.price : (it.price * ((rates[it.currency] ?? 1) / (rates['USD'] ?? 1)))), 0);
-          return {
-            items: items.map(it => ({
-              id: it.id,
-              title: it.title || it.id,
-              price: it.price,
-              currency: it.currency,
-              priceGEL: it.price * ((rates[it.currency] ?? 1) / (rates['GEL'] ?? 2.71)),
-              similarity: 0.5,
-              image_url: (it.item_images && it.item_images[0]?.image_url) || null,
-            })),
-            totalPriceGEL: totalUSD * (rates['GEL'] ?? 2.71) / (rates['USD'] ?? 1),
-            totalPriceUSD: totalUSD,
-            similarity: b.score,
-            score: b.score,
-          };
-        });
-
-        // Strong dedupe per target: same set of item IDs should appear only once
-        const seen = new Set<string>();
-        const unique: SwapSuggestion[] = [];
-        for (const s of mapped) {
-          const key = s.items.map(x => x.id).sort().join(',');
-          if (seen.has(key)) continue;
-          seen.add(key);
-          unique.push(s);
-        }
-
-        // Debug: log signatures and counts
-        const sigs = unique.map(u => u.items.map(x => x.id).sort().join(',')).sort();
-        const sigSet = sigs.join(' | ');
-        console.log(`[SwapSuggestions] Generated ${unique.length} unique bundle(s). Signatures: ${sigSet}`);
-
-        if (!mounted) return;
-        // Avoid redundant state updates if signatures haven't changed
-        if (lastSigSetRef.current === sigSet) {
-          console.log('[SwapSuggestions] Skipping setSuggestions - signatures unchanged');
-        } else {
-          lastSigSetRef.current = sigSet;
-          // As a final guard, strip any duplicate items per suggestion by id
-          const cleaned = unique.map(s => {
-            const seen = new Set<string>();
-            const uniqItems = s.items.filter(it => {
-              if (seen.has(it.id)) return false; seen.add(it.id); return true;
-            });
-            return { ...s, items: uniqItems };
-          });
-          setSuggestions(cleaned);
-        }
-      } catch (err: any) {
-        if (!mounted) return;
-        console.error('[SwapSuggestions] Exception:', err);
-        setError('Failed to load suggestions');
-        setSuggestions([]);
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    fetchSuggestions();
-
-    return () => {
-      mounted = false;
-    };
-    // Only depend on targetItemId, user.id, and bundleKey (stable key from bundleData)
-    // Don't include bundleData directly as it changes reference on every render
-    // bundleKey is stable and calculated from bundleData, so it will change when bundleData items change
-  }, [targetItemId, user?.id, bundleKey]);
+  // Data fetching moved to useSwapSuggestions hook
 
   if (loading) {
     return (
@@ -297,8 +78,12 @@ const SwapSuggestions: React.FC<SwapSuggestionsProps> = ({
     );
   }
 
-  if (suggestions.length === 0) {
-    console.log(`[SwapSuggestions] No suggestions found for ${bundleData ? 'bundle' : 'item'} ${targetItemId}`);
+  if (renderSuggestions.length === 0) {
+    if (__DEV__) {
+      // Helpful for development visibility
+      // eslint-disable-next-line no-console
+      console.log(`[SwapSuggestions] No suggestions found for ${bundleData ? 'bundle' : 'item'} ${targetItemId}`);
+    }
     // DEBUG: Show message when no suggestions (remove this in production)
     return (
       <View style={styles.container}>
