@@ -64,6 +64,69 @@ export class ApiService {
     });
   }
 
+  // Semantic search by free text. Tries vector RPC, falls back to simple title match.
+  static async semanticSearch(query: string, limit: number = 30) {
+    const q = (query || '').trim();
+    if (!q) return { data: [], error: null } as any;
+
+    return this.authenticatedCall(async (client) => {
+      // Preferred: call Edge Function for semantic search (one round trip)
+      try {
+        const { data, error } = await client.functions.invoke('semantic-search', {
+          body: { query: q, limit }
+        });
+        if (!error && data && Array.isArray(data.items)) {
+          return { data: data.items, error: null } as any;
+        }
+      } catch (e) {
+        // Fall through to fallback search
+      }
+
+      // Fallback: basic keyword search on title with minimal fields
+      const { data, error } = await client
+        .from('items')
+        .select('id, title, description, price, currency, item_images(image_url)')
+        .ilike('title', `%${q}%`)
+        .limit(limit);
+
+      return { data, error } as any;
+    });
+  }
+
+  // Fast keyword search for snappy UX while semantic loads
+  static async keywordSearch(query: string, limit: number = 20) {
+    const q = (query || '').trim();
+    if (!q) return { data: [], error: null } as any;
+    return this.authenticatedCall(async (client) => {
+      // Prefer fuzzy RPC with trigram similarity (matches typos like 'fener' -> 'Fender')
+      try {
+        const { data, error } = await client.rpc('fuzzy_search_items', { p_query: q, p_limit: limit });
+        if (!error && Array.isArray(data)) {
+          // Ensure images are present; if missing, pull minimal images for ids
+          const ids = data.map((d: any) => d.id);
+          if (ids.length > 0) {
+            const { data: rows } = await client
+              .from('items')
+              .select('id, item_images(image_url)')
+              .in('id', ids);
+            const map = new Map<string, any>();
+            (rows || []).forEach((r: any) => map.set(r.id, r));
+            const enriched = data.map((d: any) => ({ ...d, ...map.get(d.id) }));
+            return { data: enriched, error: null } as any;
+          }
+          return { data, error: null } as any;
+        }
+      } catch (_) {
+        // Fall back to simple ILIKE
+      }
+      return await client
+        .from('items')
+        .select('id, title, description, price, currency, item_images(image_url)')
+        .ilike('title', `%${q}%`)
+        .limit(limit);
+    });
+  }
+
   // Get recommendation weights for user (stored in notification_preferences JSONB field)
   static async getRecommendationWeights(userId: string): Promise<RecommendationWeights> {
     try {

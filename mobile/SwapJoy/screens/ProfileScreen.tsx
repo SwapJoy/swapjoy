@@ -130,16 +130,6 @@ const ProfileHeaderSkeleton = memo(() => (
       <SkeletonLoader width={100} height={100} borderRadius={50} />
     </View>
     <View style={styles.statsInfoRow}>
-      <View style={styles.statsGrid}>
-        <View style={styles.statItem}>
-          <SkeletonLoader width={40} height={20} style={{ marginBottom: 4 }} />
-          <SkeletonLoader width={50} height={12} />
-        </View>
-        <View style={styles.statItem}>
-          <SkeletonLoader width={40} height={20} style={{ marginBottom: 4 }} />
-          <SkeletonLoader width={50} height={12} />
-        </View>
-      </View>
       <View style={styles.socialGrid}>
         <View style={styles.socialStatItem}>
           <SkeletonLoader width={40} height={20} style={{ marginBottom: 4 }} />
@@ -178,17 +168,20 @@ const GridItemsSkeleton = memo(() => {
   const numColumns = 3;
   const screenWidth = Dimensions.get('window').width;
   const gridSpacing = 2;
-  const itemSize = Math.floor((screenWidth - gridSpacing * (numColumns - 1)) / numColumns);
+  const itemSize: number = Math.floor((screenWidth - gridSpacing * (numColumns - 1)) / numColumns);
   const skeletonItems = Array.from({ length: 6 }, (_, i) => i);
 
   return (
     <View style={styles.gridList}>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
-        {skeletonItems.map((item) => (
-          <View key={item} style={{ width: itemSize, height: itemSize * 1.7, marginBottom: 2 }}>
-            <SkeletonLoader width="100%" height="100%" borderRadius={0} />
-          </View>
-        ))}
+        {skeletonItems.map((item) => {
+          const itemHeight = itemSize * 1.7;
+          return (
+            <View key={item} style={{ width: itemSize, height: itemHeight, marginBottom: 2 }}>
+              <SkeletonLoader width="100%" height="100%" borderRadius={0} />
+            </View>
+          );
+        })}
       </View>
     </View>
   );
@@ -337,34 +330,9 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
                   </View>
                 </View>
 
-                {/* Stats & Info Row */}
-                <View style={styles.statsInfoRow}>
-                  {/* Stats Grid */}
-                  <View style={styles.statsGrid}>
-                    {loadingMetrics ? (
-                      <StatsSkeleton />
-                    ) : (
-                      <>
-                        <TouchableOpacity
-                          activeOpacity={0.7}
-                          onPress={() => navigation.navigate('Offers', { initialTab: 'sent' })}
-                          style={{ flex: 1 }}
-                        >
-                          {renderStatItem('Sent', stats.sentOffers)}
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          activeOpacity={0.7}
-                          onPress={() => navigation.navigate('Offers', { initialTab: 'received' })}
-                          style={{ flex: 1 }}
-                        >
-                          {renderStatItem('Received', stats.receivedOffers)}
-                        </TouchableOpacity>
-                      </>
-                    )}
-                  </View>
-
-                  {/* Followers & Following */}
-                  {!loadingFollowCounts && (
+                {/* Followers & Following */}
+                {!loadingFollowCounts && (
+                  <View style={styles.statsInfoRow}>
                     <View style={styles.socialGrid}>
                       <TouchableOpacity
                         style={styles.socialStatItem}
@@ -383,8 +351,8 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
                         <Text style={styles.socialStatLabel}>Following</Text>
                       </TouchableOpacity>
                     </View>
-                  )}
-                </View>
+                  </View>
+                )}
 
                 {/* User Info */}
                 <View style={styles.userInfoSection}>

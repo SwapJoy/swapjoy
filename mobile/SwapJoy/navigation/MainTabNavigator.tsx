@@ -5,6 +5,7 @@ import { MainTabParamList } from '../types/navigation';
 import { Ionicons } from '@expo/vector-icons';
 import ExploreScreen from '../screens/ExploreScreen';
 import SearchScreen from '../screens/SearchScreen';
+import OffersScreen from '../screens/OffersScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import { styles, colors } from './MainTabNavigator.styles';
@@ -71,9 +72,23 @@ const MainTabNavigator: React.FC<MainTabNavigatorProps> = ({ onNavigateToAdd }) 
         name="Search"
         component={SearchScreen}
         options={{
+          headerShown: false,
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons 
               name={focused ? "search" : "search-outline"} 
+              size={size} 
+              color={color} 
+            />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Offers"
+        component={OffersScreen}
+        options={{
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons 
+              name={focused ? "swap-horizontal" : "swap-horizontal-outline"} 
               size={size} 
               color={color} 
             />

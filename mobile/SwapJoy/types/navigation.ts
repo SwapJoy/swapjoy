@@ -69,6 +69,7 @@ export type RootStackParamList = {
 export type MainTabParamList = {
   Explore: undefined;
   Search: undefined;
+  Offers: undefined;
   Notifications: undefined;
   Profile: undefined;
 };
@@ -95,8 +96,8 @@ export type ExploreScreenProps = {
 };
 
 export type OffersScreenProps = {
-  navigation: NavigationProp<RootStackParamList, 'Offers'>;
-  route: RouteProp<RootStackParamList, 'Offers'>;
+  navigation: NavigationProp<RootStackParamList | MainTabParamList, 'Offers'>;
+  route?: RouteProp<RootStackParamList | MainTabParamList, 'Offers'>;
 };
 
 export type NotificationsScreenProps = {

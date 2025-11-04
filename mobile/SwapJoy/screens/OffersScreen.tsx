@@ -16,7 +16,7 @@ const { width } = Dimensions.get('window');
 
 const OffersScreen: React.FC<OffersScreenProps> = memo(({ route }) => {
   const { sentOffers, receivedOffers, loading, refreshing, onRefresh, getStatusColor, getStatusText } = useOffersData();
-  const [activeTab, setActiveTab] = useState<'sent' | 'received'>(route?.params?.initialTab ?? 'sent');
+  const [activeTab, setActiveTab] = useState<'sent' | 'received'>((route?.params as any)?.initialTab ?? 'sent');
 
   const data = activeTab === 'sent' ? sentOffers : receivedOffers;
 
