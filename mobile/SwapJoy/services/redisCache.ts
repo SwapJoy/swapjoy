@@ -2,7 +2,7 @@ import { supabase } from '../lib/supabase';
 
 export class RedisCache {
   private static readonly CACHE_PREFIX = 'swapjoy:';
-  private static readonly DEFAULT_TTL = 300; // 5 minutes in seconds
+  private static readonly DEFAULT_TTL = 10; // 5 minutes in seconds
 
   // Generate cache key
   private static getCacheKey(prefix: string, ...params: any[]): string {

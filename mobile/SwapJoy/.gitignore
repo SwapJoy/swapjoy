@@ -31,11 +31,58 @@ yarn-error.*
 *.pem
 
 # local env files
+.env
 .env*.local
 
 # typescript
 *.tsbuildinfo
 
-# generated native folders
-/ios
-/android
+# Native folders - selectively ignore
+# Commit configuration files but ignore build artifacts
+
+# iOS
+ios/Pods/
+ios/build/
+ios/*.xcworkspace/
+ios/*.xcworkspace/xcuserdata/
+ios/*.xcodeproj/xcuserdata/
+ios/*.xcodeproj/project.xcworkspace/xcuserdata/
+ios/*.xcodeproj/xcshareddata/xcschemes/*.xcscheme
+ios/DerivedData/
+ios/*.xcuserstate
+ios/.xcode.env.local
+ios/.swiftpm/
+ios/Podfile.lock
+ios/vendor/
+
+# iOS - Sensitive files
+# Note: GoogleService-Info.plist contains project-specific config but is usually committed
+# Uncomment if you want to exclude it (but then you'll need to add it manually on each machine)
+# ios/SwapJoy/GoogleService-Info.plist
+ios/*.mobileprovision
+ios/*.p12
+ios/*.cer
+
+# Android
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+android/*.iml
+android/app/release/
+android/app/debug/
+android/app/debugOptimized/
+android/.cxx/
+android/gradle/
+android/gradlew
+android/gradlew.bat
+android/gradle-wrapper.jar
+android/gradle-wrapper.properties
+
+# Android - Sensitive files
+# Note: google-services.json contains project-specific config but is usually committed
+# Uncomment if you want to exclude it (but then you'll need to add it manually on each machine)
+# android/app/google-services.json
+android/app/*.jks
+android/app/*.keystore

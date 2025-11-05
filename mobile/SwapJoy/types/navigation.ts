@@ -5,6 +5,8 @@ import { RouteProp } from '@react-navigation/native';
 export type RootStackParamList = {
   Onboarding: undefined;
   PhoneSignIn: undefined;
+  EmailSignIn: undefined;
+  EmailSignUp: undefined;
   OTPVerification: {
     phone: string;
   };
@@ -80,6 +82,14 @@ export type OnboardingScreenProps = {
 
 export type PhoneSignInScreenProps = {
   navigation: NavigationProp<RootStackParamList, 'PhoneSignIn'>;
+};
+
+export type EmailSignInScreenProps = {
+  navigation: NavigationProp<RootStackParamList, 'EmailSignIn'>;
+};
+
+export type EmailSignUpScreenProps = {
+  navigation: NavigationProp<RootStackParamList, 'EmailSignUp'>;
 };
 
 export type OTPVerificationScreenProps = {

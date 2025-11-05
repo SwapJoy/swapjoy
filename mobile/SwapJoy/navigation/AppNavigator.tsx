@@ -1,5 +1,5 @@
-import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import React, { forwardRef } from 'react';
+import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Platform, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,6 +7,8 @@ import { RootStackParamList } from '../types/navigation';
 import { useAuth } from '../contexts/AuthContext';
 import OnboardingScreen from '../screens/OnboardingScreen';
 import PhoneSignInScreen from '../screens/PhoneSignInScreen';
+import EmailSignInScreen from '../screens/EmailSignInScreen';
+import EmailSignUpScreen from '../screens/EmailSignUpScreen';
 import OTPVerificationScreen from '../screens/OTPVerificationScreen';
 import MainPageContainer from '../screens/MainPageContainer';
 import CreateListingScreen from '../screens/CreateListingScreen';
@@ -28,7 +30,11 @@ import OffersScreen from '../screens/OffersScreen';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
-const AppNavigator: React.FC = () => {
+interface AppNavigatorProps {
+  ref?: React.Ref<NavigationContainerRef<RootStackParamList>>;
+}
+
+const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((props, ref) => {
   const { isAuthenticated, isLoading } = useAuth();
 
   // Show loading screen while checking authentication
@@ -36,8 +42,21 @@ const AppNavigator: React.FC = () => {
     return null; // Or a loading component
   }
 
+  // Deep linking configuration for OAuth callbacks
+  const linking = {
+    prefixes: ['com.swapjoy://', 'swapjoy://'],
+    config: {
+      screens: {
+        EmailSignIn: 'auth/callback',
+        EmailSignUp: 'auth/callback',
+        PhoneSignIn: 'auth/callback',
+        OTPVerification: 'auth/callback',
+      },
+    },
+  };
+
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={ref} linking={linking}>
       <Stack.Navigator
         initialRouteName={isAuthenticated ? "MainTabs" : "Onboarding"}
         screenOptions={{
@@ -212,6 +231,16 @@ const AppNavigator: React.FC = () => {
               options={{ title: 'Sign In' }}
             />
             <Stack.Screen 
+              name="EmailSignIn" 
+              component={EmailSignInScreen}
+              options={{ title: 'Sign In' }}
+            />
+            <Stack.Screen 
+              name="EmailSignUp" 
+              component={EmailSignUpScreen}
+              options={{ title: 'Sign Up' }}
+            />
+            <Stack.Screen 
               name="OTPVerification" 
               component={OTPVerificationScreen}
               options={{ title: 'Verify Phone' }}
@@ -221,6 +250,8 @@ const AppNavigator: React.FC = () => {
       </Stack.Navigator>
     </NavigationContainer>
   );
-};
+});
+
+AppNavigator.displayName = 'AppNavigator';
 
 export default AppNavigator;

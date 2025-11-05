@@ -40,17 +40,25 @@ export class ApiService {
 
   // Example authenticated API methods
   static async getProfile() {
+    console.log('[ApiService.getProfile] start');
     return this.authenticatedCall(async (client) => {
       // Ensure we fetch the row for the authenticated user only
       const currentUser = await AuthService.getCurrentUser();
       if (!currentUser?.id) {
+        console.warn('[ApiService.getProfile] no current user');
         return { data: null, error: { message: 'Not authenticated' } } as any;
       }
-      return await client
+      const result = await client
         .from('users')
         .select('*')
         .eq('id', currentUser.id)
         .single();
+      if (result.error) {
+        console.warn('[ApiService.getProfile] error:', result.error?.message || result.error);
+      } else {
+        console.log('[ApiService.getProfile] success');
+      }
+      return result as any;
     });
   }
 
@@ -320,6 +328,8 @@ export class ApiService {
 
   // AI-Powered Vector-Based Recommendations
   static async getTopPicksForUser(userId: string, limit: number = 10, options?: { bypassCache?: boolean }) {
+
+    console.log('fetching [getTopPicksForUser]');
     // Use Redis caching for expensive AI recommendations (graceful fallback if not available)
     return RedisCache.cache(
       'top-picks',
@@ -1009,17 +1019,35 @@ export class ApiService {
       .single();
 
     if (userError || !user) {
-      return { data: null, error: 'User not found' };
+      console.warn('[TopPicks Fallback] User not found; returning recent items');
+      const { data: recent, error: recentErr } = await client
+        .from('items')
+        .select('*, item_images(image_url), users!items_user_id_fkey(username, first_name, last_name)')
+        .eq('status', 'available')
+        .neq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+      return { data: recent || [], error: recentErr || null };
     }
 
-    const query = client
-      .from('items')
-      .select('*, item_images(image_url), users!items_user_id_fkey(username, first_name, last_name)')
-      .in('category_id', user.favorite_categories || [])
-      .eq('status', 'available')
-      .neq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(limit);
+    // If no favorite categories yet, fall back to recent items
+    const hasFavs = Array.isArray(user.favorite_categories) && user.favorite_categories.length > 0;
+    const query = hasFavs
+      ? client
+          .from('items')
+          .select('*, item_images(image_url), users!items_user_id_fkey(username, first_name, last_name)')
+          .in('category_id', user.favorite_categories)
+          .eq('status', 'available')
+          .neq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(limit)
+      : client
+          .from('items')
+          .select('*, item_images(image_url), users!items_user_id_fkey(username, first_name, last_name)')
+          .eq('status', 'available')
+          .neq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(limit);
 
     const { data, error } = await query;
     

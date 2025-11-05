@@ -1,0 +1,4 @@
+# Firebase service account (contains sensitive credentials)
+service-account.json
+**/service-account.json
+

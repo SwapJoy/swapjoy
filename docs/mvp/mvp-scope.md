@@ -163,6 +163,7 @@ The SwapJoy MVP will focus on core functionality needed to validate the concept 
   - Offer accepted/declined
   - New follower
   - Swap confirmed by other user
+  - User you follow added an item
   - Basic notification settings (on/off)
 
 **Excluded from MVP:**

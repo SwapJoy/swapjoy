@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ApiService } from '../services/api';
+import { NotificationService } from '../services/notificationService';
 import { useAuth } from '../contexts/AuthContext';
 import { RecommendationWeights, DEFAULT_RECOMMENDATION_WEIGHTS, clampWeight } from '../types/recommendation';
 
@@ -344,6 +345,74 @@ const DevRecommendationSettingsScreen: React.FC = () => {
           </Text>
         </View>
 
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>🔔 Test Push Notifications</Text>
+          <Text style={styles.sectionDescription}>
+            Test push notifications by creating a notification for yourself.
+          </Text>
+          
+          <View style={styles.testButtonContainer}>
+            <TouchableOpacity
+              style={styles.testButton}
+              onPress={async () => {
+                if (!user?.id) {
+                  Alert.alert('Error', 'User not found');
+                  return;
+                }
+
+                try {
+                  const result = await NotificationService.notifyNewOffer({
+                    userId: user.id,
+                    offerId: 'test-offer-' + Date.now(),
+                    senderName: 'Test User',
+                    itemTitle: 'Test Item',
+                  });
+
+                  if (result.error) {
+                    Alert.alert('Error', `Failed to send notification: ${result.error.message}`);
+                  } else {
+                    Alert.alert('Success', 'Test notification sent! Check your device for push notification.');
+                  }
+                } catch (error: any) {
+                  Alert.alert('Error', `Failed: ${error.message}`);
+                }
+              }}
+            >
+              <Text style={styles.testButtonText}>Test New Offer Notification</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.testButtonContainer}>
+            <TouchableOpacity
+              style={styles.testButton}
+              onPress={async () => {
+                if (!user?.id) {
+                  Alert.alert('Error', 'User not found');
+                  return;
+                }
+
+                try {
+                  const result = await NotificationService.notifyNewFollower({
+                    userId: user.id,
+                    followerId: 'test-follower-' + Date.now(),
+                    followerName: 'Test Follower',
+                  });
+
+                  if (result.error) {
+                    Alert.alert('Error', `Failed to send notification: ${result.error.message}`);
+                  } else {
+                    Alert.alert('Success', 'Test notification sent! Check your device for push notification.');
+                  }
+                } catch (error: any) {
+                  Alert.alert('Error', `Failed: ${error.message}`);
+                }
+              }}
+            >
+              <Text style={styles.testButtonText}>Test New Follower Notification</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         <View style={styles.actions}>
           <View style={styles.buttonRow}>
             <View style={styles.buttonContainer}>
@@ -580,6 +649,21 @@ const styles = StyleSheet.create({
   },
   disabledButton: {
     opacity: 0.5,
+  },
+  testButtonContainer: {
+    marginBottom: 12,
+  },
+  testButton: {
+    backgroundColor: '#34C759',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  testButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
 

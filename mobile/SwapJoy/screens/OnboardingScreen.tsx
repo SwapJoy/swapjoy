@@ -17,7 +17,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ navigation }) => {
   const { slides, activeSlide, handleSlideChange, handleGetStarted } = useOnboarding();
 
   const handleGetStartedPress = () => {
-    navigation.navigate('PhoneSignIn');
+    navigation.navigate('EmailSignIn');
   };
 
   const handleScroll = (event: any) => {

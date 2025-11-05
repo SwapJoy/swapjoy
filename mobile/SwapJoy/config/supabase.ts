@@ -9,3 +9,6 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   // In production, these must be provided by the environment.
   console.warn('[config/supabase] Missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_ANON_KEY');
 }
+// Extra diagnostics
+// eslint-disable-next-line no-console
+console.log('[config/supabase] URL set:', !!SUPABASE_URL, 'KEY set:', !!SUPABASE_ANON_KEY);

@@ -1,12 +1,62 @@
 import 'react-native-gesture-handler';
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Platform } from 'react-native';
+import { NavigationContainerRef } from '@react-navigation/native';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
+// React Native Firebase is initialized natively via FirebaseApp.configure() in AppDelegate.swift
 import AppNavigator from './navigation/AppNavigator';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { PushNotificationService } from './services/pushNotificationService';
+import { RootStackParamList } from './types/navigation';
+
+// Configure Google Sign-In as early as possible to ensure native config is set
+const WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID
+  || '1084218893699-7tc9acoor67a35jcsmlg4o8rq89vkl90.apps.googleusercontent.com';
+// Fallback to Info.plist value if env not set
+const IOS_CLIENT_ID = Platform.OS === 'ios'
+  ? (process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID
+      || '1084218893699-b0lhlgtlr4fjhdbt9qrs3gkldppco342.apps.googleusercontent.com')
+  : undefined;
+console.log('[Google] Using WEB_CLIENT_ID from env or fallback:', !!process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID);
+console.log('[Google] Using IOS_CLIENT_ID from env or fallback:', !!process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID);
+GoogleSignin.configure({
+  webClientId: WEB_CLIENT_ID,
+  iosClientId: IOS_CLIENT_ID,
+  offlineAccess: true,
+  scopes: ['profile', 'email'],
+});
 
 function AppContent() {
   const { isLoading } = useAuth();
+  const navigationRef = useRef<NavigationContainerRef<RootStackParamList>>(null);
+
+  // (Moved) Google Sign-In is configured at module scope above
+
+  // Setup push notification handlers
+  useEffect(() => {
+    // Initialize push notification handlers (async)
+    let cleanup: (() => void) | null = null;
+    
+    PushNotificationService.initialize().then((cleanupFn) => {
+      cleanup = cleanupFn;
+    }).catch((error) => {
+      console.error('Error initializing push notifications:', error);
+    });
+
+    return () => {
+      if (cleanup) {
+        cleanup();
+      }
+    };
+  }, []);
+
+  // Update navigation ref when it becomes available
+  useEffect(() => {
+    if (navigationRef.current) {
+      PushNotificationService.setNavigationRef(navigationRef.current);
+    }
+  }, [isLoading]);
 
   if (isLoading) {
     return (
@@ -20,7 +70,7 @@ function AppContent() {
 
   return (
     <>
-      <AppNavigator />
+      <AppNavigator ref={navigationRef} />
       <StatusBar style="auto" />
     </>
   );

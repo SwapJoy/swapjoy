@@ -10,12 +10,16 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { usePhoneSignIn } from '../hooks/usePhoneSignIn';
+import { useAuth } from '../contexts/AuthContext';
 import { PhoneSignInScreenProps } from '../types/navigation';
 
 const PhoneSignInScreen: React.FC<PhoneSignInScreenProps> = ({ navigation }) => {
   const [phone, setPhone] = useState('');
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const { isLoading, handleSendOTP, formatPhoneNumber } = usePhoneSignIn();
+  const { signInWithGoogle } = useAuth();
 
   const handleSendOTPPress = async () => {
     const { success } = await handleSendOTP({ phone });
@@ -24,6 +28,28 @@ const PhoneSignInScreen: React.FC<PhoneSignInScreenProps> = ({ navigation }) => 
       const formattedPhone = formatPhoneNumber(phone);
       navigation.navigate('OTPVerification', { phone: formattedPhone });
     }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setIsGoogleLoading(true);
+    try {
+      console.log('[UI] Google button pressed, calling signInWithGoogle()');
+      const result = await signInWithGoogle();
+      if (result.error) {
+        // Error handling is done in the context
+        console.error('Google sign-in error:', result.error);
+      }
+      // Navigation will be handled by AuthContext/auth state change
+    } catch (err: any) {
+      console.error('Google sign-in error:', err);
+    } finally {
+      console.log('[UI] Google sign-in flow finished');
+      setIsGoogleLoading(false);
+    }
+  };
+
+  const handleEmailSignInPress = () => {
+    navigation.navigate('EmailSignIn');
   };
 
   const handleBackPress = () => {
@@ -74,6 +100,36 @@ const PhoneSignInScreen: React.FC<PhoneSignInScreenProps> = ({ navigation }) => 
               <ActivityIndicator color="white" />
             ) : (
               <Text style={styles.sendButtonText}>Send Code</Text>
+            )}
+          </TouchableOpacity>
+
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>OR</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          <TouchableOpacity
+            style={[styles.emailButton, isLoading && styles.disabledButton]}
+            onPress={handleEmailSignInPress}
+            disabled={isLoading}
+          >
+            <Ionicons name="mail-outline" size={20} color="#007AFF" style={styles.emailIcon} />
+            <Text style={styles.emailButtonText}>Sign in with Email</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.googleButton, (isLoading || isGoogleLoading) && styles.disabledButton]}
+            onPress={handleGoogleSignIn}
+            disabled={isLoading || isGoogleLoading}
+          >
+            {isGoogleLoading ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <>
+                <Ionicons name="logo-google" size={20} color="#fff" style={styles.googleIcon} />
+                <Text style={styles.googleButtonText}>Continue with Google</Text>
+              </>
             )}
           </TouchableOpacity>
         </View>
@@ -167,6 +223,57 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 25,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#ddd',
+  },
+  dividerText: {
+    marginHorizontal: 15,
+    color: '#999',
+    fontSize: 14,
+  },
+  emailButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#007AFF',
+    backgroundColor: '#fff',
+    paddingVertical: 15,
+    borderRadius: 12,
+    marginBottom: 15,
+  },
+  emailIcon: {
+    marginRight: 10,
+  },
+  emailButtonText: {
+    color: '#007AFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  googleButton: {
+    backgroundColor: '#4285F4',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 15,
+    borderRadius: 12,
+    marginBottom: 20,
+  },
+  googleIcon: {
+    marginRight: 10,
+  },
+  googleButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 
