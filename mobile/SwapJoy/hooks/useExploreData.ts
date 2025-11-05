@@ -30,6 +30,7 @@ export const useExploreData = () => {
   const [isFetching, setIsFetching] = useState(false);
   const [hasData, setHasData] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [error, setError] = useState<any>(null); // ADD: Error state for visibility
   const isMountedRef = useRef(true);
   const hasFetchedRef = useRef(false);
   const forceBypassRef = useRef(false);
@@ -133,6 +134,7 @@ export const useExploreData = () => {
   }, []);
 
   const fetchAIOffers = useCallback(async () => {
+    console.log('[useExploreData] fetchAIOffers start. user?', !!user);
     if (!user) {
       if (isMountedRef.current) {
         setLoading(false);
@@ -141,22 +143,55 @@ export const useExploreData = () => {
       return;
     }
 
-    if (isFetching) {
+    if (isFetching && !forceBypassRef.current) {
+      console.log('[useExploreData] Already fetching, skipping');
       return;
     }
     
     try {
       setIsFetching(true);
+      setLoading(true); // Ensure loading state is set
 
-      const bypassCache = forceBypassRef.current || hasFetchedRef.current;
+      // FIXED: Only bypass cache on explicit refresh, not after first fetch
+      // This allows cache to work properly and reduces unnecessary API calls
+      const bypassCache = forceBypassRef.current; // Only bypass if explicitly requested
+      console.log('[useExploreData] calling getTopPicksForUserSafe. bypassCache=', bypassCache, 'hasFetched=', hasFetchedRef.current);
       // Fetch items from "Top Picks" section (favorite categories)
       const { data: topPicks, error: topPicksError } = await ApiService.getTopPicksForUserSafe(user.id, 10, { bypassCache });
       forceBypassRef.current = false;
       
       if (topPicksError) {
-        console.error('Error fetching top picks:', topPicksError);
+        console.error('[useExploreData] Error fetching top picks:', topPicksError);
+        if (isMountedRef.current) {
+          // CRITICAL FIX: Set ALL state consistently on error
+          setAiOffers([]);
+          setError(topPicksError); // Store error for UI display
+          setHasData(true); // Allow UI to render (even with empty data)
+          setIsInitialized(true); // Mark as initialized so UI doesn't block
+          setLoading(false); // Stop loading indicator
+          setIsFetching(false); // Allow future fetches
+          hasFetchedRef.current = true; // Prevent infinite retries
+        }
         return;
       }
+      
+      // Clear error on successful fetch
+      if (isMountedRef.current) {
+        setError(null);
+      }
+
+      // Log the raw data received from API
+      console.log('[useExploreData] Raw topPicks from API:', {
+        isArray: Array.isArray(topPicks),
+        length: topPicks?.length || 0,
+        firstItem: topPicks?.[0] ? {
+          id: topPicks[0].id,
+          title: topPicks[0].title,
+          hasUsers: !!topPicks[0].users,
+          hasUser: !!topPicks[0].user,
+          userId: topPicks[0].user_id
+        } : null
+      });
 
       // Transform items to AIOffer format
       const aiOffers: AIOffer[] = (Array.isArray(topPicks) ? topPicks : []).map((item: any) => {
@@ -218,29 +253,60 @@ export const useExploreData = () => {
       filteredOffers.sort((a, b) => b.match_score - a.match_score);
 
       if (isMountedRef.current) {
+        console.log('[useExploreData] TRANSFORMED DATA:', {
+          aiOffersCount: aiOffers.length,
+          filteredCount: filteredOffers.length,
+          firstOffer: filteredOffers[0] ? {
+            id: filteredOffers[0].id,
+            title: filteredOffers[0].title,
+            hasImage: !!filteredOffers[0].image_url,
+            matchScore: filteredOffers[0].match_score
+          } : null
+        });
+        console.log('[useExploreData] Setting state - aiOffers:', filteredOffers.length, 'hasData: true, isInitialized: true');
         setAiOffers(filteredOffers);
         setHasData(true);
         setIsInitialized(true);
+        setLoading(false); // Ensure loading is false
+        setIsFetching(false); // Ensure fetching is false
         hasFetchedRef.current = true;
       }
     } catch (error) {
-      console.error('Error fetching AI offers:', error);
+      console.error('[useExploreData] Error fetching AI offers:', error);
       if (isMountedRef.current) {
+        // CRITICAL FIX: Set ALL state consistently on error
         setAiOffers([]);
-        setHasData(false);
+        setError(error); // Store error for UI display
+        setHasData(true); // Allow UI to render (even with empty data)
+        setIsInitialized(true); // Mark as initialized so UI doesn't block
+        setLoading(false); // Stop loading indicator
+        setIsFetching(false); // Allow future fetches
+        hasFetchedRef.current = true; // Prevent infinite retries
       }
     } finally {
       if (isMountedRef.current) {
+        console.log('[useExploreData] fetchAIOffers finished');
+        // Ensure all state is set even if there was an early return
         setLoading(false);
         setIsFetching(false);
         setIsInitialized(true);
+        hasFetchedRef.current = true; // Always mark as fetched to prevent infinite loops
       }
     }
   }, [user?.id, calculateMatchScore, getMatchReason, isFetching]);
 
   useEffect(() => {
+    console.log('[useExploreData] useEffect triggered:', {
+      hasUser: !!user,
+      userId: user?.id,
+      hasFetched: hasFetchedRef.current,
+      willFetch: !!(user && !hasFetchedRef.current)
+    });
     if (user && !hasFetchedRef.current) {
+      console.log('[useExploreData] Triggering fetchAIOffers');
       fetchAIOffers();
+    } else {
+      console.log('[useExploreData] NOT fetching - user:', !!user, 'hasFetched:', hasFetchedRef.current);
     }
   }, [user?.id]);
 
@@ -251,10 +317,14 @@ export const useExploreData = () => {
   }, []);
 
   const refreshData = useCallback(async () => {
+    console.log('[useExploreData] refreshData called');
     forceBypassRef.current = true;
+    setError(null);
     setLoading(true);
     setHasData(false);
     setIsInitialized(false);
+    setIsFetching(false); // Reset fetching state to allow new fetch
+    hasFetchedRef.current = false; // Allow re-fetch
     await fetchAIOffers();
   }, [fetchAIOffers]);
 
@@ -265,7 +335,8 @@ export const useExploreData = () => {
     isFetching,
     hasData,
     isInitialized,
+    error, // ADD: Expose error for UI display
     user,
     refreshData,
-  }), [aiOffers, loading, isFetching, hasData, isInitialized, user, refreshData]);
+  }), [aiOffers, loading, isFetching, hasData, isInitialized, error, user, refreshData]);
 };

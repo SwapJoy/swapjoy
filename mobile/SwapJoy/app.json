@@ -15,7 +15,11 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSCameraUsageDescription": "This app needs access to camera to take photos for your item listings."
+        "NSCameraUsageDescription": "This app needs access to camera to take photos for your item listings.",
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true,
+          "NSAllowsLocalNetworking": true
+        }
       },
       "bundleIdentifier": "com.swapjoy"
     },

@@ -1,4 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import { supabase } from '../lib/supabase';
 import { User, AuthResponse, AuthSession, CreateUserData } from '../types/auth';
@@ -30,14 +31,19 @@ export class AuthService {
         
         // Check if session is expired
         if (session.expires_at && Date.now() >= session.expires_at * 1000) {
+          console.log('[AuthService] Stored session expired, attempting refresh');
           // Try to refresh the token
           const refreshedSession = await this.refreshSession(session.refresh_token);
           if (refreshedSession) {
+            console.log('[AuthService] Session refreshed successfully');
             return refreshedSession;
           }
-          // If refresh failed, clear stored session
-          await this.clearStoredSession();
-          return null;
+          // If refresh failed due to network error, keep existing session (don't clear)
+          // Only clear if refresh failed for non-network reasons
+          console.warn('[AuthService] Refresh failed - keeping stored session to prevent unwanted sign-out');
+          // Don't clear session on network errors - keep stored session
+          // This prevents unwanted sign-out during network issues
+          return session; // Return expired session rather than clearing it
         }
         
         return session;
@@ -62,12 +68,30 @@ export class AuthService {
   // Refresh session using refresh token
   private static async refreshSession(refreshToken: string): Promise<AuthSession | null> {
     try {
+      console.log('[AuthService] refreshSession called');
       const { data, error } = await supabase.auth.refreshSession({
         refresh_token: refreshToken,
       });
 
-      if (error || !data.session) {
-        console.error('Error refreshing session:', error);
+      if (error) {
+        const errorMsg = error?.message || String(error);
+        const isNetworkError = errorMsg.includes('Network request failed') || errorMsg.includes('network') || errorMsg.includes('fetch');
+        console.error('[AuthService] Error refreshing session:', {
+          message: errorMsg,
+          code: error?.code,
+          status: error?.status,
+          isNetworkError
+        });
+        if (isNetworkError) {
+          // Don't clear session on network error - keep existing session
+          console.warn('[AuthService] Network error during refresh - keeping existing session');
+          return null;
+        }
+        return null;
+      }
+
+      if (!data.session) {
+        console.error('[AuthService] No session in refresh response');
         return null;
       }
 
@@ -81,9 +105,20 @@ export class AuthService {
       };
 
       await this.storeSession(session);
+      console.log('[AuthService] Session refreshed successfully');
       return session;
-    } catch (error) {
-      console.error('Error refreshing session:', error);
+    } catch (error: any) {
+      const errorMsg = error?.message || String(error);
+      const isNetworkError = errorMsg.includes('Network request failed') || errorMsg.includes('network') || errorMsg.includes('fetch');
+      console.error('[AuthService] Exception refreshing session:', {
+        message: errorMsg,
+        isNetworkError,
+        stack: error?.stack?.substring(0, 200)
+      });
+      if (isNetworkError) {
+        // Don't clear session on network error - keep existing session
+        console.warn('[AuthService] Network exception during refresh - keeping existing session');
+      }
       return null;
     }
   }
@@ -257,38 +292,28 @@ export class AuthService {
   // Get current session (with automatic refresh)
   static async getCurrentSession(): Promise<AuthSession | null> {
     try {
-      // First try to get stored session
+      // First try to get stored session - AVOID calling Supabase getSession/setSession
+      // to prevent automatic refresh attempts that cause network errors
       let session = await this.getStoredSession();
       
       if (session) {
-        // Set the session on the Supabase client
-        await supabase.auth.setSession({
-          access_token: session.access_token,
-          refresh_token: session.refresh_token,
-        });
+        // CRITICAL: Don't call setSession() or sync to AsyncStorage
+        // Supabase client now uses customStorage that blocks reads, so it won't auto-restore sessions
+        // This prevents automatic refresh attempts that cause network errors
+        console.log('[AuthService] Using stored session from SecureStore (Supabase auto-restore disabled)');
         return session;
       }
 
-      // If no stored session, try to get from Supabase
-      const { data: { session: supabaseSession } } = await supabase.auth.getSession();
-      
-      if (supabaseSession) {
-        const authSession: AuthSession = {
-          access_token: supabaseSession.access_token,
-          refresh_token: supabaseSession.refresh_token,
-          expires_at: supabaseSession.expires_at || 0,
-          expires_in: supabaseSession.expires_in || 3600,
-          token_type: supabaseSession.token_type || 'bearer',
-          user: supabaseSession.user as User,
-        };
-        
-        await this.storeSession(authSession);
-        return authSession;
-      }
-
+      // If no stored session, ONLY THEN try to get from Supabase (but this will also fail if network is down)
+      // Skip this to avoid network errors on app startup
+      console.log('[AuthService] No stored session found - skipping Supabase getSession to avoid network errors');
       return null;
+      
+      // REMOVED: supabase.auth.getSession() call - it triggers refresh attempts even with autoRefreshToken: false
+      // This was causing "Network request failed" errors on app startup
+
     } catch (error) {
-      console.error('Error getting current session:', error);
+      console.error('[AuthService] Error getting current session:', error);
       return null;
     }
   }
@@ -325,7 +350,41 @@ export class AuthService {
 
   // Listen to auth state changes
   static onAuthStateChange(callback: (user: User | null, session: AuthSession | null) => void) {
+    let isInitialized = false;
+    let hasStoredSession = false;
+    
+    // Check if we have a stored session on startup
+    this.getStoredSession().then((stored) => {
+      hasStoredSession = !!stored;
+      console.log('[AuthService] onAuthStateChange - hasStoredSession:', hasStoredSession);
+    });
+    
     return supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('[AuthService] onAuthStateChange event:', event, 'hasSession:', !!session);
+      
+      // CRITICAL: Ignore TOKEN_REFRESHED events to prevent handling refresh attempts
+      // These events are triggered by Supabase's internal refresh logic even with autoRefreshToken: false
+      if (event === 'TOKEN_REFRESHED') {
+        console.log('[AuthService] Ignoring TOKEN_REFRESHED event to prevent network errors');
+        return;
+      }
+      
+      // CRITICAL: Ignore SIGNED_OUT events during startup if we have a stored session
+      // This prevents Supabase from clearing our stored session when it can't find one in AsyncStorage
+      if (event === 'SIGNED_OUT' && !isInitialized && hasStoredSession) {
+        console.log('[AuthService] Ignoring SIGNED_OUT event during startup - we have a stored session');
+        // Try to restore from SecureStore
+        const storedSession = await this.getStoredSession();
+        if (storedSession) {
+          console.log('[AuthService] Restoring session from SecureStore');
+          callback(storedSession.user, storedSession);
+          isInitialized = true;
+          return;
+        }
+      }
+      
+      isInitialized = true;
+      
       if (session?.user) {
         const authSession: AuthSession = {
           access_token: session.access_token,
@@ -339,8 +398,15 @@ export class AuthService {
         await this.storeSession(authSession);
         callback(session.user as User, authSession);
       } else {
-        await this.clearStoredSession();
-        callback(null, null);
+        // Only clear stored session if this is an explicit sign out (not a startup event)
+        if (event === 'SIGNED_OUT' && isInitialized) {
+          console.log('[AuthService] Explicit sign out - clearing stored session');
+          await this.clearStoredSession();
+          callback(null, null);
+        } else {
+          // Don't clear session on other events (like INITIAL_SESSION)
+          console.log('[AuthService] No session from Supabase, but not clearing stored session (event:', event, ')');
+        }
       }
     });
   }

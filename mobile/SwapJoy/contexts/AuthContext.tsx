@@ -24,6 +24,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [session, setSession] = useState<AuthSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const tokenRefreshCleanup = useRef<(() => void) | null>(null);
+  const hasStoredSessionRef = useRef(false); // Track if we've initialized from stored session
 
   const isAuthenticated = !!user && !!session;
 
@@ -33,8 +34,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       try {
         const currentSession = await AuthService.getCurrentSession();
         if (currentSession) {
+          console.log('[AuthContext] Found stored session on startup');
           setUser(currentSession.user);
           setSession(currentSession);
+          hasStoredSessionRef.current = true; // Mark that we have a stored session
           // Ensure user row exists (handles cases where Google sign-in happened previously)
           try {
             // Lightweight check via ApiService.getProfile
@@ -65,22 +68,38 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               }
             }).catch(() => {});
           } catch {}
+        } else {
+          console.log('[AuthContext] No stored session found on startup');
+          hasStoredSessionRef.current = false;
         }
       } catch (error) {
         console.error('Error initializing auth:', error);
+        hasStoredSessionRef.current = false;
       } finally {
         setIsLoading(false);
       }
     };
 
     initializeAuth();
-
+    
     // Listen to auth state changes
     const { data: { subscription } } = AuthService.onAuthStateChange(async (user, session) => {
       console.log('[AuthState] onAuthStateChange user:', !!user, 'session:', !!session);
+      
+      // If we have a stored session but Supabase reports no session, ignore it
+      // This prevents Supabase from clearing our stored session on startup
+      if (!user && !session && hasStoredSessionRef.current) {
+        console.log('[AuthState] Ignoring sign-out event - we have a stored session');
+        // Don't update state - keep the stored session
+        return;
+      }
+      
       setUser(user);
       setSession(session);
       setIsLoading(false);
+      
+      // Update stored session flag
+      hasStoredSessionRef.current = !!(user && session);
       
       // Register device when user signs in (if not already registered)
       if (user && session) {

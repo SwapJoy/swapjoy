@@ -25,11 +25,66 @@ const { width } = Dimensions.get('window');
 const ITEM_WIDTH = width * 0.7;
 const GRID_ITEM_WIDTH = (width - 60) / 2; // 2 columns with margins
 
+// Skeleton loader component for Top Picks - only content, no section wrapper
+const TopPicksSkeleton = () => (
+  <View style={styles.horizontalList}>
+    {[1, 2, 3].map((i) => (
+      <View key={i} style={[styles.offerCard, styles.skeletonCard, { width: ITEM_WIDTH, marginRight: 20 }]}>
+        <View style={[styles.itemImage, styles.skeletonImage]} />
+        <View style={styles.offerDetails}>
+          <View style={[styles.skeletonText, { width: '80%', marginBottom: 8, height: 16 }]} />
+          <View style={[styles.skeletonText, { width: '60%', marginBottom: 8, height: 14 }]} />
+          <View style={[styles.skeletonText, { width: '70%', height: 12 }]} />
+        </View>
+      </View>
+    ))}
+  </View>
+);
+
+// Skeleton loader component for Recent Items - only content, no section wrapper
+const RecentItemsSkeleton = () => (
+  <View style={styles.horizontalList}>
+    {[1, 2, 3].map((i) => (
+      <View key={i} style={[styles.recentCard, styles.skeletonCard, { width: ITEM_WIDTH * 0.8, marginRight: 15 }]}>
+        <View style={[styles.recentImage, styles.skeletonImage]} />
+        <View style={styles.recentDetails}>
+          <View style={[styles.skeletonText, { width: '90%', marginBottom: 4, height: 14 }]} />
+          <View style={[styles.skeletonText, { width: '60%', marginBottom: 4, height: 12 }]} />
+          <View style={[styles.skeletonText, { width: '50%', height: 10 }]} />
+        </View>
+      </View>
+    ))}
+  </View>
+);
+
+// Skeleton loader component for Categories - only content, no section wrapper
+const CategoriesSkeleton = () => (
+  <View style={styles.categoriesGrid}>
+    {[1, 2, 3, 4, 5, 6].map((i) => (
+      <View key={i} style={[styles.categoryCard, styles.skeletonCard]}>
+        <View style={[styles.skeletonText, { width: '80%', marginBottom: 4 }]} />
+        <View style={[styles.skeletonText, { width: '50%', height: 10 }]} />
+      </View>
+    ))}
+  </View>
+);
+
+// Error display component
+const ErrorDisplay: React.FC<{ error: any; onRetry: () => void }> = ({ error, onRetry }) => (
+  <View style={styles.errorContainer}>
+    <Text style={styles.errorText}>Error loading data</Text>
+    <Text style={styles.errorMessage}>{error?.message || 'Unknown error'}</Text>
+    <TouchableOpacity style={styles.retryButton} onPress={onRetry}>
+      <Text style={styles.retryButtonText}>Retry</Text>
+    </TouchableOpacity>
+  </View>
+);
+
 const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
-  const { aiOffers, loading: topPicksLoading, hasData, isInitialized, user, refreshData: refreshTopPicks } = useExploreData();
-  const { items: recentItems, loading: recentLoading, refresh: refreshRecent } = useRecentlyListed(10);
-  const { categories: topCategories, loading: categoriesLoading, refresh: refreshCategories } = useTopCategories(6);
-  const { items: otherItems, pagination, loading: othersLoading, loadingMore, loadMore, refresh: refreshOthers } = useOtherItems(10);
+  const { aiOffers, loading: topPicksLoading, hasData, isInitialized, error: topPicksError, user, refreshData: refreshTopPicks } = useExploreData();
+  const { items: recentItems, loading: recentLoading, error: recentError, refresh: refreshRecent } = useRecentlyListed(10);
+  const { categories: topCategories, loading: categoriesLoading, error: categoriesError, refresh: refreshCategories } = useTopCategories(6);
+  const { items: otherItems, pagination, loading: othersLoading, loadingMore, error: othersError, loadMore, refresh: refreshOthers } = useOtherItems(10);
   
   const [refreshing, setRefreshing] = useState(false);
 
@@ -44,15 +99,23 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
     setRefreshing(false);
   }, [refreshTopPicks, refreshRecent, refreshCategories, refreshOthers]);
 
-  // Refresh data when screen comes into focus (e.g., after adding a new item)
+  // FIXED: Only refresh on focus if data is stale (not on every focus)
+  // This prevents race conditions and unnecessary state resets
   useFocusEffect(
     useCallback(() => {
-      console.log('ExploreScreen focused - refreshing recently listed items');
-      refreshRecent();
-    }, [refreshRecent])
+      // Only refresh if user just authenticated or if explicitly needed
+      // Don't refresh on every focus to prevent race conditions
+      console.log('[ExploreScreen] focused - checking if refresh needed');
+      // Only refresh if not initialized yet
+      if (!isInitialized) {
+        console.log('[ExploreScreen] Not initialized yet, refreshing');
+        refreshTopPicks();
+        refreshRecent();
+        refreshCategories();
+        refreshOthers();
+      }
+    }, [isInitialized, refreshTopPicks, refreshRecent, refreshCategories, refreshOthers])
   );
-
-  const loading = topPicksLoading && recentLoading && categoriesLoading && othersLoading;
 
 
   const renderAIOffer = useCallback(({ item }: { item: AIOffer }) => {
@@ -218,58 +281,88 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
     );
   }
 
-  if (!isInitialized || loading || !hasData) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Finding perfect matches for you...</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
+  // FIXED: Removed blocking logic - sections render independently
+  // No longer blocking UI until ALL sections are ready
 
   return (
     <View style={styles.container}>
       <FlatList
-        data={otherItems}
+        data={otherItems || []}
         renderItem={renderGridItem}
         keyExtractor={(item) => item.id}
         numColumns={2}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.mainContent}
+        ListEmptyComponent={
+          othersLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#007AFF" />
+              <Text style={styles.loadingText}>Loading items...</Text>
+            </View>
+          ) : null
+        }
         ListHeaderComponent={
           <>
-            {/* Top Matches Section */}
-            {aiOffers.length > 0 && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Top Matches</Text>
-                <FlatList
-                  data={aiOffers}
-                  renderItem={renderAIOffer}
-                  keyExtractor={(item) => item.id}
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.horizontalList}
-                  snapToInterval={ITEM_WIDTH + 20}
-                  decelerationRate="fast"
-                  removeClippedSubviews={true}
-                  maxToRenderPerBatch={5}
-                  windowSize={10}
-                  initialNumToRender={3}
-                  getItemLayout={(data, index) => ({
-                    length: ITEM_WIDTH + 20,
-                    offset: (ITEM_WIDTH + 20) * index,
-                    index,
-                  })}
-                />
-              </View>
-            )}
+            {/* Top Matches Section - RENDER INDEPENDENTLY */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Top Matches</Text>
+              {(() => {
+                // DEBUG: Log current state
+                console.log('[ExploreScreen] Top Picks Render State:', {
+                  hasError: !!topPicksError,
+                  isLoading: topPicksLoading,
+                  offersCount: aiOffers?.length || 0,
+                  isInitialized,
+                  hasData,
+                  firstOffer: aiOffers?.[0] ? { id: aiOffers[0].id, title: aiOffers[0].title } : null
+                });
 
-            {/* Recently Listed Section */}
-            {recentItems.length > 0 && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Recently Listed</Text>
-                <Text style={styles.sectionSubtitle}>New items from the last month</Text>
+                if (topPicksError) {
+                  return <ErrorDisplay error={topPicksError} onRetry={refreshTopPicks} />;
+                }
+                if (topPicksLoading && !isInitialized) {
+                  return <TopPicksSkeleton />;
+                }
+                if (aiOffers && aiOffers.length > 0) {
+                  return (
+                    <FlatList
+                      data={aiOffers}
+                      renderItem={renderAIOffer}
+                      keyExtractor={(item) => item.id}
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.horizontalList}
+                      snapToInterval={ITEM_WIDTH + 20}
+                      decelerationRate="fast"
+                      removeClippedSubviews={true}
+                      maxToRenderPerBatch={5}
+                      windowSize={10}
+                      initialNumToRender={3}
+                      getItemLayout={(data, index) => ({
+                        length: ITEM_WIDTH + 20,
+                        offset: (ITEM_WIDTH + 20) * index,
+                        index,
+                      })}
+                    />
+                  );
+                }
+                // Show empty message if initialized and not loading
+                if (isInitialized && !topPicksLoading) {
+                  return <Text style={styles.emptyText}>No top matches found</Text>;
+                }
+                return <TopPicksSkeleton />;
+              })()}
+            </View>
+
+            {/* Recently Listed Section - RENDER INDEPENDENTLY */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Recently Listed</Text>
+              <Text style={styles.sectionSubtitle}>New items from the last month</Text>
+              {recentError ? (
+                <ErrorDisplay error={recentError} onRetry={refreshRecent} />
+              ) : recentLoading && recentItems.length === 0 ? (
+                <RecentItemsSkeleton />
+              ) : recentItems.length > 0 ? (
                 <FlatList
                   data={recentItems}
                   renderItem={renderRecentItem}
@@ -280,13 +373,19 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
                   snapToInterval={ITEM_WIDTH * 0.8 + 15}
                   decelerationRate="fast"
                 />
-              </View>
-            )}
+              ) : (
+                <Text style={styles.emptyText}>No recent items found</Text>
+              )}
+            </View>
 
-            {/* Top Categories Section */}
-            {topCategories.length > 0 && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Top Categories</Text>
+            {/* Top Categories Section - RENDER INDEPENDENTLY */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Top Categories</Text>
+              {categoriesError ? (
+                <ErrorDisplay error={categoriesError} onRetry={refreshCategories} />
+              ) : categoriesLoading && topCategories.length === 0 ? (
+                <CategoriesSkeleton />
+              ) : topCategories.length > 0 ? (
                 <View style={styles.categoriesGrid}>
                   {topCategories.map((category) => (
                     <TouchableOpacity
@@ -302,14 +401,21 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
                     </TouchableOpacity>
                   ))}
                 </View>
-              </View>
-            )}
+              ) : (
+                <Text style={styles.emptyText}>No categories found</Text>
+              )}
+            </View>
 
-            {/* Others Section Header */}
+            {/* Others Section Header - RENDER INDEPENDENTLY */}
             {otherItems.length > 0 && (
               <View style={[styles.section, styles.othersHeader]}>
                 <Text style={styles.sectionTitle}>Explore More</Text>
                 <Text style={styles.sectionSubtitle}>Discover all available items</Text>
+              </View>
+            )}
+            {othersError && (
+              <View style={styles.section}>
+                <ErrorDisplay error={othersError} onRetry={refreshOthers} />
               </View>
             )}
           </>
@@ -621,6 +727,60 @@ const styles = StyleSheet.create({
     width: '100%',
     paddingVertical: 20,
     alignItems: 'center',
+  },
+  // Skeleton loader styles
+  skeletonCard: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  skeletonImage: {
+    backgroundColor: '#e8e8e8',
+    width: '100%',
+    height: 180,
+  },
+  skeletonText: {
+    height: 12,
+    backgroundColor: '#e8e8e8',
+    borderRadius: 4,
+    marginTop: 8,
+    width: '80%',
+  },
+  // Error display styles
+  errorContainer: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  errorText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#F44336',
+    marginBottom: 8,
+  },
+  errorMessage: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  retryButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
+    padding: 20,
   },
 });
 

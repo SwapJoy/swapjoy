@@ -2,7 +2,21 @@ import { supabase } from '../lib/supabase';
 
 export class RedisCache {
   private static readonly CACHE_PREFIX = 'swapjoy:';
-  private static readonly DEFAULT_TTL = 10; // 5 minutes in seconds
+  private static readonly DEFAULT_TTL = 300; // 5 minutes in seconds
+  private static readonly INVOKE_TIMEOUT_MS = 1500;
+
+  private static async invokeWithTimeout<T>(fn: () => Promise<T>, timeoutMs: number): Promise<{ timedOut: boolean; result?: T }> {
+    let timedOut = false;
+    const timeout = new Promise<undefined>((resolve) => setTimeout(() => {
+      timedOut = true;
+      resolve(undefined);
+    }, timeoutMs));
+    const result = await Promise.race([fn(), timeout]);
+    if (timedOut) {
+      return { timedOut: true };
+    }
+    return { timedOut: false, result: result as T };
+  }
 
   // Generate cache key
   private static getCacheKey(prefix: string, ...params: any[]): string {
@@ -14,11 +28,13 @@ export class RedisCache {
   static async get<T>(prefix: string, ...params: any[]): Promise<T | null> {
     try {
       const key = this.getCacheKey(prefix, ...params);
-      
-      // Try to use Edge Function first
-      const { data, error } = await supabase.functions.invoke('redis-get', {
-        body: { key }
-      });
+      // Try to use Edge Function first (with timeout)
+      const res = await this.invokeWithTimeout(() => supabase.functions.invoke('redis-get', { body: { key } }), this.INVOKE_TIMEOUT_MS);
+      if (res.timedOut) {
+        console.warn('Redis get timed out, bypassing cache for key:', key);
+        return null;
+      }
+      const { data, error } = (res.result as any) || {};
 
       if (error) {
         console.warn('Redis get error (Edge Function not available):', error);
@@ -41,9 +57,12 @@ export class RedisCache {
     try {
       const ttl: number = this.DEFAULT_TTL
       const key = this.getCacheKey(prefix, ...params);
-      const { error } = await supabase.functions.invoke('redis-set', {
-        body: { key, value, ttl, ttlSeconds: ttl }
-      });
+      const res = await this.invokeWithTimeout(() => supabase.functions.invoke('redis-set', { body: { key, value, ttl, ttlSeconds: ttl } }), this.INVOKE_TIMEOUT_MS);
+      if (res.timedOut) {
+        console.warn('Redis set timed out, proceeding without cache for key:', key);
+        return false;
+      }
+      const { error } = (res.result as any) || {};
 
       if (error) {
         console.warn('Redis set error:', error);
@@ -61,9 +80,12 @@ export class RedisCache {
   static async delete(prefix: string, ...params: any[]): Promise<boolean> {
     try {
       const key = this.getCacheKey(prefix, ...params);
-      const { error } = await supabase.functions.invoke('redis-delete', {
-        body: { key }
-      });
+      const res = await this.invokeWithTimeout(() => supabase.functions.invoke('redis-delete', { body: { key } }), this.INVOKE_TIMEOUT_MS);
+      if (res.timedOut) {
+        console.warn('Redis delete timed out for key:', key);
+        return false;
+      }
+      const { error } = (res.result as any) || {};
 
       if (error) {
         console.warn('Redis delete error:', error);
@@ -110,9 +132,12 @@ export class RedisCache {
   // Invalidate cache patterns
   static async invalidatePattern(pattern: string): Promise<boolean> {
     try {
-      const { error } = await supabase.functions.invoke('redis-invalidate-pattern', {
-        body: { pattern: `${this.CACHE_PREFIX}${pattern}` }
-      });
+      const res = await this.invokeWithTimeout(() => supabase.functions.invoke('redis-invalidate-pattern', { body: { pattern: `${this.CACHE_PREFIX}${pattern}` } }), this.INVOKE_TIMEOUT_MS);
+      if (res.timedOut) {
+        console.warn('Redis invalidate pattern timed out for pattern:', pattern);
+        return false;
+      }
+      const { error } = (res.result as any) || {};
 
       if (error) {
         console.warn('Redis invalidate pattern error:', error);

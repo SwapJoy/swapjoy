@@ -50,25 +50,11 @@
 		<string>google</string>
 		<string>com.googleusercontent.apps.1084218893699-b0lhlgtlr4fjhdbt9qrs3gkldppco342</string>
 	</array>
-	<key>NSAppTransportSecurity</key>
-	<dict>
-		<key>NSAllowsArbitraryLoads</key>
-		<true/>
-		<key>NSAllowsLocalNetworking</key>
-		<true/>
-		<key>NSExceptionDomains</key>
-		<dict>
-			<key>supabase.co</key>
-			<dict>
-				<key>NSIncludesSubdomains</key>
-				<true/>
-				<key>NSTemporaryExceptionAllowsInsecureHTTPLoads</key>
-				<false/>
-				<key>NSTemporaryExceptionMinimumTLSVersion</key>
-				<string>TLSv1.2</string>
-			</dict>
-		</dict>
-	</dict>
+  <key>NSAppTransportSecurity</key>
+  <dict>
+    <key>NSAllowsLocalNetworking</key><true/>
+    <key>NSAllowsArbitraryLoads</key><true/>
+  </dict>
 	<key>NSCameraUsageDescription</key>
 	<string>Allow SwapJoy to access your camera to take photos for your item listings.</string>
 	<key>NSMicrophoneUsageDescription</key>

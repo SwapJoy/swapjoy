@@ -12,16 +12,44 @@ import {
 } from '../types/recommendation';
 
 export class ApiService {
+  // Ensure only one auth initialization runs at a time across the app
+  private static authInitInFlight: Promise<void> | null = null;
+  private static isAuthReady: boolean = false;
   // Get authenticated Supabase client
   private static async getAuthenticatedClient() {
-    const accessToken = await AuthService.getAccessToken();
-    
-    if (!accessToken) {
-      throw new Error('No access token available. Please sign in.');
+    console.log('[ApiService] getAuthenticatedClient ENTRY');
+    if (this.isAuthReady) {
+      return supabase;
     }
-
-    // Return the existing client - it should already have the session set
-    // The session is managed by AuthService and should be automatically set
+    if (this.authInitInFlight) {
+      console.log('[ApiService] awaiting existing authInitInFlight');
+      await this.authInitInFlight;
+      return supabase;
+    }
+    // Start a single-flight auth init
+    this.authInitInFlight = (async () => {
+      // CRITICAL FIX: Use stored session only - DO NOT call Supabase getSession/setSession
+      // These methods trigger refresh attempts even with autoRefreshToken: false, causing network errors
+      let session: any = await AuthService.getCurrentSession();
+      
+      if (!session?.access_token) {
+        console.warn('[ApiService] No stored session found - user needs to sign in');
+        // Don't poll Supabase - it triggers refresh attempts that fail with network errors
+        throw new Error('No access token available. Please sign in.');
+      }
+      
+      // CRITICAL: Don't call setSession() - it triggers refresh attempts
+      // Instead, manually sync to Supabase storage if needed (already done in getCurrentSession)
+        const who = session?.user?.id || 'unknown';
+        console.log('[ApiService] auth ready. user:', who, 'tokenLen:', session.access_token.length);
+      
+      this.isAuthReady = true;
+    })();
+    try {
+      await this.authInitInFlight;
+    } finally {
+      this.authInitInFlight = null;
+    }
     return supabase;
   }
 
@@ -31,10 +59,69 @@ export class ApiService {
   ): Promise<{ data: T | null; error: any }> {
     try {
       const client = await this.getAuthenticatedClient();
-      return await apiCall(client);
+      try {
+        const sess = await client.auth.getSession();
+        const tk = sess?.data?.session?.access_token;
+        console.log('[ApiService] calling API with token?', !!tk, 'tokenLen:', tk?.length || 0);
+      } catch (error: any) {
+        console.error('[ApiService] client.auth.getSession threw:', error);
+      }
+      let result: any;
+      try {
+        result = await apiCall(client);
+      } catch (callErr: any) {
+        const errorMsg = callErr?.message || String(callErr);
+        const isNetworkError = errorMsg.includes('Network request failed') || errorMsg.includes('network') || errorMsg.includes('fetch');
+        console.error('[ApiService] apiCall threw:', {
+          message: errorMsg,
+          isNetworkError,
+          stack: callErr?.stack?.substring(0, 200)
+        });
+        if (isNetworkError) {
+          return { data: null, error: { message: 'Network request failed. Please check your internet connection.', code: 'NETWORK_ERROR', originalError: callErr } };
+        }
+        throw callErr;
+      }
+      if (result?.error) {
+        const e = result.error;
+        console.warn('[ApiService] apiCall error:', e?.message || e, 'status:', e?.status, 'code:', e?.code);
+      }
+      // If unauthorized or JWT error, attempt one refresh + retry
+      const errMsg = String(result?.error?.message || '').toLowerCase();
+      const isAuthError = !!result?.error && (
+        errMsg.includes('jwt') || errMsg.includes('token') || errMsg.includes('unauthorized') || errMsg.includes('auth') || result?.error?.status === 401
+      );
+      if (isAuthError) {
+        try {
+          // Force reload current session; AuthService.getCurrentSession will refresh if expired
+          await AuthService.getCurrentSession();
+          await this.getAuthenticatedClient();
+          console.log('[ApiService] retrying API call after session refresh');
+          result = await apiCall(client);
+        } catch (refreshError: any) {
+          // FIXED: Log refresh error instead of swallowing it
+          console.error('[ApiService] Session refresh failed:', refreshError?.message || refreshError);
+          // Return the original error, not the refresh error
+          return result;
+        }
+      }
+      return result;
     } catch (error: any) {
-      console.error('API call failed:', error);
-      return { data: null, error: { message: error.message || 'API call failed' } };
+      const errorMsg = error?.message || String(error);
+      const isNetworkError = errorMsg.includes('Network request failed') || errorMsg.includes('network') || errorMsg.includes('fetch');
+      console.error('[ApiService] API call failed:', {
+        message: errorMsg,
+        isNetworkError,
+        stack: error?.stack?.substring(0, 200)
+      });
+      return { 
+        data: null, 
+        error: { 
+          message: isNetworkError ? 'Network request failed. Please check your internet connection.' : (error.message || 'API call failed'),
+          code: isNetworkError ? 'NETWORK_ERROR' : 'API_ERROR',
+          originalError: error
+        } 
+      };
     }
   }
 
@@ -328,13 +415,23 @@ export class ApiService {
 
   // AI-Powered Vector-Based Recommendations
   static async getTopPicksForUser(userId: string, limit: number = 10, options?: { bypassCache?: boolean }) {
-
     console.log('fetching [getTopPicksForUser]');
-    // Use Redis caching for expensive AI recommendations (graceful fallback if not available)
-    return RedisCache.cache(
-      'top-picks',
-      [userId, limit, 'v2'],
-      () => this.authenticatedCall(async (client) => {
+    
+    const fetchFn = async () => {
+      console.log('[TopPicks] fetchFn ENTRY - starting query execution');
+      const startTime = Date.now();
+      try {
+        const result = await this.authenticatedCall(async (client) => {
+          try {
+      console.log('[ApiService.getTopPicksForUser] begin for user', userId, 'limit', limit);
+            
+      // Sanity: ensure auth header present
+      try {
+        const sess = await client.auth.getSession();
+        console.log('[TopPicks] client session present?', !!sess?.data?.session, 'tokenLen:', sess?.data?.session?.access_token?.length || 0);
+      } catch (e) {
+        console.warn('[TopPicks] unable to read client session:', (e as any)?.message || e);
+      }
       // Get user's items to find similar matches
       const { data: userItems, error: userItemsError } = await client
         .from('items')
@@ -343,10 +440,18 @@ export class ApiService {
         .eq('status', 'available')
         .not('embedding', 'is', null);
 
+      if (userItemsError) {
+        console.warn('[TopPicks] userItems error:', userItemsError?.message || userItemsError);
+      } else {
+        console.log('[TopPicks] userItems count:', (userItems || []).length);
+      }
+
       if (userItemsError || !userItems || userItems.length === 0) {
         console.log('No user items found, using fallback recommendations');
         // Fallback to category-based recommendations
-        return this.getFallbackRecommendations(client, userId, limit);
+        const fb = await this.getFallbackRecommendations(client, userId, limit);
+        console.log('[TopPicks] fallback returned count:', Array.isArray((fb as any)?.data) ? (fb as any).data.length : 0, 'error?', !!(fb as any)?.error);
+        return fb;
       }
 
       // Get user's preferences including favorite categories and location
@@ -355,6 +460,9 @@ export class ApiService {
         .select('favorite_categories, manual_location_lat, manual_location_lng, preferred_radius_km')
         .eq('id', userId)
         .single();
+      if (userError) {
+        console.warn('[ApiService.getTopPicksForUser] users lookup error:', userError?.message || userError);
+      }
 
       const favoriteCategories = user?.favorite_categories || [];
       
@@ -376,7 +484,11 @@ export class ApiService {
           p_match_count: Math.max(limit * 4, 40),
           p_exclude_user: userId
         });
+        if (promptErr) {
+          console.warn('[TopPicks] prompt RPC error:', promptErr?.message || promptErr);
+        }
         if (!promptErr && Array.isArray(promptTop) && promptTop.length > 0) {
+          console.log('[TopPicks] promptTop count:', promptTop.length);
           const sortedBySim = [...promptTop].sort((a: any, b: any) => (b.similarity || 0) - (a.similarity || 0));
           const topIds = sortedBySim.slice(0, Math.max(limit * 2, 20)).map((it: any) => it.id);
           let enriched: any[] = [];
@@ -417,7 +529,10 @@ export class ApiService {
       }
 
       // Get exchange rates once
-      const { data: rates } = await client.from('currencies').select('code, rate');
+      const { data: rates, error: ratesErr } = await client.from('currencies').select('code, rate');
+      if (ratesErr) {
+        console.warn('[TopPicks] currencies error:', ratesErr?.message || ratesErr);
+      }
       const rateMap: { [key: string]: number } = {};
       rates?.forEach((r: any) => { rateMap[r.code] = parseFloat(r.rate); });
 
@@ -443,7 +558,6 @@ export class ApiService {
       // BUT: If category_score >= 0.99, SQL function already filters to only favorite categories, so skip this
       if (favoriteCategories.length > 0 && weights.category_score < 0.99) {
         console.log('[FAV-CAT-FETCH] Fetching items directly from favorite categories (category_score < 1.0):', favoriteCategories);
-        try {
           const { data: favoriteCategoryItems, error: favError } = await client
             .from('items')
             .select('id, title, description, price, currency, category_id, embedding')
@@ -515,14 +629,9 @@ export class ApiService {
           } else if (favError) {
             console.error('Error fetching favorite category items:', favError);
           }
-        } catch (error) {
-          console.error('Error fetching items from favorite categories:', error);
         }
-      }
-      
       // PRODUCTION-READY: Use SQL-level weighted matching function
       // All filtering and scoring happens in the database, not in application code
-      try {
         for (const userItem of userItems) {
           // PRODUCTION-READY: When price_score = 0, price doesn't matter, so don't filter by price
           // When price_score > 0, use flexible price range for better matching
@@ -598,15 +707,11 @@ export class ApiService {
           } else {
             console.log(`[SQL-WEIGHTED] No similar items found for ${userItem.title}`);
           }
-        }
-      } catch (error) {
-        console.error('[SQL-WEIGHTED] Error processing user items for recommendations:', error);
       }
 
       // Generate virtual bundles from user's items
       // PRODUCTION-READY: Generate bundles even in strict mode, but only from favorite category items
       // The generateVirtualBundles function should filter items by category when strictCategoryFilter is true
-      try {
         const virtualBundles = await this.generateVirtualBundles(
           client, 
           userItems, 
@@ -639,9 +744,6 @@ export class ApiService {
           } else {
             allRecommendations.push(...virtualBundles);
           }
-        }
-      } catch (error) {
-        console.error('[BUNDLES] Error generating virtual bundles:', error);
       }
 
       // Remove duplicates and sort by overall score
@@ -935,43 +1037,9 @@ export class ApiService {
       console.log(`After sorting - Total items: ${sortedResults.length}, Favorite category items: ${sortedResults.filter((r: any) => r.is_favorite_category || r.from_favorite_category || (r.category_id && favoriteCategories.includes(r.category_id))).length}`);
       console.log(`Favorite category item IDs after sorting: ${sortedResults.filter((r: any) => r.is_favorite_category || r.from_favorite_category || (r.category_id && favoriteCategories.includes(r.category_id))).map((r: any) => r.id).join(', ')}`);
       
-      // CRITICAL: Filter to only include items/bundles that have swap suggestions
-      // This ensures Top Picks only shows items the user can actually swap for
-      console.log(`[TOP-PICKS-FILTER] Checking ${sortedResults.length} items/bundles for swap suggestions...`);
-      const suggestionChecks = await Promise.all(
-        sortedResults.map(async (item: any) => {
-          if (item.is_bundle && item.bundle_items) {
-            // For bundles, create bundleData structure
-            const bundleData = {
-              bundle_items: item.bundle_items.map((bi: any) => ({
-                id: bi.id || bi.item?.id || bi.item_id,
-                embedding: bi.embedding
-              })),
-              price: item.price || item.estimated_value || 0,
-              currency: item.currency || 'USD'
-            };
-            const hasSuggestions = await this.checkSwapSuggestions(client, item.id, userId, bundleData);
-            console.log(`[TOP-PICKS-FILTER] Bundle ${item.id} (${item.title}): ${hasSuggestions.length > 0 ? 'HAS suggestions' : 'NO suggestions'}`);
-            return { item, hasSuggestions: hasSuggestions.length > 0 };
-          } else {
-            // For single items
-            const hasSuggestions = await this.checkSwapSuggestions(client, item.id, userId);
-            console.log(`[TOP-PICKS-FILTER] Item ${item.id} (${item.title}): ${hasSuggestions.length > 0 ? 'HAS suggestions' : 'NO suggestions'}`);
-            return { item, hasSuggestions: hasSuggestions.length > 0 };
-          }
-        })
-      );
-      
-      const itemsWithSuggestions = suggestionChecks
-        .filter(check => check.hasSuggestions)
-        .map(check => check.item);
-      
-      console.log(`[TOP-PICKS-FILTER] Filtered from ${sortedResults.length} to ${itemsWithSuggestions.length} items/bundles with suggestions`);
-      
-      const filteredResults = itemsWithSuggestions;
-      
+            // Top Picks no longer filters by swap suggestions - show all recommendations based on scoring
       // Limit results (already sorted by weighted overall_score)
-      const limitedResults = filteredResults.slice(0, limit);
+            const limitedResults = sortedResults.slice(0, limit);
       console.log(`Final limited results: ${limitedResults.length}, Favorite category items in limited: ${limitedResults.filter((r: any) => r.is_favorite_category || r.from_favorite_category || (r.category_id && favoriteCategories.includes(r.category_id))).length}`);
       console.log(`Final favorite category item IDs: ${limitedResults.filter((r: any) => r.is_favorite_category || r.from_favorite_category || (r.category_id && favoriteCategories.includes(r.category_id))).map((r: any) => r.id).join(', ')}`);
       
@@ -983,26 +1051,151 @@ export class ApiService {
       });
 
       if (limitedResults.length > 0) {
+              console.log('[TopPicks] QUERY SUCCESS - final limited results count:', limitedResults.length);
         return { data: limitedResults, error: null };
       }
 
       // Fallback if no vector matches found
-      return this.getFallbackRecommendations(client, userId, limit);
-    }),
-    options?.bypassCache === true
-    );
+            console.warn('[TopPicks] QUERY RETURNED EMPTY - calling fallback');
+      const fb2 = await this.getFallbackRecommendations(client, userId, limit);
+            const fallbackCount = Array.isArray((fb2 as any)?.data) ? (fb2 as any).data.length : 0;
+            const fallbackError = !!(fb2 as any)?.error;
+            console.log('[TopPicks] Fallback result:', {
+              count: fallbackCount,
+              hasError: fallbackError,
+              errorMessage: (fb2 as any)?.error?.message || null
+            });
+            if (fallbackError) {
+              console.error('[TopPicks] Fallback ERROR:', (fb2 as any).error);
+            } else if (fallbackCount === 0) {
+              console.warn('[TopPicks] Fallback returned EMPTY data');
+            }
+      return fb2;
+          } catch (error: any) {
+            // Single catch for all errors - fallback to recommendations
+            const errorMsg = error?.message || String(error);
+            const isNetworkError = errorMsg.includes('Network request failed') || errorMsg.includes('network') || errorMsg.includes('fetch');
+            console.error('[TopPicks] QUERY EXCEPTION:', {
+              message: errorMsg,
+              isNetworkError,
+              stack: error?.stack?.substring(0, 300)
+            });
+            
+            // Fallback to category-based recommendations on any error
+            try {
+              console.log('[TopPicks] Attempting fallback after error');
+              const fb = await this.getFallbackRecommendations(client, userId, limit);
+              const fallbackCount = Array.isArray((fb as any)?.data) ? (fb as any).data.length : 0;
+              console.log('[TopPicks] Error fallback result:', {
+                count: fallbackCount,
+                hasError: !!(fb as any)?.error,
+                errorMessage: (fb as any)?.error?.message || null
+              });
+              return fb;
+            } catch (fallbackError: any) {
+              const fallbackErrorMsg = fallbackError?.message || String(fallbackError);
+              console.error('[TopPicks] Fallback also FAILED:', {
+                message: fallbackErrorMsg,
+                originalError: errorMsg
+              });
+              return { 
+                data: [], 
+                error: {
+                  message: isNetworkError ? 'Network request failed. Please check your internet connection.' : errorMsg,
+                  code: isNetworkError ? 'NETWORK_ERROR' : 'QUERY_ERROR',
+                  originalError: error,
+                  fallbackError: fallbackError
+                }
+              };
+            }
+          }
+        });
+        
+        const duration = Date.now() - startTime;
+        const dataCount = Array.isArray(result?.data) ? result.data.length : 0;
+        const hasError = !!result?.error;
+        console.log('[TopPicks] fetchFn COMPLETED:', {
+          duration: `${duration}ms`,
+          dataCount,
+          hasError,
+          errorMessage: result?.error?.message || null,
+          errorCode: result?.error?.code || null
+        });
+        if (hasError) {
+          console.error('[TopPicks] Query ERROR:', {
+            message: result.error.message,
+            code: result.error.code,
+            status: result.error.status
+          });
+        } else if (dataCount === 0) {
+          console.warn('[TopPicks] Query SUCCEEDED but returned EMPTY data');
+        } else {
+          console.log('[TopPicks] Query SUCCEEDED with', dataCount, 'items');
+        }
+        return result;
+      } catch (fetchErr: any) {
+        const duration = Date.now() - startTime;
+        const errorMsg = fetchErr?.message || String(fetchErr);
+        const isNetworkError = errorMsg.includes('Network request failed') || errorMsg.includes('network') || errorMsg.includes('fetch');
+        console.error('[TopPicks] fetchFn THREW EXCEPTION:', {
+          duration: `${duration}ms`,
+          message: errorMsg,
+          isNetworkError,
+          stack: fetchErr?.stack?.substring(0, 300)
+        });
+        // Return empty data instead of throwing to prevent loading screen hanging
+        return { 
+          data: [], 
+          error: {
+            message: isNetworkError ? 'Network request failed. Please check your internet connection.' : errorMsg,
+            code: isNetworkError ? 'NETWORK_ERROR' : 'QUERY_ERROR',
+            originalError: fetchErr
+          }
+        };
+      }
+    };
+
+    // Use cache if bypassCache is false
+    const bypassCache = options?.bypassCache ?? false;
+    if (bypassCache) {
+      console.log('[TopPicks] bypassing cache, calling fetchFn directly');
+    return fetchFn();
+    }
+    
+    // Try cache first
+    const cached = await RedisCache.get('topPicks', userId, limit);
+    if (cached) {
+      console.log('[TopPicks] cache hit, returning cached data');
+      return { data: cached, error: null };
+    }
+    
+    console.log('[TopPicks] cache miss, calling fetchFn');
+    const result = await fetchFn();
+    
+    // Store in cache if successful
+    if (result.data && !result.error) {
+      await RedisCache.set('topPicks', result.data, userId, limit);
+    }
+    
+    return result;
   }
 
   // Ensure we always return a valid response
   static async getTopPicksForUserSafe(userId: string, limit: number = 10, options?: { bypassCache?: boolean }) {
     try {
-      const result = await this.getTopPicksForUser(userId, limit, { bypassCache: true });
+      // FIXED: Default to false (use cache) instead of true (bypass cache)
+      // This allows cache to work properly after Expo ejection
+      const bypassCache = options?.bypassCache ?? false;
+      console.log('[TopPicksSafe] calling getTopPicksForUser with bypassCache=', bypassCache);
+      const result = await this.getTopPicksForUser(userId, limit, { bypassCache });
+      const count = Array.isArray(result?.data) ? result.data.length : 0;
+      console.log('[TopPicksSafe] data count:', count, 'error?', !!result?.error, 'errorMsg:', result?.error?.message || null);
       return {
         data: Array.isArray(result?.data) ? result.data : [],
         error: result?.error || null
       };
     } catch (error) {
-      console.error('Error in getTopPicksForUserSafe:', error);
+      console.error('[TopPicksSafe] Error in getTopPicksForUserSafe:', error);
       return {
         data: [],
         error: error
@@ -1012,6 +1205,7 @@ export class ApiService {
 
   // Fallback method for when vector search fails
   static async getFallbackRecommendations(client: any, userId: string, limit: number) {
+    console.log('[TopPicks Fallback] start. user:', userId, 'limit:', limit);
     const { data: user, error: userError } = await client
       .from('users')
       .select('favorite_categories')
@@ -1027,11 +1221,13 @@ export class ApiService {
         .neq('user_id', userId)
         .order('created_at', { ascending: false })
         .limit(limit);
+      console.log('[TopPicks Fallback] recent count:', (recent || []).length, 'error?', !!recentErr);
       return { data: recent || [], error: recentErr || null };
     }
 
     // If no favorite categories yet, fall back to recent items
     const hasFavs = Array.isArray(user.favorite_categories) && user.favorite_categories.length > 0;
+    console.log('[TopPicks Fallback] hasFavs:', hasFavs, 'favCount:', hasFavs ? user.favorite_categories.length : 0);
     const query = hasFavs
       ? client
           .from('items')
@@ -1050,6 +1246,7 @@ export class ApiService {
           .limit(limit);
 
     const { data, error } = await query;
+    console.log('[TopPicks Fallback] query result count:', (data || []).length, 'error?', !!error);
     
     if (error) {
       console.error('Fallback query error:', error);
@@ -2631,6 +2828,7 @@ export class ApiService {
   static async getRecentlyListedSafe(userId: string, limit: number = 10) {
     try {
       const result = await this.getRecentlyListed(userId, limit);
+      console.log('[RecentlyListedSafe] items count:', Array.isArray(result?.data) ? result.data.length : 0, 'error?', !!result?.error);
       return {
         data: Array.isArray(result?.data) ? result.data : [],
         error: result?.error || null
@@ -2648,10 +2846,8 @@ export class ApiService {
    * Get top categories based on item count and user activity
    */
   static async getTopCategories(userId: string, limit: number = 6) {
-    return RedisCache.cache(
-      'top-categories',
-      [userId, limit],
-      () => this.authenticatedCall(async (client) => {
+    const fetchFn = () => this.authenticatedCall(async (client) => {
+        console.log('[TopCategories] begin for user', userId, 'limit', limit);
         // Get all categories with item counts
         const { data: categories, error: categoriesError } = await client
           .from('categories')
@@ -2659,6 +2855,7 @@ export class ApiService {
           .order('name');
 
         if (categoriesError || !categories) {
+          console.warn('[TopCategories] categories error:', categoriesError?.message || categoriesError);
           return { data: null, error: categoriesError };
         }
 
@@ -2684,11 +2881,11 @@ export class ApiService {
           .filter(cat => cat.item_count > 0)
           .sort((a, b) => b.item_count - a.item_count)
           .slice(0, limit);
-
+        console.log('[TopCategories] result count:', topCategories.length);
         return { data: topCategories, error: null };
-      }),
-      true // no TTL param; caller controls bypass if needed
-    );
+      });
+    // Always bypass cache during investigation to ensure live data
+    return fetchFn();
   }
 
   /**
@@ -2697,6 +2894,7 @@ export class ApiService {
   static async getTopCategoriesSafe(userId: string, limit: number = 6) {
     try {
       const result = await this.getTopCategories(userId, limit);
+      console.log('[TopCategoriesSafe] count:', Array.isArray(result?.data) ? result.data.length : 0, 'error?', !!result?.error);
       return {
         data: Array.isArray(result?.data) ? result.data : [],
         error: result?.error || null
@@ -2760,6 +2958,8 @@ export class ApiService {
   static async getOtherItemsSafe(userId: string, page: number = 1, limit: number = 10) {
     try {
       const result = await this.getOtherItems(userId, page, limit);
+       const cnt = Array.isArray((result as any)?.data?.items) ? (result as any).data.items.length : 0;
+       console.log('[OtherItemsSafe] items count:', cnt, 'page', page, 'error?', !!result?.error);
       return {
         data: result?.data || { items: [], pagination: { page, limit, total: 0, totalPages: 0, hasMore: false } },
         error: result?.error || null
