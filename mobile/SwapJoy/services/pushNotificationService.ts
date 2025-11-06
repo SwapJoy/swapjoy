@@ -3,6 +3,7 @@ import firebaseApp from '@react-native-firebase/app';
 import { Platform } from 'react-native';
 import { NavigationContainerRef } from '@react-navigation/native';
 import { RootStackParamList } from '../types/navigation';
+import { NotificationNavigation } from '../utils/notificationNavigation';
 
 /**
  * Notification type enum values
@@ -57,71 +58,39 @@ export class PushNotificationService {
 
   /**
    * Handle notification tap and navigate to appropriate screen
+   * Now uses shared NotificationNavigation utility
    */
   static handleNotificationNavigation(data: NotificationData) {
-    if (!this.navigationRef) {
-      console.warn('Navigation ref not set, cannot navigate');
-      return;
-    }
-
     try {
-      const { type, itemId, offerId, userId } = data;
+      const { type, itemId, offerId, userId, notificationId } = data;
+      
+      // Extract userId from data field if available (FCM data fields are strings)
+      // The push function already spreads notification.data fields into the FCM payload
+      // So userId, itemId, offerId should be directly available in the data object
+      
+      // Convert FCM data format to Notification format for shared navigation
+      const notification: any = {
+        type,
+        id: notificationId || '',
+        data: {
+          // Extract from top-level data fields (FCM already spreads them)
+          userId: userId || (data as any).userId,
+          itemId: itemId || (data as any).itemId,
+          offerId: offerId || (data as any).offerId,
+          // Include all other fields from data
+          ...Object.fromEntries(
+            Object.entries(data).filter(([key]) => 
+              !['type', 'itemId', 'offerId', 'userId', 'notificationId'].includes(key)
+            )
+          ),
+        },
+      };
 
-      switch (type) {
-        case 'new_offer':
-        case 'offer_decision':
-          // Navigate to Offers screen with appropriate tab
-          this.navigationRef.navigate('Offers', {
-            initialTab: type === 'new_offer' ? 'received' : 'sent',
-          });
-          break;
-
-        case 'new_follower':
-          // Navigate to user profile
-          if (userId) {
-            this.navigationRef.navigate('UserProfile', { userId });
-          } else {
-            // Fallback to notifications screen
-            this.navigationRef.navigate('MainTabs');
-            // Then navigate to Notifications tab (handled by MainTabNavigator)
-          }
-          break;
-
-        case 'swap_confirmed':
-          // Navigate to Offers screen to view completed offer
-          if (offerId) {
-            this.navigationRef.navigate('Offers', {
-              initialTab: 'sent',
-            });
-          } else {
-            this.navigationRef.navigate('Offers');
-          }
-          break;
-
-        case 'followed_user_new_item':
-          // Navigate to item details
-          if (itemId) {
-            this.navigationRef.navigate('ItemDetails', { itemId });
-          } else if (userId) {
-            // Fallback to user profile
-            this.navigationRef.navigate('UserProfile', { userId });
-          } else {
-            // Fallback to explore
-            this.navigationRef.navigate('MainTabs');
-          }
-          break;
-
-        default:
-          // Default: navigate to notifications screen
-          this.navigationRef.navigate('MainTabs');
-          break;
-      }
+      // Use shared navigation utility
+      NotificationNavigation.navigateFromNotification(notification);
     } catch (error) {
       console.error('Error navigating from notification:', error);
-      // Fallback to main screen
-      if (this.navigationRef) {
-        this.navigationRef.navigate('MainTabs');
-      }
+      // Fallback handled by NotificationNavigation
     }
   }
 
@@ -197,6 +166,17 @@ export class PushNotificationService {
 
       if (remoteMessage.data) {
         const data = remoteMessage.data as unknown as NotificationData;
+        // Extract userId from data field if it's a JSON string
+        if (data.data && typeof data.data === 'string') {
+          try {
+            const parsedData = JSON.parse(data.data);
+            data.userId = data.userId || parsedData.userId;
+            data.itemId = data.itemId || parsedData.itemId;
+            data.offerId = data.offerId || parsedData.offerId;
+          } catch (e) {
+            // If parsing fails, data might already be an object
+          }
+        }
         this.handleNotificationNavigation(data);
       }
     });
@@ -254,6 +234,17 @@ export class PushNotificationService {
         setTimeout(() => {
           if (remoteMessage?.data) {
             const data = remoteMessage.data as unknown as NotificationData;
+            // Extract userId from data field if it's a JSON string
+            if (data.data && typeof data.data === 'string') {
+              try {
+                const parsedData = JSON.parse(data.data);
+                data.userId = data.userId || parsedData.userId;
+                data.itemId = data.itemId || parsedData.itemId;
+                data.offerId = data.offerId || parsedData.offerId;
+              } catch (e) {
+                // If parsing fails, data might already be an object
+              }
+            }
             this.handleNotificationNavigation(data);
           }
         }, 1000);

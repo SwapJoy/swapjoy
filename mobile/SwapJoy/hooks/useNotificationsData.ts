@@ -12,6 +12,18 @@ export interface Notification {
   related_item_id?: string;
   related_offer_id?: string;
   related_user_id?: string;
+  data?: {
+    userId?: string;
+    username?: string;
+    firstName?: string;
+    lastName?: string;
+    profileImageUrl?: string;
+    offerId?: string;
+    itemId?: string;
+    itemTitle?: string;
+    decision?: string;
+    [key: string]: any;
+  };
 }
 
 export const useNotificationsData = () => {
@@ -22,22 +34,31 @@ export const useNotificationsData = () => {
   const [unreadCount, setUnreadCount] = useState(0);
 
   const fetchNotifications = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      console.log('[useNotificationsData] No user, skipping fetch');
+      return;
+    }
 
     try {
       setLoading(true);
-      const { data, error } = await ApiService.getNotifications(user.id);
+      console.log('[useNotificationsData] Fetching notifications for user:', user.id);
+      const { data, error } = await ApiService.getNotifications();
 
       if (error) {
-        console.error('Error fetching notifications:', error);
+        console.error('[useNotificationsData] Error fetching notifications:', error);
+        setNotifications([]);
+        setUnreadCount(0);
         return;
       }
 
       const notificationsData = data || [];
+      console.log(`[useNotificationsData] Received ${notificationsData.length} notifications`);
       setNotifications(notificationsData);
       setUnreadCount(notificationsData.filter((n: Notification) => !n.is_read).length);
     } catch (error) {
-      console.error('Error fetching notifications:', error);
+      console.error('[useNotificationsData] Exception fetching notifications:', error);
+      setNotifications([]);
+      setUnreadCount(0);
     } finally {
       setLoading(false);
     }
@@ -50,39 +71,66 @@ export const useNotificationsData = () => {
   }, [fetchNotifications]);
 
   const markAsRead = useCallback(async (notificationId: string) => {
+    // Optimistically update UI first
+    setNotifications(prev => 
+      prev.map(notification => 
+        notification.id === notificationId 
+          ? { ...notification, is_read: true }
+          : notification
+      )
+    );
+    setUnreadCount(prev => Math.max(0, prev - 1));
+    
+    // Then update in background
     try {
-      const { success, error } = await ApiService.markNotificationAsRead(notificationId);
-      if (success) {
+      const { error } = await ApiService.markNotificationAsRead(notificationId);
+      if (error) {
+        console.warn('[useNotificationsData] Error marking notification as read:', error);
+        // Revert optimistic update on error
         setNotifications(prev => 
           prev.map(notification => 
             notification.id === notificationId 
-              ? { ...notification, is_read: true }
+              ? { ...notification, is_read: false }
               : notification
           )
         );
-        setUnreadCount(prev => Math.max(0, prev - 1));
-      } else {
-        console.error('Error marking notification as read:', error);
+        setUnreadCount(prev => prev + 1);
       }
     } catch (error) {
-      console.error('Error marking notification as read:', error);
+      console.warn('[useNotificationsData] Exception marking notification as read:', error);
+      // Revert optimistic update on error
+      setNotifications(prev => 
+        prev.map(notification => 
+          notification.id === notificationId 
+            ? { ...notification, is_read: false }
+            : notification
+        )
+      );
+      setUnreadCount(prev => prev + 1);
     }
   }, []);
 
   const getNotificationIcon = useCallback((type: string) => {
     switch (type) {
+      case 'new_offer':
       case 'offer_received':
         return '🤝';
+      case 'offer_decision':
       case 'offer_accepted':
         return '✅';
       case 'offer_rejected':
         return '❌';
+      case 'new_follower':
+        return '👤';
+      case 'swap_confirmed':
+      case 'swap_completed':
+        return '🎉';
+      case 'followed_user_new_item':
+        return '📦';
       case 'message_received':
         return '💬';
       case 'match_found':
         return '🎯';
-      case 'swap_completed':
-        return '🎉';
       default:
         return '🔔';
     }
@@ -90,18 +138,25 @@ export const useNotificationsData = () => {
 
   const getNotificationColor = useCallback((type: string) => {
     switch (type) {
+      case 'new_offer':
       case 'offer_received':
         return '#007AFF';
+      case 'offer_decision':
       case 'offer_accepted':
         return '#4CAF50';
       case 'offer_rejected':
         return '#F44336';
+      case 'new_follower':
+        return '#9C27B0';
+      case 'swap_confirmed':
+      case 'swap_completed':
+        return '#4CAF50';
+      case 'followed_user_new_item':
+        return '#FF9800';
       case 'message_received':
         return '#FF9800';
       case 'match_found':
         return '#9C27B0';
-      case 'swap_completed':
-        return '#4CAF50';
       default:
         return '#666';
     }

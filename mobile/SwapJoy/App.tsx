@@ -8,6 +8,7 @@ import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import AppNavigator from './navigation/AppNavigator';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { PushNotificationService } from './services/pushNotificationService';
+import { NotificationNavigation } from './utils/notificationNavigation';
 import { RootStackParamList } from './types/navigation';
 
 // Configure Google Sign-In as early as possible to ensure native config is set
@@ -55,6 +56,7 @@ function AppContent() {
   useEffect(() => {
     if (navigationRef.current) {
       PushNotificationService.setNavigationRef(navigationRef.current);
+      NotificationNavigation.setNavigationRef(navigationRef.current);
     }
   }, [isLoading]);
 

@@ -15,6 +15,12 @@ export class ApiService {
   // Ensure only one auth initialization runs at a time across the app
   private static authInitInFlight: Promise<void> | null = null;
   private static isAuthReady: boolean = false;
+  
+  // Reset auth ready state when session changes
+  static resetAuthState() {
+    this.isAuthReady = false;
+    this.authInitInFlight = null;
+  }
   // Get authenticated Supabase client
   private static async getAuthenticatedClient() {
     console.log('[ApiService] getAuthenticatedClient ENTRY');
@@ -28,20 +34,36 @@ export class ApiService {
     }
     // Start a single-flight auth init
     this.authInitInFlight = (async () => {
-      // CRITICAL FIX: Use stored session only - DO NOT call Supabase getSession/setSession
-      // These methods trigger refresh attempts even with autoRefreshToken: false, causing network errors
+      // Get stored session from SecureStore
       let session: any = await AuthService.getCurrentSession();
       
       if (!session?.access_token) {
         console.warn('[ApiService] No stored session found - user needs to sign in');
-        // Don't poll Supabase - it triggers refresh attempts that fail with network errors
         throw new Error('No access token available. Please sign in.');
       }
       
-      // CRITICAL: Don't call setSession() - it triggers refresh attempts
-      // Instead, manually sync to Supabase storage if needed (already done in getCurrentSession)
-        const who = session?.user?.id || 'unknown';
-        console.log('[ApiService] auth ready. user:', who, 'tokenLen:', session.access_token.length);
+      // CRITICAL: Set session on Supabase client so RLS policies work
+      // RLS uses auth.uid() which comes from the Supabase client's session
+      // Without this, auth.uid() returns null and RLS blocks all queries
+      try {
+        const { data: setSessionData, error: setSessionError } = await supabase.auth.setSession({
+          access_token: session.access_token,
+          refresh_token: session.refresh_token,
+        });
+        
+        if (setSessionError) {
+          console.warn('[ApiService] Error setting session on Supabase client:', setSessionError.message);
+          // Continue anyway - the session might still work for RLS
+        } else {
+          console.log('[ApiService] Session set on Supabase client for RLS');
+        }
+      } catch (setSessionErr: any) {
+        console.warn('[ApiService] Exception setting session:', setSessionErr?.message);
+        // Continue anyway
+      }
+      
+      const who = session?.user?.id || 'unknown';
+      console.log('[ApiService] auth ready. user:', who, 'tokenLen:', session.access_token.length);
       
       this.isAuthReady = true;
     })();
@@ -1990,25 +2012,112 @@ export class ApiService {
 
   static async getNotifications() {
     return this.authenticatedCall(async (client) => {
-      return await client
+      // Get current user for logging
+      const currentUser = await AuthService.getCurrentUser();
+      if (!currentUser?.id) {
+        console.warn('[ApiService.getNotifications] No current user found');
+        return { data: null, error: { message: 'Not authenticated' } };
+      }
+
+      // Verify session to check auth.uid()
+      let sessionUserId: string | null = null;
+      try {
+        const session = await client.auth.getSession();
+        sessionUserId = session.data.session?.user?.id || null;
+        console.log(`[ApiService.getNotifications] Session user ID: ${sessionUserId}`);
+        console.log(`[ApiService.getNotifications] Current user ID: ${currentUser.id}`);
+        console.log(`[ApiService.getNotifications] IDs match: ${sessionUserId === currentUser.id}`);
+      } catch (sessionError) {
+        console.warn('[ApiService.getNotifications] Could not get session:', sessionError);
+      }
+      
+      // RLS policy automatically filters by auth.uid() = user_id
+      // So we don't need to explicitly filter - RLS handles it
+      const { data, error } = await client
         .from('notifications')
         .select('*')
         .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('[ApiService.getNotifications] Error:', error);
+        console.error('[ApiService.getNotifications] Error details:', JSON.stringify(error, null, 2));
+        return { data: null, error };
+      }
+
+      console.log(`[ApiService.getNotifications] Found ${data?.length || 0} notifications`);
+      if (data && data.length > 0) {
+        console.log('[ApiService.getNotifications] Notification IDs:', data.map(n => n.id));
+        console.log('[ApiService.getNotifications] Notification user_ids:', data.map(n => n.user_id));
+      } else {
+        console.warn('[ApiService.getNotifications] No notifications returned. This could mean:');
+        console.warn('  1. RLS policy is blocking (auth.uid() != notification.user_id)');
+        console.warn(`  2. Session user ID: ${sessionUserId}`);
+        console.warn(`  3. Expected user ID: ${currentUser.id}`);
+      }
+      
+      return { data, error: null };
     });
   }
 
   static async markNotificationAsRead(notificationId: string) {
-    return this.authenticatedCall(async (client) => {
-      return await client
-        .from('notifications')
-        .update({ 
-          is_read: true,
-          read_at: new Date().toISOString()
-        })
-        .eq('id', notificationId)
-        .select()
-        .single();
+    // Fire and forget - don't wait for response to avoid "already read" errors
+    // This is a background operation that doesn't need to block the UI
+    this.authenticatedCall(async (client) => {
+      try {
+        // Get current user to verify we own this notification
+        const currentUser = await AuthService.getCurrentUser();
+        if (!currentUser?.id) {
+          console.warn('[ApiService.markNotificationAsRead] No current user');
+          return { data: null, error: { message: 'Not authenticated' } };
+        }
+
+        // Update with explicit user_id check (RLS should also enforce this)
+        const updateResult = await client
+          .from('notifications')
+          .update({ is_read: true })
+          .eq('id', notificationId)
+          .eq('user_id', currentUser.id); // Ensure we own this notification
+        
+        // Check if update actually succeeded by checking if any rows were affected
+        // Note: Without .select(), we can't check the data, but we can check for errors
+        if (updateResult.error) {
+          console.error('[ApiService.markNotificationAsRead] Error (background):', updateResult.error);
+          console.error('[ApiService.markNotificationAsRead] Error details:', JSON.stringify(updateResult.error, null, 2));
+          return { data: null, error: updateResult.error };
+        }
+        
+        // Verify update worked by checking if notification exists and is read
+        // We'll do this in a separate query to avoid response reading issues
+        setTimeout(async () => {
+          try {
+            const { data: verify } = await client
+              .from('notifications')
+              .select('id, is_read')
+              .eq('id', notificationId)
+              .single();
+            
+            if (verify?.is_read) {
+              console.log('[ApiService.markNotificationAsRead] Verified: notification marked as read in DB');
+            } else {
+              console.warn('[ApiService.markNotificationAsRead] WARNING: Update appeared successful but is_read is still false');
+            }
+          } catch (verifyErr) {
+            // Ignore verification errors
+          }
+        }, 500);
+        
+        console.log('[ApiService.markNotificationAsRead] Update call completed for:', notificationId);
+        return { data: { id: notificationId, is_read: true }, error: null };
+      } catch (err: any) {
+        console.error('[ApiService.markNotificationAsRead] Exception (background):', err?.message);
+        return { data: null, error: { message: err?.message || 'Update failed' } };
+      }
+    }).catch((err) => {
+      console.error('[ApiService.markNotificationAsRead] Promise rejection:', err);
     });
+    
+    // Return success immediately for UI (optimistic update)
+    return { data: { id: notificationId, is_read: true }, error: null };
   }
 
   static async getFavorites() {
@@ -2784,16 +2893,27 @@ export class ApiService {
           for (const userItem of userItems) {
             if (!userItem.embedding) continue;
 
-            const { data: simResult } = await client.rpc('match_items_cosine', {
-              query_embedding: userItem.embedding,
-              match_threshold: 0.1,
-              match_count: 1,
-              target_item_id: item.id
-            });
+            try {
+              const { data: simResult, error: rpcError } = await client.rpc('match_items_cosine', {
+                query_embedding: userItem.embedding,
+                target_item_id: item.id,
+                match_threshold: 0.1,
+                match_count: 1
+              });
 
-            if (simResult && simResult.length > 0) {
-              totalSimilarity += simResult[0].similarity || 0;
-              count++;
+              if (rpcError) {
+                console.warn('Error calling match_items_cosine:', rpcError);
+                continue;
+              }
+
+              if (simResult && simResult.length > 0 && simResult[0].similarity) {
+                totalSimilarity += simResult[0].similarity;
+                count++;
+              }
+            } catch (error) {
+              console.warn('Exception calling match_items_cosine:', error);
+              // Continue with next user item
+              continue;
             }
           }
 

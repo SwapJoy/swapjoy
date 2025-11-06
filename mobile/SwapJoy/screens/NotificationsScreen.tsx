@@ -8,10 +8,15 @@ import {
   RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { NotificationsScreenProps } from '../types/navigation';
+import { useNavigation } from '@react-navigation/native';
+import { CommonActions } from '@react-navigation/native';
+import { NotificationsScreenProps, RootStackParamList } from '../types/navigation';
 import { useNotificationsData, Notification } from '../hooks/useNotificationsData';
+import CachedImage from '../components/CachedImage';
+import { NotificationNavigation } from '../utils/notificationNavigation';
 
 const NotificationsScreen: React.FC<NotificationsScreenProps> = memo(() => {
+  const navigation = useNavigation();
   const {
     notifications,
     loading,
@@ -24,62 +29,179 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = memo(() => {
     formatTimeAgo,
   } = useNotificationsData();
 
-  const renderNotification = ({ item }: { item: Notification }) => (
-    <TouchableOpacity
-      style={[
-        styles.notificationCard,
-        !item.is_read && styles.unreadNotification
-      ]}
-      onPress={() => markAsRead(item.id)}
-    >
-      <View style={styles.notificationContent}>
-        <View style={styles.notificationHeader}>
-          <Text style={styles.notificationIcon}>
-            {getNotificationIcon(item.type)}
-          </Text>
-          <View style={styles.notificationText}>
-            <Text style={styles.notificationTitle}>{item.title}</Text>
-            <Text style={styles.notificationMessage} numberOfLines={2}>
-              {item.message}
-            </Text>
-          </View>
-          <View style={styles.notificationMeta}>
-            <Text style={styles.notificationTime}>
-              {formatTimeAgo(item.created_at)}
-            </Text>
-            {!item.is_read && (
-              <View style={[styles.unreadDot, { backgroundColor: getNotificationColor(item.type) }]} />
+  const handleNotificationPress = (item: Notification) => {
+    console.log('[NotificationsScreen] Notification pressed:', { 
+      id: item.id, 
+      type: item.type, 
+      data: item.data,
+      is_read: item.is_read,
+      dataType: typeof item.data,
+      dataKeys: item.data ? Object.keys(item.data) : []
+    });
+    
+    // Navigate immediately - don't wait for mark as read
+    // Use CommonActions to navigate to root stack screens from tab navigator
+    try {
+      const { type, data } = item;
+
+      switch (type) {
+        case 'new_follower':
+          // Navigate to user profile in root stack
+          // Try different possible field names for userId
+          const userId = data?.userId || data?.user_id || data?.follower_id || item.related_user_id;
+          if (userId) {
+            console.log('[NotificationsScreen] Navigating to UserProfile for userId:', userId);
+            // Try using CommonActions first (recommended for nested navigators)
+            try {
+              navigation.dispatch(
+                CommonActions.navigate({
+                  name: 'UserProfile',
+                  params: { userId },
+                })
+              );
+              console.log('[NotificationsScreen] Navigation via CommonActions completed');
+            } catch (commonErr) {
+              console.warn('[NotificationsScreen] CommonActions failed, trying getParent:', commonErr);
+              // Fallback: try getParent approach
+              try {
+                const rootNavigation = navigation.getParent();
+                if (rootNavigation) {
+                  (rootNavigation as any).navigate('UserProfile', { userId });
+                  console.log('[NotificationsScreen] Navigation via getParent completed');
+                } else {
+                  throw new Error('No parent navigator found');
+                }
+              } catch (parentErr) {
+                console.error('[NotificationsScreen] getParent failed, using static ref:', parentErr);
+                // Final fallback: use static navigation ref
+                NotificationNavigation.navigateFromNotification(item);
+              }
+            }
+          } else {
+            console.warn('[NotificationsScreen] No userId found in data for new_follower');
+            console.warn('[NotificationsScreen] Data object:', JSON.stringify(data, null, 2));
+            console.warn('[NotificationsScreen] Item.related_user_id:', item.related_user_id);
+            // Try static navigation as fallback
+            NotificationNavigation.navigateFromNotification(item);
+          }
+          break;
+
+        case 'new_offer':
+          {
+            const rootNavigation = navigation.getParent() || navigation;
+            (rootNavigation as any).navigate('Offers', { initialTab: 'received' });
+          }
+          break;
+
+        case 'offer_decision':
+          {
+            const rootNavigation = navigation.getParent() || navigation;
+            (rootNavigation as any).navigate('Offers', { initialTab: 'sent' });
+          }
+          break;
+
+        case 'swap_confirmed':
+          {
+            const rootNavigation = navigation.getParent() || navigation;
+            (rootNavigation as any).navigate('Offers', { initialTab: 'sent' });
+          }
+          break;
+
+        case 'followed_user_new_item':
+          {
+            const rootNavigation = navigation.getParent() || navigation;
+            if (data?.itemId) {
+              (rootNavigation as any).navigate('ItemDetails', { itemId: data.itemId });
+            } else if (data?.userId) {
+              (rootNavigation as any).navigate('UserProfile', { userId: data.userId });
+            }
+          }
+          break;
+
+        default:
+          // Use static navigation as fallback
+          NotificationNavigation.navigateFromNotification(item);
+          break;
+      }
+    } catch (navError) {
+      console.error('[NotificationsScreen] Navigation error:', navError);
+      // Fallback to static navigation
+      NotificationNavigation.navigateFromNotification(item);
+    }
+    
+    // Mark as read in background (fire and forget)
+    if (!item.is_read) {
+      markAsRead(item.id).catch(error => {
+        console.warn('[NotificationsScreen] Failed to mark notification as read:', error);
+        // Don't show error to user - this is background operation
+      });
+    }
+  };
+
+  const renderNotification = ({ item }: { item: Notification }) => {
+    // Get user data for new_follower notifications
+    const userData = item.type === 'new_follower' && item.data ? {
+      username: item.data.username || item.data.firstName || 'User',
+      profileImageUrl: item.data.profileImageUrl,
+    } : null;
+
+    return (
+      <TouchableOpacity
+        style={[
+          styles.notificationCard,
+          !item.is_read && styles.unreadNotification
+        ]}
+        onPress={() => handleNotificationPress(item)}
+      >
+        <View style={styles.notificationContent}>
+          <View style={styles.notificationHeader}>
+            {/* Show profile image for new_follower if available, otherwise show icon */}
+            {item.type === 'new_follower' && userData && userData.profileImageUrl ? (
+              <CachedImage
+                uri={userData.profileImageUrl}
+                style={styles.profileImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={styles.iconContainer}>
+                <Text style={styles.notificationIcon}>
+                  {getNotificationIcon(item.type)}
+                </Text>
+              </View>
             )}
+            <View style={styles.notificationText}>
+              <Text style={styles.notificationTitle}>{item.title}</Text>
+              <Text style={styles.notificationMessage} numberOfLines={2}>
+                {item.message}
+              </Text>
+            </View>
+            <View style={styles.notificationMeta}>
+              <Text style={styles.notificationTime}>
+                {formatTimeAgo(item.created_at)}
+              </Text>
+              {!item.is_read && (
+                <View style={[styles.unreadDot, { backgroundColor: getNotificationColor(item.type) }]} />
+              )}
+            </View>
           </View>
         </View>
-      </View>
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Notifications</Text>
-        </View>
+      <View style={styles.container}>
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>Loading notifications...</Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Notifications</Text>
-        {unreadCount > 0 && (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{unreadCount}</Text>
-          </View>
-        )}
-      </View>
-
+    <View style={styles.container}>
+     
       <FlatList
         data={notifications}
         renderItem={renderNotification}
@@ -102,7 +224,7 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = memo(() => {
           </View>
         }
       />
-    </SafeAreaView>
+    </View>
   );
 });
 
@@ -178,10 +300,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
   },
+  iconContainer: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
   notificationIcon: {
     fontSize: 24,
+  },
+  profileImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     marginRight: 12,
-    marginTop: 2,
+    backgroundColor: '#e0e0e0',
   },
   notificationText: {
     flex: 1,
@@ -215,7 +349,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 60,
+    paddingVertical: 30,
   },
   emptyTitle: {
     fontSize: 18,
