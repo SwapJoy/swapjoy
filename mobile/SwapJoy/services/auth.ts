@@ -327,11 +327,22 @@ export class AuthService {
   // Sign out
   static async signOut(): Promise<{ error: string | null }> {
     try {
-      const { error } = await supabase.auth.signOut();
+      // Clear Supabase client session first
+      await supabase.auth.signOut();
+      
+      // Reset ApiService auth state (important for new login)
+      const { ApiService } = await import('./api');
+      ApiService.resetAuthState();
+      
+      // Clear stored session
       await this.clearStoredSession();
-      return { error: error ? error.message : null };
+      
+      return { error: null };
     } catch (error: any) {
+      // Even if signOut fails, clear everything
       await this.clearStoredSession();
+      const { ApiService } = await import('./api');
+      ApiService.resetAuthState();
       return { error: error.message || 'Failed to sign out' };
     }
   }

@@ -2,6 +2,7 @@ import { supabase } from '../lib/supabase';
 import * as FileSystem from 'expo-file-system/legacy';
 import { decode } from 'base64-arraybuffer';
 import { AuthService } from './auth';
+import { ApiService } from './api';
 
 export interface UploadProgress {
   imageId: string;
@@ -51,8 +52,12 @@ export class ImageUploadService {
 
       onProgress?.(50);
 
+      // Get authenticated Supabase client to ensure session is set
+      // This is critical after logout/login to ensure fresh session
+      const client = await ApiService.getAuthenticatedClient();
+
       // Upload to Supabase Storage
-      const { data, error } = await supabase.storage
+      const { data, error } = await client.storage
         .from(this.BUCKET_NAME)
         .upload(filePath, arrayBuffer, {
           contentType: this.getMimeType(extension),
@@ -61,13 +66,14 @@ export class ImageUploadService {
         });
 
       if (error) {
+        console.error('[ImageUploadService] Upload error:', error);
         throw error;
       }
 
       onProgress?.(80);
 
       // Get public URL
-      const { data: urlData } = supabase.storage
+      const { data: urlData } = client.storage
         .from(this.BUCKET_NAME)
         .getPublicUrl(filePath);
 
@@ -147,7 +153,10 @@ export class ImageUploadService {
         throw new Error('Invalid image URL');
       }
 
-      const { error } = await supabase.storage
+      // Get authenticated client to ensure session is set
+      const client = await ApiService.getAuthenticatedClient();
+
+      const { error } = await client.storage
         .from(this.BUCKET_NAME)
         .remove([filePath]);
 
@@ -175,7 +184,10 @@ export class ImageUploadService {
         return true;
       }
 
-      const { error } = await supabase.storage
+      // Get authenticated client to ensure session is set
+      const client = await ApiService.getAuthenticatedClient();
+
+      const { error } = await client.storage
         .from(this.BUCKET_NAME)
         .remove(filePaths);
 
@@ -195,7 +207,9 @@ export class ImageUploadService {
    */
   static async checkStorageAccess(): Promise<boolean> {
     try {
-      const { data, error } = await supabase.storage.getBucket(this.BUCKET_NAME);
+      // Get authenticated client to ensure session is set
+      const client = await ApiService.getAuthenticatedClient();
+      const { data, error } = await client.storage.getBucket(this.BUCKET_NAME);
       return !error && data !== null;
     } catch (error) {
       console.error('Storage access check failed:', error);

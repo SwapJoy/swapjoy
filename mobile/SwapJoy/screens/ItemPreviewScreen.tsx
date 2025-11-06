@@ -141,13 +141,17 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
       console.log('Item created - embedding will be generated automatically by trigger');
 
       // Invalidate recently listed cache so new item appears immediately
-      try {
-        const { RedisCache } = await import('../services/redisCache');
-        await RedisCache.invalidatePattern('recently-listed*');
-        console.log('Cache invalidated for recently-listed items');
-      } catch (error) {
-        console.warn('Failed to invalidate cache:', error);
-      }
+      // Fire and forget - don't wait for it to complete
+      (async () => {
+        try {
+          const { RedisCache } = await import('../services/redisCache');
+          await RedisCache.invalidatePattern('recently-listed*');
+          console.log('Cache invalidated for recently-listed items');
+        } catch (error) {
+          // Silently fail - cache invalidation is not critical
+          console.warn('Failed to invalidate cache (non-critical):', error);
+        }
+      })();
 
       // Show success and navigate
       Alert.alert(

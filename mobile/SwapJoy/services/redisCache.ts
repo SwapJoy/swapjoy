@@ -4,6 +4,7 @@ export class RedisCache {
   private static readonly CACHE_PREFIX = 'swapjoy:';
   private static readonly DEFAULT_TTL = 300; // 5 minutes in seconds
   private static readonly INVOKE_TIMEOUT_MS = 1500;
+  private static readonly PATTERN_INVALIDATE_TIMEOUT_MS = 5000; // 5 seconds for pattern invalidation (can take longer)
 
   private static async invokeWithTimeout<T>(fn: () => Promise<T>, timeoutMs: number): Promise<{ timedOut: boolean; result?: T }> {
     let timedOut = false;
@@ -130,23 +131,37 @@ export class RedisCache {
   }
 
   // Invalidate cache patterns
+  // Note: This can take longer than other operations, so we use a longer timeout
   static async invalidatePattern(pattern: string): Promise<boolean> {
     try {
-      const res = await this.invokeWithTimeout(() => supabase.functions.invoke('redis-invalidate-pattern', { body: { pattern: `${this.CACHE_PREFIX}${pattern}` } }), this.INVOKE_TIMEOUT_MS);
+      // Use longer timeout for pattern invalidation since it may need to scan many keys
+      const res = await this.invokeWithTimeout(
+        () => supabase.functions.invoke('redis-invalidate-pattern', { 
+          body: { pattern: `${this.CACHE_PREFIX}${pattern}` } 
+        }), 
+        this.PATTERN_INVALIDATE_TIMEOUT_MS
+      );
+      
       if (res.timedOut) {
-        console.warn('Redis invalidate pattern timed out for pattern:', pattern);
+        // Timeout is expected for pattern invalidation - it's non-critical
+        console.warn('[RedisCache] Pattern invalidation timed out (non-critical) for pattern:', pattern);
         return false;
       }
+      
       const { error } = (res.result as any) || {};
-
       if (error) {
-        console.warn('Redis invalidate pattern error:', error);
+        console.warn('[RedisCache] Pattern invalidation error (non-critical):', error);
         return false;
       }
 
       return true;
-    } catch (error) {
-      console.warn('Redis invalidate pattern failed:', error);
+    } catch (error: any) {
+      // Silently handle errors - pattern invalidation is non-critical
+      // Don't log full error to avoid cluttering console
+      const errorMsg = error?.message || String(error);
+      if (!errorMsg.includes('timeout')) {
+        console.warn('[RedisCache] Pattern invalidation failed (non-critical):', errorMsg.substring(0, 100));
+      }
       return false;
     }
   }
