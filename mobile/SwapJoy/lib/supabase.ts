@@ -46,10 +46,23 @@ const customFetch = async (url: RequestInfo | URL, options?: RequestInit) => {
     headers.set('apikey', supabaseAnonKey);
   }
   
+  // Check if this is a redis-invalidate-pattern request (non-critical, can timeout)
+  const isRedisInvalidatePattern = urlString.includes('redis-invalidate-pattern');
+  
   // Add timeout to prevent hanging requests (using Promise.race instead of AbortController for React Native compatibility)
-  const timeout = 30000; // 30 seconds
+  // Use longer timeout for cache invalidation since it can take time
+  const timeout = isRedisInvalidatePattern ? 60000 : 30000; // 60 seconds for cache invalidation, 30 for others
   const timeoutPromise = new Promise<never>((_, reject) => {
-    setTimeout(() => reject(new Error('Request timeout after 30 seconds')), timeout);
+    setTimeout(() => {
+      // For redis-invalidate-pattern, return a timeout response instead of throwing
+      if (isRedisInvalidatePattern) {
+        // Return a response that indicates timeout but don't throw
+        // This will be handled gracefully by the caller
+        reject(new Error('Request timeout (cache invalidation - non-critical)'));
+      } else {
+        reject(new Error('Request timeout after ' + (timeout / 1000) + ' seconds'));
+      }
+    }, timeout);
   });
   
   try {
@@ -63,9 +76,16 @@ const customFetch = async (url: RequestInfo | URL, options?: RequestInit) => {
     
     if (!response.ok) {
       const errorText = await response.text().catch(() => '');
-      console.error('[Supabase] Fetch error:', response.status, response.statusText, urlString.substring(0, 100));
-      if (response.status === 401) {
-        console.error('[Supabase] 401 Unauthorized - apikey header present:', headers.has('apikey'));
+      // Suppress timeout errors for redis-invalidate-pattern (non-critical operation)
+      const isRedisInvalidatePattern = urlString.includes('redis-invalidate-pattern');
+      const isTimeoutError = response.status === 408 || response.status === 504 || 
+                            (response.status >= 500 && errorText.includes('timeout'));
+      
+      if (!isRedisInvalidatePattern || !isTimeoutError) {
+        console.error('[Supabase] Fetch error:', response.status, response.statusText, urlString.substring(0, 100));
+        if (response.status === 401) {
+          console.error('[Supabase] 401 Unauthorized - apikey header present:', headers.has('apikey'));
+        }
       }
     }
     return response;
@@ -78,6 +98,21 @@ const customFetch = async (url: RequestInfo | URL, options?: RequestInit) => {
                           errorMsg.includes('aborted') ||
                           error?.name === 'AbortError';
     const urlString = typeof url === 'string' ? url : url.toString();
+    const isTimeoutError = errorMsg.includes('timeout') || errorMsg.includes('Request timeout') || error?.name === 'AbortError';
+    const isRedisInvalidatePattern = urlString.includes('redis-invalidate-pattern');
+    
+    // Suppress timeout errors for redis-invalidate-pattern (non-critical, fire-and-forget operation)
+    if (isRedisInvalidatePattern && isTimeoutError) {
+      // Silently handle - this is expected and non-critical
+      // Don't log or re-throw - just return a minimal response that indicates timeout
+      // This prevents error logs for a non-critical operation
+      // The caller (RedisCache.invalidatePattern) will handle this gracefully
+      return new Response('', { 
+        status: 408, 
+        statusText: 'Request Timeout (suppressed for cache invalidation)',
+        headers: { 'Content-Type': 'text/plain' }
+      });
+    }
     
     console.error('[Supabase] Fetch exception:', {
       message: errorMsg,

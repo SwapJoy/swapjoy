@@ -8,15 +8,31 @@ export class RedisCache {
 
   private static async invokeWithTimeout<T>(fn: () => Promise<T>, timeoutMs: number): Promise<{ timedOut: boolean; result?: T }> {
     let timedOut = false;
-    const timeout = new Promise<undefined>((resolve) => setTimeout(() => {
-      timedOut = true;
-      resolve(undefined);
-    }, timeoutMs));
-    const result = await Promise.race([fn(), timeout]);
-    if (timedOut) {
-      return { timedOut: true };
+    let requestAborted = false;
+    
+    // Create an AbortController to actually cancel the request if possible
+    const timeout = new Promise<undefined>((resolve) => {
+      setTimeout(() => {
+        timedOut = true;
+        requestAborted = true;
+        resolve(undefined);
+      }, timeoutMs);
+    });
+    
+    try {
+      const result = await Promise.race([fn(), timeout]);
+      if (timedOut) {
+        return { timedOut: true };
+      }
+      return { timedOut: false, result: result as T };
+    } catch (error: any) {
+      // If we timed out, suppress the error - it's expected
+      if (timedOut || requestAborted) {
+        return { timedOut: true };
+      }
+      // Re-throw unexpected errors
+      throw error;
     }
-    return { timedOut: false, result: result as T };
   }
 
   // Generate cache key
@@ -131,38 +147,42 @@ export class RedisCache {
   }
 
   // Invalidate cache patterns
-  // Note: This can take longer than other operations, so we use a longer timeout
+  // Note: This is fire-and-forget and non-critical - failures are silently handled
+  // Timeouts are expected and should not be logged as errors
   static async invalidatePattern(pattern: string): Promise<boolean> {
-    try {
-      // Use longer timeout for pattern invalidation since it may need to scan many keys
-      const res = await this.invokeWithTimeout(
-        () => supabase.functions.invoke('redis-invalidate-pattern', { 
-          body: { pattern: `${this.CACHE_PREFIX}${pattern}` } 
-        }), 
-        this.PATTERN_INVALIDATE_TIMEOUT_MS
-      );
-      
-      if (res.timedOut) {
-        // Timeout is expected for pattern invalidation - it's non-critical
-        console.warn('[RedisCache] Pattern invalidation timed out (non-critical) for pattern:', pattern);
-        return false;
-      }
-      
-      const { error } = (res.result as any) || {};
-      if (error) {
-        console.warn('[RedisCache] Pattern invalidation error (non-critical):', error);
-        return false;
-      }
+    // Wrap in a promise that catches and suppresses all errors
+    return new Promise((resolve) => {
+      // Start the invalidation in background
+      (async () => {
+        try {
+          // Use shorter timeout - we don't want to wait long for cache invalidation
+          const res = await this.invokeWithTimeout(
+            () => supabase.functions.invoke('redis-invalidate-pattern', { 
+              body: { pattern: `${this.CACHE_PREFIX}${pattern}` } 
+            }), 
+            this.PATTERN_INVALIDATE_TIMEOUT_MS
+          );
+          
+          if (res.timedOut) {
+            // Timeout is expected - cache invalidation continues in background
+            resolve(false);
+            return;
+          }
+          
+          const { error } = (res.result as any) || {};
+          if (error) {
+            // Non-critical error - silently fail
+            resolve(false);
+            return;
+          }
 
-      return true;
-    } catch (error: any) {
-      // Silently handle errors - pattern invalidation is non-critical
-      // Don't log full error to avoid cluttering console
-      const errorMsg = error?.message || String(error);
-      if (!errorMsg.includes('timeout')) {
-        console.warn('[RedisCache] Pattern invalidation failed (non-critical):', errorMsg.substring(0, 100));
-      }
-      return false;
-    }
+          resolve(true);
+        } catch (error: any) {
+          // Suppress ALL errors - cache invalidation failures are acceptable
+          // The error may have been logged by Supabase client, but we don't propagate it
+          resolve(false);
+        }
+      })();
+    });
   }
 }

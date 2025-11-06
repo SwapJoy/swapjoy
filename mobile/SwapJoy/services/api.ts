@@ -385,15 +385,21 @@ export class ApiService {
         .single();
       
       // Invalidate personalization caches when profile changes
+      // Fire and forget - don't wait for cache invalidation to complete
       if (result?.data) {
         const userId = currentUser.id;
-        try {
-          await RedisCache.invalidatePattern(`top-picks:${userId}:*`);
-          await RedisCache.invalidatePattern(`similar-categories:${userId}:*`);
-          await RedisCache.invalidatePattern(`recently-added:${userId}:*`);
-        } catch (error) {
-          console.warn('Failed to invalidate caches after profile update:', error);
-        }
+        // Run cache invalidation in background without blocking
+        (async () => {
+          try {
+            await RedisCache.invalidatePattern(`top-picks:${userId}:*`);
+            await RedisCache.invalidatePattern(`similar-categories:${userId}:*`);
+            await RedisCache.invalidatePattern(`recently-added:${userId}:*`);
+            console.log('[ApiService.updateProfile] Cache invalidated for user:', userId);
+          } catch (error) {
+            // Silently fail - cache invalidation is non-critical
+            console.warn('[ApiService.updateProfile] Failed to invalidate caches (non-critical):', error);
+          }
+        })();
       }
       
       return result as any;
@@ -2216,20 +2222,25 @@ export class ApiService {
 
 
   // Cache invalidation methods
+  // Note: This is fire-and-forget - doesn't block the caller
   static async invalidateUserCache(userId: string) {
-    try {
-      await Promise.all([
-        RedisCache.delete('user-stats', userId),
-        RedisCache.delete('user-ratings', userId),
-        RedisCache.invalidatePattern(`top-picks:${userId}:*`),
-        RedisCache.invalidatePattern(`similar-cost:${userId}:*`),
-        RedisCache.invalidatePattern(`similar-categories:${userId}:*`),
-        RedisCache.invalidatePattern(`recently-added:${userId}:*`),
-      ]);
-      console.log('Cache invalidated for user:', userId);
-    } catch (error) {
-      console.error('Error invalidating cache:', error);
-    }
+    // Fire and forget - don't block on cache invalidation
+    (async () => {
+      try {
+        await Promise.all([
+          RedisCache.delete('user-stats', userId),
+          RedisCache.delete('user-ratings', userId),
+          RedisCache.invalidatePattern(`top-picks:${userId}:*`),
+          RedisCache.invalidatePattern(`similar-cost:${userId}:*`),
+          RedisCache.invalidatePattern(`similar-categories:${userId}:*`),
+          RedisCache.invalidatePattern(`recently-added:${userId}:*`),
+        ]);
+        console.log('[ApiService.invalidateUserCache] Cache invalidated for user:', userId);
+      } catch (error) {
+        // Silently fail - cache invalidation is non-critical
+        console.warn('[ApiService.invalidateUserCache] Failed to invalidate cache (non-critical):', error);
+      }
+    })();
   }
 
   // Create sample items for specific user
