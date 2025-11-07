@@ -1,6 +1,4 @@
 import { ApiService } from './api';
-import { supabase } from '../lib/supabase';
-import { PushNotificationService } from './pushNotificationService';
 
 /**
  * Notification type enum values
@@ -41,35 +39,22 @@ export class NotificationService {
     message: string;
     data?: Record<string, any>;
   }) {
-    try {
-      const { userId, type, title, message, data } = params;
+    const { userId, type } = params;
 
-      // Generate default title if not provided
-      const notificationTitle =
-        title || PushNotificationService.getNotificationTitle(type);
+    console.warn(
+      '[NotificationService] Client-side notification creation is disabled. Id:',
+      userId,
+      'type:',
+      type
+    );
 
-      const { data: notification, error } = await supabase
-        .from('notifications')
-        .insert({
-          user_id: userId,
-          type,
-          title: notificationTitle,
-          message,
-          data: data || {},
-        })
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Error creating notification:', error);
-        return { data: null, error };
-      }
-
-      return { data: notification, error: null };
-    } catch (error: any) {
-      console.error('Error in createNotification:', error);
-      return { data: null, error: { message: error.message } };
-    }
+    return {
+      data: null,
+      error: {
+        message:
+          'Notification creation is handled by backend triggers. Client-side creation is disabled.',
+      },
+    };
   }
 
   /**
