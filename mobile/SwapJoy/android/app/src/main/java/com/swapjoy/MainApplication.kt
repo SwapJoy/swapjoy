@@ -1,4 +1,4 @@
-package com.leongoldfeld.SwapJoy
+package com.swapjoy
 
 import android.app.Application
 import android.app.NotificationChannel
@@ -71,3 +71,5 @@ class MainApplication : Application(), ReactApplication {
     ApplicationLifecycleDispatcher.onConfigurationChanged(this, newConfig)
   }
 }
+
+

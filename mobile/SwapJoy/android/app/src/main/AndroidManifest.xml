@@ -19,7 +19,7 @@
     <meta-data android:name="expo.modules.updates.EXPO_UPDATES_CHECK_ON_LAUNCH" android:value="ALWAYS"/>
     <meta-data android:name="expo.modules.updates.EXPO_UPDATES_LAUNCH_WAIT_MS" android:value="0"/>
     <!-- Firebase Cloud Messaging -->
-    <meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" android:value="swapjoy_default_channel"/>
+    <meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" android:value="swapjoy_default_channel" tools:replace="android:value"/>
     <activity android:name=".MainActivity" android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|uiMode" android:launchMode="singleTask" android:windowSoftInputMode="adjustResize" android:theme="@style/Theme.App.SplashScreen" android:exported="true" android:screenOrientation="portrait">
       <intent-filter>
         <action android:name="android.intent.action.MAIN"/>
@@ -35,7 +35,8 @@
       </intent-filter>
     </activity>
     <!-- Google Sign-In configuration -->
-    <!-- Replace with your Google Client ID from Google Cloud Console -->
-    <meta-data android:name="com.google.android.gms.auth.api.signin.client_id" android:value="YOUR_GOOGLE_CLIENT_ID"/>
+    <meta-data
+      android:name="com.google.android.gms.auth.api.signin.client_id"
+      android:value="96140617553-tjhtkj338gr1oql41at8t3hpnncr5tug.apps.googleusercontent.com"/>
   </application>
 </manifest>

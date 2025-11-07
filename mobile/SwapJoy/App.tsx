@@ -13,11 +13,11 @@ import { RootStackParamList } from './types/navigation';
 
 // Configure Google Sign-In as early as possible to ensure native config is set
 const WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID
-  || '1084218893699-7tc9acoor67a35jcsmlg4o8rq89vkl90.apps.googleusercontent.com';
+  || '96140617553-tjhtkj338gr1oql41at8t3hpnncr5tug.apps.googleusercontent.com';
 // Fallback to Info.plist value if env not set
 const IOS_CLIENT_ID = Platform.OS === 'ios'
   ? (process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID
-      || '1084218893699-b0lhlgtlr4fjhdbt9qrs3gkldppco342.apps.googleusercontent.com')
+      || '96140617553-lcohn29aagtb7ed3h8898lh0vivtuns6.apps.googleusercontent.com')
   : undefined;
 console.log('[Google] Using WEB_CLIENT_ID from env or fallback:', !!process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID);
 console.log('[Google] Using IOS_CLIENT_ID from env or fallback:', !!process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID);

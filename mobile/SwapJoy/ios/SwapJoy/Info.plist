@@ -27,7 +27,7 @@
 		<dict>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.googleusercontent.apps.1084218893699-b0lhlgtlr4fjhdbt9qrs3gkldppco342</string>
+				<string>com.googleusercontent.apps.96140617553-lcohn29aagtb7ed3h8898lh0vivtuns6</string>
 			</array>
 		</dict>
 		<dict>
@@ -38,7 +38,7 @@
 		</dict>
 	</array>
 	<key>GIDClientID</key>
-	<string>1084218893699-b0lhlgtlr4fjhdbt9qrs3gkldppco342.apps.googleusercontent.com</string>
+	<string>96140617553-lcohn29aagtb7ed3h8898lh0vivtuns6.apps.googleusercontent.com</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
 	<key>LSMinimumSystemVersion</key>
@@ -48,7 +48,7 @@
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
 		<string>google</string>
-		<string>com.googleusercontent.apps.1084218893699-b0lhlgtlr4fjhdbt9qrs3gkldppco342</string>
+		<string>com.googleusercontent.apps.96140617553-lcohn29aagtb7ed3h8898lh0vivtuns6</string>
 	</array>
   <key>NSAppTransportSecurity</key>
   <dict>

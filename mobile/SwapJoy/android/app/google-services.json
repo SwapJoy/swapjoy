@@ -7,12 +7,25 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:96140617553:android:3c8f1c92259e18d2af1570",
+        "mobilesdk_app_id": "1:96140617553:android:489ad5bd3a64af15af1570",
         "android_client_info": {
           "package_name": "com.swapjoy"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "96140617553-3cqc4k1v0jnlsol8cf7g9flq5ko7ujrf.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.swapjoy",
+            "certificate_hash": "22632c581fe0151c1235ea385505ba74296f1daf"
+          }
+        },
+        {
+          "client_id": "96140617553-tjhtkj338gr1oql41at8t3hpnncr5tug.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyDDUu6WT7ncchO4kyW6ILzHWF5WdiCoQiY"
@@ -20,7 +33,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "96140617553-tjhtkj338gr1oql41at8t3hpnncr5tug.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "96140617553-lcohn29aagtb7ed3h8898lh0vivtuns6.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.swapjoy"
+              }
+            }
+          ]
         }
       }
     }
