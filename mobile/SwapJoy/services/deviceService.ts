@@ -145,7 +145,14 @@ export class DeviceService {
 
       // Get FCM token from native Firebase
       const token = await messaging().getToken();
-      return token || null;
+
+      if (token) {
+        console.log('✅ DeviceService: Retrieved FCM token:', token);
+        return token;
+      }
+
+      console.warn('⚠️ DeviceService: messaging().getToken() returned an empty token');
+      return null;
     } catch (error: any) {
       console.error('Error getting FCM token:', error);
       // If error is about Firebase not initialized, log it but don't crash

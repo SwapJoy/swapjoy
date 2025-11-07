@@ -57,12 +57,19 @@ async function getFCMAccessToken(serviceAccount: any): Promise<string> {
     scopes: ['https://www.googleapis.com/auth/firebase.messaging'],
   })
 
-  const tokens = await jwtClient.getAccessToken()
-  if (!tokens || !tokens.access_token) {
-    throw new Error('Failed to get FCM access token')
-  }
+  try {
+    const tokens = await jwtClient.authorize()
 
-  return tokens.access_token
+    if (!tokens || !tokens.access_token) {
+      console.error('FCM access token response missing access_token:', tokens)
+      throw new Error('Failed to get FCM access token')
+    }
+
+    return tokens.access_token
+  } catch (error) {
+    console.error('Error fetching FCM access token:', error)
+    throw error
+  }
 }
 
 // Send FCM notification to a single device
@@ -308,10 +315,22 @@ Deno.serve(async (req) => {
     )
   } catch (error) {
     console.error('Error in push function:', error)
+    const errorDetails = (() => {
+      try {
+        if (error && typeof error === 'object') {
+          return JSON.stringify(error)
+        }
+        return String(error)
+      } catch (_) {
+        return 'Unable to stringify error'
+      }
+    })()
+
     return new Response(
       JSON.stringify({
         success: false,
         error: error.message || 'Unknown error',
+        details: errorDetails,
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
