@@ -75,14 +75,24 @@ const customFetch = async (url: RequestInfo | URL, options?: RequestInit) => {
     const response = await Promise.race([fetchPromise, timeoutPromise]);
     
     if (!response.ok) {
-      const errorText = await response.text().catch(() => '');
+      let errorText = '';
+      try {
+        errorText = await response.clone().text();
+      } catch (cloneErr) {
+        console.warn('[Supabase] Failed to read error response text:', cloneErr);
+      }
       // Suppress timeout errors for redis-invalidate-pattern (non-critical operation)
       const isRedisInvalidatePattern = urlString.includes('redis-invalidate-pattern');
       const isTimeoutError = response.status === 408 || response.status === 504 || 
                             (response.status >= 500 && errorText.includes('timeout'));
       
       if (!isRedisInvalidatePattern || !isTimeoutError) {
-        console.error('[Supabase] Fetch error:', response.status, response.statusText, urlString.substring(0, 100));
+        console.error('[Supabase] Fetch error:', {
+          status: response.status,
+          statusText: response.statusText,
+          url: urlString.substring(0, 100),
+          body: errorText?.slice(0, 500) || ''
+        });
         if (response.status === 401) {
           console.error('[Supabase] 401 Unauthorized - apikey header present:', headers.has('apikey'));
         }

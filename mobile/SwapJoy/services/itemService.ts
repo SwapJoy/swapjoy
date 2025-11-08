@@ -1,4 +1,5 @@
 import { ApiService } from './api';
+import { AppLanguage } from '../types/language';
 
 /**
  * Service for item-related operations
@@ -36,8 +37,8 @@ export class ItemService {
   /**
    * Get item by ID
    */
-  static async getItemById(itemId: string) {
-    return ApiService.getItemById(itemId);
+  static async getItemById(itemId: string, lang?: AppLanguage) {
+    return ApiService.getItemById(itemId, lang);
   }
 
   /**

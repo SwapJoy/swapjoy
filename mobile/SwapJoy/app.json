@@ -46,7 +46,8 @@
         {
           "cameraPermission": "Allow SwapJoy to access your camera to take photos for your item listings."
         }
-      ]
+      ],
+      "expo-localization"
     ]
   }
 }

@@ -5,15 +5,40 @@ import { OfferPreviewScreenProps } from '../types/navigation';
 import CachedImage from '../components/CachedImage';
 import { ApiService } from '../services/api';
 import { formatCurrency } from '../utils';
+import { useLocalization } from '../localization';
 
 const OfferPreviewScreen: React.FC<OfferPreviewScreenProps> = ({ navigation, route }) => {
   const { receiverId, offeredItemIds, requestedItemIds, topUpAmount, message, summary } = route.params;
+  const { t } = useLocalization();
+  const strings = useMemo(
+    () => ({
+      youOffer: t('offers.preview.youOffer'),
+      youWant: t('offers.preview.youWant'),
+      moneyLabel: t('offers.preview.moneyLabel'),
+      messageLabel: t('offers.preview.messageLabel'),
+      evenSwap: t('offers.preview.evenSwap'),
+      youAdd: t('offers.preview.youAdd'),
+      theyAdd: t('offers.preview.theyAdd'),
+      submitButton: t('offers.preview.submitButton'),
+      submittingButton: t('offers.preview.submittingButton'),
+      alerts: {
+        failedTitle: t('offers.preview.alerts.failedTitle'),
+        failedMessage: t('offers.preview.alerts.failedMessage'),
+        successTitle: t('offers.preview.alerts.successTitle'),
+        successMessage: t('offers.preview.alerts.successMessage'),
+      },
+    }),
+    [t]
+  );
   const [submitting, setSubmitting] = useState(false);
 
   const moneyDescriptor = useMemo(() => {
-    if (!topUpAmount) return 'Even swap';
-    return topUpAmount > 0 ? `You add $${topUpAmount.toFixed(2)}` : `They add $${Math.abs(topUpAmount).toFixed(2)}`;
-  }, [topUpAmount]);
+    if (!topUpAmount) return strings.evenSwap;
+    const amount = `$${Math.abs(topUpAmount).toFixed(2)}`;
+    return topUpAmount > 0
+      ? strings.youAdd.replace('{amount}', amount)
+      : strings.theyAdd.replace('{amount}', amount);
+  }, [strings.evenSwap, strings.theyAdd, strings.youAdd, topUpAmount]);
 
   const onSubmit = useCallback(async () => {
     try {
@@ -29,18 +54,18 @@ const OfferPreviewScreen: React.FC<OfferPreviewScreenProps> = ({ navigation, rou
         offer_items,
       });
       if (error) {
-        Alert.alert('Offer failed', error.message || 'Please try again later.');
+        Alert.alert(strings.alerts.failedTitle, error.message || strings.alerts.failedMessage);
         return;
       }
-      Alert.alert('Offer sent', 'Your offer has been submitted.');
+      Alert.alert(strings.alerts.successTitle, strings.alerts.successMessage);
       navigation.popToTop();
       (navigation as any).navigate('MainTabs');
     } catch (e: any) {
-      Alert.alert('Offer failed', e?.message || 'Please try again later.');
+      Alert.alert(strings.alerts.failedTitle, e?.message || strings.alerts.failedMessage);
     } finally {
       setSubmitting(false);
     }
-  }, [receiverId, offeredItemIds, requestedItemIds, topUpAmount, message, navigation]);
+  }, [receiverId, offeredItemIds, requestedItemIds, topUpAmount, message, navigation, strings.alerts.failedMessage, strings.alerts.failedTitle, strings.alerts.successMessage, strings.alerts.successTitle]);
 
   const renderItem = ({ item }: { item: any }) => (
     <View style={styles.itemCard}>
@@ -62,7 +87,7 @@ const OfferPreviewScreen: React.FC<OfferPreviewScreenProps> = ({ navigation, rou
       <FlatList
         ListHeaderComponent={
           <View>
-            <Text style={styles.sectionTitle}>You offer</Text>
+            <Text style={styles.sectionTitle}>{strings.youOffer}</Text>
             <FlatList
               data={summary.offered}
               keyExtractor={(it) => it.id}
@@ -71,7 +96,7 @@ const OfferPreviewScreen: React.FC<OfferPreviewScreenProps> = ({ navigation, rou
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={{ paddingHorizontal: 16 }}
             />
-            <Text style={styles.sectionTitle}>You want</Text>
+            <Text style={styles.sectionTitle}>{strings.youWant}</Text>
             <FlatList
               data={summary.requested}
               keyExtractor={(it) => it.id}
@@ -81,12 +106,12 @@ const OfferPreviewScreen: React.FC<OfferPreviewScreenProps> = ({ navigation, rou
               contentContainerStyle={{ paddingHorizontal: 16 }}
             />
             <View style={styles.infoBox}>
-              <Text style={styles.infoLabel}>Money</Text>
+              <Text style={styles.infoLabel}>{strings.moneyLabel}</Text>
               <Text style={styles.infoValue}>{moneyDescriptor}</Text>
             </View>
             {message ? (
               <View style={styles.infoBox}>
-                <Text style={styles.infoLabel}>Message</Text>
+                <Text style={styles.infoLabel}>{strings.messageLabel}</Text>
                 <Text style={styles.message}>{message}</Text>
               </View>
             ) : null}
@@ -99,7 +124,7 @@ const OfferPreviewScreen: React.FC<OfferPreviewScreenProps> = ({ navigation, rou
 
       <View style={styles.footer}>
         <TouchableOpacity style={[styles.submitBtn, submitting && { opacity: 0.6 }]} onPress={onSubmit} disabled={submitting}>
-          <Text style={styles.submitText}>{submitting ? 'Submitting...' : 'Submit Offer'}</Text>
+          <Text style={styles.submitText}>{submitting ? strings.submittingButton : strings.submitButton}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

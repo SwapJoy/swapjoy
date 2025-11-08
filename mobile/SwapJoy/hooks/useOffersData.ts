@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { ApiService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import { useLocalization } from '../localization';
 
 export interface Offer {
   id: string;
@@ -15,6 +16,7 @@ export interface Offer {
 
 export const useOffersData = () => {
   const { user } = useAuth();
+  const { t } = useLocalization();
   const [sentOffers, setSentOffers] = useState<Offer[]>([]);
   const [receivedOffers, setReceivedOffers] = useState<Offer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -72,20 +74,23 @@ export const useOffersData = () => {
     }
   }, []);
 
-  const getStatusText = useCallback((status: string) => {
-    switch (status) {
-      case 'pending':
-        return 'Pending';
-      case 'accepted':
-        return 'Accepted';
-      case 'rejected':
-        return 'Rejected';
-      case 'completed':
-        return 'Completed';
-      default:
-        return status;
-    }
-  }, []);
+  const getStatusText = useCallback(
+    (status: string) => {
+      switch (status) {
+        case 'pending':
+          return t('offers.statuses.pending');
+        case 'accepted':
+          return t('offers.statuses.accepted');
+        case 'rejected':
+          return t('offers.statuses.rejected');
+        case 'completed':
+          return t('offers.statuses.completed');
+        default:
+          return status;
+      }
+    },
+    [t]
+  );
 
   // stable memoized references
   const memoSent = useMemo(() => sentOffers, [sentOffers]);

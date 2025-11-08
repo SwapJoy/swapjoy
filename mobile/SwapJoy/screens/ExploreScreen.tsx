@@ -20,6 +20,7 @@ import { useOtherItems } from '../hooks/useOtherItems';
 import CachedImage from '../components/CachedImage';
 import SwapSuggestions from '../components/SwapSuggestions';
 import { formatCurrency } from '../utils';
+import { useLocalization } from '../localization';
 
 const { width } = Dimensions.get('window');
 const ITEM_WIDTH = width * 0.7;
@@ -70,17 +71,66 @@ const CategoriesSkeleton = () => (
 );
 
 // Error display component
-const ErrorDisplay: React.FC<{ error: any; onRetry: () => void }> = ({ error, onRetry }) => (
+const ErrorDisplay: React.FC<{ title: string; message?: string; retryLabel: string; onRetry: () => void }> = ({
+  title,
+  message,
+  retryLabel,
+  onRetry,
+}) => (
   <View style={styles.errorContainer}>
-    <Text style={styles.errorText}>Error loading data</Text>
-    <Text style={styles.errorMessage}>{error?.message || 'Unknown error'}</Text>
+    <Text style={styles.errorText}>{title}</Text>
+    {!!message && <Text style={styles.errorMessage}>{message}</Text>}
     <TouchableOpacity style={styles.retryButton} onPress={onRetry}>
-      <Text style={styles.retryButtonText}>Retry</Text>
+      <Text style={styles.retryButtonText}>{retryLabel}</Text>
     </TouchableOpacity>
   </View>
 );
 
 const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
+  const { t } = useLocalization();
+  const strings = useMemo(
+    () => ({
+      sections: {
+        topMatches: t('explore.sections.topMatches'),
+        recentlyListed: t('explore.sections.recentlyListed'),
+        topCategories: t('explore.sections.topCategories'),
+        exploreMore: t('explore.sections.exploreMore'),
+      },
+      subtitles: {
+        recentlyListed: t('explore.subtitles.recentlyListed'),
+        exploreMore: t('explore.subtitles.exploreMore'),
+      },
+      loading: {
+        signInRequired: t('explore.loading.signInRequired'),
+        items: t('explore.loading.items'),
+      },
+      errors: {
+        title: t('explore.errors.title'),
+        unknown: t('explore.errors.unknown'),
+        retry: t('explore.errors.retry'),
+      },
+      empty: {
+        topMatches: t('explore.empty.topMatches'),
+        recentItems: t('explore.empty.recentItems'),
+        categories: t('explore.empty.categories'),
+      },
+      labels: {
+        bundle: t('explore.labels.bundle'),
+        bundleValue: t('explore.labels.bundleValue'),
+        price: t('explore.labels.price'),
+        matchSuffix: t('explore.labels.matchSuffix'),
+      },
+      counts: {
+        itemsTemplate: t('explore.counts.items'),
+      },
+    }),
+    [t]
+  );
+  const formatItemsCount = useCallback(
+    (count: number) => strings.counts.itemsTemplate.replace('{count}', String(count ?? 0)),
+    [strings]
+  );
+
   const { aiOffers, loading: topPicksLoading, hasData, isInitialized, error: topPicksError, user, refreshData: refreshTopPicks } = useExploreData();
   const { items: recentItems, loading: recentLoading, error: recentError, refresh: refreshRecent } = useRecentlyListed(10);
   const { categories: topCategories, loading: categoriesLoading, error: categoriesError, refresh: refreshCategories } = useTopCategories(6);
@@ -167,18 +217,18 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
             fallbackUri="https://picsum.photos/200/150?random=1"
           />
           <View style={styles.matchScoreBadge}>
-            <Text style={styles.matchScoreText}>{item.match_score}% Match</Text>
+            <Text style={styles.matchScoreText}>{`${item.match_score}${strings.labels.matchSuffix}`}</Text>
           </View>
           {item.is_bundle && (
             <View style={styles.bundleBadge}>
-              <Text style={styles.bundleBadgeText}>Bundle</Text>
+              <Text style={styles.bundleBadgeText}>{strings.labels.bundle}</Text>
             </View>
           )}
         </View>
         <View style={styles.offerDetails}>
           <Text style={styles.offerTitle} numberOfLines={1}>{item.title}</Text>
           <Text style={styles.offerValue}>
-            {item.is_bundle ? 'Bundle Value' : 'Price'}: {formatCurrency(item.price || item.estimated_value || 0, item.currency || 'USD')}
+            {item.is_bundle ? strings.labels.bundleValue : strings.labels.price}: {formatCurrency(item.price || item.estimated_value || 0, item.currency || 'USD')}
           </Text>
           {item.is_bundle && item.bundle_items && (
             <Text style={styles.bundleItems} numberOfLines={1}>
@@ -209,7 +259,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
         </View>
       </TouchableOpacity>
     );
-  }, [navigation]);
+  }, [navigation, strings]);
 
   const renderRecentItem = useCallback(({ item }: { item: any }) => (
     <TouchableOpacity
@@ -229,19 +279,6 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
       </View>
     </TouchableOpacity>
   ), [navigation]);
-
-  const renderCategory = useCallback(({ item }: { item: any }) => (
-    <TouchableOpacity
-      style={styles.categoryCard}
-      onPress={() => {
-        // TODO: Navigate to category items screen
-        console.log('Category pressed:', item.name);
-      }}
-    >
-      <Text style={styles.categoryName}>{item.name}</Text>
-      <Text style={styles.categoryCount}>{item.item_count} items</Text>
-    </TouchableOpacity>
-  ), []);
 
   const renderGridItem = useCallback(({ item, index }: { item: any; index: number }) => (
     <TouchableOpacity
@@ -275,7 +312,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Please sign in to view AI Matches...</Text>
+          <Text style={styles.loadingText}>{strings.loading.signInRequired}</Text>
         </View>
       </SafeAreaView>
     );
@@ -297,7 +334,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
           othersLoading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color="#007AFF" />
-              <Text style={styles.loadingText}>Loading items...</Text>
+              <Text style={styles.loadingText}>{strings.loading.items}</Text>
             </View>
           ) : null
         }
@@ -305,7 +342,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
           <>
             {/* Top Matches Section - RENDER INDEPENDENTLY */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Top Matches</Text>
+              <Text style={styles.sectionTitle}>{strings.sections.topMatches}</Text>
               {(() => {
                 // DEBUG: Log current state
                 console.log('[ExploreScreen] Top Picks Render State:', {
@@ -318,7 +355,14 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
                 });
 
                 if (topPicksError) {
-                  return <ErrorDisplay error={topPicksError} onRetry={refreshTopPicks} />;
+                  return (
+                    <ErrorDisplay
+                      title={strings.errors.title}
+                      message={topPicksError?.message ?? strings.errors.unknown}
+                      retryLabel={strings.errors.retry}
+                      onRetry={refreshTopPicks}
+                    />
+                  );
                 }
                 if (topPicksLoading && !isInitialized) {
                   return <TopPicksSkeleton />;
@@ -348,7 +392,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
                 }
                 // Show empty message if initialized and not loading
                 if (isInitialized && !topPicksLoading) {
-                  return <Text style={styles.emptyText}>No top matches found</Text>;
+                  return <Text style={styles.emptyText}>{strings.empty.topMatches}</Text>;
                 }
                 return <TopPicksSkeleton />;
               })()}
@@ -356,10 +400,15 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
 
             {/* Recently Listed Section - RENDER INDEPENDENTLY */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Recently Listed</Text>
-              <Text style={styles.sectionSubtitle}>New items from the last month</Text>
+              <Text style={styles.sectionTitle}>{strings.sections.recentlyListed}</Text>
+              <Text style={styles.sectionSubtitle}>{strings.subtitles.recentlyListed}</Text>
               {recentError ? (
-                <ErrorDisplay error={recentError} onRetry={refreshRecent} />
+                <ErrorDisplay
+                  title={strings.errors.title}
+                  message={recentError?.message ?? strings.errors.unknown}
+                  retryLabel={strings.errors.retry}
+                  onRetry={refreshRecent}
+                />
               ) : recentLoading && recentItems.length === 0 ? (
                 <RecentItemsSkeleton />
               ) : recentItems.length > 0 ? (
@@ -374,15 +423,20 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
                   decelerationRate="fast"
                 />
               ) : (
-                <Text style={styles.emptyText}>No recent items found</Text>
+                <Text style={styles.emptyText}>{strings.empty.recentItems}</Text>
               )}
             </View>
 
             {/* Top Categories Section - RENDER INDEPENDENTLY */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Top Categories</Text>
+              <Text style={styles.sectionTitle}>{strings.sections.topCategories}</Text>
               {categoriesError ? (
-                <ErrorDisplay error={categoriesError} onRetry={refreshCategories} />
+                <ErrorDisplay
+                  title={strings.errors.title}
+                  message={categoriesError?.message ?? strings.errors.unknown}
+                  retryLabel={strings.errors.retry}
+                  onRetry={refreshCategories}
+                />
               ) : categoriesLoading && topCategories.length === 0 ? (
                 <CategoriesSkeleton />
               ) : topCategories.length > 0 ? (
@@ -397,25 +451,30 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
                       }}
                     >
                       <Text style={styles.categoryName}>{category.name}</Text>
-                      <Text style={styles.categoryCount}>{category.item_count} items</Text>
+                      <Text style={styles.categoryCount}>{formatItemsCount(category.item_count ?? 0)}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
               ) : (
-                <Text style={styles.emptyText}>No categories found</Text>
+                <Text style={styles.emptyText}>{strings.empty.categories}</Text>
               )}
             </View>
 
             {/* Others Section Header - RENDER INDEPENDENTLY */}
             {otherItems.length > 0 && (
               <View style={[styles.section, styles.othersHeader]}>
-                <Text style={styles.sectionTitle}>Explore More</Text>
-                <Text style={styles.sectionSubtitle}>Discover all available items</Text>
+                <Text style={styles.sectionTitle}>{strings.sections.exploreMore}</Text>
+                <Text style={styles.sectionSubtitle}>{strings.subtitles.exploreMore}</Text>
               </View>
             )}
             {othersError && (
               <View style={styles.section}>
-                <ErrorDisplay error={othersError} onRetry={refreshOthers} />
+                <ErrorDisplay
+                  title={strings.errors.title}
+                  message={othersError?.message ?? strings.errors.unknown}
+                  retryLabel={strings.errors.retry}
+                  onRetry={refreshOthers}
+                />
               </View>
             )}
           </>

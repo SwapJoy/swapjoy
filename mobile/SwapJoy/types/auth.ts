@@ -5,6 +5,7 @@ export interface User {
   username?: string;
   first_name?: string;
   last_name?: string;
+  profile_image_url?: string;
   phone_verified?: boolean;
   email_verified?: boolean;
   created_at?: string;
@@ -54,4 +55,5 @@ export interface CreateUserData {
   last_name: string;
   phone: string;
   email?: string;
+  profile_image_url?: string;
 }

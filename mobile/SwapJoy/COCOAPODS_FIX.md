@@ -115,3 +115,5 @@ Once CocoaPods is fixed and Xcode opens:
 3. Test Firebase setup
 4. Configure APNs certificates for physical device testing
 
+
+

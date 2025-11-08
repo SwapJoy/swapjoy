@@ -10,6 +10,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { PushNotificationService } from './services/pushNotificationService';
 import { NotificationNavigation } from './utils/notificationNavigation';
 import { RootStackParamList } from './types/navigation';
+import { LocalizationProvider, useLocalization } from './localization';
 
 // Configure Google Sign-In as early as possible to ensure native config is set
 const WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID
@@ -29,7 +30,8 @@ GoogleSignin.configure({
 });
 
 function AppContent() {
-  const { isLoading } = useAuth();
+  const { isLoading: authIsLoading } = useAuth();
+  const { isLoading: localizationIsLoading, t } = useLocalization();
   const navigationRef = useRef<NavigationContainerRef<RootStackParamList>>(null);
 
   // (Moved) Google Sign-In is configured at module scope above
@@ -58,13 +60,13 @@ function AppContent() {
       PushNotificationService.setNavigationRef(navigationRef.current);
       NotificationNavigation.setNavigationRef(navigationRef.current);
     }
-  }, [isLoading]);
+  }, [authIsLoading]);
 
-  if (isLoading) {
+  if (authIsLoading || localizationIsLoading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#007AFF" />
-        <Text style={styles.loadingText}>Loading...</Text>
+        <Text style={styles.loadingText}>{t('common.loading')}</Text>
         <StatusBar style="auto" />
       </View>
     );
@@ -80,9 +82,11 @@ function AppContent() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <LocalizationProvider>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </LocalizationProvider>
   );
 }
 

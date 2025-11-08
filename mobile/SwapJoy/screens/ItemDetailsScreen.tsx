@@ -6,11 +6,25 @@ import CachedImage from '../components/CachedImage';
 import { ApiService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { formatCurrency } from '../utils';
+import { useLocalization } from '../localization';
 
 const { width } = Dimensions.get('window');
 
 const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route }) => {
   const { user } = useAuth();
+  const { language, t } = useLocalization();
+  const strings = useMemo(
+    () => ({
+      category: t('addItem.preview.info.category'),
+      condition: t('addItem.preview.info.condition'),
+      seller: t('itemDetails.sellerTitle', { defaultValue: 'Seller' }),
+      goBack: t('itemDetails.goBack', { defaultValue: 'Go Back' }),
+      offer: t('itemDetails.offerButton', { defaultValue: 'Offer' }),
+      loadFailed: t('itemDetails.loadFailed', { defaultValue: 'Failed to load item' }),
+      itemNotFound: t('itemDetails.itemNotFound', { defaultValue: 'Item not found' }),
+    }),
+    [t]
+  );
   const { itemId } = route.params;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -20,10 +34,10 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
     let mounted = true;
     (async () => {
       setLoading(true);
-      const { data, error } = await ApiService.getItemById(itemId);
+      const { data, error } = await ApiService.getItemById(itemId, language);
       if (!mounted) return;
       if (error) {
-        setError(error.message || 'Failed to load item');
+        setError(error.message || strings.loadFailed);
       } else {
         setItem(data);
       }
@@ -32,7 +46,7 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
     return () => {
       mounted = false;
     };
-  }, [itemId]);
+  }, [itemId, language, strings]);
 
   const showOffer = useMemo(() => {
     if (!item?.user?.id || !user?.id) return false;
@@ -50,9 +64,9 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
   if (error || !item) {
     return (
       <SafeAreaView style={styles.centered}>
-        <Text style={styles.errorText}>{error || 'Item not found'}</Text>
+        <Text style={styles.errorText}>{error || strings.itemNotFound}</Text>
         <TouchableOpacity style={styles.retry} onPress={() => navigation.goBack()}>
-          <Text style={styles.retryText}>Go Back</Text>
+          <Text style={styles.retryText}>{strings.goBack}</Text>
         </TouchableOpacity>
       </SafeAreaView>
     );
@@ -93,10 +107,14 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
                 <Text style={styles.itemTitle}>{item.title}</Text>
                 <Text style={styles.price}>{formatCurrency(item.price || item.estimated_value || 0, item.currency || 'USD')}</Text>
                 {item.category?.name ? (
-                  <Text style={styles.meta}>Category: {item.category.name}</Text>
+                  <Text style={styles.meta}>
+                    {strings.category}: {item.category.name}
+                  </Text>
                 ) : null}
                 {item.condition ? (
-                  <Text style={styles.meta}>Condition: {item.condition}</Text>
+                  <Text style={styles.meta}>
+                    {strings.condition}: {item.condition}
+                  </Text>
                 ) : null}
                 <Text style={styles.description}>{item.description}</Text>
 
@@ -106,7 +124,7 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
                     style={styles.sellerBox}
                     onPress={() => (navigation as any).navigate('UserProfile', { userId: item.user.id })}
                   >
-                    <Text style={styles.sellerTitle}>Seller</Text>
+                    <Text style={styles.sellerTitle}>{strings.seller}</Text>
                     <Text style={styles.sellerName}>
                       {item.user.first_name} {item.user.last_name} @{item.user.username}
                     </Text>
@@ -141,7 +159,7 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
               });
             }}
           >
-            <Text style={styles.offerText}>Offer</Text>
+            <Text style={styles.offerText}>{strings.offer}</Text>
           </TouchableOpacity>
         </View>
       )}

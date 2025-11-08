@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -22,21 +22,22 @@ import { ImageUploadService } from '../services/imageUpload';
 import { ApiService } from '../services/api';
 import { ItemDraft, ItemCondition, Category } from '../types/item';
 import { getCurrencySymbol } from '../utils';
+import { useLocalization } from '../localization';
 
 const { width } = Dimensions.get('window');
 
-const CONDITIONS: { value: ItemCondition; label: string; icon: string }[] = [
-  { value: 'new', label: 'New', icon: 'sparkles' },
-  { value: 'like_new', label: 'Like New', icon: 'star' },
-  { value: 'good', label: 'Good', icon: 'thumbs-up' },
-  { value: 'fair', label: 'Fair', icon: 'hand-left' },
-  { value: 'poor', label: 'Poor', icon: 'hand-right' },
+const CONDITION_DEFS: { value: ItemCondition; icon: string }[] = [
+  { value: 'new', icon: 'sparkles' },
+  { value: 'like_new', icon: 'star' },
+  { value: 'good', icon: 'thumbs-up' },
+  { value: 'fair', icon: 'hand-left' },
+  { value: 'poor', icon: 'hand-right' },
 ];
 
-const CURRENCIES: { code: string; label: string; symbol: string }[] = [
-  { code: 'USD', label: 'US Dollar', symbol: '$' },
-  { code: 'EUR', label: 'Euro', symbol: '€' },
-  { code: 'GEL', label: 'Georgian Lari', symbol: '₾' },
+const CURRENCY_DEFS: { code: string; symbol: string }[] = [
+  { code: 'USD', symbol: '$' },
+  { code: 'EUR', symbol: '€' },
+  { code: 'GEL', symbol: '₾' },
 ];
 
 const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
@@ -44,6 +45,67 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
   route,
 }) => {
   const { draftId, imageUris } = route.params;
+  const { language, t } = useLocalization();
+  const strings = useMemo(() => ({
+    headerTitle: t('addItem.details.title'),
+    saving: t('addItem.details.saving'),
+    uploading: t('addItem.details.uploading'),
+    loading: t('addItem.details.loading'),
+    labels: {
+      title: t('addItem.details.labels.title'),
+      description: t('addItem.details.labels.description'),
+      category: t('addItem.details.labels.category'),
+      condition: t('addItem.details.labels.condition'),
+      currency: t('addItem.details.labels.currency'),
+      price: t('addItem.details.labels.price'),
+    },
+    placeholders: {
+      title: t('addItem.details.placeholders.title'),
+      description: t('addItem.details.placeholders.description'),
+      category: t('addItem.details.placeholders.category'),
+      condition: t('addItem.details.placeholders.condition'),
+      currency: t('addItem.details.placeholders.currency'),
+      value: t('addItem.details.placeholders.value'),
+    },
+    buttons: {
+      next: t('addItem.details.buttons.next'),
+    },
+    modals: {
+      selectCategory: t('addItem.details.modals.selectCategory'),
+      selectCondition: t('addItem.details.modals.selectCondition'),
+      selectCurrency: t('addItem.details.modals.selectCurrency'),
+    },
+    alerts: {
+      missingInfoTitle: t('addItem.alerts.missingInfoTitle'),
+      missingTitle: t('addItem.alerts.missingTitle'),
+      missingDescription: t('addItem.alerts.missingDescription'),
+      missingCategory: t('addItem.alerts.missingCategory'),
+      missingCondition: t('addItem.alerts.missingCondition'),
+      missingPrice: t('addItem.alerts.missingPrice'),
+      uploadingImagesTitle: t('addItem.alerts.uploadingImagesTitle'),
+      uploadingImagesMessage: t('addItem.alerts.uploadingImagesMessage'),
+    },
+  }), [t]);
+  const uploadingText = useCallback(
+    (progress: number) => strings.uploading.replace('{progress}', String(progress)),
+    [strings.uploading]
+  );
+  const conditionOptions = useMemo(
+    () =>
+      CONDITION_DEFS.map((def) => ({
+        ...def,
+        label: t(`addItem.conditions.${def.value}` as const),
+      })),
+    [t]
+  );
+  const currencyOptions = useMemo(
+    () =>
+      CURRENCY_DEFS.map((curr) => ({
+        ...curr,
+        label: t(`addItem.currencies.${curr.code}` as const),
+      })),
+    [t]
+  );
   
   const [draft, setDraft] = useState<ItemDraft | null>(null);
   const [title, setTitle] = useState('');
@@ -66,14 +128,9 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Load draft and start image uploads
-  useEffect(() => {
-    loadDraftAndCategories();
-    startImageUploads();
-  }, []);
-
-  const loadDraftAndCategories = async () => {
+  const loadDraftAndCategories = useCallback(async () => {
     try {
+      setLoadingCategories(true);
       // Load draft
       const loadedDraft = await DraftManager.getDraft(draftId);
       if (loadedDraft) {
@@ -87,7 +144,7 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
       }
 
       // Load categories
-      const { data: categoriesData, error } = await ApiService.getCategories();
+      const { data: categoriesData, error } = await ApiService.getCategories(language);
       if (error) {
         console.error('Error loading categories:', error);
         // Don't block the UI, just show empty categories
@@ -102,9 +159,9 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
     } finally {
       setLoadingCategories(false);
     }
-  };
+  }, [draftId, language]);
 
-  const startImageUploads = async () => {
+  const startImageUploads = useCallback(async () => {
     if (!imageUris || imageUris.length === 0) return;
 
     setUploading(true);
@@ -153,7 +210,15 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
 
     setUploading(false);
     setAllUploaded(true);
-  };
+  }, [draftId, imageUris]);
+
+  useEffect(() => {
+    loadDraftAndCategories();
+  }, [loadDraftAndCategories]);
+
+  useEffect(() => {
+    startImageUploads();
+  }, [startImageUploads]);
 
   // Auto-save draft with debounce
   const saveDraft = async (updates: Partial<ItemDraft>) => {
@@ -206,27 +271,27 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
   const handleNext = async () => {
     // Validate form
     if (!title.trim()) {
-      Alert.alert('Missing Information', 'Please enter a title for your item');
+      Alert.alert(strings.alerts.missingInfoTitle, strings.alerts.missingTitle);
       return;
     }
     if (!description.trim()) {
-      Alert.alert('Missing Information', 'Please enter a description');
+      Alert.alert(strings.alerts.missingInfoTitle, strings.alerts.missingDescription);
       return;
     }
     if (!category) {
-      Alert.alert('Missing Information', 'Please select a category');
+      Alert.alert(strings.alerts.missingInfoTitle, strings.alerts.missingCategory);
       return;
     }
     if (!condition) {
-      Alert.alert('Missing Information', 'Please select the condition');
+      Alert.alert(strings.alerts.missingInfoTitle, strings.alerts.missingCondition);
       return;
     }
     if (!price.trim()) {
-      Alert.alert('Missing Information', 'Please enter a price');
+      Alert.alert(strings.alerts.missingInfoTitle, strings.alerts.missingPrice);
       return;
     }
     if (!allUploaded) {
-      Alert.alert('Uploading Images', 'Please wait for images to finish uploading');
+      Alert.alert(strings.alerts.uploadingImagesTitle, strings.alerts.uploadingImagesMessage);
       return;
     }
 
@@ -258,15 +323,15 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
   };
 
   const getCategoryName = () => {
-    if (!category) return 'Select Category';
+    if (!category) return strings.placeholders.category;
     const cat = categories.find((c) => c.id === category);
-    return cat ? cat.name : 'Select Category';
+    return cat ? cat.name : strings.placeholders.category;
   };
 
   const getConditionLabel = () => {
-    if (!condition) return 'Select Condition';
-    const cond = CONDITIONS.find((c) => c.value === condition);
-    return cond ? cond.label : 'Select Condition';
+    if (!condition) return strings.placeholders.condition;
+    const cond = conditionOptions.find((c) => c.value === condition);
+    return cond ? cond.label : strings.placeholders.condition;
   };
 
   const getOverallProgress = () => {
@@ -280,7 +345,7 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#007AFF" />
-          <Text style={styles.loadingText}>Loading...</Text>
+          <Text style={styles.loadingText}>{strings.loading}</Text>
         </View>
       </SafeAreaView>
     );
@@ -297,12 +362,12 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
           <TouchableOpacity style={styles.backButton} onPress={handleBack}>
             <Ionicons name="arrow-back" size={24} color="#007AFF" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Item Details</Text>
+          <Text style={styles.headerTitle}>{strings.headerTitle}</Text>
           <View style={styles.savingIndicator}>
             {isSaving && (
               <>
                 <ActivityIndicator size="small" color="#007AFF" />
-                <Text style={styles.savingText}>Saving...</Text>
+                <Text style={styles.savingText}>{strings.saving}</Text>
               </>
             )}
           </View>
@@ -315,7 +380,7 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
               <View style={styles.progressHeader}>
                 <Ionicons name="cloud-upload" size={20} color="#007AFF" />
                 <Text style={styles.uploadProgressText}>
-                  Uploading images... {getOverallProgress()}%
+                  {uploadingText(getOverallProgress())}
                 </Text>
               </View>
               <View style={styles.progressBar}>
@@ -352,11 +417,11 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
             {/* Title */}
             <View style={styles.fieldContainer}>
               <Text style={styles.fieldLabel}>
-                Title <Text style={styles.required}>*</Text>
+                {strings.labels.title} <Text style={styles.required}>*</Text>
               </Text>
               <TextInput
                 style={styles.textInput}
-                placeholder="e.g., iPhone 13 Pro Max"
+                placeholder={strings.placeholders.title}
                 value={title}
                 onChangeText={handleTitleChange}
                 maxLength={100}
@@ -367,11 +432,11 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
             {/* Description */}
             <View style={styles.fieldContainer}>
               <Text style={styles.fieldLabel}>
-                Description <Text style={styles.required}>*</Text>
+                {strings.labels.description} <Text style={styles.required}>*</Text>
               </Text>
               <TextInput
                 style={[styles.textInput, styles.textArea]}
-                placeholder="Describe your item in detail..."
+                placeholder={strings.placeholders.description}
                 value={description}
                 onChangeText={handleDescriptionChange}
                 multiline
@@ -385,7 +450,7 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
             {/* Category */}
             <View style={styles.fieldContainer}>
               <Text style={styles.fieldLabel}>
-                Category <Text style={styles.required}>*</Text>
+                {strings.labels.category} <Text style={styles.required}>*</Text>
               </Text>
               <TouchableOpacity
                 style={styles.pickerButton}
@@ -401,7 +466,7 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
             {/* Condition */}
             <View style={styles.fieldContainer}>
               <Text style={styles.fieldLabel}>
-                Condition <Text style={styles.required}>*</Text>
+                {strings.labels.condition} <Text style={styles.required}>*</Text>
               </Text>
               <TouchableOpacity
                 style={styles.pickerButton}
@@ -417,14 +482,14 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
             {/* Currency */}
             <View style={styles.fieldContainer}>
               <Text style={styles.fieldLabel}>
-                Currency <Text style={styles.required}>*</Text>
+                {strings.labels.currency} <Text style={styles.required}>*</Text>
               </Text>
               <TouchableOpacity
                 style={styles.pickerButton}
                 onPress={() => setShowCurrencyPicker(true)}
               >
                 <Text style={styles.pickerButtonText}>
-                  {CURRENCIES.find(c => c.code === currency)?.label || 'Select Currency'}
+                  {currencyOptions.find(c => c.code === currency)?.label || strings.placeholders.currency}
                 </Text>
                 <Ionicons name="chevron-down" size={20} color="#666" />
               </TouchableOpacity>
@@ -433,13 +498,13 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
             {/* Price */}
             <View style={styles.fieldContainer}>
               <Text style={styles.fieldLabel}>
-                Price <Text style={styles.required}>*</Text>
+                {strings.labels.price} <Text style={styles.required}>*</Text>
               </Text>
               <View style={styles.valueInputContainer}>
                 <Text style={styles.currencySymbol}>{getCurrencySymbol(currency)}</Text>
                 <TextInput
                   style={[styles.textInput, styles.valueInput]}
-                  placeholder="0.00"
+                  placeholder={strings.placeholders.value}
                   value={price}
                   onChangeText={handleValueChange}
                   keyboardType="decimal-pad"
@@ -456,7 +521,7 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
             onPress={handleNext}
             disabled={uploading}
           >
-            <Text style={styles.nextButtonText}>Next</Text>
+            <Text style={styles.nextButtonText}>{strings.buttons.next}</Text>
             <Ionicons name="arrow-forward" size={20} color="#fff" />
           </TouchableOpacity>
         </View>
@@ -471,7 +536,7 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Select Category</Text>
+                <Text style={styles.modalTitle}>{strings.modals.selectCategory}</Text>
                 <TouchableOpacity onPress={() => setShowCategoryPicker(false)}>
                   <Ionicons name="close" size={24} color="#666" />
                 </TouchableOpacity>
@@ -507,13 +572,13 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Select Condition</Text>
+                <Text style={styles.modalTitle}>{strings.modals.selectCondition}</Text>
                 <TouchableOpacity onPress={() => setShowConditionPicker(false)}>
                   <Ionicons name="close" size={24} color="#666" />
                 </TouchableOpacity>
               </View>
               <ScrollView>
-                {CONDITIONS.map((cond) => (
+                {conditionOptions.map((cond) => (
                   <TouchableOpacity
                     key={cond.value}
                     style={[
@@ -546,13 +611,13 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Select Currency</Text>
+                <Text style={styles.modalTitle}>{strings.modals.selectCurrency}</Text>
                 <TouchableOpacity onPress={() => setShowCurrencyPicker(false)}>
                   <Ionicons name="close" size={24} color="#666" />
                 </TouchableOpacity>
               </View>
               <ScrollView>
-                {CURRENCIES.map((curr) => (
+                {currencyOptions.map((curr) => (
                   <TouchableOpacity
                     key={curr.code}
                     style={[

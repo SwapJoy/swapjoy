@@ -27,10 +27,13 @@ export interface ItemDraft {
 export interface Category {
   id: string;
   name: string;
+  title_en?: string | null;
+  title_ka?: string | null;
   slug: string;
   description: string | null;
-  icon_url: string | null;
-  sort_order: number;
+  icon?: string | null;
+  color?: string | null;
+  sort_order?: number | null;
   is_active: boolean;
 }
 

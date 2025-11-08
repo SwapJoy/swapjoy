@@ -203,3 +203,5 @@ Follow the guide in `mobile/SwapJoy/NATIVE_FIREBASE_SETUP.md`:
    - Create notifications when swaps are confirmed
    - Create notifications when followed users add items
 
+
+

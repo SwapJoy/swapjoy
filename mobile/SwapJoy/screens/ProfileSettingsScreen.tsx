@@ -1,18 +1,28 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Modal, TextInput, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { ProfileSettingsScreenProps } from '../types/navigation';
 import { useAuth } from '../contexts/AuthContext';
-import { useNavigation } from '@react-navigation/native';
 import { ApiService } from '../services/api';
 import { UserService } from '../services/userService';
+import { useLocalization } from '../localization';
+import { LanguageSelector } from '../components/LanguageSelector';
 
-const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigation: nav }) => {
+const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigation }) => {
   const { signOut } = useAuth();
-  const navigation = useNavigation<any>();
+  const { t, language, setLanguage } = useLocalization();
   const [prompt, setPrompt] = useState<string>('');
   const [isPromptModalVisible, setPromptModalVisible] = useState(false);
   const charLimit = 500;
+
+  const promptModalSubtitle = useMemo(
+    () => t('settings.profile.promptModalSubtitle').replace('{charLimit}', String(charLimit)),
+    [charLimit, t]
+  );
+
+  const promptPlaceholder = useMemo(
+    () => t('settings.profile.promptPlaceholder'),
+    [t]
+  );
 
   useEffect(() => {
     (async () => {
@@ -26,16 +36,40 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigatio
 
   const promptPreview = useMemo(() => {
     const trimmed = (prompt || '').trim();
-    if (!trimmed) return 'Add what you want to swap for';
+    if (!trimmed) return t('settings.profile.swapPromptSubtitle');
     return trimmed.length <= 80 ? trimmed : trimmed.slice(0, 80) + '…';
-  }, [prompt]);
+  }, [prompt, t]);
 
   const confirmSignOut = useCallback(() => {
-    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign Out', style: 'destructive', onPress: async () => { try { await signOut(); } catch (e) { Alert.alert('Error', 'Failed to sign out.'); } } },
-    ]);
-  }, [signOut]);
+    Alert.alert(
+      t('settings.profile.signOutConfirmTitle'),
+      t('settings.profile.signOutConfirmMessage'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('settings.profile.signOut'),
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await signOut();
+            } catch (e) {
+              Alert.alert(
+                t('settings.profile.signOutErrorTitle'),
+                t('settings.profile.signOutErrorMessage')
+              );
+            }
+          },
+        },
+      ]
+    );
+  }, [signOut, t]);
+
+  const handleLanguageChange = useCallback(
+    (nextLanguage: typeof language) => {
+      void setLanguage(nextLanguage);
+    },
+    [setLanguage]
+  );
 
   const Item = ({ icon, title, subtitle, onPress }: { icon: string; title: string; subtitle?: string; onPress?: () => void }) => (
     <TouchableOpacity style={styles.item} onPress={onPress}>
@@ -52,87 +86,145 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigatio
 
   return (
     <ScrollView contentContainerStyle={styles.scrollContainer}>
-
-        <View style={styles.card}>
-          <Item 
-            icon="📝" 
-            title="Swap Prompt"
-            subtitle={promptPreview}
-            onPress={() => setPromptModalVisible(true)}
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>{t('settings.languageSectionTitle')}</Text>
+        <Text style={styles.sectionSubtitle}>{t('settings.restartNotice')}</Text>
+        <View style={styles.languageSelectorWrapper}>
+          <LanguageSelector
+            selectedLanguage={language}
+            onSelect={handleLanguageChange}
+            variant="list"
           />
         </View>
+      </View>
 
-        <View style={styles.card}>
-          <Item icon="👤" title="Edit Profile" subtitle="Name, photo, bio" onPress={() => { /* navigate to edit profile subpage */ }} />
-          <Item icon="🔔" title="Notifications" subtitle="Push, email" onPress={() => { /* navigate to notifications settings */ }} />
-          <Item icon="🔒" title="Privacy & Security" subtitle="Visibility, data" onPress={() => { /* navigate to privacy */ }} />
-        </View>
+      <View style={styles.card}>
+        <Item
+          icon="📝"
+          title={t('settings.profile.swapPromptTitle')}
+          subtitle={promptPreview}
+          onPress={() => setPromptModalVisible(true)}
+        />
+      </View>
 
-        <View style={styles.card}>
-          <Item icon="💬" title="Help & Support" subtitle="FAQ, contact" onPress={() => { /* navigate to help */ }} />
-          <Item icon="ℹ️" title="About" subtitle="Version, terms" onPress={() => { /* navigate to about */ }} />
-        </View>
+      <View style={styles.card}>
+        <Item
+          icon="👤"
+          title={t('settings.profile.editProfileTitle')}
+          subtitle={t('settings.profile.editProfileSubtitle')}
+          onPress={() => { /* navigate to edit profile subpage */ }}
+        />
+        <Item
+          icon="🔔"
+          title={t('settings.profile.notificationsTitle')}
+          subtitle={t('settings.profile.notificationsSubtitle')}
+          onPress={() => { /* navigate to notifications settings */ }}
+        />
+        <Item
+          icon="🔒"
+          title={t('settings.profile.privacyTitle')}
+          subtitle={t('settings.profile.privacySubtitle')}
+          onPress={() => { /* navigate to privacy */ }}
+        />
+      </View>
 
-        <View style={styles.card}>
-          <Item 
-            icon="🔧" 
-            title="DEV: Recommendation Weights" 
-            subtitle="Adjust Top Picks scoring parameters" 
-            onPress={() => { navigation.navigate('DevRecommendationSettings'); }} 
-          />
-        </View>
+      <View style={styles.card}>
+        <Item
+          icon="💬"
+          title={t('settings.profile.helpTitle')}
+          subtitle={t('settings.profile.helpSubtitle')}
+          onPress={() => { /* navigate to help */ }}
+        />
+        <Item
+          icon="ℹ️"
+          title={t('settings.profile.aboutTitle')}
+          subtitle={t('settings.profile.aboutSubtitle')}
+          onPress={() => { /* navigate to about */ }}
+        />
+      </View>
 
-        <View style={styles.dangerCard}>
-          <TouchableOpacity style={styles.dangerButton} onPress={confirmSignOut}>
-            <Text style={styles.dangerText}>Sign Out</Text>
-          </TouchableOpacity>
-        </View>
-        <Modal visible={isPromptModalVisible} animationType="slide" transparent onRequestClose={() => setPromptModalVisible(false)}>
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalOverlay}>
-            <View style={styles.modalCard}>
-              <ScrollView contentContainerStyle={styles.modalScroll} keyboardShouldPersistTaps="handled">
-                <Text style={styles.modalTitle}>Swap Prompt</Text>
-                <Text style={styles.modalSubtitle}>Describe what you want to swap for (max {charLimit} chars)</Text>
-                <TextInput
-                  style={styles.textInput}
-                  placeholder="e.g., I would like to swap my items for a Fender Stratocaster..."
-                  multiline
-                  maxLength={charLimit}
-                  value={prompt}
-                  onChangeText={setPrompt}
-                  textAlignVertical="top"
-                  returnKeyType="done"
-                  blurOnSubmit
-                />
-                <View style={styles.modalFooter}>
-                  <Text style={styles.charCount}>{prompt.length}/{charLimit}</Text>
-                  <View style={styles.modalButtons}>
-                    <TouchableOpacity style={[styles.modalButton, styles.cancelBtn]} onPress={() => setPromptModalVisible(false)}>
-                      <Text style={styles.cancelText}>Cancel</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.modalButton, styles.saveBtn]}
-                      onPress={async () => {
-                        const trimmed = (prompt || '').trim();
-                        Keyboard.dismiss();
-                        setPromptModalVisible(false);
-                        try {
-                          const { error } = await UserService.updateProfile({ prompt: trimmed });
-                          if (error) throw error;
-                        } catch (e: any) {
-                          Alert.alert('Error', e?.message || 'Failed to save prompt');
-                        }
-                      }}
-                    >
-                      <Text style={styles.saveText}>Save</Text>
-                    </TouchableOpacity>
-                  </View>
+      <View style={styles.card}>
+        <Item
+          icon="🔧"
+          title={t('settings.profile.devRecommendationTitle')}
+          subtitle={t('settings.profile.devRecommendationSubtitle')}
+          onPress={() => {
+            navigation.navigate('DevRecommendationSettings');
+          }}
+        />
+      </View>
+
+      <View style={styles.dangerCard}>
+        <TouchableOpacity style={styles.dangerButton} onPress={confirmSignOut}>
+          <Text style={styles.dangerText}>{t('settings.profile.signOut')}</Text>
+        </TouchableOpacity>
+      </View>
+
+      <Modal
+        visible={isPromptModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setPromptModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalOverlay}
+        >
+          <View style={styles.modalCard}>
+            <ScrollView
+              contentContainerStyle={styles.modalScroll}
+              keyboardShouldPersistTaps="handled"
+            >
+              <Text style={styles.modalTitle}>{t('settings.profile.promptModalTitle')}</Text>
+              <Text style={styles.modalSubtitle}>{promptModalSubtitle}</Text>
+              <TextInput
+                style={styles.textInput}
+                placeholder={promptPlaceholder}
+                multiline
+                maxLength={charLimit}
+                value={prompt}
+                onChangeText={setPrompt}
+                textAlignVertical="top"
+                returnKeyType="done"
+                blurOnSubmit
+              />
+              <View style={styles.modalFooter}>
+                <Text style={styles.charCount}>
+                  {prompt.length}/{charLimit}
+                </Text>
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.cancelBtn]}
+                    onPress={() => setPromptModalVisible(false)}
+                  >
+                    <Text style={styles.cancelText}>{t('common.cancel')}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.saveBtn]}
+                    onPress={async () => {
+                      const trimmed = (prompt || '').trim();
+                      Keyboard.dismiss();
+                      setPromptModalVisible(false);
+                      try {
+                        const { error } = await UserService.updateProfile({ prompt: trimmed });
+                        if (error) throw error;
+                      } catch (e: any) {
+                        Alert.alert(
+                          t('settings.profile.promptSaveErrorTitle'),
+                          e?.message || t('settings.profile.promptSaveErrorMessage')
+                        );
+                      }
+                    }}
+                  >
+                    <Text style={styles.saveText}>{t('common.save')}</Text>
+                  </TouchableOpacity>
                 </View>
-              </ScrollView>
-            </View>
-          </KeyboardAvoidingView>
-        </Modal>
-      </ScrollView>
+              </View>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+    </ScrollView>
   );
 };
 
@@ -154,6 +246,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 12,
     paddingHorizontal: 12,
+    paddingVertical: 16,
     marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -184,6 +277,20 @@ const styles = StyleSheet.create({
   itemTitle: { fontSize: 16, color: '#1a1a1a', fontWeight: '500' },
   itemSubtitle: { fontSize: 13, color: '#707070', marginTop: 2 },
   itemArrow: { fontSize: 20, color: '#c2c2c2' },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1a1a1a',
+    marginBottom: 6,
+  },
+  sectionSubtitle: {
+    fontSize: 13,
+    color: '#707070',
+    marginBottom: 14,
+  },
+  languageSelectorWrapper: {
+    gap: 12,
+  },
   dangerCard: { backgroundColor: '#fff', borderRadius: 12, padding: 12 },
   dangerButton: { backgroundColor: '#FF3B30', borderRadius: 10, alignItems: 'center', paddingVertical: 14 },
   dangerText: { color: '#fff', fontSize: 16, fontWeight: '700' },

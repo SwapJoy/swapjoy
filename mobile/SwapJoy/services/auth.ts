@@ -124,16 +124,25 @@ export class AuthService {
   }
 
   // Create user in database if not exists
-  private static async createUserInDatabase(userData: CreateUserData, userId: string, email?: string): Promise<User | null> {
+  private static async createUserInDatabase(
+    userData: CreateUserData,
+    userId: string,
+    email?: string,
+    profileImageUrl?: string
+  ): Promise<User | null> {
     try {
-      const userPayload: any = {
+      const timestamp = new Date().toISOString();
+      const resolvedEmail = email ?? userData.email;
+      const resolvedProfileImage = userData.profile_image_url ?? profileImageUrl;
+
+      const userPayload: Record<string, any> = {
         id: userId,
         username: userData.username,
         first_name: userData.first_name,
         last_name: userData.last_name,
         status: 'active',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        created_at: timestamp,
+        updated_at: timestamp,
       };
 
       if (userData.phone) {
@@ -141,9 +150,13 @@ export class AuthService {
         userPayload.phone_verified = true;
       }
 
-      if (email) {
-        userPayload.email = email;
+      if (resolvedEmail) {
+        userPayload.email = resolvedEmail;
         userPayload.email_verified = true;
+      }
+
+      if (resolvedProfileImage) {
+        userPayload.profile_image_url = resolvedProfileImage;
       }
 
       const { data, error } = await supabase
@@ -171,12 +184,127 @@ export class AuthService {
         .from('users')
         .select('id')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
 
-      return !error && !!data;
+      if (error) {
+        // 406 from maybeSingle should not happen, but log warnings just in case
+        if (error.code && error.code !== 'PGRST116') {
+          console.warn('[AuthService] checkUserExists error:', error.message);
+        }
+        return false;
+      }
+
+      return !!data;
     } catch (error) {
       console.error('Error checking user existence:', error);
       return false;
+    }
+  }
+
+  private static extractUserCreationData(session: AuthSession): {
+    userData: CreateUserData;
+    email?: string;
+    profileImageUrl?: string;
+  } {
+    const rawUser: any = session.user ?? {};
+    const metadata: any = rawUser.user_metadata ?? {};
+    const identities = Array.isArray(rawUser.identities) ? rawUser.identities : [];
+    const googleMetadata = identities.find((id: any) => id?.provider === 'google')?.identity_data ?? {};
+
+    const email: string | undefined =
+      rawUser.email ??
+      metadata.email ??
+      metadata.email_address ??
+      googleMetadata.email ??
+      undefined;
+
+    const firstName: string =
+      rawUser.first_name ??
+      metadata.first_name ??
+      googleMetadata.given_name ??
+      metadata.given_name ??
+      (metadata.full_name ? String(metadata.full_name).split(' ')[0] : '') ??
+      '';
+
+    const lastName: string =
+      rawUser.last_name ??
+      metadata.last_name ??
+      googleMetadata.family_name ??
+      metadata.family_name ??
+      (metadata.full_name
+        ? String(metadata.full_name)
+            .split(' ')
+            .slice(1)
+            .join(' ')
+        : '') ??
+      '';
+
+    const username: string =
+      rawUser.username ??
+      metadata.username ??
+      googleMetadata.username ??
+      (email ? email.split('@')[0] : undefined) ??
+      `user_${Date.now()}`;
+
+    const profileImageUrl: string | undefined =
+      rawUser.profile_image_url ??
+      metadata.profile_image_url ??
+      metadata.avatar_url ??
+      metadata.picture ??
+      googleMetadata.picture ??
+      undefined;
+
+    const phone = rawUser.phone ?? metadata.phone ?? '';
+
+    return {
+      userData: {
+        username,
+        first_name: firstName || 'User',
+        last_name: lastName || '',
+        phone: phone || '',
+        email,
+        profile_image_url: profileImageUrl,
+      },
+      email,
+      profileImageUrl,
+    };
+  }
+
+  static async ensureUserRecord(): Promise<User | null> {
+    try {
+      const session = await this.getCurrentSession();
+      if (!session?.user?.id) {
+        console.log('[AuthService] ensureUserRecord skipped - no session');
+        return null;
+      }
+
+      const exists = await this.checkUserExists(session.user.id);
+      if (exists) {
+        return session.user;
+      }
+
+      console.warn('[AuthService] ensureUserRecord: user row missing, recreating', session.user.id);
+      const { userData, email, profileImageUrl } = this.extractUserCreationData(session);
+
+      const created = await this.createUserInDatabase(
+        userData,
+        session.user.id,
+        email,
+        profileImageUrl
+      );
+
+      if (created) {
+        session.user = created;
+        await this.storeSession(session);
+        console.log('[AuthService] ensureUserRecord: user recreated successfully');
+        return created;
+      }
+
+      console.error('[AuthService] ensureUserRecord: failed to recreate user');
+      return null;
+    } catch (error) {
+      console.error('[AuthService] ensureUserRecord error:', error);
+      return null;
     }
   }
 
@@ -627,7 +755,12 @@ export class AuthService {
       // Sign in with Google
       console.log('[GoogleAuth] Calling GoogleSignin.signIn()');
       const userInfo = await GoogleSignin.signIn();
-      console.log('[GoogleAuth] Google sign-in completed, got userInfo:', !!userInfo, 'has idToken:', !!userInfo?.idToken);
+      console.log(
+        '[GoogleAuth] Google sign-in completed, got userInfo:',
+        !!userInfo,
+        'has idToken:',
+        !!(userInfo as any)?.idToken
+      );
       try {
         const userInfoKeys = Object.keys(userInfo ?? {});
         const userSubKeys = Object.keys((userInfo as any)?.user ?? {});
@@ -717,29 +850,103 @@ export class AuthService {
         user: data.user as User,
       };
 
+      const googleAccount = (userInfo as any)?.user ?? {};
+      const authMetadata = (data.user as any)?.user_metadata ?? {};
+      const resolvedEmail: string | undefined =
+        data.user.email ?? googleAccount.email ?? authMetadata.email ?? undefined;
+      const resolvedFirstName: string =
+        authMetadata.first_name ??
+        googleAccount.givenName ??
+        (googleAccount.name ? String(googleAccount.name).split(' ')[0] : '') ??
+        '';
+      const resolvedLastName: string =
+        authMetadata.last_name ??
+        googleAccount.familyName ??
+        (googleAccount.name
+          ? String(googleAccount.name)
+              .split(' ')
+              .slice(1)
+              .join(' ')
+          : '') ??
+        '';
+      const resolvedProfileImageUrl: string | undefined =
+        authMetadata.avatar_url ??
+        authMetadata.picture ??
+        googleAccount.photo ??
+        undefined;
+      const resolvedUsername: string =
+        authMetadata.username ??
+        (googleAccount.email ? String(googleAccount.email).split('@')[0] : undefined) ??
+        (resolvedEmail ? resolvedEmail.split('@')[0] : undefined) ??
+        `user_${Date.now()}`;
+      let latestUserRecord: User | null = null;
+
       // Check if user exists in database, create if not
       console.log('[GoogleAuth] Checking if user exists in app database');
       const userExists = await this.checkUserExists(data.user.id);
       if (!userExists) {
         console.log('[GoogleAuth] User not found, creating in app database');
-        const email = data.user.email || userInfo.user.email || '';
-        const name = userInfo.user.name || '';
-        const nameParts = name.split(' ');
-        const firstName = nameParts[0] || '';
-        const lastName = nameParts.slice(1).join(' ') || '';
-
         const userData: CreateUserData = {
-          username: data.user.user_metadata?.username || userInfo.user.email?.split('@')[0] || 'user_' + Date.now(),
-          first_name: data.user.user_metadata?.first_name || firstName,
-          last_name: data.user.user_metadata?.last_name || lastName,
+          username: resolvedUsername,
+          first_name: resolvedFirstName || 'User',
+          last_name: resolvedLastName || '',
           phone: '',
+          email: resolvedEmail,
+          profile_image_url: resolvedProfileImageUrl,
         };
 
-        const createdUser = await this.createUserInDatabase(userData, data.user.id, email);
+        const createdUser = await this.createUserInDatabase(
+          userData,
+          data.user.id,
+          resolvedEmail,
+          resolvedProfileImageUrl
+        );
         if (createdUser) {
+          latestUserRecord = createdUser;
           session.user = createdUser;
           console.log('[GoogleAuth] User created in app database');
         }
+      }
+
+      const updatePayload: Record<string, any> = {};
+      if (resolvedEmail) {
+        updatePayload.email = resolvedEmail;
+        updatePayload.email_verified = true;
+      }
+      if (resolvedFirstName) {
+        updatePayload.first_name = resolvedFirstName;
+      }
+      if (resolvedLastName) {
+        updatePayload.last_name = resolvedLastName;
+      }
+      if (resolvedProfileImageUrl) {
+        updatePayload.profile_image_url = resolvedProfileImageUrl;
+      }
+
+      if (Object.keys(updatePayload).length > 0) {
+        updatePayload.updated_at = new Date().toISOString();
+        const { data: updatedUser, error: updateError } = await supabase
+          .from('users')
+          .update(updatePayload)
+          .eq('id', data.user.id)
+          .select()
+          .maybeSingle();
+
+        if (updateError) {
+          console.warn('[GoogleAuth] Failed to update user profile after Google sign-in', updateError);
+        } else if (updatedUser) {
+          latestUserRecord = updatedUser as User;
+          session.user = latestUserRecord;
+          console.log('[GoogleAuth] User profile updated with Google account details');
+        }
+      }
+
+      if (!latestUserRecord && session.user && resolvedEmail) {
+        session.user.email = resolvedEmail;
+      }
+
+      if (!latestUserRecord && session.user && resolvedProfileImageUrl) {
+        (session.user as any).profile_image_url = resolvedProfileImageUrl;
       }
 
       await this.storeSession(session);
@@ -754,8 +961,16 @@ export class AuthService {
           first_name: session.user.first_name || '',
           last_name: session.user.last_name || '',
           phone: '',
+          email: resolvedEmail ?? session.user.email,
+          profile_image_url:
+            resolvedProfileImageUrl || (session.user as any)?.profile_image_url,
         };
-        const retried = await this.createUserInDatabase(retryUserData, session.user.id, (session.user as any).email);
+        const retried = await this.createUserInDatabase(
+          retryUserData,
+          session.user.id,
+          resolvedEmail ?? (session.user as any).email,
+          resolvedProfileImageUrl || (session.user as any)?.profile_image_url
+        );
         if (retried) {
           session.user = retried;
           await this.storeSession(session);

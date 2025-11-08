@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,15 +10,26 @@ import {
 } from 'react-native';
 import { useOnboarding } from '../hooks/useOnboarding';
 import { OnboardingScreenProps } from '../types/navigation';
+import { useLocalization } from '../localization';
+import { LanguageSelector } from '../components/LanguageSelector';
 
 const { width } = Dimensions.get('window');
 
 const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ navigation }) => {
   const { slides, activeSlide, handleSlideChange, handleGetStarted } = useOnboarding();
+  const { t, language, setLanguage } = useLocalization();
 
   const handleGetStartedPress = () => {
     navigation.navigate('EmailSignIn');
+    handleGetStarted();
   };
+
+  const handleLanguageSelect = useCallback(
+    (nextLanguage: typeof language) => {
+      void setLanguage(nextLanguage);
+    },
+    [setLanguage]
+  );
 
   const handleScroll = (event: any) => {
     const slideSize = event.nativeEvent.layoutMeasurement.width;
@@ -44,10 +55,15 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Skip button */}
-      <TouchableOpacity style={styles.skipButton} onPress={handleGetStartedPress}>
-        <Text style={styles.skipText}>Skip</Text>
-      </TouchableOpacity>
+      <View style={styles.topBar}>
+        <LanguageSelector
+          selectedLanguage={language}
+          onSelect={handleLanguageSelect}
+        />
+        <TouchableOpacity style={styles.skipButton} onPress={handleGetStartedPress}>
+          <Text style={styles.skipText}>{t('onboarding.actions.skip')}</Text>
+        </TouchableOpacity>
+      </View>
 
       {/* Sliding content */}
       <ScrollView
@@ -86,17 +102,17 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ navigation }) => {
       <View style={styles.navigationContainer}>
         {activeSlide > 0 && (
           <TouchableOpacity style={styles.navButton} onPress={goToPrevious}>
-            <Text style={styles.navButtonText}>Previous</Text>
+            <Text style={styles.navButtonText}>{t('onboarding.actions.previous')}</Text>
           </TouchableOpacity>
         )}
         
         {activeSlide < slides.length - 1 ? (
           <TouchableOpacity style={styles.navButton} onPress={goToNext}>
-            <Text style={styles.navButtonText}>Next</Text>
+            <Text style={styles.navButtonText}>{t('onboarding.actions.next')}</Text>
           </TouchableOpacity>
         ) : (
           <TouchableOpacity style={styles.signInButton} onPress={handleGetStartedPress}>
-            <Text style={styles.signInButtonText}>Get Started</Text>
+            <Text style={styles.signInButtonText}>{t('onboarding.actions.getStarted')}</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -109,11 +125,16 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#ffffff',
   },
+  topBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+  },
   skipButton: {
-    position: 'absolute',
-    top: 50,
-    right: 20,
-    zIndex: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
   },
   skipText: {
     fontSize: 16,
@@ -175,6 +196,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 40,
     paddingBottom: 40,
+    gap: 12,
   },
   navButton: {
     paddingHorizontal: 20,

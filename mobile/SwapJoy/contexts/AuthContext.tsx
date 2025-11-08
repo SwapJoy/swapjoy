@@ -40,33 +40,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           hasStoredSessionRef.current = true; // Mark that we have a stored session
           // Ensure user row exists (handles cases where Google sign-in happened previously)
           try {
-            // Lightweight check via ApiService.getProfile
-            // If it fails due to missing row or RLS, AuthService will have logs from creation attempts
-            // We avoid blocking UI; errors are logged internally
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            const { ApiService } = require('../services/api');
-            ApiService.getProfile().then(async (res: any) => {
-              if (res?.error) {
-                // Attempt to create a minimal user row if missing
-                try {
-                  const { AuthService } = require('../services/auth');
-                  const sess = await AuthService.getCurrentSession();
-                  if (sess?.user?.id) {
-                    const email = (sess.user as any).email || '';
-                    const name = (sess.user as any).first_name || (sess.user as any).user_metadata?.full_name || '';
-                    const first = name?.split(' ')[0] || '';
-                    const last = name?.split(' ').slice(1).join(' ') || '';
-                    const createData = {
-                      username: (sess.user as any).username || (email ? email.split('@')[0] : `user_${Date.now()}`),
-                      first_name: first,
-                      last_name: last,
-                      phone: '',
-                    };
-                    await AuthService["createUserInDatabase"].call(AuthService, createData, sess.user.id, email);
-                  }
-                } catch {}
-              }
-            }).catch(() => {});
+            // Lightweight check that also recreates row if missing
+            const { AuthService } = require('../services/auth');
+            AuthService.ensureUserRecord().catch((err: any) => {
+              console.warn('[AuthContext] ensureUserRecord on init failed', err?.message || err);
+            });
           } catch {}
         } else {
           console.log('[AuthContext] No stored session found on startup');

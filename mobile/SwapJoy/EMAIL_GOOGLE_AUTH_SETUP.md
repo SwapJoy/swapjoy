@@ -206,3 +206,5 @@ This guide covers the manual configuration steps needed to complete the email an
 - All authentication methods create/update users in the `public.users` table automatically
 - Session persistence works across all auth methods via SecureStore
 
+
+

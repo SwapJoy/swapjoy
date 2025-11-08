@@ -61,3 +61,5 @@ after insert on offers
 for each row
 execute function public.create_new_offer_notification();
 
+
+

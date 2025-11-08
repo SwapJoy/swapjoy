@@ -1,15 +1,16 @@
 import { supabase } from '../lib/supabase';
 import { AuthService } from './auth';
 import { RedisCache } from './redisCache';
-import { 
-  RecommendationWeights, 
+import {
+  RecommendationWeights,
   DEFAULT_RECOMMENDATION_WEIGHTS,
   calculateWeightedScore,
   calculateCategoryScore,
   calculatePriceScore,
   calculateLocationScore,
-  clampWeight 
+  clampWeight
 } from '../types/recommendation';
+import { AppLanguage, DEFAULT_LANGUAGE } from '../types/language';
 
 export class ApiService {
   // Ensure only one auth initialization runs at a time across the app
@@ -161,7 +162,18 @@ export class ApiService {
         .from('users')
         .select('*')
         .eq('id', currentUser.id)
-        .single();
+        .maybeSingle();
+
+      if (!result.error && !result.data) {
+        console.warn('[ApiService.getProfile] No user row found, attempting to recreate');
+        await AuthService.ensureUserRecord();
+        return await client
+          .from('users')
+          .select('*')
+          .eq('id', currentUser.id)
+          .maybeSingle();
+      }
+
       if (result.error) {
         console.warn('[ApiService.getProfile] error:', result.error?.message || result.error);
       } else {
@@ -177,7 +189,7 @@ export class ApiService {
         .from('users')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
     });
   }
 
@@ -487,7 +499,7 @@ export class ApiService {
         .from('users')
         .select('favorite_categories, manual_location_lat, manual_location_lng, preferred_radius_km')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
       if (userError) {
         console.warn('[ApiService.getTopPicksForUser] users lookup error:', userError?.message || userError);
       }
@@ -1234,11 +1246,26 @@ export class ApiService {
   // Fallback method for when vector search fails
   static async getFallbackRecommendations(client: any, userId: string, limit: number) {
     console.log('[TopPicks Fallback] start. user:', userId, 'limit:', limit);
-    const { data: user, error: userError } = await client
+    let { data: user, error: userError } = await client
       .from('users')
       .select('favorite_categories')
       .eq('id', userId)
-      .single();
+      .maybeSingle();
+
+    if (!userError && !user) {
+      console.warn('[TopPicks Fallback] Missing user row, attempting ensureUserRecord');
+      await AuthService.ensureUserRecord();
+      const retry = await client
+        .from('users')
+        .select('favorite_categories')
+        .eq('id', userId)
+        .maybeSingle();
+      if (!retry.error && retry.data) {
+        user = retry.data;
+      } else if (retry.error) {
+        userError = retry.error;
+      }
+    }
 
     if (userError || !user) {
       console.warn('[TopPicks Fallback] User not found; returning recent items');
@@ -2976,23 +3003,32 @@ export class ApiService {
   /**
    * Get top categories based on item count and user activity
    */
-  static async getTopCategories(userId: string, limit: number = 6) {
-    const fetchFn = () => this.authenticatedCall(async (client) => {
+  static async getTopCategories(userId: string, limit: number = 6, lang: AppLanguage = DEFAULT_LANGUAGE) {
+    const localizedColumn = lang === 'ka' ? 'title_ka' : 'title_en';
+    const fallbackColumn = lang === 'ka' ? 'title_en' : 'title_ka';
+
+    const fetchFn = () =>
+      this.authenticatedCall(async (client) => {
         console.log('[TopCategories] begin for user', userId, 'limit', limit);
         // Get all categories with item counts
         const { data: categories, error: categoriesError } = await client
           .from('categories')
-          .select('id, name, description')
-          .order('name');
+          .select('id, title_en, title_ka, description, slug, icon, color')
+          .eq('is_active', true);
 
         if (categoriesError || !categories) {
           console.warn('[TopCategories] categories error:', categoriesError?.message || categoriesError);
           return { data: null, error: categoriesError };
         }
 
+        const localizedCategories = categories.map((category: any) => ({
+          ...category,
+          name: category?.[localizedColumn] || category?.[fallbackColumn] || '',
+        }));
+
         // Get item counts per category (available items only)
         const categoriesWithCounts = await Promise.all(
-          categories.map(async (category) => {
+          localizedCategories.map(async (category) => {
             const { count } = await client
               .from('items')
               .select('id', { count: 'exact', head: true })
@@ -3002,14 +3038,14 @@ export class ApiService {
 
             return {
               ...category,
-              item_count: count || 0
+              item_count: count || 0,
             };
           })
         );
 
         // Sort by item count and get top categories
         const topCategories = categoriesWithCounts
-          .filter(cat => cat.item_count > 0)
+          .filter((cat) => cat.item_count > 0)
           .sort((a, b) => b.item_count - a.item_count)
           .slice(0, limit);
         console.log('[TopCategories] result count:', topCategories.length);
@@ -3022,9 +3058,9 @@ export class ApiService {
   /**
    * Get top categories (safe wrapper)
    */
-  static async getTopCategoriesSafe(userId: string, limit: number = 6) {
+  static async getTopCategoriesSafe(userId: string, limit: number = 6, lang: AppLanguage = DEFAULT_LANGUAGE) {
     try {
-      const result = await this.getTopCategories(userId, limit);
+      const result = await this.getTopCategories(userId, limit, lang);
       console.log('[TopCategoriesSafe] count:', Array.isArray(result?.data) ? result.data.length : 0, 'error?', !!result?.error);
       return {
         data: Array.isArray(result?.data) ? result.data : [],
@@ -3173,24 +3209,41 @@ export class ApiService {
   /**
    * Get all categories
    */
-  static async getCategories() {
+  static async getCategories(lang: AppLanguage = DEFAULT_LANGUAGE) {
+    const localizedColumn = lang === 'ka' ? 'title_ka' : 'title_en';
+    const fallbackColumn = lang === 'ka' ? 'title_en' : 'title_ka';
+
     // Cached categories for performance (used for favorite category chips and filters)
     return RedisCache.cache(
       'all-categories',
-      ['active'],
+      ['active', lang],
       () => this.authenticatedCall(async (client) => {
-        return await client
+        const { data, error } = await client
           .from('categories')
-          .select('id, name, description, is_active')
+          .select('id, title_en, title_ka, description, slug, icon, color, is_active, created_at')
           .eq('is_active', true)
-          .order('name', { ascending: true });
+          .order(localizedColumn, { ascending: true });
+
+        if (error || !data) {
+          return { data: null, error };
+        }
+
+        const dataWithLocalizedName = data.map((category: any) => ({
+          ...category,
+          name: category?.[localizedColumn] || category?.[fallbackColumn] || '',
+        }));
+
+        return {
+          data: dataWithLocalizedName,
+          error: null,
+        };
       }),
       true
     );
   }
 
-  static async getCategoryIdToNameMap() {
-    const { data } = await this.getCategories();
+  static async getCategoryIdToNameMap(lang: AppLanguage = DEFAULT_LANGUAGE) {
+    const { data } = await this.getCategories(lang);
     const map: Record<string, string> = {};
     (data || []).forEach((c: any) => { if (c?.id) map[c.id] = c.name || String(c.id); });
     return map;
@@ -3632,7 +3685,7 @@ export class ApiService {
   /**
    * Get item by ID with relations
    */
-  static async getItemById(itemId: string) {
+  static async getItemById(itemId: string, lang: AppLanguage = DEFAULT_LANGUAGE) {
     return this.authenticatedCall(async (client) => {
       // First get the item
       const { data: item, error: itemError } = await client
@@ -3652,13 +3705,25 @@ export class ApiService {
       
       // Get category if category_id exists
       if (item.category_id) {
+        const localizedColumn = lang === 'ka' ? 'title_ka' : 'title_en';
+        const fallbackColumn = lang === 'ka' ? 'title_en' : 'title_ka';
         try {
           const { data: categoryData } = await client
             .from('categories')
-            .select('name')
+            .select('id, title_en, title_ka, slug, description, icon, color')
             .eq('id', item.category_id)
             .single();
-          category = categoryData;
+          if (categoryData) {
+            category = {
+              ...categoryData,
+              name:
+                categoryData?.[localizedColumn] ||
+                categoryData?.[fallbackColumn] ||
+                categoryData?.title_en ||
+                categoryData?.title_ka ||
+                '',
+            };
+          }
         } catch (error) {
           console.log('Error fetching category:', error);
         }

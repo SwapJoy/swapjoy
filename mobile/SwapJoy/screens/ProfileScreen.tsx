@@ -15,8 +15,10 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { FlatList, Dimensions, Alert } from 'react-native';
 import { ApiService } from '../services/api';
 import { formatCurrency } from '../utils';
+import { useLocalization } from '../localization';
 
 const FollowButton: React.FC<{ targetUserId: string }> = ({ targetUserId }) => {
+  const { t } = useLocalization();
   const [loading, setLoading] = useState(false);
   const [isFollowing, setIsFollowing] = useState<boolean>(false);
 
@@ -38,14 +40,20 @@ const FollowButton: React.FC<{ targetUserId: string }> = ({ targetUserId }) => {
       if (isFollowing) {
         const { error } = await ApiService.unfollowUser(targetUserId);
         if (error) {
-          Alert.alert('Error', error.message || 'Failed to unfollow.');
+          Alert.alert(
+            t('profileScreen.alerts.errorTitle'),
+            error.message || t('profileScreen.alerts.unfollowFailed')
+          );
         } else {
           setIsFollowing(false);
         }
       } else {
         const { error } = await ApiService.followUser(targetUserId);
         if (error) {
-          Alert.alert('Error', error.message || 'Failed to follow.');
+          Alert.alert(
+            t('profileScreen.alerts.errorTitle'),
+            error.message || t('profileScreen.alerts.followFailed')
+          );
         } else {
           setIsFollowing(true);
         }
@@ -70,7 +78,11 @@ const FollowButton: React.FC<{ targetUserId: string }> = ({ targetUserId }) => {
           isFollowing ? styles.followButtonTextFollowing : styles.followButtonTextPrimary,
         ]}
       >
-        {loading ? 'Please wait…' : isFollowing ? 'Unfollow' : 'Follow'}
+        {loading
+          ? t('profileScreen.followButton.loading')
+          : isFollowing
+            ? t('profileScreen.followButton.unfollow')
+            : t('profileScreen.followButton.follow')}
       </Text>
     </TouchableOpacity>
   );
@@ -191,6 +203,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const viewedUserId: string | undefined = (route as any)?.name === 'UserProfile' ? (route as any)?.params?.userId : undefined;
+  const { t } = useLocalization();
   const {
     user,
     profile,
@@ -221,6 +234,34 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
   useEffect(() => {
     if (isViewingOtherUser) setActiveTab('published');
   }, [isViewingOtherUser]);
+
+  const strings = useMemo(() => ({
+    stats: {
+      followers: t('profileScreen.stats.followers'),
+      following: t('profileScreen.stats.following'),
+      ratingTitle: t('profileScreen.stats.ratingTitle'),
+      reviews: t('profileScreen.stats.reviews'),
+    },
+    tabs: {
+      published: t('profileScreen.tabs.published'),
+      saved: t('profileScreen.tabs.saved'),
+      drafts: t('profileScreen.tabs.drafts'),
+    },
+    loading: {
+      items: t('profileScreen.loading.items'),
+    },
+    empty: {
+      title: t('profileScreen.empty.title'),
+      published: t('profileScreen.empty.published'),
+      saved: t('profileScreen.empty.saved'),
+      drafts: t('profileScreen.empty.drafts'),
+    },
+  }), [t]);
+
+  const reviewsLabel = useCallback(
+    (count: number) => strings.stats.reviews.replace('{count}', String(count)),
+    [strings.stats.reviews]
+  );
 
   // Load items when tab changes (lazy loading)
   useEffect(() => {
@@ -279,13 +320,13 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
         defaultSource={require('../assets/icon.png')}
       />
       <View style={styles.gridMetaBar}>
-        <Text style={styles.gridMetaText} numberOfLines={1}>{item.title || 'Untitled'}</Text>
+        <Text style={styles.gridMetaText} numberOfLines={1}>{item.title || t('profileScreen.grid.untitled')}</Text>
         {typeof item.price !== 'undefined' && item.price !== null && (
           <Text style={styles.gridMetaPrice}>{formatCurrency(Number(item.price), item.currency || 'USD').replace(/\.00$/, '')}</Text>
         )}
       </View>
     </TouchableOpacity>
-  ), [itemSize, navigation]);
+  ), [itemSize, navigation, t]);
 
   return (
     <View style={styles.container}>
@@ -340,7 +381,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
                         activeOpacity={0.7}
                       >
                         <Text style={styles.socialStatValue}>{followCounts.followers}</Text>
-                        <Text style={styles.socialStatLabel}>Followers</Text>
+                        <Text style={styles.socialStatLabel}>{strings.stats.followers}</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={styles.socialStatItem}
@@ -348,7 +389,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
                         activeOpacity={0.7}
                       >
                         <Text style={styles.socialStatValue}>{followCounts.following}</Text>
-                        <Text style={styles.socialStatLabel}>Following</Text>
+                        <Text style={styles.socialStatLabel}>{strings.stats.following}</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -366,6 +407,11 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
                   ) && (
                     <Text style={styles.username}>@
                       {profile?.username || (user as any)?.user_metadata?.username || (user as any)?.email?.split?.('@')?.[0]}
+                    </Text>
+                  )}
+                  {(profile?.email || (user as any)?.email) && (
+                    <Text style={styles.emailText}>
+                      {profile?.email || (user as any)?.email}
                     </Text>
                   )}
                   {(profile?.bio) && (
@@ -398,11 +444,11 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
             {/* Rating */}
             {!loadingMetrics && rating.totalRatings > 0 && (
               <View style={styles.ratingContainer}>
-                <Text style={styles.ratingTitle}>Rating</Text>
+                <Text style={styles.ratingTitle}>{strings.stats.ratingTitle}</Text>
                 <View style={styles.ratingContent}>
                   <Text style={styles.ratingValue}>{formatRating(rating.averageRating)}</Text>
                   <Text style={styles.ratingStars}>★★★★★</Text>
-                  <Text style={styles.ratingCount}>({rating.totalRatings} reviews)</Text>
+                  <Text style={styles.ratingCount}>{reviewsLabel(rating.totalRatings)}</Text>
                 </View>
               </View>
             )}
@@ -416,19 +462,25 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
                       onPress={() => setActiveTab('published')}
                       style={[styles.tabButton, activeTab === 'published' && styles.tabButtonActive]}
                     >
-                      <Text style={[styles.tabText, activeTab === 'published' && styles.tabTextActive]}>Published</Text>
+                      <Text style={[styles.tabText, activeTab === 'published' && styles.tabTextActive]}>
+                        {strings.tabs.published}
+                      </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={() => setActiveTab('saved')}
                       style={[styles.tabButton, activeTab === 'saved' && styles.tabButtonActive]}
                     >
-                      <Text style={[styles.tabText, activeTab === 'saved' && styles.tabTextActive]}>Saved</Text>
+                      <Text style={[styles.tabText, activeTab === 'saved' && styles.tabTextActive]}>
+                        {strings.tabs.saved}
+                      </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       onPress={() => setActiveTab('drafts')}
                       style={[styles.tabButton, activeTab === 'drafts' && styles.tabButtonActive]}
                     >
-                      <Text style={[styles.tabText, activeTab === 'drafts' && styles.tabTextActive]}>Drafts</Text>
+                      <Text style={[styles.tabText, activeTab === 'drafts' && styles.tabTextActive]}>
+                        {strings.tabs.drafts}
+                      </Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -436,13 +488,17 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
                 {isLoadingCurrentTab ? (
                   <View style={styles.loadingItemsContainer}>
                     <ActivityIndicator size="large" color="#007AFF" />
-                    <Text style={styles.loadingItemsText}>Loading items...</Text>
+                    <Text style={styles.loadingItemsText}>{strings.loading.items}</Text>
                   </View>
                 ) : gridData.length === 0 ? (
                   <View style={styles.emptyItemsContainer}>
-                    <Text style={styles.emptyItemsText}>No items to display</Text>
+                    <Text style={styles.emptyItemsText}>{strings.empty.title}</Text>
                     <Text style={styles.emptyItemsSubtext}>
-                      {activeTab === 'published' ? 'Publish items to show here.' : activeTab === 'saved' ? 'Save items to view them here.' : 'Your draft items will appear here.'}
+                      {activeTab === 'published'
+                        ? strings.empty.published
+                        : activeTab === 'saved'
+                          ? strings.empty.saved
+                          : strings.empty.drafts}
                     </Text>
                   </View>
                 ) : null}
@@ -537,6 +593,12 @@ const styles = StyleSheet.create({
   username: {
     fontSize: 15,
     color: '#737373',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emailText: {
+    fontSize: 14,
+    color: '#4a4a4a',
     marginBottom: 8,
     textAlign: 'center',
   },

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -15,24 +15,53 @@ import { Ionicons } from '@expo/vector-icons';
 import { ItemPreviewScreenProps } from '../types/navigation';
 import { DraftManager } from '../services/draftManager';
 import { ApiService } from '../services/api';
-import { ItemDraft, Category } from '../types/item';
+import { ItemDraft, Category, ItemCondition } from '../types/item';
 import { formatCurrency } from '../utils';
+import { useLocalization } from '../localization';
 
 const { width } = Dimensions.get('window');
-
-const CONDITIONS_DISPLAY: Record<string, string> = {
-  new: 'New',
-  like_new: 'Like New',
-  good: 'Good',
-  fair: 'Fair',
-  poor: 'Poor',
-};
 
 const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
   navigation,
   route,
 }) => {
   const { draftId } = route.params;
+  const { language, t } = useLocalization();
+  const strings = useMemo(() => ({
+    loading: t('addItem.preview.loading'),
+    headerTitle: t('addItem.preview.title'),
+    descriptionTitle: t('addItem.preview.descriptionTitle'),
+    infoTitle: t('addItem.preview.infoTitle'),
+    info: {
+      category: t('addItem.preview.info.category'),
+      condition: t('addItem.preview.info.condition'),
+      price: t('addItem.preview.info.price'),
+    },
+    note: t('addItem.preview.note'),
+    buttons: {
+      edit: t('addItem.preview.buttons.edit'),
+      submit: t('addItem.preview.buttons.submit'),
+      submitting: t('addItem.preview.buttons.submitting'),
+    },
+    alerts: {
+      draftNotFoundTitle: t('addItem.preview.alerts.draftNotFoundTitle'),
+      draftNotFoundMessage: t('addItem.preview.alerts.draftNotFoundMessage'),
+      loadFailed: t('addItem.preview.alerts.loadFailed'),
+      incompleteTitle: t('addItem.preview.alerts.incompleteTitle'),
+      incompleteMessage: t('addItem.preview.alerts.incompleteMessage'),
+      submitTitle: t('addItem.preview.alerts.submitTitle'),
+      submitMessage: t('addItem.preview.alerts.submitMessage'),
+      submitConfirm: t('addItem.preview.alerts.submitConfirm'),
+      successTitle: t('addItem.preview.alerts.successTitle'),
+      successMessage: t('addItem.preview.alerts.successMessage'),
+      submitError: t('addItem.preview.alerts.submitError'),
+    },
+  }), [t]);
+  const getConditionLabel = useCallback(
+    (value?: ItemCondition | null) =>
+      value ? t(`addItem.conditions.${value}` as const) : t('common.notAvailable'),
+    [t]
+  );
 
   const [draft, setDraft] = useState<ItemDraft | null>(null);
   const [category, setCategory] = useState<Category | null>(null);
@@ -40,15 +69,11 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
-  useEffect(() => {
-    loadDraft();
-  }, []);
-
-  const loadDraft = async () => {
+  const loadDraft = useCallback(async () => {
     try {
       const loadedDraft = await DraftManager.getDraft(draftId);
       if (!loadedDraft) {
-        Alert.alert('Error', 'Draft not found');
+        Alert.alert(strings.alerts.draftNotFoundTitle, strings.alerts.draftNotFoundMessage);
         navigation.goBack();
         return;
       }
@@ -57,7 +82,7 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
 
       // Load category details
       if (loadedDraft.category_id) {
-        const { data: categories } = await ApiService.getCategories();
+        const { data: categories } = await ApiService.getCategories(language);
         if (categories) {
           const cat = categories.find((c) => c.id === loadedDraft.category_id);
           setCategory(cat || null);
@@ -65,31 +90,35 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
       }
     } catch (error) {
       console.error('Error loading draft:', error);
-      Alert.alert('Error', 'Failed to load preview');
+      Alert.alert(strings.alerts.draftNotFoundTitle, strings.alerts.loadFailed);
     } finally {
       setLoading(false);
     }
-  };
+  }, [draftId, language, navigation, strings.alerts.draftNotFoundTitle, strings.alerts.draftNotFoundMessage, strings.alerts.loadFailed]);
+
+  useEffect(() => {
+    loadDraft();
+  }, [loadDraft]);
 
   const handleSubmit = async () => {
     if (!draft) return;
 
     // Final validation
     if (!DraftManager.isDraftComplete(draft)) {
-      Alert.alert('Incomplete', 'Please fill in all required fields');
+      Alert.alert(strings.alerts.incompleteTitle, strings.alerts.incompleteMessage);
       return;
     }
 
     Alert.alert(
-      'Submit Item',
-      'Are you ready to list this item?',
+      strings.alerts.submitTitle,
+      strings.alerts.submitMessage,
       [
         {
-          text: 'Cancel',
+          text: t('common.cancel'),
           style: 'cancel',
         },
         {
-          text: 'Submit',
+          text: strings.alerts.submitConfirm,
           style: 'default',
           onPress: submitItem,
         },
@@ -155,11 +184,11 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
 
       // Show success and navigate
       Alert.alert(
-        'Success!',
-        'Your item has been listed successfully.',
+        strings.alerts.successTitle,
+        strings.alerts.successMessage,
         [
           {
-            text: 'OK',
+            text: t('common.ok'),
             onPress: () => {
               // Navigate to item details or back to main screen
               navigation.reset({
@@ -175,7 +204,7 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
       );
     } catch (error: any) {
       console.error('Error submitting item:', error);
-      Alert.alert('Error', error.message || 'Failed to submit item. Please try again.');
+      Alert.alert(t('common.error'), error.message || strings.alerts.submitError);
     } finally {
       setSubmitting(false);
     }
@@ -190,7 +219,7 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#007AFF" />
-          <Text style={styles.loadingText}>Loading preview...</Text>
+          <Text style={styles.loadingText}>{strings.loading}</Text>
         </View>
       </SafeAreaView>
     );
@@ -203,7 +232,7 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
         <TouchableOpacity style={styles.backButton} onPress={handleEdit}>
           <Ionicons name="arrow-back" size={24} color="#007AFF" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Preview</Text>
+        <Text style={styles.headerTitle}>{strings.headerTitle}</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -264,7 +293,7 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
               <View style={styles.tag}>
                 <Ionicons name="checkmark-circle" size={14} color="#34C759" />
                 <Text style={styles.tagText}>
-                  {CONDITIONS_DISPLAY[draft.condition]}
+                  {getConditionLabel(draft.condition)}
                 </Text>
               </View>
             )}
@@ -275,25 +304,23 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
 
           {/* Description */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Description</Text>
+            <Text style={styles.sectionTitle}>{strings.descriptionTitle}</Text>
             <Text style={styles.description}>{draft.description}</Text>
           </View>
 
           {/* Item Info */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Item Information</Text>
+            <Text style={styles.sectionTitle}>{strings.infoTitle}</Text>
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Category</Text>
-              <Text style={styles.infoValue}>{category?.name || 'N/A'}</Text>
+              <Text style={styles.infoLabel}>{strings.info.category}</Text>
+              <Text style={styles.infoValue}>{category?.name || t('common.notAvailable')}</Text>
             </View>
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Condition</Text>
-              <Text style={styles.infoValue}>
-                {draft.condition ? CONDITIONS_DISPLAY[draft.condition] : 'N/A'}
-              </Text>
+              <Text style={styles.infoLabel}>{strings.info.condition}</Text>
+              <Text style={styles.infoValue}>{getConditionLabel(draft.condition)}</Text>
             </View>
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Price</Text>
+              <Text style={styles.infoLabel}>{strings.info.price}</Text>
               <Text style={styles.infoValue}>
                 {formatCurrency(parseFloat(draft.price), draft.currency)}
               </Text>
@@ -304,7 +331,7 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
           <View style={styles.noteContainer}>
             <Ionicons name="information-circle" size={20} color="#8e8e93" />
             <Text style={styles.noteText}>
-              Review your listing carefully. You can edit it later from your profile.
+              {strings.note}
             </Text>
           </View>
         </View>
@@ -317,7 +344,7 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
           onPress={handleEdit}
           disabled={submitting}
         >
-          <Text style={styles.editButtonText}>Edit</Text>
+          <Text style={styles.editButtonText}>{strings.buttons.edit}</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.submitButton, submitting && styles.submitButtonDisabled]}
@@ -327,11 +354,11 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
           {submitting ? (
             <>
               <ActivityIndicator size="small" color="#fff" />
-              <Text style={styles.submitButtonText}>Submitting...</Text>
+              <Text style={styles.submitButtonText}>{strings.buttons.submitting}</Text>
             </>
           ) : (
             <>
-              <Text style={styles.submitButtonText}>Submit</Text>
+              <Text style={styles.submitButtonText}>{strings.buttons.submit}</Text>
               <Ionicons name="checkmark" size={20} color="#fff" />
             </>
           )}

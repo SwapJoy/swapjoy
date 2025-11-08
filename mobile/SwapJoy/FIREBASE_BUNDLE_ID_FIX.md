@@ -44,3 +44,5 @@ If you still see errors, the plist file might not be in the app bundle. Add it m
 4. Ensure "Copy items if needed" and "Add to targets: SwapJoy" are checked
 5. Click "Add"
 
+
+

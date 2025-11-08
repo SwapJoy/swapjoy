@@ -11,20 +11,66 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { OffersScreenProps } from '../types/navigation';
 import { useOffersData, Offer } from '../hooks/useOffersData';
+import { useLocalization } from '../localization';
 
 const { width } = Dimensions.get('window');
 
 const OffersScreen: React.FC<OffersScreenProps> = memo(({ route }) => {
   const { sentOffers, receivedOffers, loading, refreshing, onRefresh, getStatusColor, getStatusText } = useOffersData();
+  const { t } = useLocalization();
+  const strings = useMemo(
+    () => ({
+      tabs: {
+        sent: t('offers.list.tabSent'),
+        received: t('offers.list.tabReceived'),
+      },
+      types: {
+        sent: t('offers.list.sentOffer'),
+        received: t('offers.list.receivedOffer'),
+      },
+      noMessage: t('offers.list.noMessage'),
+      topUpYouAdd: t('offers.list.topUpYouAdd'),
+      topUpTheyAdd: t('offers.list.topUpTheyAdd'),
+      moreItems: t('offers.list.moreItems'),
+      toUser: t('offers.list.toUser'),
+      fromUser: t('offers.list.fromUser'),
+      emptySentTitle: t('offers.list.emptySentTitle'),
+      emptySentSubtitle: t('offers.list.emptySentSubtitle'),
+      emptyReceivedTitle: t('offers.list.emptyReceivedTitle'),
+      emptyReceivedSubtitle: t('offers.list.emptyReceivedSubtitle'),
+    }),
+    [t]
+  );
   const [activeTab, setActiveTab] = useState<'sent' | 'received'>((route?.params as any)?.initialTab ?? 'sent');
 
   const data = activeTab === 'sent' ? sentOffers : receivedOffers;
+
+  const formatTopUp = useCallback(
+    (amount: number) => {
+      const formatted = `$${Math.abs(amount).toFixed(2)}`;
+      return amount > 0
+        ? strings.topUpYouAdd.replace('{amount}', formatted)
+        : strings.topUpTheyAdd.replace('{amount}', formatted);
+    },
+    [strings.topUpTheyAdd, strings.topUpYouAdd]
+  );
+
+  const formatUserLabel = useCallback(
+    (username: string, isSent: boolean) =>
+      (isSent ? strings.toUser : strings.fromUser).replace('{username}', username || ''),
+    [strings.fromUser, strings.toUser]
+  );
+
+  const formatMoreItems = useCallback(
+    (count: number) => strings.moreItems.replace('{count}', String(count)),
+    [strings.moreItems]
+  );
 
   const OfferRow = React.memo(({ item }: { item: Offer }) => (
     <TouchableOpacity style={styles.offerCard}>
       <View style={styles.offerHeader}>
         <Text style={styles.offerType}>
-          {activeTab === 'sent' ? 'Sent Offer' : 'Received Offer'}
+          {activeTab === 'sent' ? strings.types.sent : strings.types.received}
         </Text>
         <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
           <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
@@ -33,12 +79,12 @@ const OffersScreen: React.FC<OffersScreenProps> = memo(({ route }) => {
       
       <View style={styles.offerContent}>
         <Text style={styles.offerMessage} numberOfLines={2}>
-          {item.message || 'No message provided'}
+          {item.message || strings.noMessage}
         </Text>
         
         {!!item.top_up_amount && item.top_up_amount !== 0 && (
           <Text style={styles.topUpAmount}>
-            {item.top_up_amount > 0 ? `+$${item.top_up_amount.toFixed(2)} cash` : `They add $${Math.abs(item.top_up_amount).toFixed(2)}`}
+            {formatTopUp(item.top_up_amount)}
           </Text>
         )}
         
@@ -46,13 +92,13 @@ const OffersScreen: React.FC<OffersScreenProps> = memo(({ route }) => {
           {item.offer_items?.slice(0, 3).map((offerItem: any, index: number) => (
             <View key={index} style={styles.itemPreview}>
               <Text style={styles.itemTitle} numberOfLines={1}>
-                {offerItem.item?.title || 'Item'}
+                {offerItem.item?.title || ''}
               </Text>
             </View>
           ))}
           {item.offer_items && item.offer_items.length > 3 && (
             <Text style={styles.moreItems}>
-              +{item.offer_items.length - 3} more items
+              {formatMoreItems(item.offer_items.length - 3)}
             </Text>
           )}
         </View>
@@ -62,7 +108,7 @@ const OffersScreen: React.FC<OffersScreenProps> = memo(({ route }) => {
             {new Date(item.created_at).toLocaleDateString()}
           </Text>
           <Text style={styles.offerUser}>
-            {activeTab === 'sent' ? `To: ${item.receiver?.username}` : `From: ${item.sender?.username}`}
+            {formatUserLabel(activeTab === 'sent' ? item.receiver?.username : item.sender?.username, activeTab === 'sent')}
           </Text>
         </View>
       </View>
@@ -74,9 +120,10 @@ const OffersScreen: React.FC<OffersScreenProps> = memo(({ route }) => {
     (prev.item.offer_items?.length || 0) === (next.item.offer_items?.length || 0)
   ));
 
-  const renderOffer = useCallback(({ item }: { item: Offer }) => (
-    <OfferRow item={item} />
-  ), []);
+  const renderOffer = useCallback(
+    ({ item }: { item: Offer }) => <OfferRow item={item} />,
+    []
+  );
 
   // Lightweight shimmer
   const SkeletonLoader: React.FC<{ width?: number | string; height?: number; borderRadius?: number; style?: any }> = ({ width = '100%', height = 16, borderRadius = 6, style }) => {
@@ -130,13 +177,13 @@ const OffersScreen: React.FC<OffersScreenProps> = memo(({ route }) => {
               onPress={() => setActiveTab('sent')}
               style={[styles.tabButton, activeTab === 'sent' && styles.tabButtonActive]}
             >
-              <Text style={[styles.tabText, activeTab === 'sent' && styles.tabTextActive]}>Sent</Text>
+              <Text style={[styles.tabText, activeTab === 'sent' && styles.tabTextActive]}>{strings.tabs.sent}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => setActiveTab('received')}
               style={[styles.tabButton, activeTab === 'received' && styles.tabButtonActive]}
             >
-              <Text style={[styles.tabText, activeTab === 'received' && styles.tabTextActive]}>Received</Text>
+              <Text style={[styles.tabText, activeTab === 'received' && styles.tabTextActive]}>{strings.tabs.received}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -156,17 +203,17 @@ const OffersScreen: React.FC<OffersScreenProps> = memo(({ route }) => {
     <View style={styles.container}>
       <View style={styles.tabsWrapper}>
         <View style={styles.tabsContainer}>
-          <TouchableOpacity
-            onPress={() => setActiveTab('sent')}
-            style={[styles.tabButton, activeTab === 'sent' && styles.tabButtonActive]}
-          >
-            <Text style={[styles.tabText, activeTab === 'sent' && styles.tabTextActive]}>Sent</Text>
+            <TouchableOpacity
+              onPress={() => setActiveTab('sent')}
+              style={[styles.tabButton, activeTab === 'sent' && styles.tabButtonActive]}
+            >
+              <Text style={[styles.tabText, activeTab === 'sent' && styles.tabTextActive]}>{strings.tabs.sent}</Text>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => setActiveTab('received')}
             style={[styles.tabButton, activeTab === 'received' && styles.tabButtonActive]}
           >
-            <Text style={[styles.tabText, activeTab === 'received' && styles.tabTextActive]}>Received</Text>
+              <Text style={[styles.tabText, activeTab === 'received' && styles.tabTextActive]}>{strings.tabs.received}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -190,9 +237,11 @@ const OffersScreen: React.FC<OffersScreenProps> = memo(({ route }) => {
         removeClippedSubviews={false}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyTitle}>No {activeTab === 'sent' ? 'sent' : 'received'} offers</Text>
+            <Text style={styles.emptyTitle}>
+              {activeTab === 'sent' ? strings.emptySentTitle : strings.emptyReceivedTitle}
+            </Text>
             <Text style={styles.emptySubtitle}>
-              {activeTab === 'sent' ? 'Send an offer to get the conversation started.' : `You'll see offers from others here.`}
+              {activeTab === 'sent' ? strings.emptySentSubtitle : strings.emptyReceivedSubtitle}
             </Text>
           </View>
         }

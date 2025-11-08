@@ -1,16 +1,21 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { ApiService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import { useLocalization } from '../localization';
 
 export interface TopCategory {
   id: string;
   name: string;
-  description: string;
+  description: string | null;
+  icon?: string | null;
+  color?: string | null;
+  slug?: string | null;
   item_count: number;
 }
 
 export const useTopCategories = (limit: number = 6) => {
   const { user } = useAuth();
+  const { language } = useLocalization();
   const [categories, setCategories] = useState<TopCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<any>(null);
@@ -29,7 +34,7 @@ export const useTopCategories = (limit: number = 6) => {
       setLoading(true);
       setError(null);
 
-      const { data, error: fetchError } = await ApiService.getTopCategoriesSafe(user.id, limit);
+      const { data, error: fetchError } = await ApiService.getTopCategoriesSafe(user.id, limit, language);
 
       if (fetchError) {
         console.error('Error fetching top categories:', fetchError);
@@ -54,13 +59,13 @@ export const useTopCategories = (limit: number = 6) => {
         setLoading(false);
       }
     }
-  }, [user?.id, limit]);
+  }, [user?.id, limit, language]);
 
   useEffect(() => {
     if (user && !hasFetchedRef.current) {
       fetchCategories();
     }
-  }, [user?.id, limit]);
+  }, [user?.id, limit, language, fetchCategories]);
 
   useEffect(() => {
     return () => {

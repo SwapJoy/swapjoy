@@ -50,3 +50,5 @@ echo "1. For iOS: Open Xcode and add GoogleService-Info.plist to your project"
 echo "2. For Android: Verify google-services.json is in android/app/"
 echo "3. Follow the instructions in NATIVE_FIREBASE_SETUP.md"
 
+
+

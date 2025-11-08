@@ -3,8 +3,22 @@ import { View, Text, StyleSheet, TextInput, FlatList, Image, TouchableOpacity, A
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SearchScreenProps } from '../types/navigation';
 import { ApiService } from '../services/api';
+import { useLocalization } from '../localization';
 
 const SearchScreen: React.FC<SearchScreenProps> = ({ navigation }) => {
+  const { t } = useLocalization();
+  const strings = useMemo(
+    () => ({
+      placeholder: t('search.placeholder'),
+      startTitle: t('search.startTitle'),
+      startSubtitle: t('search.startSubtitle'),
+      noResultsTitle: t('search.noResultsTitle'),
+      noResultsSubtitle: t('search.noResultsSubtitle'),
+      noImage: t('search.noImage'),
+      error: t('search.error'),
+    }),
+    [t]
+  );
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -16,7 +30,7 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ navigation }) => {
     <View style={styles.searchBarWrapper}>
       <View style={styles.searchContainer}>
         <TextInput
-          placeholder="Search items"
+          placeholder={strings.placeholder}
           placeholderTextColor="#9aa0a6"
           value={query}
           onChangeText={setQuery}
@@ -28,7 +42,7 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ navigation }) => {
         />
       </View>
     </View>
-  ), [query]);
+  ), [query, strings.placeholder]);
 
   const requestIdRef = useRef(0);
   const performSearch = useCallback(async (text: string) => {
@@ -55,7 +69,7 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ navigation }) => {
       const { data: semData, error: apiError } = await ApiService.semanticSearch(text, 30);
       if (currentId !== requestIdRef.current) return;
       if (apiError) {
-        setError(apiError.message || '');
+        setError(apiError.message || strings.error);
       } else if (Array.isArray(semData)) {
         // Merge by id; compute combined score if similarity fields exist
         const byId: Record<string, any> = {};
@@ -85,12 +99,12 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ navigation }) => {
       }
     } catch (e: any) {
       if (currentId === requestIdRef.current) {
-        setError(e?.message || '');
+        setError(e?.message || strings.error);
       }
     } finally {
       if (currentId === requestIdRef.current) setLoading(false);
     }
-  }, []);
+  }, [strings.error]);
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -110,7 +124,7 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ navigation }) => {
           <Image source={{ uri: imageUrl }} style={styles.cardImage} />
         ) : (
           <View style={[styles.cardImage, styles.imagePlaceholder]}>
-            <Text style={styles.imagePlaceholderText}>No Image</Text>
+            <Text style={styles.imagePlaceholderText}>{strings.noImage}</Text>
           </View>
         )}
         <View style={styles.cardContent}>
@@ -125,7 +139,7 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ navigation }) => {
         </View>
       </TouchableOpacity>
     );
-  }, [navigation]);
+  }, [navigation, strings.noImage]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -136,13 +150,13 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ navigation }) => {
         </View>
       ) : results.length === 0 && !query ? (
         <View style={styles.centerContainer}>
-          <Text style={styles.placeholderTitle}>Start searching</Text>
-          <Text style={styles.placeholderSubtitle}>Try "gaming headset" or "baby stroller"</Text>
+          <Text style={styles.placeholderTitle}>{strings.startTitle}</Text>
+          <Text style={styles.placeholderSubtitle}>{strings.startSubtitle}</Text>
         </View>
       ) : results.length === 0 && !!query ? (
         <View style={styles.centerContainer}>
-          <Text style={styles.placeholderTitle}>No results</Text>
-          <Text style={styles.placeholderSubtitle}>Try different keywords</Text>
+          <Text style={styles.placeholderTitle}>{strings.noResultsTitle}</Text>
+          <Text style={styles.placeholderSubtitle}>{strings.noResultsSubtitle}</Text>
         </View>
       ) : (
         <FlatList

@@ -6,14 +6,13 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { EmailSignInScreenProps } from '../types/navigation';
+import { useLocalization } from '../localization';
 
 const EmailSignInScreen: React.FC<EmailSignInScreenProps> = ({ navigation }) => {
   const [email, setEmail] = useState('');
@@ -22,15 +21,16 @@ const EmailSignInScreen: React.FC<EmailSignInScreenProps> = ({ navigation }) => 
   const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const { signInWithEmail, signInWithGoogle } = useAuth();
+  const { t } = useLocalization();
 
   const handleSignIn = async () => {
     if (!email.trim() || !password.trim()) {
-      setError('Please enter both email and password');
+      setError(t('auth.signIn.errors.missingCredentials'));
       return;
     }
 
     if (!email.includes('@')) {
-      setError('Please enter a valid email address');
+      setError(t('auth.signIn.errors.invalidEmail'));
       return;
     }
 
@@ -46,7 +46,7 @@ const EmailSignInScreen: React.FC<EmailSignInScreenProps> = ({ navigation }) => 
         // Navigation will be handled by AuthContext/auth state change
       }
     } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred');
+      setError(err.message || t('auth.signIn.errors.unexpected'));
     } finally {
       setIsLoading(false);
     }
@@ -65,7 +65,7 @@ const EmailSignInScreen: React.FC<EmailSignInScreenProps> = ({ navigation }) => 
         // Navigation will be handled by AuthContext/auth state change
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to sign in with Google');
+      setError(err.message || t('auth.signIn.errors.googleFailed'));
     } finally {
       setIsLoading(false);
     }
@@ -80,25 +80,16 @@ const EmailSignInScreen: React.FC<EmailSignInScreenProps> = ({ navigation }) => 
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
-            <Text style={styles.backButtonText}>← Back</Text>
-          </TouchableOpacity>
-          <Text style={styles.title}>Sign In</Text>
-          <View style={styles.placeholder} />
-        </View>
-
         {/* Content */}
         <View style={styles.content}>
-          <Text style={styles.subtitle}>Welcome to SwapJoy</Text>
+          <Text style={styles.subtitle}>{t('auth.signIn.title')}</Text>
           <Text style={styles.description}>
-            Sign in to get started
+            {t('auth.signIn.description')}
           </Text>
 
           {error && (
@@ -118,14 +109,14 @@ const EmailSignInScreen: React.FC<EmailSignInScreenProps> = ({ navigation }) => 
             ) : (
               <>
                 <Ionicons name="logo-google" size={20} color="#fff" style={styles.googleIcon} />
-                <Text style={styles.googleButtonText}>Continue with Google</Text>
+                <Text style={styles.googleButtonText}>{t('auth.common.continueWithGoogle')}</Text>
               </>
             )}
           </TouchableOpacity>
 
           <View style={styles.divider}>
             <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>OR</Text>
+            <Text style={styles.dividerText}>{t('auth.common.dividerLabel')}</Text>
             <View style={styles.dividerLine} />
           </View>
 
@@ -134,7 +125,7 @@ const EmailSignInScreen: React.FC<EmailSignInScreenProps> = ({ navigation }) => 
             <Ionicons name="mail-outline" size={20} color="#666" style={styles.inputIcon} />
             <TextInput
               style={styles.input}
-              placeholder="Email"
+              placeholder={t('auth.common.emailPlaceholder')}
               placeholderTextColor="#999"
               value={email}
               onChangeText={(text) => {
@@ -151,7 +142,7 @@ const EmailSignInScreen: React.FC<EmailSignInScreenProps> = ({ navigation }) => 
             <Ionicons name="lock-closed-outline" size={20} color="#666" style={styles.inputIcon} />
             <TextInput
               style={styles.input}
-              placeholder="Password"
+              placeholder={t('auth.common.passwordPlaceholder')}
               placeholderTextColor="#999"
               value={password}
               onChangeText={(text) => {
@@ -182,19 +173,19 @@ const EmailSignInScreen: React.FC<EmailSignInScreenProps> = ({ navigation }) => 
             {isLoading ? (
               <ActivityIndicator color="white" />
             ) : (
-              <Text style={styles.signInButtonText}>Sign In with Email</Text>
+              <Text style={styles.signInButtonText}>{t('auth.common.buttons.signInWithEmail')}</Text>
             )}
           </TouchableOpacity>
 
           <View style={styles.signUpContainer}>
-            <Text style={styles.signUpText}>Don't have an account? </Text>
+            <Text style={styles.signUpText}>{t('auth.common.links.noAccount')} </Text>
             <TouchableOpacity onPress={handleSignUpPress}>
-              <Text style={styles.signUpLink}>Sign Up</Text>
+              <Text style={styles.signUpLink}>{t('auth.common.links.signUp')}</Text>
             </TouchableOpacity>
           </View>
         </View>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 };
 

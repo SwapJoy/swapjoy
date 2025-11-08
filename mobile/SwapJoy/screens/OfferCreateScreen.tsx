@@ -6,12 +6,29 @@ import { OfferCreateScreenProps } from '../types/navigation';
 import { useAuth } from '../contexts/AuthContext';
 import { ApiService } from '../services/api';
 import { formatCurrency } from '../utils';
+import { useLocalization } from '../localization';
 
 const { width } = Dimensions.get('window');
 
 const OfferCreateScreen: React.FC<OfferCreateScreenProps> = ({ navigation, route }) => {
   const { user } = useAuth();
   const { receiverId, requestedItems, contextTitle } = route.params;
+  const { t } = useLocalization();
+  const strings = useMemo(
+    () => ({
+      requestedTitle: t('offers.create.requestedTitle'),
+      toggleLabel: t('offers.create.toggleLabel'),
+      placeholderAdd: t('offers.create.placeholderAdd'),
+      placeholderRequest: t('offers.create.placeholderRequest'),
+      selectYourItems: t('offers.create.selectYourItems'),
+      messagePlaceholder: t('offers.create.messagePlaceholder'),
+      nextButton: t('offers.create.nextButton'),
+      errorTitle: t('offers.create.errors.title'),
+      loadItemsError: t('offers.create.errors.loadItems'),
+      unknownCondition: t('offers.create.unknownCondition'),
+    }),
+    [t]
+  );
 
   const [myItems, setMyItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,7 +60,7 @@ const OfferCreateScreen: React.FC<OfferCreateScreenProps> = ({ navigation, route
       const { data, error } = await ApiService.getUserItems(user.id);
       if (!mounted) return;
       if (error) {
-        Alert.alert('Error', error.message || 'Failed to load your items');
+        Alert.alert(strings.errorTitle, error.message || strings.loadItemsError);
       } else {
         const available = (data || []).filter((it: any) => it.status === 'available');
         setMyItems(available);
@@ -51,7 +68,7 @@ const OfferCreateScreen: React.FC<OfferCreateScreenProps> = ({ navigation, route
       setLoading(false);
     })();
     return () => { mounted = false; };
-  }, [user?.id]);
+  }, [user?.id, strings.errorTitle, strings.loadItemsError]);
 
   const toggleSelect = useCallback((id: string) => {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
@@ -116,7 +133,9 @@ const OfferCreateScreen: React.FC<OfferCreateScreenProps> = ({ navigation, route
           />
           <View style={{ flex: 1 }}>
             <Text style={styles.myItemTitle} numberOfLines={1}>{item.title}</Text>
-            <Text style={styles.myItemMeta}>{formatCurrency(item.price || 0, item.currency || 'USD')} • {item.condition || 'unknown'}</Text>
+            <Text style={styles.myItemMeta}>
+              {formatCurrency(item.price || 0, item.currency || 'USD')} • {item.condition || strings.unknownCondition}
+            </Text>
           </View>
           <View style={[styles.checkbox, selected && styles.checkboxOn]} />
         </TouchableOpacity>
@@ -144,7 +163,7 @@ const OfferCreateScreen: React.FC<OfferCreateScreenProps> = ({ navigation, route
 
   const listHeader = useMemo(() => (
     <View>
-      <Text style={styles.sectionTitle}>{contextTitle || 'Selected Items'}</Text>
+      <Text style={styles.sectionTitle}>{contextTitle || strings.requestedTitle}</Text>
       <FlatList
         data={requestedItems}
         keyExtractor={(it) => it.id}
@@ -156,11 +175,11 @@ const OfferCreateScreen: React.FC<OfferCreateScreenProps> = ({ navigation, route
 
       <View style={styles.moneyBox}>
         <View style={styles.toggleRow}>
-          <Text style={styles.toggleLabel}>I will add money</Text>
+          <Text style={styles.toggleLabel}>{strings.toggleLabel}</Text>
           <Switch value={iWillAddMoney} onValueChange={setIWillAddMoney} />
         </View>
         <TextInput
-          placeholder={iWillAddMoney ? 'Amount you will add (optional)' : 'Amount you ask them to add (optional)'}
+          placeholder={iWillAddMoney ? strings.placeholderAdd : strings.placeholderRequest}
           keyboardType="decimal-pad"
           value={amountInput}
           onChangeText={setAmountInput}
@@ -169,10 +188,10 @@ const OfferCreateScreen: React.FC<OfferCreateScreenProps> = ({ navigation, route
       </View>
 
       <View style={{ paddingHorizontal: 16, paddingTop: 8 }}>
-        <Text style={styles.sectionTitle}>Select your items to offer</Text>
+        <Text style={styles.sectionTitle}>{strings.selectYourItems}</Text>
       </View>
     </View>
-  ), [contextTitle, requestedItems, iWillAddMoney, amountInput, renderRequestedItemFn]);
+  ), [contextTitle, requestedItems, iWillAddMoney, amountInput, renderRequestedItemFn, strings.placeholderAdd, strings.placeholderRequest, strings.requestedTitle, strings.selectYourItems, strings.toggleLabel]);
 
   if (loading) {
     return (
@@ -201,14 +220,14 @@ const OfferCreateScreen: React.FC<OfferCreateScreenProps> = ({ navigation, route
 
       <View style={styles.footer}>
         <TextInput
-          placeholder="Optional message"
+          placeholder={strings.messagePlaceholder}
           value={message}
           onChangeText={setMessage}
           style={styles.messageInput}
           multiline
         />
         <TouchableOpacity style={[styles.nextBtn, !canProceed && { opacity: 0.5 }]} disabled={!canProceed} onPress={onNext}>
-          <Text style={styles.nextText}>Next</Text>
+          <Text style={styles.nextText}>{strings.nextButton}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

@@ -6,14 +6,15 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { EmailSignUpScreenProps } from '../types/navigation';
+import { useLocalization } from '../localization';
 
 const EmailSignUpScreen: React.FC<EmailSignUpScreenProps> = ({ navigation }) => {
   const [email, setEmail] = useState('');
@@ -27,35 +28,36 @@ const EmailSignUpScreen: React.FC<EmailSignUpScreenProps> = ({ navigation }) => 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const { signUpWithEmail } = useAuth();
+  const { t } = useLocalization();
 
   const validateForm = (): boolean => {
     if (!email.trim() || !password.trim() || !confirmPassword.trim()) {
-      setError('Please fill in all required fields');
+      setError(t('auth.signUp.errors.missingFields'));
       return false;
     }
 
     if (!email.includes('@')) {
-      setError('Please enter a valid email address');
+      setError(t('auth.signUp.errors.invalidEmail'));
       return false;
     }
 
     if (password.length < 6) {
-      setError('Password must be at least 6 characters long');
+      setError(t('auth.signUp.errors.passwordShort'));
       return false;
     }
 
     if (password !== confirmPassword) {
-      setError('Passwords do not match');
+      setError(t('auth.signUp.errors.passwordMismatch'));
       return false;
     }
 
     if (!username.trim()) {
-      setError('Please enter a username');
+      setError(t('auth.signUp.errors.missingUsername'));
       return false;
     }
 
     if (!firstName.trim()) {
-      setError('Please enter your first name');
+      setError(t('auth.signUp.errors.missingFirstName'));
       return false;
     }
 
@@ -88,16 +90,16 @@ const EmailSignUpScreen: React.FC<EmailSignUpScreenProps> = ({ navigation }) => 
         // If email confirmation is required, show message
         if (!result.session) {
           Alert.alert(
-            'Check your email',
-            'We sent you a confirmation link. Please check your email to verify your account.',
-            [{ text: 'OK', onPress: () => navigation.navigate('EmailSignIn') }]
+            t('auth.signUp.alerts.checkEmailTitle'),
+            t('auth.signUp.alerts.checkEmailDescription'),
+            [{ text: t('auth.signUp.alerts.ok'), onPress: () => navigation.navigate('EmailSignIn') }]
           );
         } else {
           // Navigation will be handled by AuthContext/auth state change
         }
       }
     } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred');
+      setError(err.message || t('auth.signUp.errors.unexpected'));
     } finally {
       setIsLoading(false);
     }
@@ -108,24 +110,15 @@ const EmailSignUpScreen: React.FC<EmailSignUpScreenProps> = ({ navigation }) => 
   };
 
   const handleSignInPress = () => {
-    navigation.navigate('EmailSignIn');
+    navigation.goBack()
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
-            <Text style={styles.backButtonText}>← Back</Text>
-          </TouchableOpacity>
-          <Text style={styles.title}>Sign Up</Text>
-          <View style={styles.placeholder} />
-        </View>
-
         <ScrollView 
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
@@ -133,9 +126,9 @@ const EmailSignUpScreen: React.FC<EmailSignUpScreenProps> = ({ navigation }) => 
         >
           {/* Content */}
           <View style={styles.content}>
-            <Text style={styles.subtitle}>Create an account</Text>
+            <Text style={styles.subtitle}>{t('auth.signUp.title')}</Text>
             <Text style={styles.description}>
-              Sign up to get started with SwapJoy
+              {t('auth.signUp.description')}
             </Text>
 
             {error && (
@@ -148,7 +141,7 @@ const EmailSignUpScreen: React.FC<EmailSignUpScreenProps> = ({ navigation }) => 
               <Ionicons name="mail-outline" size={20} color="#666" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="Email"
+                placeholder={t('auth.common.emailPlaceholder')}
                 placeholderTextColor="#999"
                 value={email}
                 onChangeText={(text) => {
@@ -166,7 +159,7 @@ const EmailSignUpScreen: React.FC<EmailSignUpScreenProps> = ({ navigation }) => 
               <Ionicons name="person-outline" size={20} color="#666" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="Username"
+                placeholder={t('auth.common.usernamePlaceholder')}
                 placeholderTextColor="#999"
                 value={username}
                 onChangeText={(text) => {
@@ -183,7 +176,7 @@ const EmailSignUpScreen: React.FC<EmailSignUpScreenProps> = ({ navigation }) => 
                 <Ionicons name="person-outline" size={20} color="#666" style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
-                  placeholder="First Name"
+                  placeholder={t('auth.common.firstNamePlaceholder')}
                   placeholderTextColor="#999"
                   value={firstName}
                   onChangeText={(text) => {
@@ -199,7 +192,7 @@ const EmailSignUpScreen: React.FC<EmailSignUpScreenProps> = ({ navigation }) => 
                 <Ionicons name="person-outline" size={20} color="#666" style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
-                  placeholder="Last Name"
+                  placeholder={t('auth.common.lastNamePlaceholder')}
                   placeholderTextColor="#999"
                   value={lastName}
                   onChangeText={(text) => {
@@ -216,7 +209,7 @@ const EmailSignUpScreen: React.FC<EmailSignUpScreenProps> = ({ navigation }) => 
               <Ionicons name="lock-closed-outline" size={20} color="#666" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="Password"
+                placeholder={t('auth.common.passwordPlaceholder')}
                 placeholderTextColor="#999"
                 value={password}
                 onChangeText={(text) => {
@@ -243,7 +236,7 @@ const EmailSignUpScreen: React.FC<EmailSignUpScreenProps> = ({ navigation }) => 
               <Ionicons name="lock-closed-outline" size={20} color="#666" style={styles.inputIcon} />
               <TextInput
                 style={styles.input}
-                placeholder="Confirm Password"
+                placeholder={t('auth.common.confirmPasswordPlaceholder')}
                 placeholderTextColor="#999"
                 value={confirmPassword}
                 onChangeText={(text) => {
@@ -274,20 +267,20 @@ const EmailSignUpScreen: React.FC<EmailSignUpScreenProps> = ({ navigation }) => 
               {isLoading ? (
                 <ActivityIndicator color="white" />
               ) : (
-                <Text style={styles.signUpButtonText}>Sign Up</Text>
+              <Text style={styles.signUpButtonText}>{t('auth.common.buttons.signUp')}</Text>
               )}
             </TouchableOpacity>
 
             <View style={styles.signInContainer}>
-              <Text style={styles.signInText}>Already have an account? </Text>
+            <Text style={styles.signInText}>{t('auth.common.links.haveAccount')} </Text>
               <TouchableOpacity onPress={handleSignInPress}>
-                <Text style={styles.signInLink}>Sign In</Text>
+              <Text style={styles.signInLink}>{t('auth.common.links.signIn')}</Text>
               </TouchableOpacity>
             </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 };
 

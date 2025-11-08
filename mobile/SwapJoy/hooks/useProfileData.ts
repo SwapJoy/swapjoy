@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Alert } from 'react-native';
 import { ApiService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import { useLocalization } from '../localization';
 
 export interface UserStats {
   sentOffers: number;
@@ -27,6 +28,7 @@ export interface UserItem {
 
 export const useProfileData = (targetUserId?: string) => {
   const { user, signOut } = useAuth();
+  const { language } = useLocalization();
   const [profile, setProfile] = useState<any>(null);
   const [favoriteCategories, setFavoriteCategories] = useState<string[]>([]);
   const [favoriteCategoryNames, setFavoriteCategoryNames] = useState<string[]>([]);
@@ -114,7 +116,7 @@ export const useProfileData = (targetUserId?: string) => {
           // Fetch category names in parallel, don't block profile loading
           (async () => {
             try {
-              const idToName = await ApiService.getCategoryIdToNameMap();
+              const idToName = await ApiService.getCategoryIdToNameMap(language);
               const names = fav.map((id: string) => idToName[id]).filter(Boolean);
               setFavoriteCategoryNames(names);
             } catch (error) {
@@ -128,7 +130,7 @@ export const useProfileData = (targetUserId?: string) => {
         setLoadingProfile(false);
       }
     })();
-  }, [user?.id, targetUserId]);
+  }, [user?.id, targetUserId, language]);
 
   // Fetch metrics (stats + rating) independently and in parallel
   useEffect(() => {
