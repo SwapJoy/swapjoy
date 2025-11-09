@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { ApiService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import { useLocalization } from '../localization';
+import { resolveCategoryName } from '../utils/category';
 
 export interface AIOffer {
   id: string;
@@ -11,6 +13,7 @@ export interface AIOffer {
   price?: number;
   currency?: string;
   image_url: string;
+  category?: string;
   user: {
     id: string;
     username: string;
@@ -25,6 +28,7 @@ export interface AIOffer {
 
 export const useExploreData = () => {
   const { user } = useAuth();
+  const { language } = useLocalization();
   const [aiOffers, setAiOffers] = useState<AIOffer[]>([]);
   const [loading, setLoading] = useState(true);
   const [isFetching, setIsFetching] = useState(false);
@@ -194,7 +198,7 @@ export const useExploreData = () => {
       });
 
       // Transform items to AIOffer format
-      const aiOffers: AIOffer[] = (Array.isArray(topPicks) ? topPicks : []).map((item: any) => {
+      const aiOffers: AIOffer[] = (Array.isArray(topPicks) ? topPicks : []).map((item: any, index: number) => {
         const matchScore = calculateMatchScore(item, user);
         const reason = getMatchReason(item, matchScore);
         
@@ -218,7 +222,21 @@ export const useExploreData = () => {
         }
 
         const imageUrl = item.image_url || item.item_images?.[0]?.image_url || 'https://via.placeholder.com/200x150';
-        
+        const primaryCategory = resolveCategoryName(item, language);
+        if (__DEV__) {
+          console.log('[useExploreData] resolved category', {
+            index,
+            itemId: item.id,
+            inputCategory: item.category,
+            primaryCategory,
+          });
+          console.log('[useExploreData] item condition', {
+            index,
+            itemId: item.id,
+            condition: item.condition,
+          });
+        }
+
         return {
           id: item.id,
           title: item.title,
@@ -228,6 +246,7 @@ export const useExploreData = () => {
           price: item.price || item.estimated_value || 0,
           currency: item.currency || 'USD',
           image_url: imageUrl,
+          category: primaryCategory,
           user: {
             id: item.users?.id || item.user?.id || item.user_id,
             username: item.users?.username || item.user?.username || `user_${(item.user_id || '').slice(-4)}`,
@@ -241,13 +260,8 @@ export const useExploreData = () => {
         };
       });
 
-      // Safety filter: drop bundles whose items have mixed owners
-      const filteredOffers = aiOffers.filter((o) => {
-        if (!o.is_bundle || !Array.isArray(o.bundle_items) || o.bundle_items.length === 0) return true;
-        const ownerId = o.user?.id;
-        if (!ownerId) return false;
-        return o.bundle_items.every((bi: any) => (bi.user_id || bi.user?.id) === ownerId);
-      });
+      // Exclude bundles from top picks
+      const filteredOffers = aiOffers.filter((offer) => !offer.is_bundle);
 
       // Sort by match score (highest first)
       filteredOffers.sort((a, b) => b.match_score - a.match_score);
@@ -293,7 +307,7 @@ export const useExploreData = () => {
         hasFetchedRef.current = true; // Always mark as fetched to prevent infinite loops
       }
     }
-  }, [user?.id, calculateMatchScore, getMatchReason, isFetching]);
+  }, [calculateMatchScore, getMatchReason, language, user, isFetching]);
 
   useEffect(() => {
     console.log('[useExploreData] useEffect triggered:', {

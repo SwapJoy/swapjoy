@@ -21,6 +21,7 @@ export type RootStackParamList = {
   ItemPreview: {
     draftId: string;
   };
+  RecentlyListed: undefined;
   ItemDetails: {
     itemId: string;
   };

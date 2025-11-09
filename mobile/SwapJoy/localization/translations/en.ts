@@ -149,9 +149,38 @@ const en = {
       bundleValue: 'Bundle Value',
       price: 'Price',
       matchSuffix: '% Match',
+      swapSuggestions: 'Possible matches',
+      categoryFallback: 'Category',
+    },
+    swapSuggestions: {
+      loading: 'Finding matches…',
+      error: 'Unable to load suggestions',
+      empty: 'No matching items yet',
+    },
+    conditions: {
+      mint: 'Mint',
+      like_new: 'Like new',
+      excellent: 'Excellent',
+      good: 'Good',
+      fair: 'Fair',
+      poor: 'Well worn',
     },
     counts: {
       items: '{count} items',
+    },
+    hero: {
+      greetingMorning: 'Good morning',
+      greetingAfternoon: 'Good afternoon',
+      greetingEvening: 'Good evening',
+      intro: 'Let’s find something you’ll love today.',
+      searchPlaceholder: 'Search items, categories, or people',
+      quickFiltersTitle: 'Quick filters',
+      quickFiltersEmpty: 'Filters will appear when categories are available.',
+      statsTopMatches: 'Top matches',
+      statsRecent: 'New this week',
+    },
+    actions: {
+      viewAll: 'See all',
     },
   },
   profileScreen: {

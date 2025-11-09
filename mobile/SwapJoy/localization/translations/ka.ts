@@ -149,9 +149,38 @@ const ka = {
       bundleValue: 'კომპლექტის ღირებულება',
       price: 'ფასი',
       matchSuffix: '%-იანი დამთხვევა',
+      swapSuggestions: 'შესაძლო შეთავაზებები',
+      categoryFallback: 'კატეგორია',
+    },
+    swapSuggestions: {
+      loading: 'შეთავაზებები იტვირთება…',
+      error: 'შეუძლებელია შეთავაზებების ჩატვირთვა',
+      empty: 'ჯერ არ არის შეთავაზებები',
+    },
+    conditions: {
+      mint: 'იდეალური',
+      like_new: 'თითქმის ახალი',
+      excellent: 'შესანიშნავი',
+      good: 'კარგი',
+      fair: 'დამაკმაყოფილებელი',
+      poor: 'გამოყენებული',
     },
     counts: {
       items: '{count} ნივთი',
+    },
+    hero: {
+      greetingMorning: 'დილა მშვიდობისა',
+      greetingAfternoon: 'შუადღე მშვიდობისა',
+      greetingEvening: 'საღამო მშვიდობისა',
+      intro: 'მოდით ვიპოვოთ რამე, რაც შეგიყვარდება დღეს.',
+      searchPlaceholder: 'მოძებნე ნივთები',
+      quickFiltersTitle: 'სწრაფი ფილტრები',
+      quickFiltersEmpty: 'ფილტრები გამოჩნდება, როცა კატეგორიები მზად იქნება.',
+      statsTopMatches: 'საუკეთესო დამთხვევები',
+      statsRecent: 'ახალი ამ კვირაში',
+    },
+    actions: {
+      viewAll: 'ყველას ნახვა',
     },
   },
   profileScreen: {

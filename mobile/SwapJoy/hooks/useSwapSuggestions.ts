@@ -10,6 +10,7 @@ export interface SwapSuggestionItem {
   priceGEL?: number;
   similarity?: number;
   image_url?: string | null;
+  condition?: string;
 }
 
 export interface SwapSuggestion {
@@ -113,6 +114,7 @@ export function useSwapSuggestions({
           price: it.price,
           currency: it.currency,
           image_url: Array.isArray(it.item_images) && it.item_images.length > 0 ? it.item_images[0]?.image_url : null,
+          condition: (it as any).condition,
         }));
 
         const rUSD = rates['USD'] ?? 1;

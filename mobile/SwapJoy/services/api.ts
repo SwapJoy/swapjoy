@@ -535,7 +535,7 @@ export class ApiService {
           if (topIds.length > 0) {
             const { data: items } = await client
               .from('items')
-              .select('*, item_images(image_url), users!items_user_id_fkey(id, username, first_name, last_name)')
+              .select('*, category:categories!items_category_id_fkey(title_en, title_ka), item_images(image_url), users!items_user_id_fkey(id, username, first_name, last_name)')
               .in('id', topIds);
             const simMap: Record<string, number> = {};
             for (const r of promptTop) simMap[r.id] = r.similarity || 0;
@@ -600,7 +600,7 @@ export class ApiService {
         console.log('[FAV-CAT-FETCH] Fetching items directly from favorite categories (category_score < 1.0):', favoriteCategories);
           const { data: favoriteCategoryItems, error: favError } = await client
             .from('items')
-            .select('id, title, description, price, currency, category_id, embedding')
+            .select('id, title, description, price, currency, category_id, embedding, category:categories!items_category_id_fkey(title_en, title_ka)')
             .in('category_id', favoriteCategories)
             .eq('status', 'available')
             .neq('user_id', userId)
@@ -837,7 +837,7 @@ export class ApiService {
         // Get items
         const { data: items, error: itemsError } = await client
           .from('items')
-          .select('*')
+          .select('*, category:categories!items_category_id_fkey(title_en, title_ka)')
           .in('id', singleItemIds);
 
         if (itemsError) {
@@ -1059,17 +1059,14 @@ export class ApiService {
       console.log(`Final results: ${finalResults.length} items (${finalResults.filter(r => r.is_bundle).length} bundles, ${finalResults.filter(r => !r.is_bundle).length} single items)`);
       console.log(`Favorite category items in final results: ${finalResults.filter((r: any) => r.is_favorite_category || r.from_favorite_category || (r.category_id && favoriteCategories.includes(r.category_id))).length}`);
       
+      // Remove bundles entirely from Explore top picks results
+      const singleResults = finalResults.filter((item: any) => !item.is_bundle);
+
       // Sort by weighted overall_score (includes all weighted factors: similarity, category, price, location)
       // The weighted score already accounts for category_score, price_score, location weights
-      const sortedResults = finalResults.sort((a, b) => {
+      const sortedResults = singleResults.sort((a, b) => {
         // Primary sort: weighted overall_score (descending)
         const scoreDiff = (b.overall_score || 0) - (a.overall_score || 0);
-        
-        // Secondary sort: prioritize single items over bundles (if scores are close)
-        if (Math.abs(scoreDiff) < 0.01) {
-          if (a.is_bundle && !b.is_bundle) return 1;
-          if (!a.is_bundle && b.is_bundle) return -1;
-        }
         
         return scoreDiff;
       });
@@ -2851,9 +2848,11 @@ export class ApiService {
    * Get recently listed items from the last month, sorted by relevance
    * Uses AI similarity scores when available
    */
-  static async getRecentlyListed(userId: string, limit: number = 10) {
+  static async getRecentlyListed(userId: string, limit: number = 10, page: number = 1) {
     // Bypass cache for recently listed to always get fresh data
     return this.authenticatedCall(async (client) => {
+      const offset = Math.max(0, (page - 1) * limit);
+      const fetchWindow = Math.max(limit * (page + 1), limit);
       // Calculate date for one month ago
       const oneMonthAgo = new Date();
       oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
@@ -2871,12 +2870,12 @@ export class ApiService {
         console.log('Fetching recently listed items (no AI scoring)...');
         const { data, error } = await client
           .from('items')
-          .select('*, item_images(image_url), users!items_user_id_fkey(username, first_name, last_name)')
+          .select('*, category:categories!items_category_id_fkey(title_en, title_ka), item_images(image_url), users!items_user_id_fkey(username, first_name, last_name)')
           .eq('status', 'available')
           .neq('user_id', userId)
           .gte('created_at', oneMonthAgo.toISOString())
           .order('created_at', { ascending: false })
-          .limit(limit);
+          .range(offset, offset + limit);
 
         console.log('Recently listed items fetched:', {
           count: data?.length || 0,
@@ -2884,7 +2883,10 @@ export class ApiService {
           itemIds: data?.map(item => item.id).slice(0, 5)
         });
 
-        return { data, error };
+        const hasMore = (data?.length || 0) > limit;
+        const items = hasMore ? (data ?? []).slice(0, limit) : data ?? [];
+
+        return { data: { items, hasMore }, error };
       }
 
       // Get user's favorite categories for additional filtering
@@ -2899,7 +2901,7 @@ export class ApiService {
       // Get recent items
       let query = client
         .from('items')
-        .select('*, item_images(image_url), users!items_user_id_fkey(username, first_name, last_name)')
+        .select('*, category:categories!items_category_id_fkey(title_en, title_ka), item_images(image_url), users!items_user_id_fkey(username, first_name, last_name)')
         .eq('status', 'available')
         .neq('user_id', userId)
         .gte('created_at', oneMonthAgo.toISOString());
@@ -2911,10 +2913,10 @@ export class ApiService {
 
       const { data: recentItems, error } = await query
         .order('created_at', { ascending: false })
-        .limit(limit * 3); // Get more items to sort by relevance
+        .limit(fetchWindow * 3); // Get more items to sort by relevance
 
       if (error || !recentItems) {
-        return { data: null, error };
+        return { data: null, error, hasMore: false };
       }
 
       // Calculate similarity scores for recent items
@@ -2973,29 +2975,39 @@ export class ApiService {
 
       // Sort by overall score and limit
       const sortedItems = itemsWithScores
-        .sort((a, b) => (b.overall_score || 0) - (a.overall_score || 0))
-        .slice(0, limit);
+        .sort((a, b) => (b.overall_score || 0) - (a.overall_score || 0));
 
-      return { data: sortedItems, error: null };
+      const paginatedItems = sortedItems.slice(offset, offset + limit);
+      const hasMore = sortedItems.length > offset + limit;
+
+      return { data: { items: paginatedItems, hasMore }, error: null };
     });
   }
 
   /**
    * Get recently listed items (safe wrapper)
    */
-  static async getRecentlyListedSafe(userId: string, limit: number = 10) {
+  static async getRecentlyListedSafe(userId: string, limit: number = 10, page: number = 1) {
     try {
-      const result = await this.getRecentlyListed(userId, limit);
-      console.log('[RecentlyListedSafe] items count:', Array.isArray(result?.data) ? result.data.length : 0, 'error?', !!result?.error);
+      const result = await this.getRecentlyListed(userId, limit, page);
+      const items = Array.isArray(result?.data?.items) ? result.data.items : [];
+      const hasMore = typeof result?.data?.hasMore === 'boolean' ? result.data.hasMore : false;
+      console.log('[RecentlyListedSafe] items count:', items.length, 'error?', !!result?.error);
       return {
-        data: Array.isArray(result?.data) ? result.data : [],
-        error: result?.error || null
+        data: items,
+        error: result?.error || null,
+        meta: {
+          hasMore,
+        },
       };
     } catch (error) {
       console.error('Error in getRecentlyListedSafe:', error);
       return {
         data: [],
-        error: error
+        error: error,
+        meta: {
+          hasMore: false,
+        },
       };
     }
   }
@@ -3093,7 +3105,7 @@ export class ApiService {
       // Get items with pagination
       const { data, error } = await client
         .from('items')
-        .select('*, item_images(image_url), users!items_user_id_fkey(username, first_name, last_name)')
+        .select('*, category:categories!items_category_id_fkey(title_en, title_ka), item_images(image_url), users!items_user_id_fkey(username, first_name, last_name)')
         .eq('status', 'available')
         .neq('user_id', userId)
         .order('created_at', { ascending: false })
@@ -3158,7 +3170,7 @@ export class ApiService {
       // Get items with pagination
       const { data, error } = await client
         .from('items')
-        .select('*, item_images(image_url), users!items_user_id_fkey(username, first_name, last_name)')
+        .select('*, category:categories!items_category_id_fkey(title_en, title_ka), item_images(image_url), users!items_user_id_fkey(username, first_name, last_name)')
         .eq('status', 'available')
         .eq('category_id', categoryId)
         .neq('user_id', userId)

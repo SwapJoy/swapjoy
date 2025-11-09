@@ -27,6 +27,7 @@ import FollowersFollowingScreen from '../screens/FollowersFollowingScreen';
 import DevRecommendationSettingsScreen from '../screens/DevRecommendationSettingsScreen';
 import SuggestionDetailsScreen from '../screens/SuggestionDetailsScreen';
 import OffersScreen from '../screens/OffersScreen';
+import RecentlyListedScreen from '../screens/RecentlyListedScreen';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -159,6 +160,11 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
                 title: 'Item Details',
                 headerBackTitleVisible: false,
               }}
+            />
+            <Stack.Screen
+              name="RecentlyListed"
+              component={RecentlyListedScreen}
+              options={{ headerShown: false }}
             />
             <Stack.Screen
               name="UserProfile"

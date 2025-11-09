@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { ApiService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import { useLocalization } from '../localization';
+import { resolveCategoryName } from '../utils/category';
 
 export interface OtherItem {
   id: string;
@@ -20,6 +22,7 @@ export interface OtherItem {
   created_at: string;
   item_images?: Array<{ image_url: string }>;
   users?: any;
+  category?: string;
 }
 
 export interface PaginationInfo {
@@ -32,6 +35,7 @@ export interface PaginationInfo {
 
 export const useOtherItems = (initialLimit: number = 10) => {
   const { user } = useAuth();
+  const { language } = useLocalization();
   const [items, setItems] = useState<OtherItem[]>([]);
   const [pagination, setPagination] = useState<PaginationInfo>({
     page: 1,
@@ -49,6 +53,7 @@ export const useOtherItems = (initialLimit: number = 10) => {
   const transformItem = (item: any): OtherItem => {
     const imageUrl = item.image_url || item.item_images?.[0]?.image_url || 'https://via.placeholder.com/200x150';
     const displayPrice = item.price || item.estimated_value || 0;
+    const category = resolveCategoryName(item, language);
 
     return {
       id: item.id,
@@ -59,6 +64,7 @@ export const useOtherItems = (initialLimit: number = 10) => {
       price: displayPrice,
       currency: item.currency || 'USD',
       image_url: imageUrl,
+      category,
       user: {
         id: item.users?.id || item.user_id,
         username: item.users?.username || `user_${(item.user_id || '').slice(-4)}`,
@@ -132,14 +138,14 @@ export const useOtherItems = (initialLimit: number = 10) => {
         }
       }
     },
-    [user?.id, initialLimit]
+    [language, user?.id, initialLimit]
   );
 
   useEffect(() => {
     if (user && !hasFetchedRef.current) {
       fetchItems(1, false);
     }
-  }, [user?.id, initialLimit]);
+  }, [language, user?.id, initialLimit, fetchItems]);
 
   useEffect(() => {
     return () => {
