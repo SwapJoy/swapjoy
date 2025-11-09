@@ -36,6 +36,9 @@ interface TopMatchCardProps {
   onLikePress?: (event: GestureResponderEvent) => void;
   containerStyle?: StyleProp<ViewStyle>;
   likeIconName?: keyof typeof Ionicons.glyphMap;
+  likeIconColor?: string;
+  likeActiveColor?: string;
+  isLikeActive?: boolean;
   disableLikeButton?: boolean;
   swapSuggestions?: React.ReactNode;
 }
@@ -52,6 +55,9 @@ const TopMatchCard: React.FC<TopMatchCardProps> = ({
   onLikePress,
   containerStyle,
   likeIconName = 'heart-outline',
+  likeIconColor = '#1f2933',
+  likeActiveColor = '#ef4444',
+  isLikeActive = false,
   disableLikeButton,
   swapSuggestions,
 }) => {
@@ -104,11 +110,15 @@ const TopMatchCard: React.FC<TopMatchCardProps> = ({
 
         {!disableLikeButton && (
           <TouchableOpacity
-            style={styles.likeButton}
+            style={[styles.likeButton, isLikeActive ? styles.likeButtonActive : null]}
             activeOpacity={0.6}
             onPress={onLikePress}
           >
-            <Ionicons name={likeIconName} size={18} color="#1f2933" />
+            <Ionicons
+              name={likeIconName}
+              size={18}
+              color={isLikeActive ? likeActiveColor : likeIconColor}
+            />
           </TouchableOpacity>
         )}
 
@@ -189,6 +199,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#ffffffdd',
+  },
+  likeButtonActive: {
+    backgroundColor: '#fee2e2',
   },
   priceBadge: {
     position: 'absolute',

@@ -1,4 +1,4 @@
-import React, { useCallback, memo, useState, useMemo } from 'react';
+import React, { useCallback, memo, useState, useMemo, useEffect, useRef } from 'react';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import {
   View,
@@ -6,17 +6,16 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  ScrollView,
   Dimensions,
   RefreshControl,
   ActivityIndicator,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ExploreScreenProps, RootStackParamList } from '../types/navigation';
 import { useExploreData, AIOffer } from '../hooks/useExploreData';
 import { useRecentlyListed } from '../hooks/useRecentlyListed';
 import { useOtherItems } from '../hooks/useOtherItems';
-import CachedImage from '../components/CachedImage';
 import TopMatchCard, { TOP_MATCH_CARD_WIDTH } from '../components/TopMatchCard';
 import { formatCurrency } from '../utils';
 import { useLocalization } from '../localization';
@@ -24,6 +23,11 @@ import { Ionicons } from '@expo/vector-icons';
 import SwapSuggestions from '../components/SwapSuggestions';
 import type { NavigationProp } from '@react-navigation/native';
 import { getConditionPresentation } from '../utils/conditions';
+import { ApiService } from '../services/api';
+import { resolveCategoryName } from '../utils/category';
+import ItemCard, { ItemCardChip } from '../components/ItemCard';
+import FavoriteToggleButton from '../components/FavoriteToggleButton';
+import { useFavorites } from '../contexts/FavoritesContext';
 
 const { width } = Dimensions.get('window');
 const ITEM_WIDTH = width * 0.7;
@@ -141,8 +145,28 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
   const { aiOffers, loading: topPicksLoading, hasData, isInitialized, error: topPicksError, user, refreshData: refreshTopPicks } = useExploreData();
   const { items: recentItems, loading: recentLoading, error: recentError, refresh: refreshRecent } = useRecentlyListed(10);
   const { items: otherItems, pagination, loading: othersLoading, loadingMore, error: othersError, loadMore, refresh: refreshOthers } = useOtherItems(10);
+  const { isFavorite, toggleFavorite } = useFavorites();
   
   const [refreshing, setRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
+  const searchRequestIdRef = useRef(0);
+
+  const searchStrings = useMemo(
+    () => ({
+      placeholder: t('search.placeholder'),
+      startTitle: t('search.startTitle'),
+      startSubtitle: t('search.startSubtitle'),
+      noResultsTitle: t('search.noResultsTitle'),
+      noResultsSubtitle: t('search.noResultsSubtitle'),
+      error: t('search.error'),
+      noImage: t('search.noImage'),
+    }),
+    [t]
+  );
 
   const heroGreeting = useMemo(() => {
     const currentHour = new Date().getHours();
@@ -157,9 +181,131 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
     return displayName ? `${heroGreeting}, ${displayName}` : heroGreeting;
   }, [heroGreeting, user]);
 
-  const handleNavigateToSearch = useCallback(() => {
-    (navigation as any).navigate('Search');
-  }, [navigation]);
+  const trimmedSearchQuery = useMemo(() => searchQuery.trim(), [searchQuery]);
+
+  const performSearch = useCallback(
+    async (rawQuery: string) => {
+      const query = (rawQuery || '').trim();
+
+      if (!query) {
+        setSearchResults([]);
+        setSearchError(null);
+        setSearchLoading(false);
+        return;
+      }
+
+      setSearchLoading(true);
+      setSearchError(null);
+      const currentRequestId = ++searchRequestIdRef.current;
+      let fuzzyData: any[] = [];
+
+      try {
+        const { data: kwData } = await ApiService.keywordSearch(query, 20);
+        if (Array.isArray(kwData)) {
+          fuzzyData = kwData;
+          if (currentRequestId === searchRequestIdRef.current) {
+            setSearchResults(kwData);
+          }
+        }
+      } catch {
+        // swallow keyword search errors; semantic search fallback will run
+      }
+
+      try {
+        const { data: semData, error: apiError } = await ApiService.semanticSearch(query, 30);
+        if (currentRequestId !== searchRequestIdRef.current) {
+          return;
+        }
+
+        if (apiError) {
+          setSearchError(apiError.message || searchStrings.error);
+          setSearchResults(fuzzyData);
+        } else if (Array.isArray(semData)) {
+          const byId: Record<string, any> = {};
+
+          for (const item of fuzzyData) {
+            byId[item.id] = { ...item, _fuzzySim: item.similarity ?? 0 };
+          }
+
+          for (const item of semData) {
+            const previous = byId[item.id];
+            const fused: any = { ...(previous || {}), ...item };
+            const fuzzySim = (previous?._fuzzySim ?? item.similarity ?? 0) as number;
+            const semanticSim = (item.similarity ?? 0) as number;
+            fused._score = 0.6 * semanticSim + 0.4 * Math.min(1, fuzzySim);
+            byId[item.id] = fused;
+          }
+
+          for (const item of fuzzyData) {
+            if (!byId[item.id]) {
+              byId[item.id] = {
+                ...item,
+                _score: Math.min(1, item.similarity ?? 0) * 0.4,
+              };
+            } else if (byId[item.id]._score == null) {
+              byId[item.id]._score = Math.min(1, byId[item.id]._fuzzySim ?? 0) * 0.4;
+            }
+          }
+
+          const merged = Object.values(byId);
+          merged.sort((a: any, b: any) => (b._score ?? 0) - (a._score ?? 0));
+          setSearchResults(merged);
+        } else {
+          setSearchResults(fuzzyData);
+        }
+      } catch (error: any) {
+        if (currentRequestId === searchRequestIdRef.current) {
+          setSearchError(error?.message || searchStrings.error);
+        }
+      } finally {
+        if (currentRequestId === searchRequestIdRef.current) {
+          setSearchLoading(false);
+        }
+      }
+    },
+    [searchStrings.error]
+  );
+
+  useEffect(() => {
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
+    }
+
+    if (trimmedSearchQuery.length === 0) {
+      performSearch('');
+      return;
+    }
+
+    searchDebounceRef.current = setTimeout(() => {
+      performSearch(trimmedSearchQuery);
+    }, 350);
+
+    return () => {
+      if (searchDebounceRef.current) {
+        clearTimeout(searchDebounceRef.current);
+      }
+    };
+  }, [performSearch, trimmedSearchQuery]);
+
+  useEffect(() => {
+    return () => {
+      if (searchDebounceRef.current) {
+        clearTimeout(searchDebounceRef.current);
+      }
+    };
+  }, []);
+
+  const handleClearSearch = useCallback(() => {
+    setSearchQuery('');
+    setSearchResults([]);
+    setSearchError(null);
+    setSearchLoading(false);
+    searchRequestIdRef.current += 1;
+  }, []);
+
+  const handleFilterPress = useCallback(() => {
+    rootNavigation.navigate('RecentlyListed');
+  }, [rootNavigation]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -215,13 +361,28 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
       }
  
       const swapSuggestionsNode = (
-         <SwapSuggestions
+        <SwapSuggestions
           label={strings.labels.swapSuggestions}
           targetItemId={item.id}
           targetItemPrice={item.price || item.estimated_value || 0}
           targetItemCurrency={item.currency || 'USD'}
         />
       );
+      const createdAt =
+        (item as any)?.created_at ??
+        (item as any)?.updated_at ??
+        null;
+      const favoriteData = {
+        id: item.id,
+        title: item.title,
+        description: item.description,
+        price: item.price || item.estimated_value || 0,
+        currency: item.currency || 'USD',
+        condition: item.condition,
+        image_url: item.image_url,
+        created_at: createdAt,
+      };
+      const isFav = isFavorite(item.id);
       return (
         <TopMatchCard
           title={item.title}
@@ -238,110 +399,233 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
           onPress={() => {
             (navigation as any).navigate('ItemDetails', { itemId: item.id });
           }}
+          onLikePress={(event) => {
+            event?.stopPropagation?.();
+            toggleFavorite(item.id, favoriteData);
+          }}
+          likeIconName={isFav ? 'heart' : 'heart-outline'}
+          likeIconColor="#1f2933"
+          likeActiveColor="#ef4444"
+          isLikeActive={isFav}
           swapSuggestions={swapSuggestionsNode}
         />
       );
     },
-    [navigation, strings.labels.categoryFallback]
+    [isFavorite, navigation, strings.labels.swapSuggestions, toggleFavorite]
   );
 
-  const renderRecentItem = useCallback(({ item }: { item: any }) => {
-    const chips: Array<{ label: string; backgroundColor: string; textColor: string }> = [];
-    const conditionChip = getConditionPresentation({
-      condition: item.condition,
-      language,
-      translate: t,
-    });
+  const renderRecentItem = useCallback(
+    ({ item }: { item: any }) => {
+      const chips: ItemCardChip[] = [];
+      const conditionChip = getConditionPresentation({
+        condition: item.condition,
+        language,
+        translate: t,
+      });
 
-    if (conditionChip) {
-      chips.push(conditionChip);
-    }
+      const categoryLabel =
+        resolveCategoryName(item, language) ||
+        (typeof item.category === 'string' ? item.category.trim() : undefined);
+      if (categoryLabel) {
+        chips.push({ label: categoryLabel, backgroundColor: '#e2e8f0', textColor: '#0f172a' });
+      }
 
-    if (item.category?.trim?.()) {
-      chips.push({ label: item.category.trim(), backgroundColor: '#e2e8f0', textColor: '#0f172a' });
-    }
+      const formattedPrice = formatCurrency(
+        item.price || item.estimated_value || 0,
+        item.currency || 'USD'
+      );
 
-    return (
-      <TouchableOpacity
-        style={styles.recentCard}
-        onPress={() => (navigation as any).navigate('ItemDetails', { itemId: item.id })}
-      >
-        <CachedImage
-          uri={item.image_url || 'https://via.placeholder.com/200x150'}
-          style={styles.recentImage}
-          resizeMode="cover"
-          fallbackUri="https://picsum.photos/200/150?random=2"
+      const favoriteData = {
+        id: item.id,
+        title: item.title,
+        description: item.description,
+        price: item.price || item.estimated_value || 0,
+        currency: item.currency || 'USD',
+        condition: item.condition,
+        image_url: item.image_url,
+        created_at: item.created_at || item.updated_at || null,
+      };
+      const ownerHandle = item.user?.username || item.user?.first_name || undefined;
+
+      return (
+        <ItemCard
+          title={item.title}
+          description={item.description}
+          priceLabel={formattedPrice}
+          imageUri={item.image_url}
+          chips={chips}
+          onPress={() => (navigation as any).navigate('ItemDetails', { itemId: item.id })}
+          variant="horizontal"
+          style={styles.recentItemCard}
+          ownerHandle={ownerHandle}
+          conditionBadge={
+            conditionChip
+              ? {
+                  label: conditionChip.label,
+                  backgroundColor: conditionChip.backgroundColor,
+                  textColor: conditionChip.textColor,
+                }
+              : undefined
+          }
+          favoriteButton={
+            <FavoriteToggleButton
+              itemId={item.id}
+              item={favoriteData}
+              size={18}
+            />
+          }
         />
-        <View style={styles.recentDetails}>
-          <Text style={styles.recentTitle} numberOfLines={1}>{item.title}</Text>
-          <Text style={styles.recentPrice}>{formatCurrency(item.price || item.estimated_value || 0, item.currency || 'USD')}</Text>
-          {item.description ? (
-            <Text style={styles.recentDescription} numberOfLines={2} ellipsizeMode="tail">
-              {item.description}
-            </Text>
-          ) : null}
-          {chips.length > 0 ? (
-            <View style={styles.itemChipsRow}>
-              {chips.map((chip) => (
-                <View key={`${item.id}-${chip.label}`} style={[styles.itemChip, { backgroundColor: chip.backgroundColor }]}>
-                  <Text style={[styles.itemChipText, { color: chip.textColor }]}>{chip.label}</Text>
-                </View>
-              ))}
-            </View>
-          ) : null}
-        </View>
-      </TouchableOpacity>
-    );
-  }, [language, navigation, t]);
+      );
+    },
+    [language, navigation, t]
+  );
 
-  const renderGridItem = useCallback(({ item, index }: { item: any; index: number }) => {
-    const chips: Array<{ label: string; backgroundColor: string; textColor: string }> = [];
-    const conditionChip = getConditionPresentation({
-      condition: item.condition,
-      language,
-      translate: t,
-    });
+  const renderGridItem = useCallback(
+    ({ item, index }: { item: any; index: number }) => {
+      const chips: ItemCardChip[] = [];
+      const conditionChip = getConditionPresentation({
+        condition: item.condition,
+        language,
+        translate: t,
+      });
 
-    if (conditionChip) {
-      chips.push(conditionChip);
-    }
+      const categoryLabel = resolveCategoryName(item, language);
+      if (categoryLabel) {
+        chips.push({ label: categoryLabel, backgroundColor: '#e2e8f0', textColor: '#0f172a' });
+      }
 
-    if (item.category?.trim?.()) {
-      chips.push({ label: item.category.trim(), backgroundColor: '#e2e8f0', textColor: '#0f172a' });
-    }
+      const formattedPrice = formatCurrency(
+        item.price || item.estimated_value || 0,
+        item.currency || 'USD'
+      );
 
-    return (
-      <TouchableOpacity
-        style={[styles.gridItem, index % 2 === 0 ? styles.gridItemLeft : styles.gridItemRight]}
-        onPress={() => (navigation as any).navigate('ItemDetails', { itemId: item.id })}
-      >
-        <CachedImage
-          uri={item.image_url || 'https://via.placeholder.com/200x150'}
-          style={styles.gridImage}
-          resizeMode="cover"
-          fallbackUri="https://picsum.photos/200/150?random=3"
+      const favoriteData = {
+        id: item.id,
+        title: item.title,
+        description: item.description,
+        price: item.price || item.estimated_value || 0,
+        currency: item.currency || 'USD',
+        condition: item.condition,
+        image_url: item.image_url,
+        created_at: item.created_at || item.updated_at || null,
+      };
+
+      const ownerHandle = item.user?.username || item.user?.first_name || undefined;
+
+      return (
+        <ItemCard
+          title={item.title}
+          description={item.description}
+          priceLabel={formattedPrice}
+          imageUri={item.image_url}
+          chips={chips}
+          onPress={() => (navigation as any).navigate('ItemDetails', { itemId: item.id })}
+          variant="grid"
+          style={[
+            styles.gridItem,
+            index % 2 === 0 ? styles.gridItemLeft : styles.gridItemRight,
+          ]}
+          ownerHandle={ownerHandle}
+          conditionBadge={
+            conditionChip
+              ? {
+                  label: conditionChip.label,
+                  backgroundColor: conditionChip.backgroundColor,
+                  textColor: conditionChip.textColor,
+                }
+              : undefined
+          }
+          favoriteButton={
+            <FavoriteToggleButton
+              itemId={item.id}
+              item={favoriteData}
+              size={18}
+            />
+          }
         />
-        <View style={styles.gridDetails}>
-          <Text style={styles.gridTitle} numberOfLines={2}>{item.title}</Text>
-          <Text style={styles.gridPrice}>{formatCurrency(item.price || item.estimated_value || 0, item.currency || 'USD')}</Text>
-          {item.description ? (
-            <Text style={styles.gridDescription} numberOfLines={2} ellipsizeMode="tail">
-              {item.description}
-            </Text>
-          ) : null}
-          {chips.length > 0 ? (
-            <View style={styles.itemChipsRow}>
-              {chips.map((chip) => (
-                <View key={`${item.id}-${chip.label}`} style={[styles.itemChip, { backgroundColor: chip.backgroundColor }]}>
-                  <Text style={[styles.itemChipText, { color: chip.textColor }]}>{chip.label}</Text>
-                </View>
-              ))}
-            </View>
-          ) : null}
-        </View>
-      </TouchableOpacity>
-    );
-  }, [language, navigation, t]);
+      );
+    },
+    [language, navigation, t]
+  );
+
+  const renderSearchResult = useCallback(
+    ({ item, index }: { item: any; index: number }) => {
+      const imageUrl = item?.item_images?.[0]?.image_url || item?.image_url || null;
+      const resolvedCategory =
+        resolveCategoryName(item, language) || strings.labels.categoryFallback;
+      const similarityLabel =
+        typeof item?.similarity === 'number'
+          ? `${Math.round((item.similarity || 0) * 100)}%`
+          : null;
+
+      const formattedPrice =
+        item?.price != null ? formatCurrency(item.price, item.currency || 'USD') : undefined;
+
+      const chips: ItemCardChip[] = [];
+      if (resolvedCategory) {
+        chips.push({ label: resolvedCategory, backgroundColor: '#e2e8f0', textColor: '#0f172a' });
+      }
+
+      let conditionBadge: ItemCardChip | undefined;
+      if (item.condition) {
+        const badge = getConditionPresentation({
+          condition: item.condition,
+          language,
+          translate: t,
+        });
+        if (badge) {
+          conditionBadge = {
+            label: badge.label,
+            backgroundColor: badge.backgroundColor,
+            textColor: badge.textColor,
+          };
+        }
+      }
+
+      const favoriteData = {
+        id: item.id,
+        title: item.title,
+        description: item.description,
+        price: item.price || item.estimated_value || 0,
+        currency: item.currency || 'USD',
+        condition: item.condition,
+        image_url: imageUrl,
+        created_at: item.created_at || item.updated_at || null,
+      };
+
+      const ownerHandle =
+        item.user?.username || item.username || item.users?.username || undefined;
+
+      return (
+        <ItemCard
+          key={item.id}
+          title={item.title}
+          description={item.description}
+          priceLabel={formattedPrice}
+          metaRightLabel={similarityLabel}
+          imageUri={imageUrl}
+          placeholderLabel={searchStrings.noImage}
+          chips={chips}
+          onPress={() => (navigation as any).navigate('ItemDetails', { itemId: item.id })}
+          variant="grid"
+          style={[
+            styles.searchGridItem,
+            index % 2 === 0 ? styles.searchGridItemLeft : styles.searchGridItemRight,
+          ]}
+          ownerHandle={ownerHandle}
+          conditionBadge={conditionBadge}
+          favoriteButton={
+            <FavoriteToggleButton
+              itemId={item.id}
+              item={favoriteData}
+              size={18}
+            />
+          }
+        />
+      );
+    },
+    [language, navigation, searchStrings.noImage, strings.labels.categoryFallback, t]
+  );
 
   const renderFooter = useCallback(() => {
     if (!loadingMore) return null;
@@ -362,25 +646,16 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
     );
   }
 
+  const hasSearchQuery = trimmedSearchQuery.length > 0;
+  const listData = hasSearchQuery ? [] : otherItems || [];
+
   // FIXED: Removed blocking logic - sections render independently
   // No longer blocking UI until ALL sections are ready
 
   return (
     <View style={styles.safeArea}>
-      <View style={styles.heroContainer}>
-        <View style={styles.searchRow}>
-          <TouchableOpacity style={styles.searchBar} onPress={handleNavigateToSearch} activeOpacity={0.85}>
-            <Ionicons name="search-outline" size={18} color="#64748b" />
-            <Text style={styles.searchPlaceholder}>{strings.hero.searchPlaceholder}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.filterButton} onPress={handleNavigateToSearch} activeOpacity={0.85}>
-            <Ionicons name="options-outline" size={18} color="#0f172a" />
-          </TouchableOpacity>
-        </View>
-      </View>
-
       <FlatList
-        data={otherItems || []}
+        data={listData}
         renderItem={renderGridItem}
         keyExtractor={(item) => item.id}
         numColumns={2}
@@ -395,7 +670,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
           />
         }
         ListEmptyComponent={
-          othersLoading ? (
+          !hasSearchQuery && othersLoading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color="#0ea5e9" />
               <Text style={styles.loadingText}>{strings.loading.items}</Text>
@@ -403,119 +678,179 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
           ) : null
         }
         ListHeaderComponent={
-          <View style={styles.listHeader}>
-            <View style={styles.sectionCard}>
-              <View style={styles.sectionHeaderRow}>
-                <Text style={styles.sectionTitle}>{strings.sections.topMatches}</Text>
-               </View>
-              {(() => {
-                if (topPicksError) {
-                  return (
+          <View>
+            <View style={styles.heroContainer}>
+              <View style={styles.searchRow}>
+                <View style={styles.searchBar}>
+                  <Ionicons name="search-outline" size={18} color="#64748b" />
+                  <TextInput
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                    style={styles.searchInputField}
+                    placeholder={strings.hero.searchPlaceholder || searchStrings.placeholder}
+                    placeholderTextColor="#94a3b8"
+                    autoCorrect={false}
+                    autoCapitalize="none"
+                    returnKeyType="search"
+                    onSubmitEditing={() => performSearch(searchQuery)}
+                  />
+                  {searchLoading && hasSearchQuery && searchResults.length === 0 ? (
+                    <ActivityIndicator size="small" color="#0ea5e9" style={styles.searchInlineActivity} />
+                  ) : null}
+                  {hasSearchQuery ? (
+                    <TouchableOpacity
+                      onPress={handleClearSearch}
+                      style={styles.searchClearButton}
+                      accessibilityLabel={t('common.clear', { defaultValue: 'Clear search' })}
+                    >
+                      <Ionicons name="close-circle" size={18} color="#94a3b8" />
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+              </View>
+              {hasSearchQuery ? (
+                <View style={styles.searchResultsContainer}>
+                  {searchLoading && searchResults.length === 0 ? (
+                    <View style={styles.searchStatusContainer}>
+                      <ActivityIndicator size="small" color="#0ea5e9" />
+                    </View>
+                  ) : searchResults.length === 0 ? (
+                    <View style={styles.searchStatusContainer}>
+                      <Text style={styles.searchStatusTitle}>{searchStrings.noResultsTitle}</Text>
+                      <Text style={styles.searchStatusSubtitle}>{searchStrings.noResultsSubtitle}</Text>
+                    </View>
+                  ) : (
+                    <View style={styles.searchResultsGrid}>
+                      {searchResults.map((item, index) =>
+                        renderSearchResult({ item, index })
+                      )}
+                    </View>
+                  )}
+                  {searchLoading && searchResults.length > 0 ? (
+                    <View style={styles.searchInlineSpinner}>
+                      <ActivityIndicator size="small" color="#0ea5e9" />
+                    </View>
+                  ) : null}
+                  {searchError ? <Text style={styles.searchErrorText}>{searchError}</Text> : null}
+                </View>
+              ) : null}
+            </View>
+            {!hasSearchQuery && (
+              <View style={styles.listHeader}>
+                <View style={styles.sectionCard}>
+                  <View style={styles.sectionHeaderRow}>
+                    <Text style={styles.sectionTitle}>{strings.sections.topMatches}</Text>
+                  </View>
+                  {(() => {
+                    if (topPicksError) {
+                      return (
+                        <ErrorDisplay
+                          title={strings.errors.title}
+                          message={topPicksError?.message ?? strings.errors.unknown}
+                          retryLabel={strings.errors.retry}
+                          onRetry={refreshTopPicks}
+                        />
+                      );
+                    }
+                    if (topPicksLoading && !isInitialized) {
+                      return <TopPicksSkeleton />;
+                    }
+                    if (aiOffers && aiOffers.length > 0) {
+                      return (
+                        <View style={styles.horizontalScroller}>
+                          <FlatList
+                            data={aiOffers}
+                            renderItem={renderAIOffer}
+                            keyExtractor={(item) => item.id}
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={styles.horizontalList}
+                            snapToInterval={TOP_MATCH_CARD_WIDTH + 16}
+                            decelerationRate="fast"
+                            removeClippedSubviews
+                            maxToRenderPerBatch={5}
+                            windowSize={10}
+                            initialNumToRender={3}
+                            getItemLayout={(data, index) => ({
+                              length: TOP_MATCH_CARD_WIDTH + 16,
+                              offset: (TOP_MATCH_CARD_WIDTH + 16) * index,
+                              index,
+                            })}
+                          />
+                        </View>
+                      );
+                    }
+                    if (isInitialized && !topPicksLoading) {
+                      return <Text style={styles.emptyText}>{strings.empty.topMatches}</Text>;
+                    }
+                    return <TopPicksSkeleton />;
+                  })()}
+                </View>
+
+                <View style={[styles.sectionCard, styles.sectionCardSpacer]}>
+                  <View style={styles.sectionHeaderRow}>
+                    <Text style={styles.sectionTitle}>{strings.sections.recentlyListed}</Text>
+                    {!!recentItems.length && (
+                      <TouchableOpacity
+                        onPress={() => rootNavigation.navigate('RecentlyListed')}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={styles.sectionAction}>{strings.actions.viewAll}</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                  {recentError ? (
                     <ErrorDisplay
                       title={strings.errors.title}
-                      message={topPicksError?.message ?? strings.errors.unknown}
+                      message={recentError?.message ?? strings.errors.unknown}
                       retryLabel={strings.errors.retry}
-                      onRetry={refreshTopPicks}
+                      onRetry={refreshRecent}
                     />
-                  );
-                }
-                if (topPicksLoading && !isInitialized) {
-                  return <TopPicksSkeleton />;
-                }
-                if (aiOffers && aiOffers.length > 0) {
-                   return (
+                  ) : recentLoading && recentItems.length === 0 ? (
+                    <RecentItemsSkeleton />
+                  ) : recentItems.length > 0 ? (
                     <View style={styles.horizontalScroller}>
                       <FlatList
-                        data={aiOffers}
-                        renderItem={renderAIOffer}
+                        data={recentItems}
+                        renderItem={renderRecentItem}
                         keyExtractor={(item) => item.id}
                         horizontal
                         showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.horizontalList}
-                        snapToInterval={TOP_MATCH_CARD_WIDTH + 16}
+                        contentContainerStyle={styles.recentList}
+                        snapToInterval={ITEM_WIDTH * 0.8 + 15}
                         decelerationRate="fast"
-                        removeClippedSubviews
-                        maxToRenderPerBatch={5}
-                        windowSize={10}
-                        initialNumToRender={3}
-                        getItemLayout={(data, index) => ({
-                          length: TOP_MATCH_CARD_WIDTH + 16,
-                          offset: (TOP_MATCH_CARD_WIDTH + 16) * index,
-                          index,
-                        })}
                       />
                     </View>
-                  );
-                }
-                if (isInitialized && !topPicksLoading) {
-                  return <Text style={styles.emptyText}>{strings.empty.topMatches}</Text>;
-                }
-                return <TopPicksSkeleton />;
-              })()}
-            </View>
+                  ) : (
+                    <Text style={styles.emptyText}>{strings.empty.recentItems}</Text>
+                  )}
+                </View>
 
-            <View style={[styles.sectionCard, styles.sectionCardSpacer]}>
-              <View style={styles.sectionHeaderRow}>
-                <Text style={styles.sectionTitle}>{strings.sections.recentlyListed}</Text>
-                {!!recentItems.length && (
-                  <TouchableOpacity
-                    onPress={() => rootNavigation.navigate('RecentlyListed')}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.sectionAction}>{strings.actions.viewAll}</Text>
-                  </TouchableOpacity>
+                {otherItems.length > 0 && (
+                  <View style={[styles.sectionHeaderRow, styles.sectionRowInset]}>
+                    <View>
+                      <Text style={styles.sectionTitle}>{strings.sections.exploreMore}</Text>
+                    </View>
+                  </View>
                 )}
-              </View>
-              {recentError ? (
-                <ErrorDisplay
-                  title={strings.errors.title}
-                  message={recentError?.message ?? strings.errors.unknown}
-                  retryLabel={strings.errors.retry}
-                  onRetry={refreshRecent}
-                />
-              ) : recentLoading && recentItems.length === 0 ? (
-                <RecentItemsSkeleton />
-              ) : recentItems.length > 0 ? (
-                <View style={styles.horizontalScroller}>
-                  <FlatList
-                    data={recentItems}
-                    renderItem={renderRecentItem}
-                    keyExtractor={(item) => item.id}
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.recentList}
-                    snapToInterval={ITEM_WIDTH * 0.8 + 15}
-                    decelerationRate="fast"
-                  />
-                </View>
-              ) : (
-                <Text style={styles.emptyText}>{strings.empty.recentItems}</Text>
-              )}
-            </View>
 
-            {otherItems.length > 0 && (
-              <View style={[styles.sectionHeaderRow, styles.sectionRowInset]}>
-                <View>
-                  <Text style={styles.sectionTitle}>{strings.sections.exploreMore}</Text>
-                </View>
-              </View>
-            )}
-
-            {othersError && (
-              <View style={styles.sectionCard}>
-                <ErrorDisplay
-                  title={strings.errors.title}
-                  message={othersError?.message ?? strings.errors.unknown}
-                  retryLabel={strings.errors.retry}
-                  onRetry={refreshOthers}
-                />
+                {othersError && (
+                  <View style={styles.sectionCard}>
+                    <ErrorDisplay
+                      title={strings.errors.title}
+                      message={othersError?.message ?? strings.errors.unknown}
+                      retryLabel={strings.errors.retry}
+                      onRetry={refreshOthers}
+                    />
+                  </View>
+                )}
               </View>
             )}
           </View>
         }
-        onEndReached={loadMore}
-        onEndReachedThreshold={0.5}
-        ListFooterComponent={renderFooter}
+        onEndReached={hasSearchQuery ? undefined : loadMore}
+        onEndReachedThreshold={hasSearchQuery ? undefined : 0.5}
+        ListFooterComponent={hasSearchQuery ? null : renderFooter}
       />
     </View>
   );
@@ -620,10 +955,11 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 2,
   },
-  searchPlaceholder: {
+  searchInputField: {
+    flex: 1,
     marginLeft: 12,
     fontSize: 14,
-    color: '#64748b',
+    color: '#0f172a',
   },
   filterButton: {
     marginLeft: 12,
@@ -633,6 +969,50 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#e2e8f0',
+  },
+  searchClearButton: {
+    marginLeft: 8,
+  },
+  searchInlineActivity: {
+    marginLeft: 8,
+  },
+  searchResultsContainer: {
+    marginTop: 16,
+  },
+  searchResultsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginTop: 8,
+  },
+  searchStatusContainer: {
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+  },
+  searchStatusTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#0f172a',
+  },
+  searchStatusSubtitle: {
+    fontSize: 13,
+    color: '#64748b',
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  searchErrorText: {
+    marginTop: 12,
+    fontSize: 13,
+    color: '#b91c1c',
+    textAlign: 'center',
+  },
+  searchInlineSpinner: {
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  searchResultCard: {
+    marginBottom: 12,
   },
   heroStatsScroll: {
     paddingTop: 18,
@@ -906,41 +1286,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#047857',
   },
-  recentCard: {
-    width: ITEM_WIDTH * 0.82,
+  recentItemCard: {
+    width: ITEM_WIDTH * 0.9,
     marginRight: 16,
-    backgroundColor: '#ffffff',
-    borderRadius: 20,
-    overflow: 'hidden',
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 3,
-  },
-  recentImage: {
-    width: '100%',
-    height: 150,
-  },
-  recentDetails: {
-    padding: 14,
-    gap: 8,
-  },
-  recentTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#0f172a',
-  },
-  recentPrice: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#047857',
-    marginTop: 4,
-  },
-  recentDescription: {
-    fontSize: 12,
-    color: '#475569',
-    lineHeight: 16,
   },
   recentSkeletonCard: {
     width: ITEM_WIDTH * 0.82,
@@ -958,15 +1306,7 @@ const styles = StyleSheet.create({
   },
   gridItem: {
     width: GRID_ITEM_WIDTH,
-    backgroundColor: '#ffffff',
-    borderRadius: 20,
-    overflow: 'hidden',
     marginBottom: 18,
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 3,
   },
   gridItemLeft: {
     marginLeft: 20,
@@ -976,30 +1316,15 @@ const styles = StyleSheet.create({
     marginLeft: 10,
     marginRight: 20,
   },
-  gridImage: {
-    width: '100%',
-    height: 160,
+  searchGridItem: {
+    width: GRID_ITEM_WIDTH,
+    marginBottom: 18,
   },
-  gridDetails: {
-    padding: 14,
-    gap: 6,
+  searchGridItemLeft: {
+    marginRight: 10,
   },
-  gridTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#0f172a',
-    marginBottom: 6,
-    minHeight: 32,
-  },
-  gridPrice: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#047857',
-  },
-  gridDescription: {
-    fontSize: 12,
-    color: '#475569',
-    lineHeight: 16,
+  searchGridItemRight: {
+    marginLeft: 10,
   },
   footerLoader: {
     width: '100%',
@@ -1073,23 +1398,6 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 14,
     fontWeight: '600',
-  },
-  itemChipsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginTop: 4,
-  },
-  itemChip: {
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    backgroundColor: '#e2e8f0',
-  },
-  itemChipText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#0f172a',
   },
   listHeader: {
     paddingHorizontal: 20,

@@ -44,7 +44,6 @@ export type RootStackParamList = {
   } | undefined;
   ProfileSettings: undefined;
   DevRecommendationSettings: undefined;
-  Search: undefined;
   // Offer flow
   OfferCreate: {
     receiverId: string;
@@ -71,7 +70,6 @@ export type RootStackParamList = {
 
 export type MainTabParamList = {
   Explore: undefined;
-  Search: undefined;
   Offers: undefined;
   Notifications: undefined;
   Profile: undefined;
@@ -150,10 +148,6 @@ export type ProfileSettingsScreenProps = {
 
 export type DevRecommendationSettingsScreenProps = {
   navigation: NavigationProp<RootStackParamList, 'DevRecommendationSettings'>;
-};
-
-export type SearchScreenProps = {
-  navigation: NavigationProp<RootStackParamList, 'Search'>;
 };
 
 export type AddItemScreenProps = {

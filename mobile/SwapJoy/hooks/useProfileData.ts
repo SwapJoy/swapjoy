@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Alert } from 'react-native';
 import { ApiService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useLocalization } from '../localization';
+import { useFavorites } from '../contexts/FavoritesContext';
 
 export interface UserStats {
   sentOffers: number;
@@ -45,7 +46,6 @@ export const useProfileData = (targetUserId?: string) => {
     totalRatings: 0,
   });
   const [userItems, setUserItems] = useState<UserItem[]>([]);
-  const [savedItems, setSavedItems] = useState<UserItem[]>([]);
   const [draftItems, setDraftItems] = useState<UserItem[]>([]);
   
   // Separate loading states for each section
@@ -53,11 +53,31 @@ export const useProfileData = (targetUserId?: string) => {
   const [loadingMetrics, setLoadingMetrics] = useState(true);
   const [loadingFollowCounts, setLoadingFollowCounts] = useState(true);
   const [loadingPublishedItems, setLoadingPublishedItems] = useState(true);
-  const [loadingSavedItems, setLoadingSavedItems] = useState(false);
   const [loadingDraftItems, setLoadingDraftItems] = useState(false);
   
   // Track which items tabs have been loaded
   const loadedTabsRef = useRef<Set<string>>(new Set());
+
+  const {
+    favoriteItems,
+    loading: favoritesLoading,
+    refreshFavorites,
+  } = useFavorites();
+
+  const savedItems = useMemo<UserItem[]>(() => {
+    return favoriteItems.map((item) => ({
+      id: item.id,
+      title: item.title ?? '',
+      description: item.description ?? '',
+      price: item.price ?? 0,
+      currency: item.currency ?? 'USD',
+      condition: item.condition ?? 'unknown',
+      image_url: item.image_url ?? undefined,
+      created_at: item.created_at ?? new Date().toISOString(),
+    }));
+  }, [favoriteItems]);
+
+  const loadingSavedItems = favoritesLoading;
 
   const handleSignOut = useCallback(() => {
     Alert.alert(
@@ -253,32 +273,14 @@ export const useProfileData = (targetUserId?: string) => {
       return;
     }
 
-    setLoadingSavedItems(true);
     loadedTabsRef.current.add('saved');
 
     try {
-      const savedRes = await ApiService.getSavedItems();
-      const saved: any[] = (savedRes?.data as any[]) || [];
-
-      if (saved) {
-        const formattedSaved = saved.map((item: any) => ({
-          id: item.id,
-          title: item.title,
-          description: item.description,
-          price: item.price,
-          currency: item.currency,
-          condition: item.condition,
-          image_url: item.image_url,
-          created_at: item.created_at,
-        }));
-        setSavedItems(formattedSaved);
-      }
+      await refreshFavorites();
     } catch (error) {
-      console.error('Error fetching saved items:', error);
-    } finally {
-      setLoadingSavedItems(false);
+      console.error('Error refreshing saved items:', error);
     }
-  }, [user]);
+  }, [refreshFavorites, user]);
 
   // Load draft items only when needed (lazy loading)
   const loadDraftItems = useCallback(async () => {

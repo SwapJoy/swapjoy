@@ -7,6 +7,7 @@ import { GoogleSignin } from '@react-native-google-signin/google-signin';
 // React Native Firebase is initialized natively via FirebaseApp.configure() in AppDelegate.swift
 import AppNavigator from './navigation/AppNavigator';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { FavoritesProvider } from './contexts/FavoritesContext';
 import { PushNotificationService } from './services/pushNotificationService';
 import { NotificationNavigation } from './utils/notificationNavigation';
 import { RootStackParamList } from './types/navigation';
@@ -84,7 +85,9 @@ export default function App() {
   return (
     <LocalizationProvider>
       <AuthProvider>
-        <AppContent />
+        <FavoritesProvider>
+          <AppContent />
+        </FavoritesProvider>
       </AuthProvider>
     </LocalizationProvider>
   );

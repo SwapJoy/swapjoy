@@ -7,6 +7,7 @@ import { ApiService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { formatCurrency } from '../utils';
 import { useLocalization } from '../localization';
+import FavoriteToggleButton from '../components/FavoriteToggleButton';
 
 const { width } = Dimensions.get('window');
 
@@ -29,6 +30,25 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [item, setItem] = useState<any | null>(null);
+
+  const favoriteData = useMemo(() => {
+    if (!item) return null;
+    const primaryImage =
+      item.image_url ||
+      item.images?.[0]?.image_url ||
+      item.item_images?.[0]?.image_url ||
+      null;
+    return {
+      id: item.id,
+      title: item.title,
+      description: item.description,
+      price: item.price || item.estimated_value || 0,
+      currency: item.currency || 'USD',
+      condition: item.condition,
+      image_url: primaryImage,
+      created_at: item.created_at || item.updated_at || null,
+    };
+  }, [item]);
 
   useEffect(() => {
     let mounted = true;
@@ -82,7 +102,7 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
         renderItem={({ item: section }) => {
           if (section.key === 'header') {
             return (
-              <View>
+              <View style={styles.heroSection}>
                 <FlatList
                   data={images.length > 0 ? images : [{ image_url: item.image_url }]}
                   keyExtractor={(_, idx) => String(idx)}
@@ -98,6 +118,14 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
                     />
                   )}
                 />
+                {favoriteData ? (
+                  <FavoriteToggleButton
+                    itemId={favoriteData.id}
+                    item={favoriteData}
+                    size={24}
+                    style={styles.detailsFavoriteButton}
+                  />
+                ) : null}
               </View>
             );
           }
@@ -198,6 +226,15 @@ const styles = StyleSheet.create({
     width,
     height: Math.min(300, Math.round(width * 0.75)),
     backgroundColor: '#eee',
+  },
+  heroSection: {
+    position: 'relative',
+  },
+  detailsFavoriteButton: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    zIndex: 5,
   },
   details: {
     backgroundColor: '#fff',

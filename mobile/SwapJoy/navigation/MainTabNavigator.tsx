@@ -4,7 +4,6 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MainTabParamList } from '../types/navigation';
 import { Ionicons } from '@expo/vector-icons';
 import ExploreScreen from '../screens/ExploreScreen';
-import SearchScreen from '../screens/SearchScreen';
 import OffersScreen from '../screens/OffersScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
@@ -62,20 +61,6 @@ const MainTabNavigator: React.FC<MainTabNavigatorProps> = ({ onNavigateToAdd }) 
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons 
               name={focused ? "compass" : "compass-outline"} 
-              size={size} 
-              color={color} 
-            />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Search"
-        component={SearchScreen}
-        options={{
-          headerShown: false,
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons 
-              name={focused ? "search" : "search-outline"} 
               size={size} 
               color={color} 
             />

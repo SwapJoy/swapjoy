@@ -38,7 +38,7 @@ const CustomHeader: React.FC<CustomHeaderProps> = React.memo(({
     if (onSearchPress) {
       onSearchPress();
     } else {
-      navigation.navigate('Search' as never);
+      navigation.navigate('MainTabs' as never, { screen: 'Explore' } as never);
     }
   };
 

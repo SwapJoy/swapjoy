@@ -214,7 +214,7 @@ export class ApiService {
       // Fallback: basic keyword search on title with minimal fields
       const { data, error } = await client
         .from('items')
-        .select('id, title, description, price, currency, item_images(image_url)')
+        .select('id, title, description, price, currency, category_id, category:categories!items_category_id_fkey(title_en, title_ka), item_images(image_url)')
         .ilike('title', `%${q}%`)
         .limit(limit);
 
@@ -227,31 +227,22 @@ export class ApiService {
     const q = (query || '').trim();
     if (!q) return { data: [], error: null } as any;
     return this.authenticatedCall(async (client) => {
-      // Prefer fuzzy RPC with trigram similarity (matches typos like 'fener' -> 'Fender')
-      try {
-        const { data, error } = await client.rpc('fuzzy_search_items', { p_query: q, p_limit: limit });
-        if (!error && Array.isArray(data)) {
-          // Ensure images are present; if missing, pull minimal images for ids
-          const ids = data.map((d: any) => d.id);
-          if (ids.length > 0) {
-            const { data: rows } = await client
-              .from('items')
-              .select('id, item_images(image_url)')
-              .in('id', ids);
-            const map = new Map<string, any>();
-            (rows || []).forEach((r: any) => map.set(r.id, r));
-            const enriched = data.map((d: any) => ({ ...d, ...map.get(d.id) }));
-            return { data: enriched, error: null } as any;
-          }
-          return { data, error: null } as any;
-        }
-      } catch (_) {
-        // Fall back to simple ILIKE
-      }
+      const searchPattern = `%${q}%`;
       return await client
         .from('items')
-        .select('id, title, description, price, currency, item_images(image_url)')
-        .ilike('title', `%${q}%`)
+        .select(
+          [
+            'id',
+            'title',
+            'description',
+            'price',
+            'currency',
+            'category_id',
+            'category:categories!items_category_id_fkey(title_en, title_ka)',
+            'item_images(image_url)',
+          ].join(', ')
+        )
+        .or([`title.ilike.${searchPattern}`, `description.ilike.${searchPattern}`].join(','))
         .limit(limit);
     });
   }
@@ -2164,9 +2155,17 @@ export class ApiService {
 
   static async addToFavorites(itemId: string) {
     return this.authenticatedCall(async (client) => {
+      const currentUser = await AuthService.getCurrentUser();
+      if (!currentUser?.id) {
+        return {
+          data: null,
+          error: { message: 'Not authenticated' },
+        } as any;
+      }
+
       return await client
         .from('favorites')
-        .insert({ item_id: itemId })
+        .insert({ item_id: itemId, user_id: currentUser.id })
         .select()
         .single();
     });
@@ -2174,10 +2173,19 @@ export class ApiService {
 
   static async removeFromFavorites(itemId: string) {
     return this.authenticatedCall(async (client) => {
+      const currentUser = await AuthService.getCurrentUser();
+      if (!currentUser?.id) {
+        return {
+          data: null,
+          error: { message: 'Not authenticated' },
+        } as any;
+      }
+
       return await client
         .from('favorites')
         .delete()
-        .eq('item_id', itemId);
+        .eq('item_id', itemId)
+        .eq('user_id', currentUser.id);
     });
   }
 

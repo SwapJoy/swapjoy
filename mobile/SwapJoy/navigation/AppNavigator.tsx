@@ -18,7 +18,6 @@ import ItemDetailsFormScreen from '../screens/ItemDetailsFormScreen';
 import ItemPreviewScreen from '../screens/ItemPreviewScreen';
 import ItemDetailsScreen from '../screens/ItemDetailsScreen';
 import ProfileSettingsScreen from '../screens/ProfileSettingsScreen';
-import SearchScreen from '../screens/SearchScreen';
 import BundleItemsScreen from '../screens/BundleItemsScreen';
 import OfferCreateScreen from '../screens/OfferCreateScreen';
 import OfferPreviewScreen from '../screens/OfferPreviewScreen';
@@ -201,11 +200,6 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
               name="DevRecommendationSettings" 
               component={DevRecommendationSettingsScreen}
               options={{ title: 'DEV: Recommendation Weights' }}
-            />
-            <Stack.Screen 
-              name="Search" 
-              component={SearchScreen}
-              options={{ title: 'Search' }}
             />
             <Stack.Screen 
               name="FollowersFollowing" 
