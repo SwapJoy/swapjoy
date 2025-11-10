@@ -1234,6 +1234,8 @@ export class ApiService {
   // Fallback method for when vector search fails
   static async getFallbackRecommendations(client: any, userId: string, limit: number) {
     console.log('[TopPicks Fallback] start. user:', userId, 'limit:', limit);
+    const baseSelect =
+      '*, category:categories!items_category_id_fkey(title_en, title_ka), item_images(image_url), users!items_user_id_fkey(username, first_name, last_name)';
     let { data: user, error: userError } = await client
       .from('users')
       .select('favorite_categories')
@@ -1259,7 +1261,7 @@ export class ApiService {
       console.warn('[TopPicks Fallback] User not found; returning recent items');
       const { data: recent, error: recentErr } = await client
         .from('items')
-        .select('*, item_images(image_url), users!items_user_id_fkey(username, first_name, last_name)')
+        .select(baseSelect)
         .eq('status', 'available')
         .neq('user_id', userId)
         .order('created_at', { ascending: false })
@@ -1274,7 +1276,7 @@ export class ApiService {
     const query = hasFavs
       ? client
           .from('items')
-          .select('*, item_images(image_url), users!items_user_id_fkey(username, first_name, last_name)')
+          .select(baseSelect)
           .in('category_id', user.favorite_categories)
           .eq('status', 'available')
           .neq('user_id', userId)
@@ -1282,7 +1284,7 @@ export class ApiService {
           .limit(limit)
       : client
           .from('items')
-          .select('*, item_images(image_url), users!items_user_id_fkey(username, first_name, last_name)')
+          .select(baseSelect)
           .eq('status', 'available')
           .neq('user_id', userId)
           .order('created_at', { ascending: false })

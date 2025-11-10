@@ -28,24 +28,49 @@ export class AuthService {
       const sessionData = await SecureStore.getItemAsync(SESSION_KEY);
       if (sessionData) {
         const session = JSON.parse(sessionData) as AuthSession;
-        
-        // Check if session is expired
-        if (session.expires_at && Date.now() >= session.expires_at * 1000) {
-          console.log('[AuthService] Stored session expired, attempting refresh');
-          // Try to refresh the token
+        const now = Date.now();
+        const expiresAtMs = session.expires_at ? session.expires_at * 1000 : 0;
+        const refreshThresholdMs = 60 * 60 * 1000; // 1 hour
+        const hasRefreshToken = !!session.refresh_token;
+        const isExpired = !!expiresAtMs && now >= expiresAtMs;
+        const needsProactiveRefresh =
+          !!expiresAtMs && !isExpired && expiresAtMs - now <= refreshThresholdMs;
+
+        if (!hasRefreshToken) {
+          console.warn('[AuthService] Stored session missing refresh token');
+          if (isExpired) {
+            console.warn('[AuthService] Session expired without refresh token - signing out');
+            await this.signOut();
+            return null;
+          }
+          return session;
+        }
+
+        if (isExpired || needsProactiveRefresh) {
+          console.log(
+            `[AuthService] Stored session ${
+              isExpired ? 'expired' : 'approaching expiry'
+            } (${Math.max(expiresAtMs - now, 0)}ms remaining) - attempting refresh`
+          );
+
           const refreshedSession = await this.refreshSession(session.refresh_token);
           if (refreshedSession) {
             console.log('[AuthService] Session refreshed successfully');
             return refreshedSession;
           }
-          // If refresh failed due to network error, keep existing session (don't clear)
-          // Only clear if refresh failed for non-network reasons
-          console.warn('[AuthService] Refresh failed - keeping stored session to prevent unwanted sign-out');
-          // Don't clear session on network errors - keep stored session
-          // This prevents unwanted sign-out during network issues
-          return session; // Return expired session rather than clearing it
+
+          if (isExpired) {
+            console.warn('[AuthService] Refresh failed for expired session - signing out');
+            await this.signOut();
+            return null;
+          }
+
+          console.warn(
+            '[AuthService] Proactive refresh failed - keeping current session until expiry'
+          );
+          return session;
         }
-        
+
         return session;
       }
     } catch (error) {
