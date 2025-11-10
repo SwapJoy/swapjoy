@@ -16,7 +16,7 @@ import { ExploreScreenProps, RootStackParamList } from '../types/navigation';
 import { useExploreData, AIOffer } from '../hooks/useExploreData';
 import { useRecentlyListed } from '../hooks/useRecentlyListed';
 import { useOtherItems } from '../hooks/useOtherItems';
-import TopMatchCard, { TOP_MATCH_CARD_WIDTH } from '../components/TopMatchCard';
+import TopMatchCard, { TOP_MATCH_CARD_WIDTH, TopMatchCardSkeleton } from '../components/TopMatchCard';
 import { formatCurrency } from '../utils';
 import { useLocalization } from '../localization';
 import { Ionicons } from '@expo/vector-icons';
@@ -25,7 +25,7 @@ import type { NavigationProp } from '@react-navigation/native';
 import { getConditionPresentation } from '../utils/conditions';
 import { ApiService } from '../services/api';
 import { resolveCategoryName } from '../utils/category';
-import ItemCard, { ItemCardChip } from '../components/ItemCard';
+import ItemCard, { ItemCardChip, ItemCardSkeleton } from '../components/ItemCard';
 import FavoriteToggleButton from '../components/FavoriteToggleButton';
 import { useFavorites } from '../contexts/FavoritesContext';
 
@@ -38,14 +38,7 @@ const TopPicksSkeleton = () => (
   <View style={styles.horizontalScroller}>
     <View style={styles.horizontalList}>
       {[1, 2].map((index) => (
-        <View key={index} style={[styles.topMatchSkeletonCard, { width: TOP_MATCH_CARD_WIDTH }]}> 
-          <View style={styles.topMatchSkeletonMedia} />
-          <View style={styles.topMatchSkeletonBody}>
-            <View style={styles.skeletonLineLarge} />
-            <View style={styles.skeletonLineMedium} />
-            <View style={styles.skeletonLineSmall} />
-          </View>
-        </View>
+        <TopMatchCardSkeleton key={index} style={{ width: TOP_MATCH_CARD_WIDTH }} />
       ))}
     </View>
   </View>
@@ -56,14 +49,11 @@ const RecentItemsSkeleton = () => (
   <View style={styles.horizontalScroller}>
     <View style={styles.horizontalList}>
       {[1, 2, 3].map((index) => (
-        <View key={index} style={styles.recentSkeletonCard}>
-          <View style={styles.recentSkeletonImage} />
-          <View style={styles.recentSkeletonBody}>
-            <View style={styles.skeletonLineMedium} />
-            <View style={styles.skeletonLineSmall} />
-            <View style={styles.skeletonLineTiny} />
-          </View>
-        </View>
+        <ItemCardSkeleton
+          key={index}
+          variant="horizontal"
+          style={styles.recentItemCard}
+        />
       ))}
     </View>
   </View>
@@ -752,7 +742,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
                         />
                       );
                     }
-                    if (topPicksLoading && !isInitialized) {
+                    if (topPicksLoading && isInitialized) {
                       return <TopPicksSkeleton />;
                     }
                     if (aiOffers && aiOffers.length > 0) {
@@ -1125,11 +1115,13 @@ const styles = StyleSheet.create({
     marginHorizontal: -12,
   },
   horizontalList: {
+    flexDirection: 'row',
     paddingTop: 6,
     paddingBottom: 6,
     paddingHorizontal: 12,
   },
   recentList: {
+    flexDirection: 'row',
     paddingTop: 6,
     paddingBottom: 6,
     paddingHorizontal: 12,
@@ -1290,20 +1282,6 @@ const styles = StyleSheet.create({
     width: ITEM_WIDTH * 0.9,
     marginRight: 16,
   },
-  recentSkeletonCard: {
-    width: ITEM_WIDTH * 0.82,
-    marginRight: 16,
-    borderRadius: 20,
-    backgroundColor: '#e2e8f0',
-    overflow: 'hidden',
-  },
-  recentSkeletonImage: {
-    height: 150,
-    backgroundColor: '#cbd5f5',
-  },
-  recentSkeletonBody: {
-    padding: 14,
-  },
   gridItem: {
     width: GRID_ITEM_WIDTH,
     marginBottom: 18,
@@ -1330,47 +1308,6 @@ const styles = StyleSheet.create({
     width: '100%',
     paddingVertical: 24,
     alignItems: 'center',
-  },
-  topMatchSkeletonCard: {
-    width: width * 0.72,
-    borderRadius: 24,
-    backgroundColor: '#e2e8f0',
-    marginRight: 16,
-    overflow: 'hidden',
-  },
-  topMatchSkeletonMedia: {
-    height: 200,
-    backgroundColor: '#cbd5f5',
-  },
-  topMatchSkeletonBody: {
-    padding: 16,
-  },
-  skeletonLineLarge: {
-    width: '78%',
-    height: 16,
-    borderRadius: 999,
-    backgroundColor: '#dbeafe',
-    marginBottom: 10,
-  },
-  skeletonLineMedium: {
-    width: '60%',
-    height: 14,
-    borderRadius: 999,
-    backgroundColor: '#e2e8f0',
-    marginBottom: 10,
-  },
-  skeletonLineSmall: {
-    width: '48%',
-    height: 12,
-    borderRadius: 999,
-    backgroundColor: '#e2e8f0',
-    marginBottom: 10,
-  },
-  skeletonLineTiny: {
-    width: '35%',
-    height: 10,
-    borderRadius: 999,
-    backgroundColor: '#e2e8f0',
   },
   errorContainer: {
     padding: 20,

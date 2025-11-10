@@ -2451,7 +2451,7 @@ export class ApiService {
         .select(`
           *,
           item_images!item_images_item_id_fkey(image_url),
-          categories!inner(name)
+          categories:categories!items_category_id_fkey(title_en, title_ka)
         `)
         .eq('user_id', userId)
         .eq('status', 'available')
@@ -2466,7 +2466,9 @@ export class ApiService {
       const itemsWithImages = items?.map(item => ({
         ...item,
         image_url: item.item_images?.[0]?.image_url || null,
-        category_name: item.categories?.name || null
+        category_name: item.categories?.title_en || item.categories?.title_ka || null,
+        category_name_en: item.categories?.title_en || null,
+        category_name_ka: item.categories?.title_ka || null,
       }));
 
       console.log('User items:', itemsWithImages?.map(item => ({

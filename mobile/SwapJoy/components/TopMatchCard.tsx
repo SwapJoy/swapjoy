@@ -1,4 +1,4 @@
-import React, { memo, useMemo } from 'react';
+import React, { memo, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   GestureResponderEvent,
   StyleProp,
   ViewStyle,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import CachedImage from './CachedImage';
@@ -17,6 +18,50 @@ import { getConditionPresentation } from '../utils/conditions';
 const { width } = Dimensions.get('window');
 
 export const TOP_MATCH_CARD_WIDTH = width * 0.75;
+
+const useFadeAnimation = () => {
+  const opacity = useRef(new Animated.Value(0.4)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(opacity, {
+          toValue: 0.85,
+          duration: 650,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacity, {
+          toValue: 0.35,
+          duration: 650,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+
+    loop.start();
+    return () => loop.stop();
+  }, [opacity]);
+
+  return opacity;
+};
+
+const FadePlaceholder: React.FC<{ style?: StyleProp<ViewStyle>; borderRadius?: number }> = ({
+  style,
+  borderRadius,
+}) => {
+  const opacity = useFadeAnimation();
+
+  return (
+    <Animated.View
+      style={[
+        styles.fadePlaceholder,
+        { opacity },
+        borderRadius !== undefined ? { borderRadius } : null,
+        style,
+      ]}
+    />
+  );
+};
 
 interface TopMatchCardOwner {
   initials: string;
@@ -288,7 +333,65 @@ const styles = StyleSheet.create({
   suggestionsSlot: {
     marginTop: 12,
   },
+  skeletonCard: {
+    backgroundColor: '#f8fafc',
+  },
+  skeletonMedia: {
+    width: '100%',
+    height: 170,
+  },
+  skeletonLineLarge: {
+    width: '70%',
+    height: 18,
+    borderRadius: 9,
+    marginBottom: 12,
+  },
+  skeletonLineMedium: {
+    width: '55%',
+    height: 14,
+    borderRadius: 7,
+    marginBottom: 10,
+  },
+  skeletonLineSmall: {
+    width: '80%',
+    height: 12,
+    borderRadius: 6,
+    marginBottom: 14,
+  },
+  skeletonChipRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  skeletonChip: {
+    width: 48,
+    height: 18,
+    borderRadius: 9,
+  },
+  skeletonChipWide: {
+    width: 68,
+    height: 18,
+    borderRadius: 9,
+  },
+  fadePlaceholder: {
+    backgroundColor: '#e2e8f0',
+  },
 });
+
+export const TopMatchCardSkeleton = memo(({ style }: { style?: StyleProp<ViewStyle> }) => (
+  <View style={[styles.card, styles.skeletonCard, style]}>
+    <FadePlaceholder style={styles.skeletonMedia} borderRadius={16} />
+    <View style={styles.content}>
+      <FadePlaceholder style={styles.skeletonLineLarge} />
+      <FadePlaceholder style={styles.skeletonLineMedium} />
+      <FadePlaceholder style={styles.skeletonLineSmall} />
+      <View style={styles.skeletonChipRow}>
+        <FadePlaceholder style={styles.skeletonChip} />
+        <FadePlaceholder style={styles.skeletonChipWide} />
+      </View>
+    </View>
+  </View>
+));
 
 export default memo(TopMatchCard);
 
