@@ -23,6 +23,8 @@ import { ApiService } from '../services/api';
 import { ItemDraft, ItemCondition, Category } from '../types/item';
 import { getCurrencySymbol } from '../utils';
 import { useLocalization } from '../localization';
+import LocationSelector from '../components/LocationSelector';
+import type { LocationSelection } from '../types/location';
 
 const { width } = Dimensions.get('window');
 
@@ -58,6 +60,7 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
       condition: t('addItem.details.labels.condition'),
       currency: t('addItem.details.labels.currency'),
       price: t('addItem.details.labels.price'),
+      location: t('addItem.details.labels.location', { defaultValue: 'Location' }),
     },
     placeholders: {
       title: t('addItem.details.placeholders.title'),
@@ -66,6 +69,7 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
       condition: t('addItem.details.placeholders.condition'),
       currency: t('addItem.details.placeholders.currency'),
       value: t('addItem.details.placeholders.value'),
+      location: t('addItem.details.placeholders.location', { defaultValue: 'Select location' }),
     },
     buttons: {
       next: t('addItem.details.buttons.next'),
@@ -84,6 +88,10 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
       missingPrice: t('addItem.alerts.missingPrice'),
       uploadingImagesTitle: t('addItem.alerts.uploadingImagesTitle'),
       uploadingImagesMessage: t('addItem.alerts.uploadingImagesMessage'),
+      missingLocation: t('addItem.alerts.missingLocation', { defaultValue: 'Please choose a location for your item.' }),
+    },
+    location: {
+      resolving: t('addItem.details.locationResolving', { defaultValue: 'Resolving nearest city…' }),
     },
   }), [t]);
   const uploadingText = useCallback(
@@ -114,6 +122,13 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
   const [condition, setCondition] = useState<ItemCondition | null>(null);
   const [price, setPrice] = useState('');
   const [currency, setCurrency] = useState<string>('USD');
+  const [showLocationSelector, setShowLocationSelector] = useState(false);
+  const [locationLabel, setLocationLabel] = useState<string | null>(null);
+  const [locationCoords, setLocationCoords] = useState<{ lat: number | null; lng: number | null }>({
+    lat: null,
+    lng: null,
+  });
+  const [resolvingLocation, setResolvingLocation] = useState(false);
   
   const [categories, setCategories] = useState<Category[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
@@ -141,6 +156,41 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
         setCondition(loadedDraft.condition);
         setPrice(loadedDraft.price);
         setCurrency(loadedDraft.currency || 'USD');
+        setLocationCoords({
+          lat: loadedDraft.location_lat,
+          lng: loadedDraft.location_lng,
+        });
+        if (loadedDraft.location_label) {
+          setLocationLabel(loadedDraft.location_label);
+        } else if (loadedDraft.location_lat !== null && loadedDraft.location_lng !== null) {
+          try {
+            setResolvingLocation(true);
+            const { data } = await ApiService.findNearestCity(
+              loadedDraft.location_lat,
+              loadedDraft.location_lng
+            );
+            if (data) {
+              const label = [data.name, data.country].filter(Boolean).join(', ') || null;
+              setLocationLabel(label);
+              if (label) {
+                await DraftManager.updateDraft(draftId, { location_label: label });
+              }
+            } else {
+              setLocationLabel(null);
+            }
+          } catch (error) {
+            console.warn('Error resolving draft location:', error);
+            setLocationLabel(null);
+          } finally {
+            setResolvingLocation(false);
+          }
+        } else {
+          setLocationLabel(null);
+        }
+      }
+      if (!loadedDraft) {
+        setLocationCoords({ lat: null, lng: null });
+        setLocationLabel(null);
       }
 
       // Load categories
@@ -268,6 +318,35 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
     saveDraft({ price: filtered });
   };
 
+  const handleLocationSelected = useCallback(
+    async (selection: LocationSelection, _radiusKm: number | null) => {
+      const labelParts = [selection.cityName, selection.country].filter(Boolean);
+      const fallbackLabel = t('locationSelector.coordinatesFallback', {
+        defaultValue: 'Exact location',
+      });
+      const label = labelParts.length > 0 ? labelParts.join(', ') : fallbackLabel;
+
+      setLocationCoords({ lat: selection.lat, lng: selection.lng });
+      setLocationLabel(label);
+      setDraft((prev) =>
+        prev
+          ? {
+              ...prev,
+              location_lat: selection.lat,
+              location_lng: selection.lng,
+              location_label: label,
+            }
+          : prev
+      );
+      saveDraft({
+        location_lat: selection.lat,
+        location_lng: selection.lng,
+        location_label: label,
+      });
+    },
+    [saveDraft, t]
+  );
+
   const handleNext = async () => {
     // Validate form
     if (!title.trim()) {
@@ -290,6 +369,10 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
       Alert.alert(strings.alerts.missingInfoTitle, strings.alerts.missingPrice);
       return;
     }
+    if (locationCoords.lat === null || locationCoords.lng === null) {
+      Alert.alert(strings.alerts.missingInfoTitle, strings.alerts.missingLocation);
+      return;
+    }
     if (!allUploaded) {
       Alert.alert(strings.alerts.uploadingImagesTitle, strings.alerts.uploadingImagesMessage);
       return;
@@ -303,6 +386,9 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
       condition,
       price: price,
       currency: currency,
+      location_lat: locationCoords.lat,
+      location_lng: locationCoords.lng,
+      location_label: locationLabel,
     });
 
     // Navigate to preview
@@ -318,6 +404,9 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
       condition,
       price: price,
       currency: currency,
+      location_lat: locationCoords.lat,
+      location_lng: locationCoords.lng,
+      location_label: locationLabel,
     });
     navigation.goBack();
   };
@@ -511,6 +600,29 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
                 />
               </View>
             </View>
+
+            {/* Location */}
+            <View style={styles.fieldContainer}>
+              <Text style={styles.fieldLabel}>
+                {strings.labels.location} <Text style={styles.required}>*</Text>
+              </Text>
+              <TouchableOpacity
+                style={styles.pickerButton}
+                onPress={() => setShowLocationSelector(true)}
+              >
+                <Text style={[styles.pickerButtonText, !locationLabel && styles.placeholder]}>
+                  {locationLabel || strings.placeholders.location}
+                </Text>
+                <Ionicons name="chevron-down" size={20} color="#666" />
+              </TouchableOpacity>
+              {resolvingLocation ? (
+                <Text style={styles.locationStatus}>{strings.location.resolving}</Text>
+              ) : locationCoords.lat !== null && locationCoords.lng !== null ? (
+                <Text style={styles.locationCoordinates}>
+                  {locationCoords.lat.toFixed(4)}, {locationCoords.lng.toFixed(4)}
+                </Text>
+              ) : null}
+            </View>
           </View>
         </ScrollView>
 
@@ -525,6 +637,13 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
             <Ionicons name="arrow-forward" size={20} color="#fff" />
           </TouchableOpacity>
         </View>
+
+        <LocationSelector
+          visible={showLocationSelector}
+          onClose={() => setShowLocationSelector(false)}
+          onSelectLocation={handleLocationSelected}
+          mode="item"
+        />
 
         {/* Category Picker Modal */}
         <Modal
@@ -808,6 +927,16 @@ const styles = StyleSheet.create({
   },
   valueInput: {
     flex: 1,
+  },
+  locationStatus: {
+    marginTop: 6,
+    fontSize: 12,
+    color: '#0ea5e9',
+  },
+  locationCoordinates: {
+    marginTop: 6,
+    fontSize: 12,
+    color: '#64748b',
   },
   footer: {
     padding: 16,

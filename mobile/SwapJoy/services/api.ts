@@ -409,6 +409,92 @@ export class ApiService {
     });
   }
 
+  static async getActiveCities() {
+    return this.authenticatedCall(async (client) => {
+      const { data, error } = await client
+        .from('cities')
+        .select('id, name, country, state_province, center_lat, center_lng, timezone, population')
+        .or('is_active.is.null,is_active.eq.true')
+        .order('name', { ascending: true });
+
+      if (error) {
+        console.warn('[ApiService.getActiveCities] Error fetching cities:', error);
+      }
+
+      return { data: data || [], error } as any;
+    });
+  }
+
+  static async findNearestCity(lat: number, lng: number) {
+    return this.authenticatedCall(async (client) => {
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        return { data: null, error: { message: 'Invalid coordinates provided' } } as any;
+      }
+
+      const { data, error } = await client.rpc('find_nearest_city', {
+        p_lat: lat,
+        p_lng: lng,
+      });
+
+      if (error) {
+        console.warn('[ApiService.findNearestCity] RPC error:', error);
+        return { data: null, error } as any;
+      }
+
+      const nearest = Array.isArray(data) ? data[0] || null : data;
+      return { data: nearest, error: null } as any;
+    });
+  }
+
+  static async updateManualLocation({
+    lat,
+    lng,
+    radiusKm,
+  }: {
+    lat: number;
+    lng: number;
+    radiusKm?: number | null;
+  }) {
+    return this.authenticatedCall(async (client) => {
+      const currentUser = await AuthService.getCurrentUser();
+      if (!currentUser?.id) {
+        return { data: null, error: { message: 'Not authenticated' } } as any;
+      }
+
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        return { data: null, error: { message: 'Invalid coordinates' } } as any;
+      }
+
+      const updates: Record<string, any> = {
+        manual_location_lat: lat,
+        manual_location_lng: lng,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (radiusKm !== undefined) {
+        updates.preferred_radius_km = radiusKm;
+      }
+
+      const { data, error } = await client
+        .from('users')
+        .update(updates)
+        .eq('id', currentUser.id)
+        .select('id, manual_location_lat, manual_location_lng, preferred_radius_km')
+        .single();
+
+      if (!error) {
+        const userId = currentUser.id;
+        RedisCache.invalidatePattern(`top-picks:${userId}:*`)
+          .then(() => console.log('[ApiService.updateManualLocation] Invalidated top picks cache'))
+          .catch((cacheErr) => console.warn('[ApiService.updateManualLocation] Cache invalidation failed:', cacheErr));
+      } else {
+        console.warn('[ApiService.updateManualLocation] Update error:', error);
+      }
+
+      return { data, error } as any;
+    });
+  }
+
   static async getItems() {
     return this.authenticatedCall(async (client) => {
       return await client
@@ -480,7 +566,11 @@ export class ApiService {
       if (userItemsError || !userItems || userItems.length === 0) {
         console.log('No user items found, using fallback recommendations');
         // Fallback to category-based recommendations
-        const fb = await this.getFallbackRecommendations(client, userId, limit);
+        const fb = await this.getFallbackRecommendations(client, userId, limit, {
+          userLat,
+          userLng,
+          radiusKm: maxRadiusKm,
+        });
         console.log('[TopPicks] fallback returned count:', Array.isArray((fb as any)?.data) ? (fb as any).data.length : 0, 'error?', !!(fb as any)?.error);
         return fb;
       }
@@ -498,9 +588,9 @@ export class ApiService {
       const favoriteCategories = user?.favorite_categories || [];
       
       // Get user location (only manual_location columns exist in database)
-      const userLat = user?.manual_location_lat || null;
-      const userLng = user?.manual_location_lng || null;
-      const maxRadiusKm = user?.preferred_radius_km || 50.0;
+      const userLat = user?.manual_location_lat ?? null;
+      const userLng = user?.manual_location_lng ?? null;
+      const maxRadiusKm = user?.preferred_radius_km ?? 50.0;
       
       // Get recommendation weights
       const weights = await this.getRecommendationWeights(userId);
@@ -536,6 +626,8 @@ export class ApiService {
               overall_score: simMap[it.id] || 0,
             }));
           }
+
+          enriched = await this.applyLocationRadiusFilter(client, enriched, userLat, userLng, maxRadiusKm);
 
           const finalByPrompt = enriched
             .sort((a, b) => (b.similarity_score || 0) - (a.similarity_score || 0))
@@ -1055,12 +1147,15 @@ export class ApiService {
 
       // Sort by weighted overall_score (includes all weighted factors: similarity, category, price, location)
       // The weighted score already accounts for category_score, price_score, location weights
-      const sortedResults = singleResults.sort((a, b) => {
+      let sortedResults = singleResults.sort((a, b) => {
         // Primary sort: weighted overall_score (descending)
         const scoreDiff = (b.overall_score || 0) - (a.overall_score || 0);
         
         return scoreDiff;
       });
+
+      sortedResults = await this.applyLocationRadiusFilter(client, sortedResults, userLat, userLng, maxRadiusKm);
+      console.log(`[LOCATION-FILTER] After radius filter (${maxRadiusKm}km): ${sortedResults.length} items (from ${singleResults.length})`);
       
       console.log(`After sorting - Total items: ${sortedResults.length}, Favorite category items: ${sortedResults.filter((r: any) => r.is_favorite_category || r.from_favorite_category || (r.category_id && favoriteCategories.includes(r.category_id))).length}`);
       console.log(`Favorite category item IDs after sorting: ${sortedResults.filter((r: any) => r.is_favorite_category || r.from_favorite_category || (r.category_id && favoriteCategories.includes(r.category_id))).map((r: any) => r.id).join(', ')}`);
@@ -1085,7 +1180,11 @@ export class ApiService {
 
       // Fallback if no vector matches found
             console.warn('[TopPicks] QUERY RETURNED EMPTY - calling fallback');
-      const fb2 = await this.getFallbackRecommendations(client, userId, limit);
+      const fb2 = await this.getFallbackRecommendations(client, userId, limit, {
+        userLat,
+        userLng,
+        radiusKm: maxRadiusKm,
+      });
             const fallbackCount = Array.isArray((fb2 as any)?.data) ? (fb2 as any).data.length : 0;
             const fallbackError = !!(fb2 as any)?.error;
             console.log('[TopPicks] Fallback result:', {
@@ -1112,7 +1211,11 @@ export class ApiService {
             // Fallback to category-based recommendations on any error
             try {
               console.log('[TopPicks] Attempting fallback after error');
-              const fb = await this.getFallbackRecommendations(client, userId, limit);
+              const fb = await this.getFallbackRecommendations(client, userId, limit, {
+                userLat,
+                userLng,
+                radiusKm: maxRadiusKm,
+              });
               const fallbackCount = Array.isArray((fb as any)?.data) ? (fb as any).data.length : 0;
               console.log('[TopPicks] Error fallback result:', {
                 count: fallbackCount,
@@ -1232,13 +1335,26 @@ export class ApiService {
   }
 
   // Fallback method for when vector search fails
-  static async getFallbackRecommendations(client: any, userId: string, limit: number) {
+  static async getFallbackRecommendations(
+    client: any,
+    userId: string,
+    limit: number,
+    options?: {
+      userLat?: number | null;
+      userLng?: number | null;
+      radiusKm?: number | null;
+    }
+  ) {
     console.log('[TopPicks Fallback] start. user:', userId, 'limit:', limit);
     const baseSelect =
       '*, category:categories!items_category_id_fkey(title_en, title_ka), item_images(image_url), users!items_user_id_fkey(username, first_name, last_name)';
+    let userLat = options?.userLat ?? null;
+    let userLng = options?.userLng ?? null;
+    let radiusKm = options?.radiusKm ?? null;
+
     let { data: user, error: userError } = await client
       .from('users')
-      .select('favorite_categories')
+      .select('favorite_categories, manual_location_lat, manual_location_lng, preferred_radius_km')
       .eq('id', userId)
       .maybeSingle();
 
@@ -1247,7 +1363,7 @@ export class ApiService {
       await AuthService.ensureUserRecord();
       const retry = await client
         .from('users')
-        .select('favorite_categories')
+        .select('favorite_categories, manual_location_lat, manual_location_lng, preferred_radius_km')
         .eq('id', userId)
         .maybeSingle();
       if (!retry.error && retry.data) {
@@ -1255,6 +1371,19 @@ export class ApiService {
       } else if (retry.error) {
         userError = retry.error;
       }
+    }
+
+    if (user && (userLat === null || userLng === null)) {
+      userLat = user.manual_location_lat ?? userLat;
+      userLng = user.manual_location_lng ?? userLng;
+    }
+
+    if (user && (radiusKm === null || radiusKm === undefined)) {
+      radiusKm = user.preferred_radius_km ?? radiusKm;
+    }
+
+    if (radiusKm === null || radiusKm === undefined) {
+      radiusKm = 50;
     }
 
     if (userError || !user) {
@@ -1267,7 +1396,8 @@ export class ApiService {
         .order('created_at', { ascending: false })
         .limit(limit);
       console.log('[TopPicks Fallback] recent count:', (recent || []).length, 'error?', !!recentErr);
-      return { data: recent || [], error: recentErr || null };
+      const filteredRecent = await this.applyLocationRadiusFilter(client, recent || [], userLat, userLng, radiusKm);
+      return { data: filteredRecent, error: recentErr || null };
     }
 
     // If no favorite categories yet, fall back to recent items
@@ -1299,7 +1429,78 @@ export class ApiService {
     }
 
 
-    return { data, error: null };
+    const filteredData = await this.applyLocationRadiusFilter(client, data || [], userLat, userLng, radiusKm);
+
+    return { data: filteredData, error: null };
+  }
+
+  private static async applyLocationRadiusFilter(
+    client: any,
+    items: any[],
+    lat?: number | null,
+    lng?: number | null,
+    radiusKm?: number | null
+  ) {
+    if (!Array.isArray(items) || items.length === 0) {
+      return items;
+    }
+
+    const hasCoordinates =
+      typeof lat === 'number' &&
+      typeof lng === 'number' &&
+      Number.isFinite(lat) &&
+      Number.isFinite(lng);
+    const hasRadius =
+      typeof radiusKm === 'number' &&
+      Number.isFinite(radiusKm) &&
+      radiusKm >= 0;
+
+    if (!hasCoordinates || !hasRadius) {
+      return items;
+    }
+
+    const itemIds = items
+      .map((item) => item?.id)
+      .filter((id): id is string => typeof id === 'string' && id.length > 0);
+
+    if (itemIds.length === 0) {
+      return items;
+    }
+
+    const { data, error } = await client.rpc('filter_items_by_radius', {
+      p_lat: lat,
+      p_lng: lng,
+      p_radius_km: radiusKm,
+      p_item_ids: itemIds,
+    });
+
+    if (error) {
+      console.warn('[ApiService.applyLocationRadiusFilter] RPC error:', error);
+      return items;
+    }
+
+    const distanceMap = new Map<string, { distance_km: number; lat: number; lng: number }>();
+    (data || []).forEach((row: any) => {
+      if (row?.item_id) {
+        distanceMap.set(row.item_id, {
+          distance_km: row.distance_km,
+          lat: row.location_lat,
+          lng: row.location_lng,
+        });
+      }
+    });
+
+    return items
+      .filter((item) => distanceMap.has(item.id))
+      .map((item) => {
+        const distanceInfo = distanceMap.get(item.id);
+        return {
+          ...item,
+          distance_km: distanceInfo?.distance_km ?? item.distance_km,
+          location_lat: item.location_lat ?? distanceInfo?.lat ?? null,
+          location_lng: item.location_lng ?? distanceInfo?.lng ?? null,
+        };
+      });
   }
 
   // Helper method to deduplicate and sort recommendations
@@ -2869,6 +3070,26 @@ export class ApiService {
       const oneMonthAgo = new Date();
       oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
 
+      const { data: userProfile, error: userProfileError } = await client
+        .from('users')
+        .select('manual_location_lat, manual_location_lng, preferred_radius_km, favorite_categories')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (userProfileError) {
+        console.warn('[RecentlyListed] Failed to load user profile:', userProfileError);
+      }
+
+      const userLat = typeof userProfile?.manual_location_lat === 'number' ? userProfile.manual_location_lat : null;
+      const userLng = typeof userProfile?.manual_location_lng === 'number' ? userProfile.manual_location_lng : null;
+      const radiusKm =
+        typeof userProfile?.preferred_radius_km === 'number' && userProfile.preferred_radius_km > 0
+          ? userProfile.preferred_radius_km
+          : 50;
+      const favoriteCategories = Array.isArray(userProfile?.favorite_categories)
+        ? userProfile?.favorite_categories
+        : [];
+
       // Get user's items to calculate similarity
       const { data: userItems, error: userItemsError } = await client
         .from('items')
@@ -2880,6 +3101,16 @@ export class ApiService {
       if (userItemsError || !userItems || userItems.length === 0) {
         // Fallback: just get recent items without AI scoring
         console.log('Fetching recently listed items (no AI scoring)...');
+
+        const locationFilterActive =
+          userLat !== null && userLng !== null && Number.isFinite(userLat) && Number.isFinite(userLng) && radiusKm > 0;
+        const prefetchMultiplier = locationFilterActive ? Math.max(page + 1, 3) : 1;
+        const fetchCount = limit * prefetchMultiplier;
+        const rangeStart = locationFilterActive ? 0 : offset;
+        const rangeEnd = locationFilterActive
+          ? Math.max(fetchCount - 1, limit - 1)
+          : offset + limit - 1;
+
         const { data, error } = await client
           .from('items')
           .select('*, category:categories!items_category_id_fkey(title_en, title_ka), item_images(image_url), users!items_user_id_fkey(username, first_name, last_name)')
@@ -2887,28 +3118,28 @@ export class ApiService {
           .neq('user_id', userId)
           .gte('created_at', oneMonthAgo.toISOString())
           .order('created_at', { ascending: false })
-          .range(offset, offset + limit);
+          .range(rangeStart, rangeEnd);
+
+        const filteredData = await this.applyLocationRadiusFilter(
+          client,
+          data || [],
+          userLat,
+          userLng,
+          radiusKm
+        );
+
+        const paginatedItems = filteredData.slice(offset, offset + limit);
+        const hasMore = filteredData.length > offset + paginatedItems.length;
 
         console.log('Recently listed items fetched:', {
-          count: data?.length || 0,
+          count: paginatedItems.length || 0,
+          totalFiltered: filteredData.length || 0,
           error: error,
-          itemIds: data?.map(item => item.id).slice(0, 5)
+          itemIds: paginatedItems?.map(item => item.id).slice(0, 5)
         });
 
-        const hasMore = (data?.length || 0) > limit;
-        const items = hasMore ? (data ?? []).slice(0, limit) : data ?? [];
-
-        return { data: { items, hasMore }, error };
+        return { data: { items: paginatedItems, hasMore }, error };
       }
-
-      // Get user's favorite categories for additional filtering
-      const { data: user } = await client
-        .from('users')
-        .select('favorite_categories')
-        .eq('id', userId)
-        .single();
-
-      const favoriteCategories = user?.favorite_categories || [];
 
       // Get recent items
       let query = client
@@ -2931,9 +3162,21 @@ export class ApiService {
         return { data: null, error, hasMore: false };
       }
 
+      const recentItemsFiltered = await this.applyLocationRadiusFilter(
+        client,
+        recentItems,
+        userLat,
+        userLng,
+        radiusKm
+      );
+
+      if (!recentItemsFiltered || recentItemsFiltered.length === 0) {
+        return { data: { items: [], hasMore: false }, error: null };
+      }
+
       // Calculate similarity scores for recent items
       const itemsWithScores = await Promise.all(
-        recentItems.map(async (item) => {
+        recentItemsFiltered.map(async (item) => {
           if (!item.embedding) {
             return { ...item, similarity_score: 0.5, overall_score: 0.5 };
           }
@@ -3106,36 +3349,98 @@ export class ApiService {
   static async getOtherItems(userId: string, page: number = 1, limit: number = 10) {
     return this.authenticatedCall(async (client) => {
       const offset = (page - 1) * limit;
+      const { data: userProfile, error: userProfileError } = await client
+        .from('users')
+        .select('manual_location_lat, manual_location_lng, preferred_radius_km')
+        .eq('id', userId)
+        .maybeSingle();
 
-      // Get total count first
-      const { count: totalCount } = await client
-        .from('items')
-        .select('id', { count: 'exact', head: true })
-        .eq('status', 'available')
-        .neq('user_id', userId);
+      if (userProfileError) {
+        console.warn('[OtherItems] Failed to load user profile:', userProfileError);
+      }
 
-      // Get items with pagination
-      const { data, error } = await client
+      const userLat = typeof userProfile?.manual_location_lat === 'number' ? userProfile.manual_location_lat : null;
+      const userLng = typeof userProfile?.manual_location_lng === 'number' ? userProfile.manual_location_lng : null;
+      const radiusKm =
+        typeof userProfile?.preferred_radius_km === 'number' && userProfile.preferred_radius_km > 0
+          ? userProfile.preferred_radius_km
+          : 50;
+
+      const hasLocationFilter =
+        userLat !== null && userLng !== null && Number.isFinite(userLat) && Number.isFinite(userLng) && radiusKm > 0;
+
+      if (!hasLocationFilter) {
+        // Default behaviour when no manual location is set
+        const { count: totalCount } = await client
+          .from('items')
+          .select('id', { count: 'exact', head: true })
+          .eq('status', 'available')
+          .neq('user_id', userId);
+
+        const { data, error } = await client
+          .from('items')
+          .select('*, category:categories!items_category_id_fkey(title_en, title_ka), item_images(image_url), users!items_user_id_fkey(username, first_name, last_name)')
+          .eq('status', 'available')
+          .neq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .range(offset, offset + limit - 1);
+
+        if (error) {
+          return { data: null, error };
+        }
+
+        return {
+          data: {
+            items: data || [],
+            pagination: {
+              page,
+              limit,
+              total: totalCount || 0,
+              totalPages: Math.ceil((totalCount || 0) / limit),
+              hasMore: (page * limit) < (totalCount || 0)
+            }
+          },
+          error: null
+        };
+      }
+
+      const prefetchMultiplier = Math.max(page + 1, 3);
+      const fetchCount = limit * prefetchMultiplier;
+
+      const { data: rawItems, error } = await client
         .from('items')
         .select('*, category:categories!items_category_id_fkey(title_en, title_ka), item_images(image_url), users!items_user_id_fkey(username, first_name, last_name)')
         .eq('status', 'available')
         .neq('user_id', userId)
         .order('created_at', { ascending: false })
-        .range(offset, offset + limit - 1);
+        .range(0, Math.max(fetchCount - 1, limit - 1));
 
       if (error) {
         return { data: null, error };
       }
 
+      const filteredItems = await this.applyLocationRadiusFilter(
+        client,
+        rawItems || [],
+        userLat,
+        userLng,
+        radiusKm
+      );
+
+      const totalFiltered = filteredItems.length;
+      const paginatedItems = filteredItems.slice(offset, offset + limit);
+      const hasMore = totalFiltered > offset + paginatedItems.length;
+      const totalPages = totalFiltered === 0 ? 0 : Math.ceil(totalFiltered / limit);
+
       return {
         data: {
-          items: data || [],
+          items: paginatedItems,
           pagination: {
             page,
             limit,
-            total: totalCount || 0,
-            totalPages: Math.ceil((totalCount || 0) / limit),
-            hasMore: (page * limit) < (totalCount || 0)
+            total: totalFiltered,
+            totalPages,
+            hasMore
           }
         },
         error: null

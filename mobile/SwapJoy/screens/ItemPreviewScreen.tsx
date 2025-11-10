@@ -36,6 +36,7 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
       category: t('addItem.preview.info.category'),
       condition: t('addItem.preview.info.condition'),
       price: t('addItem.preview.info.price'),
+      location: t('addItem.preview.info.location', { defaultValue: 'Location' }),
     },
     note: t('addItem.preview.note'),
     buttons: {
@@ -140,6 +141,8 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
         condition: draft.condition!,
         price: parseFloat(draft.price),
         currency: draft.currency,
+        location_lat: draft.location_lat,
+        location_lng: draft.location_lng,
       });
 
       if (itemError || !item) {
@@ -323,6 +326,15 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
               <Text style={styles.infoLabel}>{strings.info.price}</Text>
               <Text style={styles.infoValue}>
                 {formatCurrency(parseFloat(draft.price), draft.currency)}
+              </Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>{strings.info.location}</Text>
+              <Text style={styles.infoValue}>
+                {draft.location_label ??
+                  (draft.location_lat !== null && draft.location_lng !== null
+                    ? `${draft.location_lat.toFixed(4)}, ${draft.location_lng.toFixed(4)}`
+                    : t('common.notAvailable'))}
               </Text>
             </View>
           </View>

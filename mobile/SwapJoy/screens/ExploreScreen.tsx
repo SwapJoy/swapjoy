@@ -10,6 +10,7 @@ import {
   RefreshControl,
   ActivityIndicator,
   TextInput,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ExploreScreenProps, RootStackParamList } from '../types/navigation';
@@ -28,6 +29,8 @@ import { resolveCategoryName } from '../utils/category';
 import ItemCard, { ItemCardChip, ItemCardSkeleton } from '../components/ItemCard';
 import FavoriteToggleButton from '../components/FavoriteToggleButton';
 import { useFavorites } from '../contexts/FavoritesContext';
+import LocationSelector from '../components/LocationSelector';
+import type { LocationSelection } from '../types/location';
 
 const { width } = Dimensions.get('window');
 const ITEM_WIDTH = width * 0.7;
@@ -113,6 +116,11 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
       counts: {
         itemsTemplate: t('explore.counts.items'),
       },
+      location: {
+        badgePlaceholder: t('explore.location.badgePlaceholder', { defaultValue: 'Set location' }),
+        updating: t('explore.location.updating', { defaultValue: 'Updating…' }),
+        error: t('explore.location.error', { defaultValue: 'Could not update location. Please try again.' }),
+      },
       hero: {
         greetingMorning: t('explore.hero.greetingMorning', { defaultValue: 'Good morning' }),
         greetingAfternoon: t('explore.hero.greetingAfternoon', { defaultValue: 'Good afternoon' }),
@@ -136,6 +144,54 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
   const { items: recentItems, loading: recentLoading, error: recentError, refresh: refreshRecent } = useRecentlyListed(10);
   const { items: otherItems, pagination, loading: othersLoading, loadingMore, error: othersError, loadMore, refresh: refreshOthers } = useOtherItems(10);
   const { isFavorite, toggleFavorite } = useFavorites();
+
+  const loadManualLocation = useCallback(async () => {
+    if (!user?.id) {
+      return;
+    }
+    try {
+      setLoadingLocation(true);
+      const { data, error } = await ApiService.getProfile();
+      if (error || !data) {
+        return;
+      }
+
+      const profile = data as any;
+      const lat = profile.manual_location_lat ?? null;
+      const lng = profile.manual_location_lng ?? null;
+      const radius = profile.preferred_radius_km ?? 50;
+
+      setLocationCoords({ lat, lng });
+      setLocationRadius(radius);
+      setPendingRadius(null);
+
+      if (lat !== null && lng !== null) {
+        try {
+          const { data: nearest } = await ApiService.findNearestCity(lat, lng);
+          const nearestCity = nearest as any;
+          if (nearestCity) {
+            const label = [nearestCity.name, nearestCity.country].filter(Boolean).join(', ');
+            setLocationLabel(label || null);
+            setLocationCityId(nearestCity.id ?? null);
+          } else {
+            setLocationLabel(null);
+            setLocationCityId(null);
+          }
+        } catch (geoError) {
+          console.warn('[ExploreScreen] Failed to resolve nearest city:', geoError);
+          setLocationLabel(null);
+          setLocationCityId(null);
+        }
+      } else {
+        setLocationLabel(null);
+        setLocationCityId(null);
+      }
+    } catch (error) {
+      console.error('[ExploreScreen] Failed to load manual location:', error);
+    } finally {
+      setLoadingLocation(false);
+    }
+  }, [user?.id]);
   
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -144,6 +200,17 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
   const [searchError, setSearchError] = useState<string | null>(null);
   const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
   const searchRequestIdRef = useRef(0);
+  const [locationModalVisible, setLocationModalVisible] = useState(false);
+  const [locationLabel, setLocationLabel] = useState<string | null>(null);
+  const [locationCoords, setLocationCoords] = useState<{ lat: number | null; lng: number | null }>({
+    lat: null,
+    lng: null,
+  });
+  const [locationRadius, setLocationRadius] = useState<number | null>(null);
+  const [pendingRadius, setPendingRadius] = useState<number | null>(null);
+  const [locationCityId, setLocationCityId] = useState<string | null>(null);
+  const [loadingLocation, setLoadingLocation] = useState(false);
+  const [updatingLocation, setUpdatingLocation] = useState(false);
 
   const searchStrings = useMemo(
     () => ({
@@ -285,6 +352,12 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
     };
   }, []);
 
+  useEffect(() => {
+    if (user?.id) {
+      loadManualLocation();
+    }
+  }, [loadManualLocation, user?.id]);
+
   const handleClearSearch = useCallback(() => {
     setSearchQuery('');
     setSearchResults([]);
@@ -292,6 +365,60 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
     setSearchLoading(false);
     searchRequestIdRef.current += 1;
   }, []);
+
+  const handleOpenLocationSelector = useCallback(() => {
+    setPendingRadius(locationRadius ?? 50);
+    setLocationModalVisible(true);
+  }, [locationRadius]);
+
+  const handleLocationModalClose = useCallback(() => {
+    setLocationModalVisible(false);
+    setPendingRadius(null);
+  }, []);
+
+  const handleRadiusInputChange = useCallback((value: number | null) => {
+    setPendingRadius(value ?? null);
+  }, []);
+
+  const handleManualLocationSelect = useCallback(
+    async (selection: LocationSelection, radiusKm: number | null) => {
+      try {
+        setUpdatingLocation(true);
+        const nextRadius =
+          typeof radiusKm === 'number' && !Number.isNaN(radiusKm)
+            ? radiusKm
+            : pendingRadius ?? locationRadius ?? 50;
+        const { error } = await ApiService.updateManualLocation({
+          lat: selection.lat,
+          lng: selection.lng,
+          radiusKm: nextRadius,
+        });
+        if (error) {
+          throw new Error(error.message || 'Failed to update location');
+        }
+
+        const labelParts = [selection.cityName, selection.country].filter(Boolean);
+        const label = labelParts.length > 0 ? labelParts.join(', ') : strings.location.badgePlaceholder;
+
+        setLocationLabel(label);
+        setLocationCoords({ lat: selection.lat, lng: selection.lng });
+        setLocationRadius(nextRadius);
+        setPendingRadius(null);
+        setLocationCityId(selection.cityId ?? null);
+
+        await refreshTopPicks();
+      } catch (error: any) {
+        console.error('[ExploreScreen] Failed to update manual location:', error);
+        Alert.alert(
+          t('common.error', { defaultValue: 'Error' }),
+          error?.message || strings.location.error
+        );
+      } finally {
+        setUpdatingLocation(false);
+      }
+    },
+    [locationRadius, pendingRadius, refreshTopPicks, strings.location.badgePlaceholder, strings.location.error, t]
+  );
 
   const handleFilterPress = useCallback(() => {
     rootNavigation.navigate('RecentlyListed');
@@ -730,6 +857,26 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
                 <View style={styles.sectionCard}>
                   <View style={styles.sectionHeaderRow}>
                     <Text style={styles.sectionTitle}>{strings.sections.topMatches}</Text>
+                    <TouchableOpacity
+                      style={styles.locationBadge}
+                      onPress={handleOpenLocationSelector}
+                      disabled={updatingLocation || loadingLocation}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name="location-outline" size={16} color="#0369a1" />
+                      <Text style={styles.locationBadgeText} numberOfLines={1}>
+                        {updatingLocation
+                          ? strings.location.updating
+                          : locationLabel || strings.location.badgePlaceholder}
+                      </Text>
+                      {(loadingLocation || updatingLocation) && (
+                        <ActivityIndicator
+                          size="small"
+                          color="#0369a1"
+                          style={styles.locationBadgeSpinner}
+                        />
+                      )}
+                    </TouchableOpacity>
                   </View>
                   {(() => {
                     if (topPicksError) {
@@ -841,6 +988,14 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
         onEndReached={hasSearchQuery ? undefined : loadMore}
         onEndReachedThreshold={hasSearchQuery ? undefined : 0.5}
         ListFooterComponent={hasSearchQuery ? null : renderFooter}
+      />
+      <LocationSelector
+        visible={locationModalVisible}
+        onClose={handleLocationModalClose}
+        onSelectLocation={handleManualLocationSelect}
+        initialRadiusKm={pendingRadius ?? locationRadius ?? 50}
+        initialCityId={locationCityId}
+        onRadiusChange={handleRadiusInputChange}
       />
     </View>
   );
@@ -1061,6 +1216,25 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#047857',
+  },
+  locationBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e0f2fe',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    maxWidth: 220,
+  },
+  locationBadgeText: {
+    marginLeft: 6,
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#0369a1',
+    flexShrink: 1,
+  },
+  locationBadgeSpinner: {
+    marginLeft: 8,
   },
   quickFiltersScroll: {
     paddingVertical: 6,

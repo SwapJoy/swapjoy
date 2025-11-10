@@ -28,6 +28,9 @@ export class DraftManager {
       condition: null,
       price: '',
       currency: 'USD',
+      location_lat: null,
+      location_lng: null,
+      location_label: null,
       images,
       created_at: now,
       updated_at: now,
@@ -65,7 +68,8 @@ export class DraftManager {
   static async getDraft(draftId: string): Promise<ItemDraft | null> {
     try {
       const drafts = await this.getAllDrafts();
-      return drafts.find((d) => d.id === draftId) || null;
+      const draft = drafts.find((d) => d.id === draftId) || null;
+      return draft ? this.ensureLocationDefaults(draft) : null;
     } catch (error) {
       console.error('Error getting draft:', error);
       return null;
@@ -82,7 +86,7 @@ export class DraftManager {
 
       const drafts = JSON.parse(data) as ItemDraft[];
       // Validate schema
-      return drafts.filter(this.validateDraft);
+      return drafts.filter(this.validateDraft).map((draft) => this.ensureLocationDefaults(draft));
     } catch (error) {
       console.error('Error getting all drafts:', error);
       return [];
@@ -102,7 +106,7 @@ export class DraftManager {
         throw new Error('Draft not found');
       }
 
-      const updatedDraft = { ...draft, ...updates };
+      const updatedDraft = this.ensureLocationDefaults({ ...draft, ...updates });
       await this.saveDraft(updatedDraft);
       return updatedDraft;
     } catch (error) {
@@ -180,6 +184,24 @@ export class DraftManager {
     );
   }
 
+  private static ensureLocationDefaults(draft: ItemDraft): ItemDraft {
+    return {
+      ...draft,
+      location_lat:
+        typeof draft.location_lat === 'number' && Number.isFinite(draft.location_lat)
+          ? draft.location_lat
+          : null,
+      location_lng:
+        typeof draft.location_lng === 'number' && Number.isFinite(draft.location_lng)
+          ? draft.location_lng
+          : null,
+      location_label:
+        typeof draft.location_label === 'string' && draft.location_label.length > 0
+          ? draft.location_label
+          : null,
+    };
+  }
+
   /**
    * Check if draft is ready for submission
    */
@@ -190,6 +212,8 @@ export class DraftManager {
       draft.category_id !== null &&
       draft.condition !== null &&
       draft.price.trim().length > 0 &&
+      draft.location_lat !== null &&
+      draft.location_lng !== null &&
       draft.images.length > 0 &&
       draft.images.every((img) => img.uploaded)
     );

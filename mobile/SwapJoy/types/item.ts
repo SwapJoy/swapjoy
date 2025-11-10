@@ -19,6 +19,9 @@ export interface ItemDraft {
   condition: ItemCondition | null;
   price: string;
   currency: string;
+  location_lat: number | null;
+  location_lng: number | null;
+  location_label?: string | null;
   images: DraftImage[];
   created_at: string;
   updated_at: string;
