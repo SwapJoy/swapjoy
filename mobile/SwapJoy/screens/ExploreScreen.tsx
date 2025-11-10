@@ -811,9 +811,6 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
                     returnKeyType="search"
                     onSubmitEditing={() => performSearch(searchQuery)}
                   />
-                  {searchLoading && hasSearchQuery && searchResults.length === 0 ? (
-                    <ActivityIndicator size="small" color="#0ea5e9" style={styles.searchInlineActivity} />
-                  ) : null}
                   {hasSearchQuery ? (
                     <TouchableOpacity
                       onPress={handleClearSearch}
@@ -827,11 +824,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
               </View>
               {hasSearchQuery ? (
                 <View style={styles.searchResultsContainer}>
-                  {searchLoading && searchResults.length === 0 ? (
-                    <View style={styles.searchStatusContainer}>
-                      <ActivityIndicator size="small" color="#0ea5e9" />
-                    </View>
-                  ) : searchResults.length === 0 ? (
+                  {!searchLoading && searchResults.length === 0 ? (
                     <View style={styles.searchStatusContainer}>
                       <Text style={styles.searchStatusTitle}>{searchStrings.noResultsTitle}</Text>
                       <Text style={styles.searchStatusSubtitle}>{searchStrings.noResultsSubtitle}</Text>
@@ -843,11 +836,6 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
                       )}
                     </View>
                   )}
-                  {searchLoading && searchResults.length > 0 ? (
-                    <View style={styles.searchInlineSpinner}>
-                      <ActivityIndicator size="small" color="#0ea5e9" />
-                    </View>
-                  ) : null}
                   {searchError ? <Text style={styles.searchErrorText}>{searchError}</Text> : null}
                 </View>
               ) : null}
@@ -1286,7 +1274,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   horizontalScroller: {
-    marginHorizontal: -12,
+    marginHorizontal: -20,
   },
   horizontalList: {
     flexDirection: 'row',

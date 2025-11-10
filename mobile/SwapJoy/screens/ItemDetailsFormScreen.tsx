@@ -953,9 +953,8 @@ const styles = StyleSheet.create({
   },
   imageRemoveButton: {
     position: 'absolute',
-    top: -6,
-    right: -6,
-    overflow: 'visible',
+    top: 4,
+    right: 4,
   },
   imageRemoveCircle: {
     width: 20,
