@@ -537,6 +537,10 @@ export class ApiService {
     const fetchFn = async () => {
       console.log('[TopPicks] fetchFn ENTRY - starting query execution');
       const startTime = Date.now();
+      let favoriteCategories: string[] = [];
+      let userLat: number | null = null;
+      let userLng: number | null = null;
+      let maxRadiusKm: number = 50;
       try {
         const result = await this.authenticatedCall(async (client) => {
           try {
@@ -549,30 +553,22 @@ export class ApiService {
       } catch (e) {
         console.warn('[TopPicks] unable to read client session:', (e as any)?.message || e);
       }
+
       // Get user's items to find similar matches
-      const { data: userItems, error: userItemsError } = await client
+      const { data: userItemsData, error: userItemsError } = await client
         .from('items')
         .select('id, embedding, price, currency, title, description, category_id')
         .eq('user_id', userId)
         .eq('status', 'available')
         .not('embedding', 'is', null);
 
-      if (userItemsError) {
+      const userItems = Array.isArray(userItemsData) ? userItemsData : [];
+      const userItemsCount = userItems.length;
+
+      if (userItemsError || !Array.isArray(userItemsData)) {
         console.warn('[TopPicks] userItems error:', userItemsError?.message || userItemsError);
       } else {
-        console.log('[TopPicks] userItems count:', (userItems || []).length);
-      }
-
-      if (userItemsError || !userItems || userItems.length === 0) {
-        console.log('No user items found, using fallback recommendations');
-        // Fallback to category-based recommendations
-        const fb = await this.getFallbackRecommendations(client, userId, limit, {
-          userLat,
-          userLng,
-          radiusKm: maxRadiusKm,
-        });
-        console.log('[TopPicks] fallback returned count:', Array.isArray((fb as any)?.data) ? (fb as any).data.length : 0, 'error?', !!(fb as any)?.error);
-        return fb;
+        console.log('[TopPicks] userItems count:', userItemsCount);
       }
 
       // Get user's preferences including favorite categories and location
@@ -585,12 +581,12 @@ export class ApiService {
         console.warn('[ApiService.getTopPicksForUser] users lookup error:', userError?.message || userError);
       }
 
-      const favoriteCategories = user?.favorite_categories || [];
+      favoriteCategories = Array.isArray(user?.favorite_categories) ? user.favorite_categories : [];
       
       // Get user location (only manual_location columns exist in database)
-      const userLat = user?.manual_location_lat ?? null;
-      const userLng = user?.manual_location_lng ?? null;
-      const maxRadiusKm = user?.preferred_radius_km ?? 50.0;
+      userLat = user?.manual_location_lat ?? null;
+      userLng = user?.manual_location_lng ?? null;
+      maxRadiusKm = user?.preferred_radius_km ?? 50.0;
       
       // Get recommendation weights
       const weights = await this.getRecommendationWeights(userId);
@@ -699,7 +695,7 @@ export class ApiService {
               const categoryMatchScore = calculateCategoryScore(item.category_id, favoriteCategories);
               
               // Price match score
-              const avgUserPrice = totalUserValueGEL / userItems.length;
+              const avgUserPrice = userItemsCount > 0 ? totalUserValueGEL / userItemsCount : 0;
               const itemPriceGEL = parseFloat(item.price || 0) * (rateMap[item.currency] || 1);
               const priceMatchScore = calculatePriceScore(avgUserPrice, itemPriceGEL, 0.3);
               
@@ -785,7 +781,7 @@ export class ApiService {
           const { data: similarItems, error: similarError } = await client.rpc('match_items_weighted', {
             query_embedding: userItem.embedding,
             match_threshold: similarityThreshold, // Lower threshold when category-only mode
-            match_count: Math.ceil(limit / userItems.length) * 5, // Get more items since we're filtering strictly
+            match_count: Math.ceil(limit / Math.max(userItemsCount, 1)) * 5, // Get more items since we're filtering strictly
             min_value_gel: minValue, // NULL when price_score = 0 (no filtering)
             max_value_gel: maxValue, // NULL when price_score = 0 (no filtering)
             exclude_user_id: userId,
@@ -3098,7 +3094,7 @@ export class ApiService {
         .eq('status', 'available')
         .not('embedding', 'is', null);
 
-      if (userItemsError || !userItems || userItems.length === 0) {
+      if (userItemsError) {
         // Fallback: just get recent items without AI scoring
         console.log('Fetching recently listed items (no AI scoring)...');
 

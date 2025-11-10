@@ -143,6 +143,33 @@ export class DraftManager {
   }
 
   /**
+   * Remove image from draft
+   */
+  static async removeDraftImage(
+    draftId: string,
+    imageId: string
+  ): Promise<ItemDraft | null> {
+    try {
+      const draft = await this.getDraft(draftId);
+      if (!draft) {
+        throw new Error('Draft not found');
+      }
+
+      const updatedImages = draft.images.filter((img) => img.id !== imageId);
+      if (updatedImages.length === draft.images.length) {
+        throw new Error('Image not found in draft');
+      }
+
+      const updatedDraft = { ...draft, images: updatedImages };
+      await this.saveDraft(updatedDraft);
+      return updatedDraft;
+    } catch (error) {
+      console.error('Error removing draft image:', error);
+      return null;
+    }
+  }
+
+  /**
    * Delete draft
    */
   static async deleteDraft(draftId: string): Promise<void> {

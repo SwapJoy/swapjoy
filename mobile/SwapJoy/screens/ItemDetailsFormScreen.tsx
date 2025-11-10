@@ -28,6 +28,11 @@ import type { LocationSelection } from '../types/location';
 
 const { width } = Dimensions.get('window');
 
+type NearestCityData = {
+  name?: string | null;
+  country?: string | null;
+};
+
 const CONDITION_DEFS: { value: ItemCondition; icon: string }[] = [
   { value: 'new', icon: 'sparkles' },
   { value: 'like_new', icon: 'star' },
@@ -170,7 +175,9 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
               loadedDraft.location_lng
             );
             if (data) {
-              const label = [data.name, data.country].filter(Boolean).join(', ') || null;
+              const cityData = data as NearestCityData;
+              const label =
+                [cityData.name, cityData.country].filter(Boolean).join(', ') || null;
               setLocationLabel(label);
               if (label) {
                 await DraftManager.updateDraft(draftId, { location_label: label });
@@ -218,10 +225,21 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
     const loadedDraft = await DraftManager.getDraft(draftId);
     if (!loadedDraft) return;
 
-    const imagesToUpload = loadedDraft.images.map((img) => ({
-      uri: img.uri,
-      id: img.id,
-    }));
+    const imagesToUpload = loadedDraft.images
+      .filter((img) => !img.uploaded || !img.supabaseUrl)
+      .map((img) => ({
+        uri: img.uri,
+        id: img.id,
+      }));
+
+    if (imagesToUpload.length === 0) {
+      setUploading(false);
+      setAllUploaded(
+        loadedDraft.images.length > 0 &&
+          loadedDraft.images.every((img) => img.uploaded)
+      );
+      return;
+    }
 
     await ImageUploadService.uploadMultipleImages(
       imagesToUpload,
@@ -258,8 +276,17 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
       }
     );
 
+    const latestDraft = await DraftManager.getDraft(draftId);
+    if (latestDraft) {
+      setDraft(latestDraft);
+      setAllUploaded(
+        latestDraft.images.length > 0 &&
+          latestDraft.images.every((img) => img.uploaded)
+      );
+    } else {
+      setAllUploaded(false);
+    }
     setUploading(false);
-    setAllUploaded(true);
   }, [draftId, imageUris]);
 
   useEffect(() => {
@@ -345,6 +372,53 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
       });
     },
     [saveDraft, t]
+  );
+
+  const handleRemoveImage = useCallback(
+    async (imageId: string) => {
+      const currentDraft = draft;
+      const imageToRemove = currentDraft?.images.find((img) => img.id === imageId);
+      if (!imageToRemove) {
+        return;
+      }
+
+      if (imageToRemove.uploaded && imageToRemove.supabaseUrl) {
+        const deleted = await ImageUploadService.deleteImage(imageToRemove.supabaseUrl);
+        if (!deleted) {
+          Alert.alert(
+            t('addItem.alerts.removeImageErrorTitle', { defaultValue: 'Could not remove image' }),
+            t('addItem.alerts.removeImageErrorMessage', {
+              defaultValue: 'We were unable to delete this image from storage. Please try again.',
+            })
+          );
+          return;
+        }
+      }
+
+      try {
+        const updatedDraft = await DraftManager.removeDraftImage(draftId, imageId);
+        if (updatedDraft) {
+          setDraft(updatedDraft);
+          setUploadProgress((prev) => {
+            const { [imageId]: _removed, ...rest } = prev;
+            return rest;
+          });
+          setAllUploaded(
+            updatedDraft.images.length > 0 &&
+              updatedDraft.images.every((img) => img.uploaded)
+          );
+        }
+      } catch (error) {
+        console.error('Error removing draft image:', error);
+        Alert.alert(
+          t('addItem.alerts.removeImageErrorTitle', { defaultValue: 'Could not remove image' }),
+          t('addItem.alerts.removeImageErrorMessage', {
+            defaultValue: 'We were unable to remove this image. Please try again.',
+          })
+        );
+      }
+    },
+    [draft, draftId, t]
   );
 
   const handleNext = async () => {
@@ -482,10 +556,23 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
 
           {/* Image Thumbnails */}
           <View style={styles.imagePreviewContainer}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.imagePreviewList}
+            >
               {draft.images.map((img, index) => (
                 <View key={img.id} style={styles.imagePreview}>
                   <Image source={{ uri: img.uri }} style={styles.imagePreviewImage} />
+                  <TouchableOpacity
+                    style={styles.imageRemoveButton}
+                    onPress={() => handleRemoveImage(img.id)}
+                    hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+                  >
+                    <View style={styles.imageRemoveCircle}>
+                      <Ionicons name="close" size={12} color="#fff" />
+                    </View>
+                  </TouchableOpacity>
                   {!img.uploaded && (
                     <View style={styles.imageUploadingOverlay}>
                       <ActivityIndicator size="small" color="#fff" />
@@ -841,10 +928,16 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingLeft: 16,
     marginBottom: 8,
+    overflow: 'visible',
+  },
+  imagePreviewList: {
+    paddingRight: 16,
+    overflow: 'visible',
   },
   imagePreview: {
     marginRight: 12,
     position: 'relative',
+    overflow: 'visible',
   },
   imagePreviewImage: {
     width: 100,
@@ -857,6 +950,21 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  imageRemoveButton: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    overflow: 'visible',
+  },
+  imageRemoveCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'visible',
   },
   imageUploadedBadge: {
     position: 'absolute',
