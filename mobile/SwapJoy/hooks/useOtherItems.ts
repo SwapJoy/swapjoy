@@ -33,7 +33,12 @@ export interface PaginationInfo {
   hasMore: boolean;
 }
 
-export const useOtherItems = (initialLimit: number = 10) => {
+interface UseOtherItemsOptions {
+  autoFetch?: boolean;
+}
+
+export const useOtherItems = (initialLimit: number = 10, options?: UseOtherItemsOptions) => {
+  const { autoFetch = true } = options ?? {};
   const { user } = useAuth();
   const { language } = useLocalization();
   const [items, setItems] = useState<OtherItem[]>([]);
@@ -49,6 +54,7 @@ export const useOtherItems = (initialLimit: number = 10) => {
   const [error, setError] = useState<any>(null);
   const isMountedRef = useRef(true);
   const hasFetchedRef = useRef(false);
+  const isFetchingRef = useRef(false);
 
   const transformItem = (item: any): OtherItem => {
     const imageUrl = item.image_url || item.item_images?.[0]?.image_url || 'https://via.placeholder.com/200x150';
@@ -84,7 +90,15 @@ export const useOtherItems = (initialLimit: number = 10) => {
         return;
       }
 
+      if (isFetchingRef.current) {
+        return;
+      }
+
       try {
+        isFetchingRef.current = true;
+        if (!append) {
+          hasFetchedRef.current = true;
+        }
         if (append) {
           setLoadingMore(true);
         } else {
@@ -129,6 +143,7 @@ export const useOtherItems = (initialLimit: number = 10) => {
           setError(err);
           if (!append) {
             setItems([]);
+          hasFetchedRef.current = false;
           }
         }
       } finally {
@@ -136,16 +151,21 @@ export const useOtherItems = (initialLimit: number = 10) => {
           setLoading(false);
           setLoadingMore(false);
         }
+      isFetchingRef.current = false;
       }
     },
     [language, user?.id, initialLimit]
   );
 
   useEffect(() => {
+    if (!autoFetch) {
+      return;
+    }
+
     if (user && !hasFetchedRef.current) {
       fetchItems(1, false);
     }
-  }, [language, user?.id, initialLimit, fetchItems]);
+  }, [autoFetch, fetchItems, user?.id]);
 
   useEffect(() => {
     return () => {
@@ -161,6 +181,7 @@ export const useOtherItems = (initialLimit: number = 10) => {
 
   const refresh = useCallback(async () => {
     hasFetchedRef.current = false;
+    isFetchingRef.current = false;
     setItems([]);
     await fetchItems(1, false);
   }, [fetchItems]);

@@ -26,7 +26,12 @@ export interface AIOffer {
   bundle_items?: any[];
 }
 
-export const useExploreData = () => {
+interface UseExploreDataOptions {
+  autoFetch?: boolean;
+}
+
+export const useExploreData = (options?: UseExploreDataOptions) => {
+  const { autoFetch = true } = options ?? {};
   const { user } = useAuth();
   const { language } = useLocalization();
   const [aiOffers, setAiOffers] = useState<AIOffer[]>([]);
@@ -38,6 +43,7 @@ export const useExploreData = () => {
   const isMountedRef = useRef(true);
   const hasFetchedRef = useRef(false);
   const forceBypassRef = useRef(false);
+  const isFetchingRef = useRef(false);
 
 
   const calculateMatchScore = useCallback((item: any, currentUser: any) => {
@@ -147,12 +153,14 @@ export const useExploreData = () => {
       return;
     }
 
-    if (isFetching && !forceBypassRef.current) {
+    if (isFetchingRef.current && !forceBypassRef.current) {
       console.log('[useExploreData] Already fetching, skipping');
       return;
     }
     
     try {
+      isFetchingRef.current = true;
+      hasFetchedRef.current = true;
       setIsFetching(true);
       setLoading(true); // Ensure loading state is set
 
@@ -306,23 +314,28 @@ export const useExploreData = () => {
         setIsInitialized(true);
         hasFetchedRef.current = true; // Always mark as fetched to prevent infinite loops
       }
+      isFetchingRef.current = false;
     }
-  }, [calculateMatchScore, getMatchReason, language, user, isFetching]);
+  }, [calculateMatchScore, getMatchReason, language, user?.id]);
 
   useEffect(() => {
     console.log('[useExploreData] useEffect triggered:', {
       hasUser: !!user,
       userId: user?.id,
       hasFetched: hasFetchedRef.current,
-      willFetch: !!(user && !hasFetchedRef.current)
+      willFetch: !!(autoFetch && user && !hasFetchedRef.current)
     });
-    if (user && !hasFetchedRef.current) {
+    if (autoFetch && user && !hasFetchedRef.current) {
       console.log('[useExploreData] Triggering fetchAIOffers');
       fetchAIOffers();
     } else {
-      console.log('[useExploreData] NOT fetching - user:', !!user, 'hasFetched:', hasFetchedRef.current);
+      console.log('[useExploreData] NOT fetching - autoFetch:', autoFetch, 'user:', !!user, 'hasFetched:', hasFetchedRef.current);
     }
-  }, [user?.id]);
+  }, [autoFetch, fetchAIOffers, user?.id]);
+
+  useEffect(() => {
+    hasFetchedRef.current = false;
+  }, [user?.id, autoFetch]);
 
   useEffect(() => {
     return () => {

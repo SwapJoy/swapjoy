@@ -27,7 +27,12 @@ export interface RecentItem {
   category?: string;
 }
 
-export const useRecentlyListed = (limit: number = 10) => {
+interface UseRecentlyListedOptions {
+  autoFetch?: boolean;
+}
+
+export const useRecentlyListed = (limit: number = 10, options?: UseRecentlyListedOptions) => {
+  const { autoFetch = true } = options ?? {};
   const { user } = useAuth();
   const { language } = useLocalization();
   const [items, setItems] = useState<RecentItem[]>([]);
@@ -35,6 +40,7 @@ export const useRecentlyListed = (limit: number = 10) => {
   const [error, setError] = useState<any>(null);
   const isMountedRef = useRef(true);
   const hasFetchedRef = useRef(false);
+  const isFetchingRef = useRef(false);
 
   const fetchRecentItems = useCallback(async () => {
     if (!user) {
@@ -44,7 +50,13 @@ export const useRecentlyListed = (limit: number = 10) => {
       return;
     }
 
+    if (isFetchingRef.current) {
+      return;
+    }
+
     try {
+      isFetchingRef.current = true;
+      hasFetchedRef.current = true;
       setLoading(true);
       setError(null);
 
@@ -105,20 +117,26 @@ export const useRecentlyListed = (limit: number = 10) => {
       if (isMountedRef.current) {
         setError(err);
         setItems([]);
+        hasFetchedRef.current = false;
       }
     } finally {
       if (isMountedRef.current) {
         setLoading(false);
       }
+      isFetchingRef.current = false;
     }
   }, [language, limit, user?.id]);
 
   // Fetch data whenever user or limit changes
   useEffect(() => {
-    if (user) {
+    if (!autoFetch) {
+      return;
+    }
+
+    if (user && !hasFetchedRef.current) {
       fetchRecentItems();
     }
-  }, [language, limit, user?.id]);
+  }, [autoFetch, fetchRecentItems, user?.id]);
 
   useEffect(() => {
     return () => {
@@ -128,6 +146,7 @@ export const useRecentlyListed = (limit: number = 10) => {
 
   const refresh = useCallback(async () => {
     hasFetchedRef.current = false;
+    isFetchingRef.current = false;
     await fetchRecentItems();
   }, [fetchRecentItems]);
 

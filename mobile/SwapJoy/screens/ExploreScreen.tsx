@@ -1,5 +1,5 @@
-import React, { useCallback, memo, useState, useMemo, useEffect, useRef } from 'react';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import React, { memo, useCallback } from 'react';
+import { useNavigation } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -14,23 +14,20 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ExploreScreenProps, RootStackParamList } from '../types/navigation';
-import { useExploreData, AIOffer } from '../hooks/useExploreData';
-import { useRecentlyListed } from '../hooks/useRecentlyListed';
-import { useOtherItems } from '../hooks/useOtherItems';
+import { AIOffer } from '../hooks/useExploreData';
 import TopMatchCard, { TOP_MATCH_CARD_WIDTH, TopMatchCardSkeleton } from '../components/TopMatchCard';
 import { formatCurrency } from '../utils';
-import { useLocalization } from '../localization';
 import { Ionicons } from '@expo/vector-icons';
 import SwapSuggestions from '../components/SwapSuggestions';
 import type { NavigationProp } from '@react-navigation/native';
 import { getConditionPresentation } from '../utils/conditions';
-import { ApiService } from '../services/api';
 import { resolveCategoryName } from '../utils/category';
 import ItemCard, { ItemCardChip, ItemCardSkeleton } from '../components/ItemCard';
 import FavoriteToggleButton from '../components/FavoriteToggleButton';
-import { useFavorites } from '../contexts/FavoritesContext';
 import LocationSelector from '../components/LocationSelector';
 import type { LocationSelection } from '../types/location';
+import { useExploreScreenState } from '../hooks/useExploreScreenState';
+import type { AppLanguage } from '../types/language';
 
 const { width } = Dimensions.get('window');
 const ITEM_WIDTH = width * 0.7;
@@ -78,379 +75,375 @@ const ErrorDisplay: React.FC<{ title: string; message?: string; retryLabel: stri
   </View>
 );
 
-const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
-  const { t, language } = useLocalization();
-  const rootNavigation = useNavigation<NavigationProp<RootStackParamList>>();
-  const strings = useMemo(
-    () => ({
-      sections: {
-        topMatches: t('explore.sections.topMatches'),
-        recentlyListed: t('explore.sections.recentlyListed'),
-        exploreMore: t('explore.sections.exploreMore'),
-      },
-      subtitles: {
-        recentlyListed: t('explore.subtitles.recentlyListed'),
-        exploreMore: t('explore.subtitles.exploreMore'),
-      },
-      loading: {
-        signInRequired: t('explore.loading.signInRequired'),
-        items: t('explore.loading.items'),
-      },
-      errors: {
-        title: t('explore.errors.title'),
-        unknown: t('explore.errors.unknown'),
-        retry: t('explore.errors.retry'),
-      },
-      empty: {
-        topMatches: t('explore.empty.topMatches'),
-        recentItems: t('explore.empty.recentItems'),
-      },
-      labels: {
-        bundle: t('explore.labels.bundle'),
-        bundleValue: t('explore.labels.bundleValue'),
-        price: t('explore.labels.price'),
-        matchSuffix: t('explore.labels.matchSuffix'),
-        swapSuggestions: t('explore.labels.swapSuggestions', { defaultValue: 'Possible matches' }),
-        categoryFallback: t('explore.labels.categoryFallback', { defaultValue: 'Other' }),
-      },
-      counts: {
-        itemsTemplate: t('explore.counts.items'),
-      },
-      location: {
-        badgePlaceholder: t('explore.location.badgePlaceholder', { defaultValue: 'Set location' }),
-        updating: t('explore.location.updating', { defaultValue: 'Updating…' }),
-        error: t('explore.location.error', { defaultValue: 'Could not update location. Please try again.' }),
-      },
-      hero: {
-        greetingMorning: t('explore.hero.greetingMorning', { defaultValue: 'Good morning' }),
-        greetingAfternoon: t('explore.hero.greetingAfternoon', { defaultValue: 'Good afternoon' }),
-        greetingEvening: t('explore.hero.greetingEvening', { defaultValue: 'Good evening' }),
-        intro: t('explore.hero.intro', { defaultValue: 'Let’s find something you’ll love today.' }),
-        searchPlaceholder: t('explore.hero.searchPlaceholder', { defaultValue: 'Search items, categories, or people' }),
-        quickFiltersTitle: t('explore.hero.quickFiltersTitle', { defaultValue: 'Quick filters' }),
-        quickFiltersEmpty: t('explore.hero.quickFiltersEmpty', { defaultValue: 'Filters will appear when categories are available.' }),
-        statsTopMatches: t('explore.hero.statsTopMatches', { defaultValue: 'Top matches' }),
-        statsRecent: t('explore.hero.statsRecent', { defaultValue: 'New this week' }),
-      },
-      actions: {
-        viewAll: t('explore.actions.viewAll', { defaultValue: 'View all' }),
-        addItem: t('explore.actions.addItem', { defaultValue: 'Add item' }),
-      },
-    }),
-    [t]
-  );
+interface AIOfferCardItemProps {
+  item: AIOffer;
+  navigation: ExploreScreenProps['navigation'];
+  toggleFavorite: (id: string, data: any) => void; // eslint-disable-line @typescript-eslint/no-explicit-any
+  isFavorite: (id: string) => boolean;
+  swapSuggestionsLabel: string;
+}
 
-  const { aiOffers, loading: topPicksLoading, hasData, isInitialized, error: topPicksError, user, refreshData: refreshTopPicks } = useExploreData();
-  const { items: recentItems, loading: recentLoading, error: recentError, refresh: refreshRecent } = useRecentlyListed(10);
-  const { items: otherItems, pagination, loading: othersLoading, loadingMore, error: othersError, loadMore, refresh: refreshOthers } = useOtherItems(10);
-  const { isFavorite, toggleFavorite } = useFavorites();
+const MainListLoader = () => (
+  <View style={styles.mainLoaderContainer}>
+    <View style={styles.mainLoaderCard}>
+      <ActivityIndicator size="small" color="#0ea5e9" />
+      <Text style={styles.mainLoaderText}>Finding more items near you…</Text>
+    </View>
+  </View>
+);
 
-  const loadManualLocation = useCallback(async () => {
-    if (!user?.id) {
-      return;
-    }
-    try {
-      setLoadingLocation(true);
-      const { data, error } = await ApiService.getProfile();
-      if (error || !data) {
-        return;
-      }
+const AIOfferCardItem: React.FC<AIOfferCardItemProps> = memo(
+  ({ item, navigation, toggleFavorite, isFavorite, swapSuggestionsLabel }) => {
+    const ownerInitials =
+      `${item.user?.first_name?.[0] ?? ''}${item.user?.last_name?.[0] ?? ''}`.trim() ||
+      item.user?.username?.[0]?.toUpperCase() ||
+      '?';
+    const ownerDisplayName =
+      `${item.user?.first_name ?? ''} ${item.user?.last_name ?? ''}`.trim() || '';
+    const ownerUsername = item.user?.username || ownerDisplayName;
+    const displayedPrice = formatCurrency(item.price || item.estimated_value || 0, item.currency || 'USD');
+    const resolvedCategory =
+      typeof item.category === 'string' && item.category.trim().length > 0
+        ? item.category.trim()
+        : undefined;
 
-      const profile = data as any;
-      const lat = profile.manual_location_lat ?? null;
-      const lng = profile.manual_location_lng ?? null;
-      const radius = profile.preferred_radius_km ?? 50;
+    const swapSuggestionsNode = (
+      <SwapSuggestions
+        label={swapSuggestionsLabel}
+        targetItemId={item.id}
+        targetItemPrice={item.price || item.estimated_value || 0}
+        targetItemCurrency={item.currency || 'USD'}
+      />
+    );
 
-      setLocationCoords({ lat, lng });
-      setLocationRadius(radius);
-      setPendingRadius(null);
+    const createdAt =
+      (item as any)?.created_at ?? // eslint-disable-line @typescript-eslint/no-explicit-any
+      (item as any)?.updated_at ?? // eslint-disable-line @typescript-eslint/no-explicit-any
+      null;
 
-      if (lat !== null && lng !== null) {
-        try {
-          const { data: nearest } = await ApiService.findNearestCity(lat, lng);
-          const nearestCity = nearest as any;
-          if (nearestCity) {
-            const label = [nearestCity.name, nearestCity.country].filter(Boolean).join(', ');
-            setLocationLabel(label || null);
-            setLocationCityId(nearestCity.id ?? null);
-          } else {
-            setLocationLabel(null);
-            setLocationCityId(null);
-          }
-        } catch (geoError) {
-          console.warn('[ExploreScreen] Failed to resolve nearest city:', geoError);
-          setLocationLabel(null);
-          setLocationCityId(null);
-        }
-      } else {
-        setLocationLabel(null);
-        setLocationCityId(null);
-      }
-    } catch (error) {
-      console.error('[ExploreScreen] Failed to load manual location:', error);
-    } finally {
-      setLoadingLocation(false);
-    }
-  }, [user?.id]);
-  
-  const [refreshing, setRefreshing] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [searchLoading, setSearchLoading] = useState(false);
-  const [searchError, setSearchError] = useState<string | null>(null);
-  const searchDebounceRef = useRef<NodeJS.Timeout | null>(null);
-  const searchRequestIdRef = useRef(0);
-  const [locationModalVisible, setLocationModalVisible] = useState(false);
-  const [locationLabel, setLocationLabel] = useState<string | null>(null);
-  const [locationCoords, setLocationCoords] = useState<{ lat: number | null; lng: number | null }>({
-    lat: null,
-    lng: null,
+    const favoriteData = {
+      id: item.id,
+      title: item.title,
+      description: item.description,
+      price: item.price || item.estimated_value || 0,
+      currency: item.currency || 'USD',
+      condition: item.condition,
+      image_url: item.image_url,
+      created_at: createdAt,
+    };
+
+    return (
+      <TopMatchCard
+        title={item.title}
+        price={displayedPrice}
+        imageUrl={item.image_url}
+        description={item.description}
+        category={resolvedCategory}
+        condition={item.condition}
+        owner={{
+          username: ownerUsername,
+          displayName: ownerDisplayName,
+          initials: ownerInitials,
+        }}
+        onPress={() => (navigation as any).navigate('ItemDetails', { itemId: item.id })} // eslint-disable-line @typescript-eslint/no-explicit-any
+        onLikePress={(event) => {
+          event?.stopPropagation?.();
+          toggleFavorite(item.id, favoriteData);
+        }}
+        likeIconName={isFavorite(item.id) ? 'heart' : 'heart-outline'}
+        likeIconColor="#1f2933"
+        likeActiveColor="#ef4444"
+        isLikeActive={isFavorite(item.id)}
+        swapSuggestions={swapSuggestionsNode}
+      />
+    );
+  }
+);
+
+interface RecentItemCardProps {
+  item: any; // eslint-disable-line @typescript-eslint/no-explicit-any
+  navigation: ExploreScreenProps['navigation'];
+  language: string;
+  t: ReturnType<typeof useExploreScreenState>['t'];
+}
+
+const RecentItemCardItem: React.FC<RecentItemCardProps> = memo(({ item, navigation, language, t }) => {
+  const resolvedLanguage = language as AppLanguage;
+  const chips: ItemCardChip[] = [];
+  const conditionChip = getConditionPresentation({
+    condition: item.condition,
+    language: resolvedLanguage,
+    translate: t,
   });
-  const [locationRadius, setLocationRadius] = useState<number | null>(null);
-  const [pendingRadius, setPendingRadius] = useState<number | null>(null);
-  const [locationCityId, setLocationCityId] = useState<string | null>(null);
-  const [loadingLocation, setLoadingLocation] = useState(false);
-  const [updatingLocation, setUpdatingLocation] = useState(false);
 
-  const searchStrings = useMemo(
-    () => ({
-      placeholder: t('search.placeholder'),
-      startTitle: t('search.startTitle'),
-      startSubtitle: t('search.startSubtitle'),
-      noResultsTitle: t('search.noResultsTitle'),
-      noResultsSubtitle: t('search.noResultsSubtitle'),
-      error: t('search.error'),
-      noImage: t('search.noImage'),
-    }),
-    [t]
+  const categoryLabel =
+    resolveCategoryName(item, resolvedLanguage) ||
+    (typeof item.category === 'string' ? item.category.trim() : undefined);
+
+  if (categoryLabel) {
+    chips.push({ label: categoryLabel, backgroundColor: '#e2e8f0', textColor: '#0f172a' });
+  }
+
+  const formattedPrice = formatCurrency(
+    item.price || item.estimated_value || 0,
+    item.currency || 'USD'
   );
 
-  const heroGreeting = useMemo(() => {
-    const currentHour = new Date().getHours();
-    if (currentHour < 12) return strings.hero.greetingMorning;
-    if (currentHour < 18) return strings.hero.greetingAfternoon;
-    return strings.hero.greetingEvening;
-  }, [strings.hero.greetingAfternoon, strings.hero.greetingEvening, strings.hero.greetingMorning]);
+  const favoriteData = {
+    id: item.id,
+    title: item.title,
+    description: item.description,
+    price: item.price || item.estimated_value || 0,
+    currency: item.currency || 'USD',
+    condition: item.condition,
+    image_url: item.image_url,
+    created_at: item.created_at || item.updated_at || null,
+  };
 
-  const heroGreetingWithName = useMemo(() => {
-    if (!user) return heroGreeting;
-    const displayName = user.first_name || user.username;
-    return displayName ? `${heroGreeting}, ${displayName}` : heroGreeting;
-  }, [heroGreeting, user]);
+  const ownerHandle = item.user?.username || item.user?.first_name || undefined;
 
-  const trimmedSearchQuery = useMemo(() => searchQuery.trim(), [searchQuery]);
-
-  const performSearch = useCallback(
-    async (rawQuery: string) => {
-      const query = (rawQuery || '').trim();
-
-      if (!query) {
-        setSearchResults([]);
-        setSearchError(null);
-        setSearchLoading(false);
-        return;
-      }
-
-      setSearchLoading(true);
-      setSearchError(null);
-      const currentRequestId = ++searchRequestIdRef.current;
-      let fuzzyData: any[] = [];
-
-      try {
-        const { data: kwData } = await ApiService.keywordSearch(query, 20);
-        if (Array.isArray(kwData)) {
-          fuzzyData = kwData;
-          if (currentRequestId === searchRequestIdRef.current) {
-            setSearchResults(kwData);
-          }
-        }
-      } catch {
-        // swallow keyword search errors; semantic search fallback will run
-      }
-
-      try {
-        const { data: semData, error: apiError } = await ApiService.semanticSearch(query, 30);
-        if (currentRequestId !== searchRequestIdRef.current) {
-          return;
-        }
-
-        if (apiError) {
-          setSearchError(apiError.message || searchStrings.error);
-          setSearchResults(fuzzyData);
-        } else if (Array.isArray(semData)) {
-          const byId: Record<string, any> = {};
-
-          for (const item of fuzzyData) {
-            byId[item.id] = { ...item, _fuzzySim: item.similarity ?? 0 };
-          }
-
-          for (const item of semData) {
-            const previous = byId[item.id];
-            const fused: any = { ...(previous || {}), ...item };
-            const fuzzySim = (previous?._fuzzySim ?? item.similarity ?? 0) as number;
-            const semanticSim = (item.similarity ?? 0) as number;
-            fused._score = 0.6 * semanticSim + 0.4 * Math.min(1, fuzzySim);
-            byId[item.id] = fused;
-          }
-
-          for (const item of fuzzyData) {
-            if (!byId[item.id]) {
-              byId[item.id] = {
-                ...item,
-                _score: Math.min(1, item.similarity ?? 0) * 0.4,
-              };
-            } else if (byId[item.id]._score == null) {
-              byId[item.id]._score = Math.min(1, byId[item.id]._fuzzySim ?? 0) * 0.4;
+  return (
+    <ItemCard
+      title={item.title}
+      description={item.description}
+      priceLabel={formattedPrice}
+      imageUri={item.image_url}
+      chips={chips}
+      onPress={() => (navigation as any).navigate('ItemDetails', { itemId: item.id })} // eslint-disable-line @typescript-eslint/no-explicit-any
+      variant="horizontal"
+      style={styles.recentItemCard}
+      ownerHandle={ownerHandle}
+      conditionBadge={
+        conditionChip
+          ? {
+              label: conditionChip.label,
+              backgroundColor: conditionChip.backgroundColor,
+              textColor: conditionChip.textColor,
             }
-          }
-
-          const merged = Object.values(byId);
-          merged.sort((a: any, b: any) => (b._score ?? 0) - (a._score ?? 0));
-          setSearchResults(merged);
-        } else {
-          setSearchResults(fuzzyData);
-        }
-      } catch (error: any) {
-        if (currentRequestId === searchRequestIdRef.current) {
-          setSearchError(error?.message || searchStrings.error);
-        }
-      } finally {
-        if (currentRequestId === searchRequestIdRef.current) {
-          setSearchLoading(false);
-        }
+          : undefined
       }
-    },
-    [searchStrings.error]
+      favoriteButton={<FavoriteToggleButton itemId={item.id} item={favoriteData} size={18} />}
+    />
   );
+});
 
-  useEffect(() => {
-    if (searchDebounceRef.current) {
-      clearTimeout(searchDebounceRef.current);
+interface GridItemCardProps {
+  item: any; // eslint-disable-line @typescript-eslint/no-explicit-any
+  index: number;
+  navigation: ExploreScreenProps['navigation'];
+  language: string;
+  t: ReturnType<typeof useExploreScreenState>['t'];
+}
+
+const GridItemCardItem: React.FC<GridItemCardProps> = memo(
+  ({ item, index, navigation, language, t }) => {
+    const resolvedLanguage = language as AppLanguage;
+    const chips: ItemCardChip[] = [];
+    const conditionChip = getConditionPresentation({
+      condition: item.condition,
+      language: resolvedLanguage,
+      translate: t,
+    });
+
+    const categoryLabel = resolveCategoryName(item, resolvedLanguage);
+    if (categoryLabel) {
+      chips.push({ label: categoryLabel, backgroundColor: '#e2e8f0', textColor: '#0f172a' });
     }
 
-    if (trimmedSearchQuery.length === 0) {
-      performSearch('');
-      return;
-    }
+    const formattedPrice = formatCurrency(
+      item.price || item.estimated_value || 0,
+      item.currency || 'USD'
+    );
 
-    searchDebounceRef.current = setTimeout(() => {
-      performSearch(trimmedSearchQuery);
-    }, 350);
-
-    return () => {
-      if (searchDebounceRef.current) {
-        clearTimeout(searchDebounceRef.current);
-      }
+    const favoriteData = {
+      id: item.id,
+      title: item.title,
+      description: item.description,
+      price: item.price || item.estimated_value || 0,
+      currency: item.currency || 'USD',
+      condition: item.condition,
+      image_url: item.image_url,
+      created_at: item.created_at || item.updated_at || null,
     };
-  }, [performSearch, trimmedSearchQuery]);
 
-  useEffect(() => {
-    return () => {
-      if (searchDebounceRef.current) {
-        clearTimeout(searchDebounceRef.current);
-      }
-    };
-  }, []);
+    const ownerHandle = item.user?.username || item.user?.first_name || undefined;
 
-  useEffect(() => {
-    if (user?.id) {
-      loadManualLocation();
+    return (
+      <ItemCard
+        title={item.title}
+        description={item.description}
+        priceLabel={formattedPrice}
+        imageUri={item.image_url}
+        chips={chips}
+        onPress={() => (navigation as any).navigate('ItemDetails', { itemId: item.id })} // eslint-disable-line @typescript-eslint/no-explicit-any
+        variant="grid"
+        style={[
+          styles.gridItem,
+          index % 2 === 0 ? styles.gridItemLeft : styles.gridItemRight,
+        ]}
+        ownerHandle={ownerHandle}
+        conditionBadge={
+          conditionChip
+            ? {
+                label: conditionChip.label,
+                backgroundColor: conditionChip.backgroundColor,
+                textColor: conditionChip.textColor,
+              }
+            : undefined
+        }
+        favoriteButton={<FavoriteToggleButton itemId={item.id} item={favoriteData} size={18} />}
+      />
+    );
+  }
+);
+
+interface SearchResultCardProps {
+  item: any; // eslint-disable-line @typescript-eslint/no-explicit-any
+  index: number;
+  navigation: ExploreScreenProps['navigation'];
+  language: string;
+  t: ReturnType<typeof useExploreScreenState>['t'];
+  searchStrings: ReturnType<typeof useExploreScreenState>['searchStrings'];
+  categoryFallback: string;
+}
+
+const SearchResultCardItem: React.FC<SearchResultCardProps> = memo(
+  ({ item, index, navigation, language, t, searchStrings, categoryFallback }) => {
+    const resolvedLanguage = language as AppLanguage;
+    const imageUrl = item?.item_images?.[0]?.image_url || item?.image_url || null;
+    const resolvedCategory =
+      resolveCategoryName(item, resolvedLanguage) || categoryFallback;
+    const similarityLabel =
+      typeof item?.similarity === 'number'
+        ? `${Math.round((item.similarity || 0) * 100)}%`
+        : null;
+
+    const formattedPrice =
+      item?.price != null ? formatCurrency(item.price, item.currency || 'USD') : undefined;
+
+    const chips: ItemCardChip[] = [];
+    if (resolvedCategory) {
+      chips.push({ label: resolvedCategory, backgroundColor: '#e2e8f0', textColor: '#0f172a' });
     }
-  }, [loadManualLocation, user?.id]);
 
-  const handleClearSearch = useCallback(() => {
-    setSearchQuery('');
-    setSearchResults([]);
-    setSearchError(null);
-    setSearchLoading(false);
-    searchRequestIdRef.current += 1;
-  }, []);
+    let conditionBadge: ItemCardChip | undefined;
+    if (item.condition) {
+      const badge = getConditionPresentation({
+        condition: item.condition,
+          language: resolvedLanguage,
+        translate: t,
+      });
+      if (badge) {
+        conditionBadge = {
+          label: badge.label,
+          backgroundColor: badge.backgroundColor,
+          textColor: badge.textColor,
+        };
+      }
+    }
 
-  const handleOpenLocationSelector = useCallback(() => {
-    setPendingRadius(locationRadius ?? 50);
-    setLocationModalVisible(true);
-  }, [locationRadius]);
+    const favoriteData = {
+      id: item.id,
+      title: item.title,
+      description: item.description,
+      price: item.price || item.estimated_value || 0,
+      currency: item.currency || 'USD',
+      condition: item.condition,
+      image_url: imageUrl,
+      created_at: item.created_at || item.updated_at || null,
+    };
 
-  const handleLocationModalClose = useCallback(() => {
-    setLocationModalVisible(false);
-    setPendingRadius(null);
-  }, []);
+    const ownerHandle =
+      item.user?.username || item.username || item.users?.username || undefined;
 
-  const handleRadiusInputChange = useCallback((value: number | null) => {
-    setPendingRadius(value ?? null);
-  }, []);
+    return (
+      <ItemCard
+        key={item.id}
+        title={item.title}
+        description={item.description}
+        priceLabel={formattedPrice}
+        metaRightLabel={similarityLabel}
+        imageUri={imageUrl}
+        placeholderLabel={searchStrings.noImage}
+        chips={chips}
+        onPress={() => (navigation as any).navigate('ItemDetails', { itemId: item.id })} // eslint-disable-line @typescript-eslint/no-explicit-any
+        variant="grid"
+        style={[
+          styles.searchGridItem,
+          index % 2 === 0 ? styles.searchGridItemLeft : styles.searchGridItemRight,
+        ]}
+        ownerHandle={ownerHandle}
+        conditionBadge={conditionBadge}
+        favoriteButton={<FavoriteToggleButton itemId={item.id} item={favoriteData} size={18} />}
+      />
+    );
+  }
+);
 
-  const handleManualLocationSelect = useCallback(
+const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
+  const rootNavigation = useNavigation<NavigationProp<RootStackParamList>>();
+  const {
+    t,
+    language,
+    strings,
+    searchStrings,
+    heroGreeting,
+    heroGreetingWithName,
+    searchQuery,
+    setSearchQuery,
+    searchResults,
+    searchLoading,
+    searchError,
+    handleClearSearch,
+    performSearch,
+    hasSearchQuery,
+    refreshing,
+    onRefresh,
+    aiOffers,
+    topPicksLoading,
+    topPicksError,
+    isInitialized,
+    refreshTopPicks,
+    recentItems,
+    recentLoading,
+    recentError,
+    refreshRecent,
+    listData,
+    othersLoading,
+    othersError,
+    loadingMore,
+    loadMore,
+    refreshOthers,
+    user,
+    isFavorite,
+    toggleFavorite,
+    locationModalVisible,
+    handleOpenLocationSelector,
+    handleLocationModalClose,
+    handleManualLocationSelect,
+    handleRadiusInputChange,
+    locationLabel,
+    locationRadius,
+    pendingRadius,
+    locationCityId,
+    loadingLocation,
+    updatingLocation,
+  } = useExploreScreenState();
+
+  const handleLocationSelect = useCallback(
     async (selection: LocationSelection, radiusKm: number | null) => {
       try {
-        setUpdatingLocation(true);
-        const nextRadius =
-          typeof radiusKm === 'number' && !Number.isNaN(radiusKm)
-            ? radiusKm
-            : pendingRadius ?? locationRadius ?? 50;
-        const { error } = await ApiService.updateManualLocation({
-          lat: selection.lat,
-          lng: selection.lng,
-          radiusKm: nextRadius,
-        });
-        if (error) {
-          throw new Error(error.message || 'Failed to update location');
-        }
-
-        const labelParts = [selection.cityName, selection.country].filter(Boolean);
-        const label = labelParts.length > 0 ? labelParts.join(', ') : strings.location.badgePlaceholder;
-
-        setLocationLabel(label);
-        setLocationCoords({ lat: selection.lat, lng: selection.lng });
-        setLocationRadius(nextRadius);
-        setPendingRadius(null);
-        setLocationCityId(selection.cityId ?? null);
-
-        await refreshTopPicks();
+        await handleManualLocationSelect(selection, radiusKm);
       } catch (error: any) {
         console.error('[ExploreScreen] Failed to update manual location:', error);
         Alert.alert(
           t('common.error', { defaultValue: 'Error' }),
           error?.message || strings.location.error
         );
-      } finally {
-        setUpdatingLocation(false);
       }
     },
-    [locationRadius, pendingRadius, refreshTopPicks, strings.location.badgePlaceholder, strings.location.error, t]
+    [handleManualLocationSelect, strings.location.error, t]
   );
-
-  const handleFilterPress = useCallback(() => {
-    rootNavigation.navigate('RecentlyListed');
-  }, [rootNavigation]);
-
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await Promise.all([
-      refreshTopPicks(),
-      refreshRecent(),
-      refreshOthers()
-    ]);
-    setRefreshing(false);
-  }, [refreshTopPicks, refreshRecent, refreshOthers]);
-
-  // FIXED: Only refresh on focus if data is stale (not on every focus)
-  // This prevents race conditions and unnecessary state resets
-  useFocusEffect(
-    useCallback(() => {
-      // Only refresh if user just authenticated or if explicitly needed
-      // Don't refresh on every focus to prevent race conditions
-      console.log('[ExploreScreen] focused - checking if refresh needed');
-      // Only refresh if not initialized yet
-      if (!isInitialized) {
-        console.log('[ExploreScreen] Not initialized yet, refreshing');
-        refreshTopPicks();
-        refreshRecent();
-        refreshOthers();
-      }
-    }, [isInitialized, refreshTopPicks, refreshRecent, refreshOthers])
-  );
-
 
   const renderAIOffer = useCallback(
     ({ item }: { item: AIOffer }) => {
@@ -458,73 +451,13 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
         return null;
       }
 
-      const ownerInitials =
-        `${item.user?.first_name?.[0] ?? ''}${item.user?.last_name?.[0] ?? ''}`.trim() ||
-        item.user?.username?.[0]?.toUpperCase() ||
-        '?';
-      const ownerDisplayName =
-        `${item.user?.first_name ?? ''} ${item.user?.last_name ?? ''}`.trim() || '';
-      const ownerUsername = item.user?.username || ownerDisplayName;
-      const displayedPrice = formatCurrency(item.price || item.estimated_value || 0, item.currency || 'USD');
-      const resolvedCategory = typeof item.category === 'string' && item.category.trim().length > 0
-        ? item.category.trim()
-        : undefined;
-      if (__DEV__) {
-        console.log('[ExploreScreen] TopMatchCard category', {
-          itemId: item.id,
-          category: item.category,
-          resolvedCategory,
-        });
-      }
- 
-      const swapSuggestionsNode = (
-        <SwapSuggestions
-          label={strings.labels.swapSuggestions}
-          targetItemId={item.id}
-          targetItemPrice={item.price || item.estimated_value || 0}
-          targetItemCurrency={item.currency || 'USD'}
-        />
-      );
-      const createdAt =
-        (item as any)?.created_at ??
-        (item as any)?.updated_at ??
-        null;
-      const favoriteData = {
-        id: item.id,
-        title: item.title,
-        description: item.description,
-        price: item.price || item.estimated_value || 0,
-        currency: item.currency || 'USD',
-        condition: item.condition,
-        image_url: item.image_url,
-        created_at: createdAt,
-      };
-      const isFav = isFavorite(item.id);
       return (
-        <TopMatchCard
-          title={item.title}
-          price={displayedPrice}
-          imageUrl={item.image_url}
-          description={item.description}
-          category={resolvedCategory}
-          condition={item.condition}
-          owner={{
-            username: ownerUsername,
-            displayName: ownerDisplayName,
-            initials: ownerInitials,
-          }}
-          onPress={() => {
-            (navigation as any).navigate('ItemDetails', { itemId: item.id });
-          }}
-          onLikePress={(event) => {
-            event?.stopPropagation?.();
-            toggleFavorite(item.id, favoriteData);
-          }}
-          likeIconName={isFav ? 'heart' : 'heart-outline'}
-          likeIconColor="#1f2933"
-          likeActiveColor="#ef4444"
-          isLikeActive={isFav}
-          swapSuggestions={swapSuggestionsNode}
+        <AIOfferCardItem
+          item={item}
+          navigation={navigation}
+          toggleFavorite={toggleFavorite}
+          isFavorite={isFavorite}
+          swapSuggestionsLabel={strings.labels.swapSuggestions}
         />
       );
     },
@@ -532,216 +465,39 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
   );
 
   const renderRecentItem = useCallback(
-    ({ item }: { item: any }) => {
-      const chips: ItemCardChip[] = [];
-      const conditionChip = getConditionPresentation({
-        condition: item.condition,
-        language,
-        translate: t,
-      });
-
-      const categoryLabel =
-        resolveCategoryName(item, language) ||
-        (typeof item.category === 'string' ? item.category.trim() : undefined);
-      if (categoryLabel) {
-        chips.push({ label: categoryLabel, backgroundColor: '#e2e8f0', textColor: '#0f172a' });
-      }
-
-      const formattedPrice = formatCurrency(
-        item.price || item.estimated_value || 0,
-        item.currency || 'USD'
-      );
-
-      const favoriteData = {
-        id: item.id,
-        title: item.title,
-        description: item.description,
-        price: item.price || item.estimated_value || 0,
-        currency: item.currency || 'USD',
-        condition: item.condition,
-        image_url: item.image_url,
-        created_at: item.created_at || item.updated_at || null,
-      };
-      const ownerHandle = item.user?.username || item.user?.first_name || undefined;
-
-      return (
-        <ItemCard
-          title={item.title}
-          description={item.description}
-          priceLabel={formattedPrice}
-          imageUri={item.image_url}
-          chips={chips}
-          onPress={() => (navigation as any).navigate('ItemDetails', { itemId: item.id })}
-          variant="horizontal"
-          style={styles.recentItemCard}
-          ownerHandle={ownerHandle}
-          conditionBadge={
-            conditionChip
-              ? {
-                  label: conditionChip.label,
-                  backgroundColor: conditionChip.backgroundColor,
-                  textColor: conditionChip.textColor,
-                }
-              : undefined
-          }
-          favoriteButton={
-            <FavoriteToggleButton
-              itemId={item.id}
-              item={favoriteData}
-              size={18}
-            />
-          }
-        />
-      );
-    },
+    ({ item }: { item: any }) => (
+      <RecentItemCardItem item={item} navigation={navigation} language={language} t={t} />
+    ),
     [language, navigation, t]
   );
 
   const renderGridItem = useCallback(
-    ({ item, index }: { item: any; index: number }) => {
-      const chips: ItemCardChip[] = [];
-      const conditionChip = getConditionPresentation({
-        condition: item.condition,
-        language,
-        translate: t,
-      });
-
-      const categoryLabel = resolveCategoryName(item, language);
-      if (categoryLabel) {
-        chips.push({ label: categoryLabel, backgroundColor: '#e2e8f0', textColor: '#0f172a' });
-      }
-
-      const formattedPrice = formatCurrency(
-        item.price || item.estimated_value || 0,
-        item.currency || 'USD'
-      );
-
-      const favoriteData = {
-        id: item.id,
-        title: item.title,
-        description: item.description,
-        price: item.price || item.estimated_value || 0,
-        currency: item.currency || 'USD',
-        condition: item.condition,
-        image_url: item.image_url,
-        created_at: item.created_at || item.updated_at || null,
-      };
-
-      const ownerHandle = item.user?.username || item.user?.first_name || undefined;
-
-      return (
-        <ItemCard
-          title={item.title}
-          description={item.description}
-          priceLabel={formattedPrice}
-          imageUri={item.image_url}
-          chips={chips}
-          onPress={() => (navigation as any).navigate('ItemDetails', { itemId: item.id })}
-          variant="grid"
-          style={[
-            styles.gridItem,
-            index % 2 === 0 ? styles.gridItemLeft : styles.gridItemRight,
-          ]}
-          ownerHandle={ownerHandle}
-          conditionBadge={
-            conditionChip
-              ? {
-                  label: conditionChip.label,
-                  backgroundColor: conditionChip.backgroundColor,
-                  textColor: conditionChip.textColor,
-                }
-              : undefined
-          }
-          favoriteButton={
-            <FavoriteToggleButton
-              itemId={item.id}
-              item={favoriteData}
-              size={18}
-            />
-          }
-        />
-      );
-    },
+    ({ item, index }: { item: any; index: number }) => (
+      <GridItemCardItem
+        item={item}
+        index={index}
+        navigation={navigation}
+        language={language}
+        t={t}
+      />
+    ),
     [language, navigation, t]
   );
 
   const renderSearchResult = useCallback(
-    ({ item, index }: { item: any; index: number }) => {
-      const imageUrl = item?.item_images?.[0]?.image_url || item?.image_url || null;
-      const resolvedCategory =
-        resolveCategoryName(item, language) || strings.labels.categoryFallback;
-      const similarityLabel =
-        typeof item?.similarity === 'number'
-          ? `${Math.round((item.similarity || 0) * 100)}%`
-          : null;
-
-      const formattedPrice =
-        item?.price != null ? formatCurrency(item.price, item.currency || 'USD') : undefined;
-
-      const chips: ItemCardChip[] = [];
-      if (resolvedCategory) {
-        chips.push({ label: resolvedCategory, backgroundColor: '#e2e8f0', textColor: '#0f172a' });
-      }
-
-      let conditionBadge: ItemCardChip | undefined;
-      if (item.condition) {
-        const badge = getConditionPresentation({
-          condition: item.condition,
-          language,
-          translate: t,
-        });
-        if (badge) {
-          conditionBadge = {
-            label: badge.label,
-            backgroundColor: badge.backgroundColor,
-            textColor: badge.textColor,
-          };
-        }
-      }
-
-      const favoriteData = {
-        id: item.id,
-        title: item.title,
-        description: item.description,
-        price: item.price || item.estimated_value || 0,
-        currency: item.currency || 'USD',
-        condition: item.condition,
-        image_url: imageUrl,
-        created_at: item.created_at || item.updated_at || null,
-      };
-
-      const ownerHandle =
-        item.user?.username || item.username || item.users?.username || undefined;
-
-      return (
-        <ItemCard
-          key={item.id}
-          title={item.title}
-          description={item.description}
-          priceLabel={formattedPrice}
-          metaRightLabel={similarityLabel}
-          imageUri={imageUrl}
-          placeholderLabel={searchStrings.noImage}
-          chips={chips}
-          onPress={() => (navigation as any).navigate('ItemDetails', { itemId: item.id })}
-          variant="grid"
-          style={[
-            styles.searchGridItem,
-            index % 2 === 0 ? styles.searchGridItemLeft : styles.searchGridItemRight,
-          ]}
-          ownerHandle={ownerHandle}
-          conditionBadge={conditionBadge}
-          favoriteButton={
-            <FavoriteToggleButton
-              itemId={item.id}
-              item={favoriteData}
-              size={18}
-            />
-          }
-        />
-      );
-    },
-    [language, navigation, searchStrings.noImage, strings.labels.categoryFallback, t]
+    ({ item, index }: { item: any; index: number }) => (
+      <SearchResultCardItem
+        key={item?.id ?? `search-result-${index}`}
+        item={item}
+        index={index}
+        navigation={navigation}
+        language={language}
+        t={t}
+        searchStrings={searchStrings}
+        categoryFallback={strings.labels.categoryFallback}
+      />
+    ),
+    [language, navigation, searchStrings, strings.labels.categoryFallback, t]
   );
 
   const renderFooter = useCallback(() => {
@@ -763,8 +519,6 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
     );
   }
 
-  const hasSearchQuery = trimmedSearchQuery.length > 0;
-  const listData = hasSearchQuery ? [] : otherItems || [];
 
   // FIXED: Removed blocking logic - sections render independently
   // No longer blocking UI until ALL sections are ready
@@ -788,10 +542,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
         }
         ListEmptyComponent={
           !hasSearchQuery && othersLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#0ea5e9" />
-              <Text style={styles.loadingText}>{strings.loading.items}</Text>
-            </View>
+            <MainListLoader />
           ) : null
         }
         ListHeaderComponent={
@@ -951,7 +702,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
                   )}
                 </View>
 
-                {otherItems.length > 0 && (
+                {listData.length > 0 && (
                   <View style={[styles.sectionHeaderRow, styles.sectionRowInset]}>
                     <View>
                       <Text style={styles.sectionTitle}>{strings.sections.exploreMore}</Text>
@@ -980,7 +731,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
       <LocationSelector
         visible={locationModalVisible}
         onClose={handleLocationModalClose}
-        onSelectLocation={handleManualLocationSelect}
+        onSelectLocation={handleLocationSelect}
         initialRadiusKm={pendingRadius ?? locationRadius ?? 50}
         initialCityId={locationCityId}
         onRadiusChange={handleRadiusInputChange}
@@ -1007,6 +758,29 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontSize: 15,
     color: '#475569',
+  },
+  mainLoaderContainer: {
+    paddingVertical: 40,
+    alignItems: 'center',
+  },
+  mainLoaderCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  mainLoaderText: {
+    marginLeft: 12,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#0f172a',
   },
   heroContainer: {
     paddingTop: 12,
