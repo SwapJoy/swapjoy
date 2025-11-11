@@ -11,15 +11,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ProfileScreenProps } from '../types/navigation';
 import { useProfileData } from '../hooks/useProfileData';
 import CachedImage from '../components/CachedImage';
-import ItemCard, { ItemCardChip } from '../components/ItemCard';
 import FavoriteToggleButton from '../components/FavoriteToggleButton';
+import ItemCardCollection from '../components/ItemCardCollection';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { FlatList, Dimensions, Alert } from 'react-native';
+import { Dimensions, Alert } from 'react-native';
 import { ApiService } from '../services/api';
-import { formatCurrency } from '../utils';
 import { useLocalization } from '../localization';
-import { getConditionPresentation } from '../utils/conditions';
-import { resolveCategoryName } from '../utils/category';
 import type { AppLanguage } from '../types/language';
 import { DEFAULT_LANGUAGE } from '../types/language';
 
@@ -303,8 +300,6 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
     return loadingDraftItems;
   }, [activeTab, isViewingOtherUser, loadingPublishedItems, loadingSavedItems, loadingDraftItems]);
 
-  const screenWidth = Dimensions.get('window').width;
-  const gridCardWidth = useMemo(() => Math.floor((screenWidth - 60) / 2), [screenWidth]);
 
 
   const renderStatItem = useCallback((title: string, value: string | number, subtitle?: string) => (
@@ -317,258 +312,226 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
 
   // removed unused renderProfileItem helper
 
-  const renderGridItem = useCallback(
-    ({ item, index }: { item: any; index: number }) => {
-      const resolvedLanguage = (language ?? DEFAULT_LANGUAGE) as AppLanguage;
-      const chips: ItemCardChip[] = [];
-      const categoryLabel =
-        resolveCategoryName(item, resolvedLanguage) ||
-        (typeof item.category_name === 'string' ? item.category_name : undefined);
-      if (categoryLabel) {
-        chips.push({ label: categoryLabel, backgroundColor: '#e2e8f0', textColor: '#0f172a' });
-      }
+  const handleItemPress = useCallback(
+    (item: any) => navigation.navigate('ItemDetails', { itemId: item.id }),
+    [navigation]
+  );
 
-      const conditionPresentation = getConditionPresentation({
-        condition: item.condition,
-        language: resolvedLanguage,
-        translate: t,
-      });
+  const buildFavoriteData = useCallback(
+    (item: any) => ({
+      id: item.id,
+      title: item.title,
+      description: item.description,
+      price: item.price,
+      currency: item.currency,
+      condition: item.condition,
+      image_url: item.image_url,
+      category: item.category ?? item.categories ?? null,
+      categories: item.categories ?? null,
+      category_name:
+        item.category_name ??
+        item?.category_name_en ??
+        item?.category_name_ka ??
+        (typeof item?.category === 'string' ? item.category : null),
+      category_name_en: item?.category_name_en ?? null,
+      category_name_ka: item?.category_name_ka ?? null,
+      created_at: item.created_at,
+    }),
+    []
+  );
 
-      const priceLabel =
-        typeof item.price === 'number'
-          ? formatCurrency(Number(item.price), item.currency || 'USD')
-          : undefined;
+  const renderFavoriteButton = useCallback(
+    (item: any) => (
+      <FavoriteToggleButton itemId={item.id} item={buildFavoriteData(item)} size={18} />
+    ),
+    [buildFavoriteData]
+  );
 
-      const favoriteData = {
-        id: item.id,
-        title: item.title,
-        description: item.description,
-        price: item.price,
-        currency: item.currency,
-        condition: item.condition,
-        image_url: item.image_url,
-        category: item.category ?? item.categories ?? null,
-        categories: item.categories ?? null,
-        category_name:
-          item.category_name ??
-          (item as any)?.category_name_en ?? // eslint-disable-line @typescript-eslint/no-explicit-any
-          (item as any)?.category_name_ka ?? // eslint-disable-line @typescript-eslint/no-explicit-any
-          categoryLabel ??
-          undefined,
-        category_name_en: (item as any)?.category_name_en ?? undefined, // eslint-disable-line @typescript-eslint/no-explicit-any
-        category_name_ka: (item as any)?.category_name_ka ?? undefined, // eslint-disable-line @typescript-eslint/no-explicit-any
-        created_at: item.created_at,
-      };
-
-      return (
-        <ItemCard
-          title={item.title || t('profileScreen.grid.untitled')}
-          description={item.description}
-          priceLabel={priceLabel}
-          imageUri={item.image_url}
-          placeholderLabel="No image"
-          variant="grid"
-          style={[
-            styles.gridCard,
-            { width: gridCardWidth },
-            index % 2 === 0 ? styles.gridCardLeft : styles.gridCardRight,
-          ]}
-          chips={chips}
-          conditionBadge={
-            conditionPresentation
-              ? {
-                  label: conditionPresentation.label,
-                  backgroundColor: conditionPresentation.backgroundColor,
-                  textColor: conditionPresentation.textColor,
+  const profileHeader = (
+    <View>
+      {/* Profile Header with Integrated Stats */}
+      {loadingProfile ? (
+        <ProfileHeaderSkeleton />
+      ) : (
+        <View style={styles.profileSection}>
+          {/* Avatar */}
+          <View style={styles.avatarSection}>
+            <View style={styles.avatarWrapper}>
+              <CachedImage
+                uri={
+                  (profile as any)?.profile_image_url ||
+                  (user as any)?.profile_image_url ||
+                  (user as any)?.user_metadata?.avatar_url ||
+                  'https://via.placeholder.com/100?text=Avatar'
                 }
-              : undefined
-          }
-          favoriteButton={<FavoriteToggleButton itemId={item.id} item={favoriteData} size={18} />}
-          onPress={() => navigation.navigate('ItemDetails', { itemId: item.id })}
-        />
-      );
-    },
-    [gridCardWidth, language, navigation, t]
+                style={styles.avatar}
+                resizeMode="cover"
+              />
+            </View>
+          </View>
+
+          {/* Followers & Following */}
+          {!loadingFollowCounts && (
+            <View style={styles.statsInfoRow}>
+              <View style={styles.socialGrid}>
+                <TouchableOpacity
+                  style={styles.socialStatItem}
+                  onPress={() =>
+                    navigation.navigate('FollowersFollowing', {
+                      userId: viewedUserId || user?.id,
+                      initialTab: 'followers',
+                    })
+                  }
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.socialStatValue}>{followCounts.followers}</Text>
+                  <Text style={styles.socialStatLabel}>{strings.stats.followers}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.socialStatItem}
+                  onPress={() =>
+                    navigation.navigate('FollowersFollowing', {
+                      userId: viewedUserId || user?.id,
+                      initialTab: 'following',
+                    })
+                  }
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.socialStatValue}>{followCounts.following}</Text>
+                  <Text style={styles.socialStatLabel}>{strings.stats.following}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
+          {/* User Info */}
+          <View style={styles.userInfoSection}>
+            <Text style={styles.userName}>
+              {profile?.first_name || (user as any)?.user_metadata?.first_name || ''}{' '}
+              {profile?.last_name || (user as any)?.user_metadata?.last_name || ''}
+            </Text>
+            {(
+              profile?.username ||
+              (user as any)?.user_metadata?.username ||
+              (user as any)?.email?.split?.('@')?.[0]
+            ) && (
+              <Text style={styles.username}>@
+                {profile?.username ||
+                  (user as any)?.user_metadata?.username ||
+                  (user as any)?.email?.split?.('@')?.[0]}
+              </Text>
+            )}
+            {(profile?.email || (user as any)?.email) && (
+              <Text style={styles.emailText}>
+                {profile?.email || (user as any)?.email}
+              </Text>
+            )}
+            {profile?.bio && <Text style={styles.bio}>{profile.bio}</Text>}
+          </View>
+
+          {/* Follow button (other users only) */}
+          {isViewingOtherUser && (
+            <View style={styles.followButtonContainer}>
+              <FollowButton targetUserId={viewedUserId!} />
+            </View>
+          )}
+
+          {/* Favorite Categories */}
+          {Array.isArray(favoriteCategoryNames) && favoriteCategoryNames.length > 0 && (
+            <View style={styles.favSection}>
+              <View style={styles.favChipsContainerCentered}>
+                {favoriteCategoryNames.slice(0, 10).map((name) => (
+                  <View key={name} style={styles.favChip}>
+                    <Text style={styles.favChipText}>{name}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* Rating */}
+      {!loadingMetrics && rating.totalRatings > 0 && (
+        <View style={styles.ratingContainer}>
+          <Text style={styles.ratingTitle}>{strings.stats.ratingTitle}</Text>
+          <View style={styles.ratingContent}>
+            <Text style={styles.ratingValue}>{formatRating(rating.averageRating)}</Text>
+            <Text style={styles.ratingStars}>★★★★★</Text>
+            <Text style={styles.ratingCount}>{reviewsLabel(rating.totalRatings)}</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Tabs (hide for other users) */}
+      {!isViewingOtherUser && (
+        <View style={styles.section}>
+          <View style={styles.tabsWrapper}>
+            <View style={styles.tabsContainer}>
+              <TouchableOpacity
+                onPress={() => setActiveTab('published')}
+                style={[styles.tabButton, activeTab === 'published' && styles.tabButtonActive]}
+              >
+                <Text style={[styles.tabText, activeTab === 'published' && styles.tabTextActive]}>
+                  {strings.tabs.published}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setActiveTab('saved')}
+                style={[styles.tabButton, activeTab === 'saved' && styles.tabButtonActive]}
+              >
+                <Text style={[styles.tabText, activeTab === 'saved' && styles.tabTextActive]}>
+                  {strings.tabs.saved}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setActiveTab('drafts')}
+                style={[styles.tabButton, activeTab === 'drafts' && styles.tabButtonActive]}
+              >
+                <Text style={[styles.tabText, activeTab === 'drafts' && styles.tabTextActive]}>
+                  {strings.tabs.drafts}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {isLoadingCurrentTab ? (
+            <View style={styles.loadingItemsContainer}>
+              <ActivityIndicator size="large" color="#007AFF" />
+              <Text style={styles.loadingItemsText}>{strings.loading.items}</Text>
+            </View>
+          ) : gridData.length === 0 ? (
+            <View style={styles.emptyItemsContainer}>
+              <Text style={styles.emptyItemsText}>{strings.empty.title}</Text>
+              <Text style={styles.emptyItemsSubtext}>
+                {activeTab === 'published'
+                  ? strings.empty.published
+                  : activeTab === 'saved'
+                    ? strings.empty.saved
+                    : strings.empty.drafts}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+      )}
+    </View>
   );
 
   return (
     <View style={styles.container}>
-      <FlatList
-        data={gridData}
-        keyExtractor={(it) => it.id}
-        numColumns={2}
-        renderItem={renderGridItem}
-        columnWrapperStyle={styles.gridRow}
-        contentContainerStyle={styles.gridListContent}
+      <ItemCardCollection
+        items={gridData}
+        t={t}
+        language={language as AppLanguage}
+        onItemPress={handleItemPress}
+        favoriteButtonRenderer={renderFavoriteButton}
+        listHeaderComponent={profileHeader}
+        emptyComponent={isLoadingCurrentTab ? <GridItemsSkeleton /> : null}
         showsVerticalScrollIndicator={false}
-        initialNumToRender={12}
-        windowSize={7}
-        removeClippedSubviews
-        maxToRenderPerBatch={20}
-        updateCellsBatchingPeriod={50}
-        ListHeaderComponent={(
-          <View>
-            {/* Profile Header with Integrated Stats */}
-            {loadingProfile ? (
-              <ProfileHeaderSkeleton />
-            ) : (
-              <View style={styles.profileSection}>
-                {/* Avatar */}
-                <View style={styles.avatarSection}>
-                  <View style={styles.avatarWrapper}>
-                    <CachedImage
-                      uri={
-                        (profile as any)?.profile_image_url ||
-                        (user as any)?.profile_image_url ||
-                        (user as any)?.user_metadata?.avatar_url ||
-                        'https://via.placeholder.com/100?text=Avatar'
-                      }
-                      style={styles.avatar}
-                      resizeMode="cover"
-                    />
-                  </View>
-                </View>
-
-                {/* Followers & Following */}
-                {!loadingFollowCounts && (
-                  <View style={styles.statsInfoRow}>
-                    <View style={styles.socialGrid}>
-                      <TouchableOpacity
-                        style={styles.socialStatItem}
-                        onPress={() => navigation.navigate('FollowersFollowing', { userId: viewedUserId || user?.id, initialTab: 'followers' })}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={styles.socialStatValue}>{followCounts.followers}</Text>
-                        <Text style={styles.socialStatLabel}>{strings.stats.followers}</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.socialStatItem}
-                        onPress={() => navigation.navigate('FollowersFollowing', { userId: viewedUserId || user?.id, initialTab: 'following' })}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={styles.socialStatValue}>{followCounts.following}</Text>
-                        <Text style={styles.socialStatLabel}>{strings.stats.following}</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                )}
-
-                {/* User Info */}
-                <View style={styles.userInfoSection}>
-                  <Text style={styles.userName}>
-                    {profile?.first_name || (user as any)?.user_metadata?.first_name || ''} {profile?.last_name || (user as any)?.user_metadata?.last_name || ''}
-                  </Text>
-                  {(
-                    profile?.username ||
-                    (user as any)?.user_metadata?.username ||
-                    (user as any)?.email?.split?.('@')?.[0]
-                  ) && (
-                    <Text style={styles.username}>@
-                      {profile?.username || (user as any)?.user_metadata?.username || (user as any)?.email?.split?.('@')?.[0]}
-                    </Text>
-                  )}
-                  {(profile?.email || (user as any)?.email) && (
-                    <Text style={styles.emailText}>
-                      {profile?.email || (user as any)?.email}
-                    </Text>
-                  )}
-                  {(profile?.bio) && (
-                    <Text style={styles.bio}>{profile.bio}</Text>
-                  )}
-                </View>
-
-                {/* Follow button (other users only) */}
-                {isViewingOtherUser && (
-                  <View style={styles.followButtonContainer}> 
-                    <FollowButton targetUserId={viewedUserId!} />
-                  </View>
-                )}
-
-                {/* Favorite Categories */}
-                {Array.isArray(favoriteCategoryNames) && favoriteCategoryNames.length > 0 && (
-                  <View style={styles.favSection}>
-                    <View style={styles.favChipsContainerCentered}>
-                      {favoriteCategoryNames.slice(0, 10).map((name) => (
-                        <View key={name} style={styles.favChip}>
-                          <Text style={styles.favChipText}>{name}</Text>
-                        </View>
-                      ))}
-                    </View>
-                  </View>
-                )}
-              </View>
-            )}
-
-            {/* Rating */}
-            {!loadingMetrics && rating.totalRatings > 0 && (
-              <View style={styles.ratingContainer}>
-                <Text style={styles.ratingTitle}>{strings.stats.ratingTitle}</Text>
-                <View style={styles.ratingContent}>
-                  <Text style={styles.ratingValue}>{formatRating(rating.averageRating)}</Text>
-                  <Text style={styles.ratingStars}>★★★★★</Text>
-                  <Text style={styles.ratingCount}>{reviewsLabel(rating.totalRatings)}</Text>
-                </View>
-              </View>
-            )}
-
-            {/* Tabs (hide for other users) */}
-            {!isViewingOtherUser && (
-              <View style={styles.section}>
-                <View style={styles.tabsWrapper}>
-                  <View style={styles.tabsContainer}>
-                    <TouchableOpacity
-                      onPress={() => setActiveTab('published')}
-                      style={[styles.tabButton, activeTab === 'published' && styles.tabButtonActive]}
-                    >
-                      <Text style={[styles.tabText, activeTab === 'published' && styles.tabTextActive]}>
-                        {strings.tabs.published}
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => setActiveTab('saved')}
-                      style={[styles.tabButton, activeTab === 'saved' && styles.tabButtonActive]}
-                    >
-                      <Text style={[styles.tabText, activeTab === 'saved' && styles.tabTextActive]}>
-                        {strings.tabs.saved}
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      onPress={() => setActiveTab('drafts')}
-                      style={[styles.tabButton, activeTab === 'drafts' && styles.tabButtonActive]}
-                    >
-                      <Text style={[styles.tabText, activeTab === 'drafts' && styles.tabTextActive]}>
-                        {strings.tabs.drafts}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                {isLoadingCurrentTab ? (
-                  <View style={styles.loadingItemsContainer}>
-                    <ActivityIndicator size="large" color="#007AFF" />
-                    <Text style={styles.loadingItemsText}>{strings.loading.items}</Text>
-                  </View>
-                ) : gridData.length === 0 ? (
-                  <View style={styles.emptyItemsContainer}>
-                    <Text style={styles.emptyItemsText}>{strings.empty.title}</Text>
-                    <Text style={styles.emptyItemsSubtext}>
-                      {activeTab === 'published'
-                        ? strings.empty.published
-                        : activeTab === 'saved'
-                          ? strings.empty.saved
-                          : strings.empty.drafts}
-                    </Text>
-                  </View>
-                ) : null}
-              </View>
-            )}
-          </View>
-        )}
-        ListEmptyComponent={
-          isLoadingCurrentTab ? (
-            <GridItemsSkeleton />
-          ) : null
-        }
+        contentContainerStyle={styles.gridListContent}
+        horizontalPadding={20}
+        columnSpacing={20}
+        rowSpacing={18}
       />
     </View>
   );
@@ -930,10 +893,6 @@ const styles = StyleSheet.create({
   gridListContent: {
     paddingTop: 6,
     paddingBottom: 120,
-  },
-  gridRow: {
-    justifyContent: 'space-between',
-    marginBottom: 0,
   },
   gridCard: {
     marginBottom: 18,

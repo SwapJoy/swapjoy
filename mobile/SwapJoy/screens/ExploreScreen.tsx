@@ -7,7 +7,6 @@ import {
   FlatList,
   TouchableOpacity,
   Dimensions,
-  RefreshControl,
   ActivityIndicator,
   TextInput,
   Alert,
@@ -28,10 +27,10 @@ import LocationSelector from '../components/LocationSelector';
 import type { LocationSelection } from '../types/location';
 import { useExploreScreenState } from '../hooks/useExploreScreenState';
 import type { AppLanguage } from '../types/language';
+import ItemCardCollection from '../components/ItemCardCollection';
 
 const { width } = Dimensions.get('window');
 const ITEM_WIDTH = width * 0.7;
-const GRID_ITEM_WIDTH = (width - 60) / 2; // 2 columns with margins
 
 // Skeleton loader component for Top Picks - only content, no section wrapper
 const TopPicksSkeleton = () => (
@@ -343,126 +342,55 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
     [language, navigation, t]
   );
 
-  const renderItemCard = useCallback(
-    (
-      item: any, // eslint-disable-line @typescript-eslint/no-explicit-any
-      index: number,
-      options?: {
-        placeholderLabel?: string;
-        categoryFallback?: string;
-        metaRightLabel?: string | null;
-      }
-    ) => {
-      const resolvedLanguage = language as AppLanguage;
-      const chips: ItemCardChip[] = [];
-      const conditionChip = getConditionPresentation({
-        condition: item.condition,
-        language: resolvedLanguage,
-        translate: t,
-      });
+  const handleItemPress = useCallback(
+    (item: any) => (navigation as any).navigate('ItemDetails', { itemId: item.id }), // eslint-disable-line @typescript-eslint/no-explicit-any
+    [navigation]
+  );
 
+  const buildFavoriteData = useCallback(
+    (item: any) => {
       const imageUrl =
-        item.image_url ||
+        item?.image_url ||
         item?.item_images?.[0]?.image_url ||
         item?.images?.[0]?.image_url ||
         null;
 
-      const fallbackCategory =
-        typeof options?.categoryFallback === 'string' ? options.categoryFallback : undefined;
-
-      const categoryLabel =
-        resolveCategoryName(item, resolvedLanguage) ||
-        (typeof item.category_name === 'string' ? item.category_name : undefined) ||
-        (typeof item.category === 'string' ? item.category.trim() : undefined) ||
-        fallbackCategory;
-      if (categoryLabel) {
-        chips.push({ label: categoryLabel, backgroundColor: '#e2e8f0', textColor: '#0f172a' });
-      }
-
-      const formattedPrice = formatCurrency(
-        item.price || item.estimated_value || 0,
-        item.currency || 'USD'
-      );
-
-      const favoriteData = {
-        id: item.id,
-        title: item.title,
-        description: item.description,
-        price: item.price || item.estimated_value || 0,
-        currency: item.currency || 'USD',
-        condition: item.condition,
+      return {
+        id: item?.id,
+        title: item?.title,
+        description: item?.description,
+        price: item?.price || item?.estimated_value || 0,
+        currency: item?.currency || 'USD',
+        condition: item?.condition,
         image_url: imageUrl,
-        created_at: item.created_at || item.updated_at || null,
+        created_at: item?.created_at || item?.updated_at || null,
         category_name:
-          item.category_name ??
-          item.category_name_en ??
-          item.category_name_ka ??
-          categoryLabel ??
-          fallbackCategory ??
-          null,
-        category_name_en: item.category_name_en ?? null,
-        category_name_ka: item.category_name_ka ?? null,
-        category: item.category ?? item.categories ?? null,
-        categories: item.categories ?? null,
+          item?.category_name ??
+          item?.category_name_en ??
+          item?.category_name_ka ??
+          (typeof item?.category === 'string' ? item.category : null),
+        category_name_en: item?.category_name_en ?? null,
+        category_name_ka: item?.category_name_ka ?? null,
+        category: item?.category ?? item?.categories ?? null,
+        categories: item?.categories ?? null,
       };
-
-      const ownerHandle = item.user?.username || item.user?.first_name || undefined;
-      const resolvedMetaRight =
-        options?.metaRightLabel !== undefined
-          ? options.metaRightLabel
-          : typeof item.similarity === 'number'
-            ? `${Math.round((item.similarity || 0) * 100)}%`
-            : null;
-      const resolvedPlaceholder = options?.placeholderLabel || item.placeholderLabel || 'No image';
-
-      return (
-        <ItemCard
-          title={item.title}
-          description={item.description}
-          priceLabel={formattedPrice}
-          metaRightLabel={resolvedMetaRight || undefined}
-          imageUri={imageUrl}
-          placeholderLabel={resolvedPlaceholder}
-          chips={chips}
-          onPress={() => (navigation as any).navigate('ItemDetails', { itemId: item.id })} // eslint-disable-line @typescript-eslint/no-explicit-any
-          variant="grid"
-          style={[
-            styles.gridItem,
-            index % 2 === 0 ? styles.gridItemLeft : styles.gridItemRight,
-          ]}
-          ownerHandle={ownerHandle}
-          conditionBadge={
-            conditionChip
-              ? {
-                  label: conditionChip.label,
-                  backgroundColor: conditionChip.backgroundColor,
-                  textColor: conditionChip.textColor,
-                }
-              : undefined
-          }
-          favoriteButton={<FavoriteToggleButton itemId={item.id} item={favoriteData} size={18} />}
-        />
-      );
     },
-    [language, navigation, t]
+    []
   );
 
-  const renderGridItem = useCallback(
-    ({ item, index }: { item: any; index: number }) => renderItemCard(item, index),
-    [renderItemCard]
+  const renderFavoriteButton = useCallback(
+    (item: any) => (
+      <FavoriteToggleButton itemId={item?.id} item={buildFavoriteData(item)} size={18} />
+    ),
+    [buildFavoriteData]
   );
 
-  const renderSearchResult = useCallback(
-    ({ item, index }: { item: any; index: number }) =>
-      renderItemCard(item, index, {
-        placeholderLabel: searchStrings.noImage,
-        categoryFallback: strings.labels.categoryFallback,
-        metaRightLabel:
-          typeof item?.similarity === 'number'
-            ? `${Math.round((item.similarity || 0) * 100)}%`
-            : null,
-      }),
-    [renderItemCard, searchStrings.noImage, strings.labels.categoryFallback]
+  const resolveSimilarityLabel = useCallback(
+    (item: any) =>
+      typeof item?.similarity === 'number'
+        ? `${Math.round((item.similarity || 0) * 100)}%`
+        : null,
+    []
   );
 
   const renderFooter = useCallback(() => {
@@ -473,6 +401,211 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
       </View>
     );
   }, [loadingMore]);
+
+  const searchResultsNode = hasSearchQuery ? (
+    <View style={styles.searchResultsContainer}>
+      {!searchLoading && searchResults.length === 0 ? (
+        <View style={styles.searchStatusContainer}>
+          <Text style={styles.searchStatusTitle}>{searchStrings.noResultsTitle}</Text>
+          <Text style={styles.searchStatusSubtitle}>{searchStrings.noResultsSubtitle}</Text>
+        </View>
+      ) : (
+        <ItemCardCollection
+          items={searchResults}
+          t={t}
+          language={language as AppLanguage}
+          onItemPress={handleItemPress}
+          favoriteButtonRenderer={renderFavoriteButton}
+          metaRightResolver={resolveSimilarityLabel}
+          placeholderLabel={searchStrings.noImage}
+          categoryFallback={strings.labels.categoryFallback}
+          horizontalPadding={8}
+          parentHorizontalPadding={40}
+          columnSpacing={16}
+          rowSpacing={18}
+          scrollEnabled={false}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.searchResultsContent}
+          flatListProps={{
+            removeClippedSubviews: false,
+          }}
+        />
+      )}
+      {searchError ? <Text style={styles.searchErrorText}>{searchError}</Text> : null}
+    </View>
+  ) : null;
+
+  const heroSection = (
+    <View>
+      <View style={styles.heroContainer}>
+        <View style={styles.searchRow}>
+          <View style={styles.searchBar}>
+            <Ionicons name="search-outline" size={18} color="#64748b" />
+            <TextInput
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              style={styles.searchInputField}
+              placeholder={strings.hero.searchPlaceholder || searchStrings.placeholder}
+              placeholderTextColor="#94a3b8"
+              autoCorrect={false}
+              autoCapitalize="none"
+              returnKeyType="search"
+              onSubmitEditing={() => performSearch(searchQuery)}
+            />
+            {hasSearchQuery ? (
+              <TouchableOpacity
+                onPress={handleClearSearch}
+                style={styles.searchClearButton}
+                accessibilityLabel={t('common.clear', { defaultValue: 'Clear search' })}
+              >
+                <Ionicons name="close-circle" size={18} color="#94a3b8" />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        </View>
+        {searchResultsNode}
+      </View>
+      {!hasSearchQuery && (
+        <View style={styles.listHeader}>
+          <View style={styles.sectionCard}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionTitle}>{strings.sections.topMatches}</Text>
+              <TouchableOpacity
+                style={styles.locationBadge}
+                onPress={handleOpenLocationSelector}
+                disabled={updatingLocation || loadingLocation}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="location-outline" size={16} color="#0369a1" />
+                <Text style={styles.locationBadgeText} numberOfLines={1}>
+                  {updatingLocation
+                    ? strings.location.updating
+                    : locationLabel || strings.location.badgePlaceholder}
+                </Text>
+                {(loadingLocation || updatingLocation) && (
+                  <ActivityIndicator
+                    size="small"
+                    color="#0369a1"
+                    style={styles.locationBadgeSpinner}
+                  />
+                )}
+              </TouchableOpacity>
+            </View>
+            {(() => {
+              if (topPicksError) {
+                return (
+                  <ErrorDisplay
+                    title={strings.errors.title}
+                    message={topPicksError?.message ?? strings.errors.unknown}
+                    retryLabel={strings.errors.retry}
+                    onRetry={refreshTopPicks}
+                  />
+                );
+              }
+              if (topPicksLoading && isInitialized) {
+                return <TopPicksSkeleton />;
+              }
+              if (aiOffers && aiOffers.length > 0) {
+                return (
+                  <View style={styles.horizontalScroller}>
+                    <FlatList
+                      data={aiOffers}
+                      renderItem={renderAIOffer}
+                      keyExtractor={(item) => item.id}
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.horizontalList}
+                      snapToInterval={TOP_MATCH_CARD_WIDTH + 16}
+                      decelerationRate="fast"
+                      removeClippedSubviews
+                      maxToRenderPerBatch={5}
+                      windowSize={10}
+                      initialNumToRender={3}
+                      getItemLayout={(data, index) => ({
+                        length: TOP_MATCH_CARD_WIDTH + 16,
+                        offset: (TOP_MATCH_CARD_WIDTH + 16) * index,
+                        index,
+                      })}
+                    />
+                  </View>
+                );
+              }
+              if (isInitialized && !topPicksLoading) {
+                return <Text style={styles.emptyText}>{strings.empty.topMatches}</Text>;
+              }
+              return <TopPicksSkeleton />;
+            })()}
+          </View>
+
+          <View style={[styles.sectionCard, styles.sectionCardSpacer]}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionTitle}>{strings.sections.recentlyListed}</Text>
+              {!!recentItems.length && (
+                <TouchableOpacity
+                  onPress={() => rootNavigation.navigate('RecentlyListed')}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.sectionAction}>{strings.actions.viewAll}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            {recentError ? (
+              <ErrorDisplay
+                title={strings.errors.title}
+                message={recentError?.message ?? strings.errors.unknown}
+                retryLabel={strings.errors.retry}
+                onRetry={refreshRecent}
+              />
+            ) : recentLoading && recentItems.length === 0 ? (
+              <RecentItemsSkeleton />
+            ) : recentItems.length > 0 ? (
+              <View style={styles.horizontalScroller}>
+                <FlatList
+                  data={recentItems}
+                  renderItem={renderRecentItem}
+                  keyExtractor={(item) => item.id}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.recentList}
+                  snapToInterval={ITEM_WIDTH * 0.8 + 15}
+                  decelerationRate="fast"
+                />
+              </View>
+            ) : (
+              <Text style={styles.emptyText}>{strings.empty.recentItems}</Text>
+            )}
+          </View>
+
+          {listData.length > 0 && (
+            <View style={[styles.sectionHeaderRow, styles.sectionRowInset]}>
+              <View>
+                <Text style={styles.sectionTitle}>{strings.sections.exploreMore}</Text>
+              </View>
+            </View>
+          )}
+        </View>
+      )}
+    </View>
+  );
+
+  const mainListEmptyComponent = hasSearchQuery
+    ? null
+    : othersLoading
+      ? <MainListLoader />
+      : othersError
+        ? (
+            <View style={[styles.sectionCard, { marginHorizontal: 20 }]}>
+              <ErrorDisplay
+                title={strings.errors.title}
+                message={othersError?.message ?? strings.errors.unknown}
+                retryLabel={strings.errors.retry}
+                onRetry={refreshOthers}
+              />
+            </View>
+          )
+        : null;
+
+  const listFooterComponent = hasSearchQuery ? null : renderFooter();
 
   if (!user) {
     return (
@@ -490,213 +623,31 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
 
   return (
     <View style={styles.safeArea}>
-      <FlatList
-        data={listData}
-        renderItem={renderGridItem}
-        keyExtractor={(item) => item.id}
-        numColumns={2}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.mainContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            colors={['#0ea5e9']}
-            tintColor="#0ea5e9"
-          />
-        }
-        ListEmptyComponent={
-          !hasSearchQuery && othersLoading ? (
-            <MainListLoader />
-          ) : null
-        }
-        ListHeaderComponent={
-          <View>
-            <View style={styles.heroContainer}>
-              <View style={styles.searchRow}>
-                <View style={styles.searchBar}>
-                  <Ionicons name="search-outline" size={18} color="#64748b" />
-                  <TextInput
-                    value={searchQuery}
-                    onChangeText={setSearchQuery}
-                    style={styles.searchInputField}
-                    placeholder={strings.hero.searchPlaceholder || searchStrings.placeholder}
-                    placeholderTextColor="#94a3b8"
-                    autoCorrect={false}
-                    autoCapitalize="none"
-                    returnKeyType="search"
-                    onSubmitEditing={() => performSearch(searchQuery)}
-                  />
-                  {hasSearchQuery ? (
-                    <TouchableOpacity
-                      onPress={handleClearSearch}
-                      style={styles.searchClearButton}
-                      accessibilityLabel={t('common.clear', { defaultValue: 'Clear search' })}
-                    >
-                      <Ionicons name="close-circle" size={18} color="#94a3b8" />
-                    </TouchableOpacity>
-                  ) : null}
-                </View>
-              </View>
-              {hasSearchQuery ? (
-                <View style={styles.searchResultsContainer}>
-                  {!searchLoading && searchResults.length === 0 ? (
-                    <View style={styles.searchStatusContainer}>
-                      <Text style={styles.searchStatusTitle}>{searchStrings.noResultsTitle}</Text>
-                      <Text style={styles.searchStatusSubtitle}>{searchStrings.noResultsSubtitle}</Text>
-                    </View>
-                  ) : (
-                    <FlatList
-                      data={searchResults}
-                      renderItem={renderSearchResult}
-                      keyExtractor={(item, index) => item?.id ?? `search-result-${index}`}
-                      numColumns={2}
-                      columnWrapperStyle={styles.gridRow}
-                      contentContainerStyle={styles.searchResultsContent}
-                      scrollEnabled={false}
-                      removeClippedSubviews={false}
-                    />
-                  )}
-                  {searchError ? <Text style={styles.searchErrorText}>{searchError}</Text> : null}
-                </View>
-              ) : null}
-            </View>
-            {!hasSearchQuery && (
-              <View style={styles.listHeader}>
-                <View style={styles.sectionCard}>
-                  <View style={styles.sectionHeaderRow}>
-                    <Text style={styles.sectionTitle}>{strings.sections.topMatches}</Text>
-                    <TouchableOpacity
-                      style={styles.locationBadge}
-                      onPress={handleOpenLocationSelector}
-                      disabled={updatingLocation || loadingLocation}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons name="location-outline" size={16} color="#0369a1" />
-                      <Text style={styles.locationBadgeText} numberOfLines={1}>
-                        {updatingLocation
-                          ? strings.location.updating
-                          : locationLabel || strings.location.badgePlaceholder}
-                      </Text>
-                      {(loadingLocation || updatingLocation) && (
-                        <ActivityIndicator
-                          size="small"
-                          color="#0369a1"
-                          style={styles.locationBadgeSpinner}
-                        />
-                      )}
-                    </TouchableOpacity>
-                  </View>
-                  {(() => {
-                    if (topPicksError) {
-                      return (
-                        <ErrorDisplay
-                          title={strings.errors.title}
-                          message={topPicksError?.message ?? strings.errors.unknown}
-                          retryLabel={strings.errors.retry}
-                          onRetry={refreshTopPicks}
-                        />
-                      );
-                    }
-                    if (topPicksLoading && isInitialized) {
-                      return <TopPicksSkeleton />;
-                    }
-                    if (aiOffers && aiOffers.length > 0) {
-                      return (
-                        <View style={styles.horizontalScroller}>
-                          <FlatList
-                            data={aiOffers}
-                            renderItem={renderAIOffer}
-                            keyExtractor={(item) => item.id}
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            contentContainerStyle={styles.horizontalList}
-                            snapToInterval={TOP_MATCH_CARD_WIDTH + 16}
-                            decelerationRate="fast"
-                            removeClippedSubviews
-                            maxToRenderPerBatch={5}
-                            windowSize={10}
-                            initialNumToRender={3}
-                            getItemLayout={(data, index) => ({
-                              length: TOP_MATCH_CARD_WIDTH + 16,
-                              offset: (TOP_MATCH_CARD_WIDTH + 16) * index,
-                              index,
-                            })}
-                          />
-                        </View>
-                      );
-                    }
-                    if (isInitialized && !topPicksLoading) {
-                      return <Text style={styles.emptyText}>{strings.empty.topMatches}</Text>;
-                    }
-                    return <TopPicksSkeleton />;
-                  })()}
-                </View>
-
-                <View style={[styles.sectionCard, styles.sectionCardSpacer]}>
-                  <View style={styles.sectionHeaderRow}>
-                    <Text style={styles.sectionTitle}>{strings.sections.recentlyListed}</Text>
-                    {!!recentItems.length && (
-                      <TouchableOpacity
-                        onPress={() => rootNavigation.navigate('RecentlyListed')}
-                        activeOpacity={0.8}
-                      >
-                        <Text style={styles.sectionAction}>{strings.actions.viewAll}</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                  {recentError ? (
-                    <ErrorDisplay
-                      title={strings.errors.title}
-                      message={recentError?.message ?? strings.errors.unknown}
-                      retryLabel={strings.errors.retry}
-                      onRetry={refreshRecent}
-                    />
-                  ) : recentLoading && recentItems.length === 0 ? (
-                    <RecentItemsSkeleton />
-                  ) : recentItems.length > 0 ? (
-                    <View style={styles.horizontalScroller}>
-                      <FlatList
-                        data={recentItems}
-                        renderItem={renderRecentItem}
-                        keyExtractor={(item) => item.id}
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.recentList}
-                        snapToInterval={ITEM_WIDTH * 0.8 + 15}
-                        decelerationRate="fast"
-                      />
-                    </View>
-                  ) : (
-                    <Text style={styles.emptyText}>{strings.empty.recentItems}</Text>
-                  )}
-                </View>
-
-                {listData.length > 0 && (
-                  <View style={[styles.sectionHeaderRow, styles.sectionRowInset]}>
-                    <View>
-                      <Text style={styles.sectionTitle}>{strings.sections.exploreMore}</Text>
-                    </View>
-                  </View>
-                )}
-
-                {othersError && (
-                  <View style={styles.sectionCard}>
-                    <ErrorDisplay
-                      title={strings.errors.title}
-                      message={othersError?.message ?? strings.errors.unknown}
-                      retryLabel={strings.errors.retry}
-                      onRetry={refreshOthers}
-                    />
-                  </View>
-                )}
-              </View>
-            )}
-          </View>
-        }
+      <ItemCardCollection
+        items={hasSearchQuery ? [] : listData}
+        t={t}
+        language={language as AppLanguage}
+        onItemPress={handleItemPress}
+        favoriteButtonRenderer={renderFavoriteButton}
+        listHeaderComponent={heroSection}
+        listFooterComponent={listFooterComponent}
+        emptyComponent={mainListEmptyComponent}
         onEndReached={hasSearchQuery ? undefined : loadMore}
         onEndReachedThreshold={hasSearchQuery ? undefined : 0.5}
-        ListFooterComponent={hasSearchQuery ? null : renderFooter}
+        refreshing={refreshing}
+        onRefresh={onRefresh}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.mainContent}
+        horizontalPadding={20}
+        columnSpacing={20}
+        rowSpacing={18}
+        flatListProps={{
+          removeClippedSubviews: false,
+          initialNumToRender: 12,
+          windowSize: 7,
+          maxToRenderPerBatch: 20,
+          updateCellsBatchingPeriod: 50,
+        }}
       />
       <LocationSelector
         visible={locationModalVisible}
@@ -755,7 +706,6 @@ const styles = StyleSheet.create({
   heroContainer: {
     paddingTop: 12,
     paddingBottom: 12,
-    paddingHorizontal: 20,
   },
   heroTopRow: {
     flexDirection: 'row',
@@ -854,7 +804,7 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   searchResultsContainer: {
-    marginTop: 16,
+    marginTop: 16
   },
   searchResultsContent: {
     paddingTop: 8,
@@ -862,7 +812,6 @@ const styles = StyleSheet.create({
   },
   searchStatusContainer: {
     paddingVertical: 16,
-    paddingHorizontal: 12,
     alignItems: 'center',
   },
   searchStatusTitle: {
@@ -892,15 +841,11 @@ const styles = StyleSheet.create({
   heroStatsScroll: {
     paddingTop: 18,
     paddingBottom: 6,
-    paddingLeft: 20,
-    paddingRight: 20,
   },
   heroStatCard: {
     backgroundColor: '#ffffff',
     borderRadius: 18,
     paddingVertical: 16,
-    paddingHorizontal: 18,
-    marginRight: 12,
     minWidth: 120,
     shadowColor: '#0f172a',
     shadowOffset: { width: 0, height: 3 },
@@ -928,7 +873,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   sectionRowInset: {
-    paddingHorizontal: 20,
     marginTop: 12,
     marginBottom: 16,
   },
@@ -1186,22 +1130,6 @@ const styles = StyleSheet.create({
     width: ITEM_WIDTH * 0.9,
     marginRight: 16,
   },
-  gridRow: {
-    justifyContent: 'space-between',
-    width: '100%',
-  },
-  gridItem: {
-    width: GRID_ITEM_WIDTH,
-    marginBottom: 18,
-  },
-  gridItemLeft: {
-    marginLeft: 20,
-    marginRight: 10,
-  },
-  gridItemRight: {
-    marginLeft: 10,
-    marginRight: 20,
-  },
   footerLoader: {
     width: '100%',
     paddingVertical: 24,
@@ -1235,7 +1163,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   listHeader: {
-    paddingHorizontal: 20,
     paddingTop: 4,
   },
 });
