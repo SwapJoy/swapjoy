@@ -19,6 +19,11 @@ export interface FavoriteItem {
   condition?: string | null;
   image_url?: string | null;
   created_at?: string | null;
+  category_name?: string | null;
+  category_name_en?: string | null;
+  category_name_ka?: string | null;
+  category?: Record<string, unknown> | null;
+  categories?: Record<string, unknown> | null;
 }
 
 export type FavoriteItemInput = Partial<Omit<FavoriteItem, 'id'>> & { id: string };
@@ -43,6 +48,15 @@ const NORMALIZE_FAVORITE = (item: FavoriteItemInput): FavoriteItem => ({
   condition: item.condition ?? null,
   image_url: item.image_url ?? null,
   created_at: item.created_at ?? new Date().toISOString(),
+  category_name:
+    item.category_name ??
+    item.category_name_en ??
+    item.category_name_ka ??
+    null,
+  category_name_en: item.category_name_en ?? null,
+  category_name_ka: item.category_name_ka ?? null,
+  category: item.category ?? null,
+  categories: item.categories ?? null,
 });
 
 export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -88,6 +102,15 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
                 condition: item.condition,
                 image_url: item.image_url,
                 created_at: item.created_at,
+                category_name:
+                  item.category_name ??
+                  item.category?.title ??
+                  item.category?.name ??
+                  null,
+                category_name_en: item.category_name_en ?? item.category?.title_en ?? null,
+                category_name_ka: item.category_name_ka ?? item.category?.title_ka ?? null,
+                category: item.category ?? null,
+                categories: item.categories ?? null,
               })
             )
         : [];

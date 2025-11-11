@@ -118,6 +118,8 @@ export class ApiService {
         try {
           // Force reload current session; AuthService.getCurrentSession will refresh if expired
           await AuthService.getCurrentSession();
+          // Reset auth state so we reapply the refreshed session to the Supabase client
+          this.resetAuthState();
           await this.getAuthenticatedClient();
           console.log('[ApiService] retrying API call after session refresh');
           result = await apiCall(client);
@@ -214,7 +216,7 @@ export class ApiService {
       // Fallback: basic keyword search on title with minimal fields
       const { data, error } = await client
         .from('items')
-        .select('id, title, description, price, currency, category_id, category:categories!items_category_id_fkey(title_en, title_ka), item_images(image_url)')
+        .select('id, title, description, price, currency, condition, category_id, category:categories!items_category_id_fkey(title_en, title_ka), item_images(image_url)')
         .ilike('title', `%${q}%`)
         .limit(limit);
 
@@ -237,6 +239,7 @@ export class ApiService {
             'description',
             'price',
             'currency',
+            'condition',
             'category_id',
             'category:categories!items_category_id_fkey(title_en, title_ka)',
             'item_images(image_url)',
@@ -2687,7 +2690,17 @@ export class ApiService {
     return this.authenticatedCall(async (client) => {
       const { data: items, error } = await client
         .from('items')
-        .select(`id, title, description, price, currency, condition, created_at`) 
+        .select(`
+          id,
+          title,
+          description,
+          price,
+          currency,
+          condition,
+          created_at,
+          category_id,
+          categories:categories!items_category_id_fkey(title_en, title_ka)
+        `) 
         .eq('user_id', userId)
         .eq('status', 'available')
         .order('created_at', { ascending: false });
@@ -2716,9 +2729,21 @@ export class ApiService {
       const itemsWithImages = (items || []).map((item: any) => {
         const firstImg = imagesByItem[item.id]?.[0];
         const chosenUrl = firstImg?.image_url || firstImg?.thumbnail_url || null;
+        const categoryRelation = item.categories ?? null;
+        const categoryNameEn = item.category_name_en ?? categoryRelation?.title_en ?? null;
+        const categoryNameKa = item.category_name_ka ?? categoryRelation?.title_ka ?? null;
         return {
           ...item,
           image_url: chosenUrl,
+          category: item.category ?? categoryRelation ?? null,
+          categories: categoryRelation ?? item.categories ?? null,
+          category_name:
+            item.category_name ??
+            categoryNameEn ??
+            categoryNameKa ??
+            null,
+          category_name_en: categoryNameEn,
+          category_name_ka: categoryNameKa,
         };
       });
 
@@ -2732,7 +2757,18 @@ export class ApiService {
     return this.authenticatedCall(async (client) => {
       const { data: items, error } = await client
         .from('items')
-        .select(`id, title, description, price, currency, condition, created_at, updated_at`) 
+        .select(`
+          id,
+          title,
+          description,
+          price,
+          currency,
+          condition,
+          created_at,
+          updated_at,
+          category_id,
+          categories:categories!items_category_id_fkey(title_en, title_ka)
+        `) 
         .eq('user_id', userId)
         .eq('status', 'draft')
         .order('updated_at', { ascending: false });
@@ -2760,9 +2796,21 @@ export class ApiService {
       const itemsWithImages = (items || []).map((item: any) => {
         const firstImg = imagesByItem[item.id]?.[0];
         const chosenUrl = firstImg?.image_url || firstImg?.thumbnail_url || null;
+        const categoryRelation = item.categories ?? null;
+        const categoryNameEn = item.category_name_en ?? categoryRelation?.title_en ?? null;
+        const categoryNameKa = item.category_name_ka ?? categoryRelation?.title_ka ?? null;
         return {
           ...item,
           image_url: chosenUrl,
+          category: item.category ?? categoryRelation ?? null,
+          categories: categoryRelation ?? item.categories ?? null,
+          category_name:
+            item.category_name ??
+            categoryNameEn ??
+            categoryNameKa ??
+            null,
+          category_name_en: categoryNameEn,
+          category_name_ka: categoryNameKa,
         };
       });
 
@@ -2790,7 +2838,17 @@ export class ApiService {
       const [itemsResult, imagesResult] = await Promise.all([
         client
           .from('items')
-          .select('id, title, description, price, currency, condition, created_at')
+          .select(`
+            id,
+            title,
+            description,
+            price,
+            currency,
+            condition,
+            created_at,
+            category_id,
+            categories:categories!items_category_id_fkey(title_en, title_ka)
+          `)
           .in('id', itemIds),
         client
           .from('item_images')
@@ -2829,9 +2887,21 @@ export class ApiService {
           if (!item) return null;
           const firstImg = imagesByItem[fav.item_id]?.[0];
           const chosenUrl = firstImg?.image_url || firstImg?.thumbnail_url || null;
+          const categoryRelation = item.categories ?? null;
+          const categoryNameEn = item.category_name_en ?? categoryRelation?.title_en ?? null;
+          const categoryNameKa = item.category_name_ka ?? categoryRelation?.title_ka ?? null;
           return {
             ...item,
             image_url: chosenUrl,
+            category: item.category ?? categoryRelation ?? null,
+            categories: categoryRelation ?? item.categories ?? null,
+            category_name:
+              item.category_name ??
+              categoryNameEn ??
+              categoryNameKa ??
+              null,
+            category_name_en: categoryNameEn,
+            category_name_ka: categoryNameKa,
           };
         })
         .filter(Boolean);

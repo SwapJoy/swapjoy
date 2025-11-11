@@ -73,6 +73,7 @@ interface TopMatchCardProps {
   title: string;
   price: string;
   description?: string;
+  descriptionLines?: number;
   category?: string;
   condition?: string;
   imageUrl?: string;
@@ -92,6 +93,7 @@ const TopMatchCard: React.FC<TopMatchCardProps> = ({
   title,
   price,
   description,
+  descriptionLines,
   category,
   condition,
   imageUrl,
@@ -185,7 +187,11 @@ const TopMatchCard: React.FC<TopMatchCardProps> = ({
         </Text>
 
         {description ? (
-          <Text style={styles.description} numberOfLines={3} ellipsizeMode="tail">
+          <Text
+            style={styles.description}
+            numberOfLines={descriptionLines ?? 3}
+            ellipsizeMode="tail"
+          >
             {description}
           </Text>
         ) : null}

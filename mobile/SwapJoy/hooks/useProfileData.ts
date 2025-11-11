@@ -24,6 +24,10 @@ export interface UserItem {
   condition: string;
   image_url?: string;
   category_name?: string;
+  category_name_en?: string;
+  category_name_ka?: string;
+  category?: any; // eslint-disable-line @typescript-eslint/no-explicit-any
+  categories?: any; // eslint-disable-line @typescript-eslint/no-explicit-any
   created_at: string;
 }
 
@@ -73,6 +77,15 @@ export const useProfileData = (targetUserId?: string) => {
       currency: item.currency ?? 'USD',
       condition: item.condition ?? 'unknown',
       image_url: item.image_url ?? undefined,
+      category: item.category ?? item.categories ?? null,
+      categories: item.categories ?? null,
+      category_name:
+        item.category_name ??
+        item.category_name_en ??
+        item.category_name_ka ??
+        undefined,
+      category_name_en: item.category_name_en ?? undefined,
+      category_name_ka: item.category_name_ka ?? undefined,
       created_at: item.created_at ?? new Date().toISOString(),
     }));
   }, [favoriteItems]);
@@ -255,6 +268,15 @@ export const useProfileData = (targetUserId?: string) => {
             currency: item.currency,
             condition: item.condition,
             image_url: item.image_url,
+            category: item.category ?? item.categories ?? null,
+            categories: item.categories ?? null,
+            category_name:
+              item.category_name ??
+              item.category_name_en ??
+              item.category_name_ka ??
+              null,
+            category_name_en: item.category_name_en ?? null,
+            category_name_ka: item.category_name_ka ?? null,
             created_at: item.created_at,
           }));
           setUserItems(formatted);
@@ -304,6 +326,15 @@ export const useProfileData = (targetUserId?: string) => {
           currency: item.currency,
           condition: item.condition,
           image_url: item.image_url,
+          category: item.category ?? item.categories ?? null,
+          categories: item.categories ?? null,
+          category_name:
+            item.category_name ??
+            item.category_name_en ??
+            item.category_name_ka ??
+            null,
+          category_name_en: item.category_name_en ?? null,
+          category_name_ka: item.category_name_ka ?? null,
           created_at: item.updated_at || item.created_at,
         }));
         setDraftItems(formattedDrafts);

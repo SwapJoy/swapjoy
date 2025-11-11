@@ -142,7 +142,6 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
   const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
   
   const [uploading, setUploading] = useState(false);
-  const [allUploaded, setAllUploaded] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
   
   const [isSaving, setIsSaving] = useState(false);
@@ -234,10 +233,6 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
 
     if (imagesToUpload.length === 0) {
       setUploading(false);
-      setAllUploaded(
-        loadedDraft.images.length > 0 &&
-          loadedDraft.images.every((img) => img.uploaded)
-      );
       return;
     }
 
@@ -279,12 +274,6 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
     const latestDraft = await DraftManager.getDraft(draftId);
     if (latestDraft) {
       setDraft(latestDraft);
-      setAllUploaded(
-        latestDraft.images.length > 0 &&
-          latestDraft.images.every((img) => img.uploaded)
-      );
-    } else {
-      setAllUploaded(false);
     }
     setUploading(false);
   }, [draftId, imageUris]);
@@ -403,10 +392,6 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
             const { [imageId]: _removed, ...rest } = prev;
             return rest;
           });
-          setAllUploaded(
-            updatedDraft.images.length > 0 &&
-              updatedDraft.images.every((img) => img.uploaded)
-          );
         }
       } catch (error) {
         console.error('Error removing draft image:', error);
@@ -447,7 +432,12 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
       Alert.alert(strings.alerts.missingInfoTitle, strings.alerts.missingLocation);
       return;
     }
-    if (!allUploaded) {
+    const hasImages =
+      draft?.images && draft.images.length > 0;
+    const pendingUploads =
+      draft?.images?.some((img) => !img.uploaded || !img.supabaseUrl) ?? true;
+
+    if (!hasImages || pendingUploads) {
       Alert.alert(strings.alerts.uploadingImagesTitle, strings.alerts.uploadingImagesMessage);
       return;
     }

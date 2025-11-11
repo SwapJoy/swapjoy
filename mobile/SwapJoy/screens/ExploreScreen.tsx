@@ -121,6 +121,11 @@ const AIOfferCardItem: React.FC<AIOfferCardItemProps> = memo(
       (item as any)?.updated_at ?? // eslint-disable-line @typescript-eslint/no-explicit-any
       null;
 
+    const itemExtras = item as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+    const categoryNameEn = itemExtras?.category_name_en ?? null;
+    const categoryNameKa = itemExtras?.category_name_ka ?? null;
+    const categoriesData = itemExtras?.categories ?? null;
+
     const favoriteData = {
       id: item.id,
       title: item.title,
@@ -130,6 +135,16 @@ const AIOfferCardItem: React.FC<AIOfferCardItemProps> = memo(
       condition: item.condition,
       image_url: item.image_url,
       created_at: createdAt,
+      category_name:
+        itemExtras?.category_name ??
+        categoryNameEn ??
+        categoryNameKa ??
+        resolvedCategory ??
+        null,
+      category_name_en: categoryNameEn,
+      category_name_ka: categoryNameKa,
+      category: item.category ?? categoriesData ?? null,
+      categories: categoriesData,
     };
 
     return (
@@ -198,6 +213,16 @@ const RecentItemCardItem: React.FC<RecentItemCardProps> = memo(({ item, navigati
     condition: item.condition,
     image_url: item.image_url,
     created_at: item.created_at || item.updated_at || null,
+    category_name:
+      item.category_name ??
+      item.category_name_en ??
+      item.category_name_ka ??
+      categoryLabel ??
+      null,
+    category_name_en: item.category_name_en ?? null,
+    category_name_ka: item.category_name_ka ?? null,
+    category: item.category ?? item.categories ?? null,
+    categories: item.categories ?? null,
   };
 
   const ownerHandle = item.user?.username || item.user?.first_name || undefined;
@@ -226,159 +251,6 @@ const RecentItemCardItem: React.FC<RecentItemCardProps> = memo(({ item, navigati
     />
   );
 });
-
-interface GridItemCardProps {
-  item: any; // eslint-disable-line @typescript-eslint/no-explicit-any
-  index: number;
-  navigation: ExploreScreenProps['navigation'];
-  language: string;
-  t: ReturnType<typeof useExploreScreenState>['t'];
-}
-
-const GridItemCardItem: React.FC<GridItemCardProps> = memo(
-  ({ item, index, navigation, language, t }) => {
-    const resolvedLanguage = language as AppLanguage;
-    const chips: ItemCardChip[] = [];
-    const conditionChip = getConditionPresentation({
-      condition: item.condition,
-      language: resolvedLanguage,
-      translate: t,
-    });
-
-    const categoryLabel = resolveCategoryName(item, resolvedLanguage);
-    if (categoryLabel) {
-      chips.push({ label: categoryLabel, backgroundColor: '#e2e8f0', textColor: '#0f172a' });
-    }
-
-    const formattedPrice = formatCurrency(
-      item.price || item.estimated_value || 0,
-      item.currency || 'USD'
-    );
-
-    const favoriteData = {
-      id: item.id,
-      title: item.title,
-      description: item.description,
-      price: item.price || item.estimated_value || 0,
-      currency: item.currency || 'USD',
-      condition: item.condition,
-      image_url: item.image_url,
-      created_at: item.created_at || item.updated_at || null,
-    };
-
-    const ownerHandle = item.user?.username || item.user?.first_name || undefined;
-
-    return (
-      <ItemCard
-        title={item.title}
-        description={item.description}
-        priceLabel={formattedPrice}
-        imageUri={item.image_url}
-        chips={chips}
-        onPress={() => (navigation as any).navigate('ItemDetails', { itemId: item.id })} // eslint-disable-line @typescript-eslint/no-explicit-any
-        variant="grid"
-        style={[
-          styles.gridItem,
-          index % 2 === 0 ? styles.gridItemLeft : styles.gridItemRight,
-        ]}
-        ownerHandle={ownerHandle}
-        conditionBadge={
-          conditionChip
-            ? {
-                label: conditionChip.label,
-                backgroundColor: conditionChip.backgroundColor,
-                textColor: conditionChip.textColor,
-              }
-            : undefined
-        }
-        favoriteButton={<FavoriteToggleButton itemId={item.id} item={favoriteData} size={18} />}
-      />
-    );
-  }
-);
-
-interface SearchResultCardProps {
-  item: any; // eslint-disable-line @typescript-eslint/no-explicit-any
-  index: number;
-  navigation: ExploreScreenProps['navigation'];
-  language: string;
-  t: ReturnType<typeof useExploreScreenState>['t'];
-  searchStrings: ReturnType<typeof useExploreScreenState>['searchStrings'];
-  categoryFallback: string;
-}
-
-const SearchResultCardItem: React.FC<SearchResultCardProps> = memo(
-  ({ item, index, navigation, language, t, searchStrings, categoryFallback }) => {
-    const resolvedLanguage = language as AppLanguage;
-    const imageUrl = item?.item_images?.[0]?.image_url || item?.image_url || null;
-    const resolvedCategory =
-      resolveCategoryName(item, resolvedLanguage) || categoryFallback;
-    const similarityLabel =
-      typeof item?.similarity === 'number'
-        ? `${Math.round((item.similarity || 0) * 100)}%`
-        : null;
-
-    const formattedPrice =
-      item?.price != null ? formatCurrency(item.price, item.currency || 'USD') : undefined;
-
-    const chips: ItemCardChip[] = [];
-    if (resolvedCategory) {
-      chips.push({ label: resolvedCategory, backgroundColor: '#e2e8f0', textColor: '#0f172a' });
-    }
-
-    let conditionBadge: ItemCardChip | undefined;
-    if (item.condition) {
-      const badge = getConditionPresentation({
-        condition: item.condition,
-          language: resolvedLanguage,
-        translate: t,
-      });
-      if (badge) {
-        conditionBadge = {
-          label: badge.label,
-          backgroundColor: badge.backgroundColor,
-          textColor: badge.textColor,
-        };
-      }
-    }
-
-    const favoriteData = {
-      id: item.id,
-      title: item.title,
-      description: item.description,
-      price: item.price || item.estimated_value || 0,
-      currency: item.currency || 'USD',
-      condition: item.condition,
-      image_url: imageUrl,
-      created_at: item.created_at || item.updated_at || null,
-    };
-
-    const ownerHandle =
-      item.user?.username || item.username || item.users?.username || undefined;
-
-    return (
-      <ItemCard
-        key={item.id}
-        title={item.title}
-        description={item.description}
-        priceLabel={formattedPrice}
-        metaRightLabel={similarityLabel}
-        imageUri={imageUrl}
-        placeholderLabel={searchStrings.noImage}
-        chips={chips}
-        onPress={() => (navigation as any).navigate('ItemDetails', { itemId: item.id })} // eslint-disable-line @typescript-eslint/no-explicit-any
-        variant="grid"
-        style={[
-          styles.searchGridItem,
-          index % 2 === 0 ? styles.searchGridItemLeft : styles.searchGridItemRight,
-        ]}
-        ownerHandle={ownerHandle}
-        conditionBadge={conditionBadge}
-        favoriteButton={<FavoriteToggleButton itemId={item.id} item={favoriteData} size={18} />}
-      />
-    );
-  }
-);
 
 const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
   const rootNavigation = useNavigation<NavigationProp<RootStackParamList>>();
@@ -471,33 +343,126 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
     [language, navigation, t]
   );
 
-  const renderGridItem = useCallback(
-    ({ item, index }: { item: any; index: number }) => (
-      <GridItemCardItem
-        item={item}
-        index={index}
-        navigation={navigation}
-        language={language}
-        t={t}
-      />
-    ),
+  const renderItemCard = useCallback(
+    (
+      item: any, // eslint-disable-line @typescript-eslint/no-explicit-any
+      index: number,
+      options?: {
+        placeholderLabel?: string;
+        categoryFallback?: string;
+        metaRightLabel?: string | null;
+      }
+    ) => {
+      const resolvedLanguage = language as AppLanguage;
+      const chips: ItemCardChip[] = [];
+      const conditionChip = getConditionPresentation({
+        condition: item.condition,
+        language: resolvedLanguage,
+        translate: t,
+      });
+
+      const imageUrl =
+        item.image_url ||
+        item?.item_images?.[0]?.image_url ||
+        item?.images?.[0]?.image_url ||
+        null;
+
+      const fallbackCategory =
+        typeof options?.categoryFallback === 'string' ? options.categoryFallback : undefined;
+
+      const categoryLabel =
+        resolveCategoryName(item, resolvedLanguage) ||
+        (typeof item.category_name === 'string' ? item.category_name : undefined) ||
+        (typeof item.category === 'string' ? item.category.trim() : undefined) ||
+        fallbackCategory;
+      if (categoryLabel) {
+        chips.push({ label: categoryLabel, backgroundColor: '#e2e8f0', textColor: '#0f172a' });
+      }
+
+      const formattedPrice = formatCurrency(
+        item.price || item.estimated_value || 0,
+        item.currency || 'USD'
+      );
+
+      const favoriteData = {
+        id: item.id,
+        title: item.title,
+        description: item.description,
+        price: item.price || item.estimated_value || 0,
+        currency: item.currency || 'USD',
+        condition: item.condition,
+        image_url: imageUrl,
+        created_at: item.created_at || item.updated_at || null,
+        category_name:
+          item.category_name ??
+          item.category_name_en ??
+          item.category_name_ka ??
+          categoryLabel ??
+          fallbackCategory ??
+          null,
+        category_name_en: item.category_name_en ?? null,
+        category_name_ka: item.category_name_ka ?? null,
+        category: item.category ?? item.categories ?? null,
+        categories: item.categories ?? null,
+      };
+
+      const ownerHandle = item.user?.username || item.user?.first_name || undefined;
+      const resolvedMetaRight =
+        options?.metaRightLabel !== undefined
+          ? options.metaRightLabel
+          : typeof item.similarity === 'number'
+            ? `${Math.round((item.similarity || 0) * 100)}%`
+            : null;
+      const resolvedPlaceholder = options?.placeholderLabel || item.placeholderLabel || 'No image';
+
+      return (
+        <ItemCard
+          title={item.title}
+          description={item.description}
+          priceLabel={formattedPrice}
+          metaRightLabel={resolvedMetaRight || undefined}
+          imageUri={imageUrl}
+          placeholderLabel={resolvedPlaceholder}
+          chips={chips}
+          onPress={() => (navigation as any).navigate('ItemDetails', { itemId: item.id })} // eslint-disable-line @typescript-eslint/no-explicit-any
+          variant="grid"
+          style={[
+            styles.gridItem,
+            index % 2 === 0 ? styles.gridItemLeft : styles.gridItemRight,
+          ]}
+          ownerHandle={ownerHandle}
+          conditionBadge={
+            conditionChip
+              ? {
+                  label: conditionChip.label,
+                  backgroundColor: conditionChip.backgroundColor,
+                  textColor: conditionChip.textColor,
+                }
+              : undefined
+          }
+          favoriteButton={<FavoriteToggleButton itemId={item.id} item={favoriteData} size={18} />}
+        />
+      );
+    },
     [language, navigation, t]
   );
 
+  const renderGridItem = useCallback(
+    ({ item, index }: { item: any; index: number }) => renderItemCard(item, index),
+    [renderItemCard]
+  );
+
   const renderSearchResult = useCallback(
-    ({ item, index }: { item: any; index: number }) => (
-      <SearchResultCardItem
-        key={item?.id ?? `search-result-${index}`}
-        item={item}
-        index={index}
-        navigation={navigation}
-        language={language}
-        t={t}
-        searchStrings={searchStrings}
-        categoryFallback={strings.labels.categoryFallback}
-      />
-    ),
-    [language, navigation, searchStrings, strings.labels.categoryFallback, t]
+    ({ item, index }: { item: any; index: number }) =>
+      renderItemCard(item, index, {
+        placeholderLabel: searchStrings.noImage,
+        categoryFallback: strings.labels.categoryFallback,
+        metaRightLabel:
+          typeof item?.similarity === 'number'
+            ? `${Math.round((item.similarity || 0) * 100)}%`
+            : null,
+      }),
+    [renderItemCard, searchStrings.noImage, strings.labels.categoryFallback]
   );
 
   const renderFooter = useCallback(() => {
@@ -581,11 +546,16 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
                       <Text style={styles.searchStatusSubtitle}>{searchStrings.noResultsSubtitle}</Text>
                     </View>
                   ) : (
-                    <View style={styles.searchResultsGrid}>
-                      {searchResults.map((item, index) =>
-                        renderSearchResult({ item, index })
-                      )}
-                    </View>
+                    <FlatList
+                      data={searchResults}
+                      renderItem={renderSearchResult}
+                      keyExtractor={(item, index) => item?.id ?? `search-result-${index}`}
+                      numColumns={2}
+                      columnWrapperStyle={styles.gridRow}
+                      contentContainerStyle={styles.searchResultsContent}
+                      scrollEnabled={false}
+                      removeClippedSubviews={false}
+                    />
                   )}
                   {searchError ? <Text style={styles.searchErrorText}>{searchError}</Text> : null}
                 </View>
@@ -886,11 +856,9 @@ const styles = StyleSheet.create({
   searchResultsContainer: {
     marginTop: 16,
   },
-  searchResultsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginTop: 8,
+  searchResultsContent: {
+    paddingTop: 8,
+    paddingBottom: 4,
   },
   searchStatusContainer: {
     paddingVertical: 16,
@@ -1218,6 +1186,10 @@ const styles = StyleSheet.create({
     width: ITEM_WIDTH * 0.9,
     marginRight: 16,
   },
+  gridRow: {
+    justifyContent: 'space-between',
+    width: '100%',
+  },
   gridItem: {
     width: GRID_ITEM_WIDTH,
     marginBottom: 18,
@@ -1229,16 +1201,6 @@ const styles = StyleSheet.create({
   gridItemRight: {
     marginLeft: 10,
     marginRight: 20,
-  },
-  searchGridItem: {
-    width: GRID_ITEM_WIDTH,
-    marginBottom: 18,
-  },
-  searchGridItemLeft: {
-    marginRight: 10,
-  },
-  searchGridItemRight: {
-    marginLeft: 10,
   },
   footerLoader: {
     width: '100%',

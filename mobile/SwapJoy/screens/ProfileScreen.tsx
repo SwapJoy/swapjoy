@@ -11,14 +11,20 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ProfileScreenProps } from '../types/navigation';
 import { useProfileData } from '../hooks/useProfileData';
 import CachedImage from '../components/CachedImage';
+import ItemCard, { ItemCardChip } from '../components/ItemCard';
+import FavoriteToggleButton from '../components/FavoriteToggleButton';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { FlatList, Dimensions, Alert } from 'react-native';
 import { ApiService } from '../services/api';
 import { formatCurrency } from '../utils';
 import { useLocalization } from '../localization';
+import { getConditionPresentation } from '../utils/conditions';
+import { resolveCategoryName } from '../utils/category';
+import type { AppLanguage } from '../types/language';
+import { DEFAULT_LANGUAGE } from '../types/language';
 
 const FollowButton: React.FC<{ targetUserId: string }> = ({ targetUserId }) => {
-  const { t } = useLocalization();
+  const { t, language } = useLocalization();
   const [loading, setLoading] = useState(false);
   const [isFollowing, setIsFollowing] = useState<boolean>(false);
 
@@ -177,23 +183,33 @@ const StatsSkeleton = memo(() => (
 
 // Grid Items Skeleton
 const GridItemsSkeleton = memo(() => {
-  const numColumns = 3;
   const screenWidth = Dimensions.get('window').width;
-  const gridSpacing = 2;
-  const itemSize: number = Math.floor((screenWidth - gridSpacing * (numColumns - 1)) / numColumns);
+  const cardWidth = Math.floor((screenWidth - 60) / 2);
+  const cardHeight = Math.round(cardWidth * 1.5);
   const skeletonItems = Array.from({ length: 6 }, (_, i) => i);
 
+  const imageHeight = Math.round(cardHeight * 0.65);
+
   return (
-    <View style={styles.gridList}>
+    <View style={styles.gridListContent}>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
-        {skeletonItems.map((item) => {
-          const itemHeight = itemSize * 1.7;
-          return (
-            <View key={item} style={{ width: itemSize, height: itemHeight, marginBottom: 2 }}>
-              <SkeletonLoader width="100%" height="100%" borderRadius={0} />
+        {skeletonItems.map((item, index) => (
+          <View
+            key={item}
+            style={[
+              styles.gridCard,
+              { width: cardWidth, height: cardHeight, marginBottom: 18 },
+              index % 2 === 0 ? styles.gridCardLeft : styles.gridCardRight,
+            ]}
+          >
+            <SkeletonLoader width="100%" height={imageHeight} borderRadius={18} />
+            <View style={{ marginTop: 12, gap: 8 }}>
+              <SkeletonLoader width="70%" height={16} borderRadius={8} />
+              <SkeletonLoader width="50%" height={14} borderRadius={7} />
+              <SkeletonLoader width="80%" height={12} borderRadius={6} />
             </View>
-          );
-        })}
+          </View>
+        ))}
       </View>
     </View>
   );
@@ -203,7 +219,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const viewedUserId: string | undefined = (route as any)?.name === 'UserProfile' ? (route as any)?.params?.userId : undefined;
-  const { t } = useLocalization();
+  const { t, language } = useLocalization();
   const {
     user,
     profile,
@@ -287,13 +303,8 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
     return loadingDraftItems;
   }, [activeTab, isViewingOtherUser, loadingPublishedItems, loadingSavedItems, loadingDraftItems]);
 
-  const numColumns = 3;
   const screenWidth = Dimensions.get('window').width;
-  const gridSpacing = 2;
-  const itemSize = useMemo(() => {
-    const horizontalPadding = 0;
-    return Math.floor((screenWidth - horizontalPadding - gridSpacing * (numColumns - 1)) / numColumns);
-  }, [screenWidth]);
+  const gridCardWidth = useMemo(() => Math.floor((screenWidth - 60) / 2), [screenWidth]);
 
 
   const renderStatItem = useCallback((title: string, value: string | number, subtitle?: string) => (
@@ -306,48 +317,95 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
 
   // removed unused renderProfileItem helper
 
-  const renderGridItem = useCallback(({ item }: { item: any }) => (
-    <TouchableOpacity
-      activeOpacity={0.8}
-      onPress={() => navigation.navigate('ItemDetails', { itemId: item.id })}
-      style={[styles.gridItem, { width: itemSize, height: itemSize * 1.7 }]}
-    > 
-      <CachedImage
-        uri={item.image_url || ''}
-        style={styles.gridImage}
-        resizeMode="cover"
-        fallbackUri={'https://via.placeholder.com/300?text=No+Image'}
-        defaultSource={require('../assets/icon.png')}
-      />
-      <View style={styles.gridMetaBar}>
-        <Text style={styles.gridMetaText} numberOfLines={1}>{item.title || t('profileScreen.grid.untitled')}</Text>
-        {typeof item.price !== 'undefined' && item.price !== null && (
-          <Text style={styles.gridMetaPrice}>{formatCurrency(Number(item.price), item.currency || 'USD').replace(/\.00$/, '')}</Text>
-        )}
-      </View>
-    </TouchableOpacity>
-  ), [itemSize, navigation, t]);
+  const renderGridItem = useCallback(
+    ({ item, index }: { item: any; index: number }) => {
+      const resolvedLanguage = (language ?? DEFAULT_LANGUAGE) as AppLanguage;
+      const chips: ItemCardChip[] = [];
+      const categoryLabel =
+        resolveCategoryName(item, resolvedLanguage) ||
+        (typeof item.category_name === 'string' ? item.category_name : undefined);
+      if (categoryLabel) {
+        chips.push({ label: categoryLabel, backgroundColor: '#e2e8f0', textColor: '#0f172a' });
+      }
+
+      const conditionPresentation = getConditionPresentation({
+        condition: item.condition,
+        language: resolvedLanguage,
+        translate: t,
+      });
+
+      const priceLabel =
+        typeof item.price === 'number'
+          ? formatCurrency(Number(item.price), item.currency || 'USD')
+          : undefined;
+
+      const favoriteData = {
+        id: item.id,
+        title: item.title,
+        description: item.description,
+        price: item.price,
+        currency: item.currency,
+        condition: item.condition,
+        image_url: item.image_url,
+        category: item.category ?? item.categories ?? null,
+        categories: item.categories ?? null,
+        category_name:
+          item.category_name ??
+          (item as any)?.category_name_en ?? // eslint-disable-line @typescript-eslint/no-explicit-any
+          (item as any)?.category_name_ka ?? // eslint-disable-line @typescript-eslint/no-explicit-any
+          categoryLabel ??
+          undefined,
+        category_name_en: (item as any)?.category_name_en ?? undefined, // eslint-disable-line @typescript-eslint/no-explicit-any
+        category_name_ka: (item as any)?.category_name_ka ?? undefined, // eslint-disable-line @typescript-eslint/no-explicit-any
+        created_at: item.created_at,
+      };
+
+      return (
+        <ItemCard
+          title={item.title || t('profileScreen.grid.untitled')}
+          description={item.description}
+          priceLabel={priceLabel}
+          imageUri={item.image_url}
+          placeholderLabel="No image"
+          variant="grid"
+          style={[
+            styles.gridCard,
+            { width: gridCardWidth },
+            index % 2 === 0 ? styles.gridCardLeft : styles.gridCardRight,
+          ]}
+          chips={chips}
+          conditionBadge={
+            conditionPresentation
+              ? {
+                  label: conditionPresentation.label,
+                  backgroundColor: conditionPresentation.backgroundColor,
+                  textColor: conditionPresentation.textColor,
+                }
+              : undefined
+          }
+          favoriteButton={<FavoriteToggleButton itemId={item.id} item={favoriteData} size={18} />}
+          onPress={() => navigation.navigate('ItemDetails', { itemId: item.id })}
+        />
+      );
+    },
+    [gridCardWidth, language, navigation, t]
+  );
 
   return (
     <View style={styles.container}>
       <FlatList
         data={gridData}
         keyExtractor={(it) => it.id}
-        numColumns={3}
+        numColumns={2}
         renderItem={renderGridItem}
-        columnWrapperStyle={{ justifyContent: 'space-between', marginBottom: 2 }}
-        contentContainerStyle={styles.gridList}
+        columnWrapperStyle={styles.gridRow}
+        contentContainerStyle={styles.gridListContent}
         showsVerticalScrollIndicator={false}
-        initialNumToRender={18}
+        initialNumToRender={12}
         windowSize={7}
         removeClippedSubviews
-        maxToRenderPerBatch={24}
+        maxToRenderPerBatch={20}
         updateCellsBatchingPeriod={50}
-        getItemLayout={(_, index) => {
-          const row = Math.floor(index / 3);
-          const rowHeight = itemSize * 1.7 + 2; // item height + spacing
-          return { length: rowHeight, offset: row * rowHeight, index };
-        }}
         ListHeaderComponent={(
           <View>
             {/* Profile Header with Integrated Stats */}
@@ -869,39 +927,24 @@ const styles = StyleSheet.create({
     color: '#007AFF',
     fontWeight: '700',
   },
-  gridList: {
+  gridListContent: {
     paddingTop: 6,
+    paddingBottom: 120,
   },
-  gridItem: {
-    backgroundColor: '#fff',
-    overflow: 'hidden',
-  },
-  gridImage: {
-    width: '100%',
-    height: '100%',
-  },
-  gridMetaBar: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 24,
-    backgroundColor: 'rgba(0,0,0,0.35)',
-    flexDirection: 'row',
-    alignItems: 'center',
+  gridRow: {
     justifyContent: 'space-between',
-    paddingHorizontal: 6,
+    marginBottom: 0,
   },
-  gridMetaText: {
-    color: '#fff',
-    fontSize: 11,
-    flex: 1,
-    marginRight: 6,
+  gridCard: {
+    marginBottom: 18,
   },
-  gridMetaPrice: {
-    color: '#fff',
-    fontSize: 11,
-    fontWeight: '700',
+  gridCardLeft: {
+    marginLeft: 20,
+    marginRight: 10,
+  },
+  gridCardRight: {
+    marginLeft: 10,
+    marginRight: 20,
   },
   followButtonContainer: {
     paddingHorizontal: 20,

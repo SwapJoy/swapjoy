@@ -50,13 +50,22 @@ export const getConditionPresentation = ({
 }: ConditionPresentationOptions): ConditionPresentation | null => {
   const key = normalizeConditionKey(condition ?? undefined);
 
+  const normalizedCondition = (condition ?? '').toString().replace(/_/g, ' ').trim();
+  const defaultLabel = capitalizeWords(normalizedCondition);
+
   if (!key) {
-    return null;
+    if (!normalizedCondition) {
+      return null;
+    }
+
+    return {
+      label: defaultLabel || translate('explore.conditions.unknown', { defaultValue: 'Unknown' }),
+      backgroundColor: '#e2e8f0',
+      textColor: '#0f172a',
+    };
   }
 
-  const defaultLabel = capitalizeWords((condition ?? '').replace(/_/g, ' ').trim());
   const label = translate(`explore.conditions.${key}`, { defaultValue: defaultLabel });
-
   const styling = CONDITION_STYLES[key];
 
   return {

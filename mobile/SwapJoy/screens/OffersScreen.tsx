@@ -1,4 +1,4 @@
-import React, { memo, useMemo, useState, useCallback, useEffect, useRef } from 'react';
+import React, { memo, useMemo, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,16 +8,21 @@ import {
   RefreshControl,
   Dimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { OffersScreenProps } from '../types/navigation';
 import { useOffersData, Offer } from '../hooks/useOffersData';
 import { useLocalization } from '../localization';
+import TopMatchCard, { TopMatchCardSkeleton } from '../components/TopMatchCard';
+import { formatCurrency } from '../utils';
+import { resolveCategoryName } from '../utils/category';
+import type { AppLanguage } from '../types/language';
+import { DEFAULT_LANGUAGE } from '../types/language';
 
 const { width } = Dimensions.get('window');
+const noop = () => {};
 
 const OffersScreen: React.FC<OffersScreenProps> = memo(({ route }) => {
   const { sentOffers, receivedOffers, loading, refreshing, onRefresh, getStatusColor, getStatusText } = useOffersData();
-  const { t } = useLocalization();
+  const { t, language } = useLocalization();
   const strings = useMemo(
     () => ({
       tabs: {
@@ -38,22 +43,15 @@ const OffersScreen: React.FC<OffersScreenProps> = memo(({ route }) => {
       emptySentSubtitle: t('offers.list.emptySentSubtitle'),
       emptyReceivedTitle: t('offers.list.emptyReceivedTitle'),
       emptyReceivedSubtitle: t('offers.list.emptyReceivedSubtitle'),
+      evenSwap: t('offers.preview.evenSwap'),
+      youOffer: t('offers.preview.youOffer'),
+      youWant: t('offers.preview.youWant'),
     }),
     [t]
   );
   const [activeTab, setActiveTab] = useState<'sent' | 'received'>((route?.params as any)?.initialTab ?? 'sent');
 
   const data = activeTab === 'sent' ? sentOffers : receivedOffers;
-
-  const formatTopUp = useCallback(
-    (amount: number) => {
-      const formatted = `$${Math.abs(amount).toFixed(2)}`;
-      return amount > 0
-        ? strings.topUpYouAdd.replace('{amount}', formatted)
-        : strings.topUpTheyAdd.replace('{amount}', formatted);
-    },
-    [strings.topUpTheyAdd, strings.topUpYouAdd]
-  );
 
   const formatUserLabel = useCallback(
     (username: string, isSent: boolean) =>
@@ -66,105 +64,159 @@ const OffersScreen: React.FC<OffersScreenProps> = memo(({ route }) => {
     [strings.moreItems]
   );
 
-  const OfferRow = React.memo(({ item }: { item: Offer }) => (
-    <TouchableOpacity style={styles.offerCard}>
-      <View style={styles.offerHeader}>
-        <Text style={styles.offerType}>
-          {activeTab === 'sent' ? strings.types.sent : strings.types.received}
-        </Text>
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
-          <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
-        </View>
-      </View>
-      
-      <View style={styles.offerContent}>
-        <Text style={styles.offerMessage} numberOfLines={2}>
-          {item.message || strings.noMessage}
-        </Text>
-        
-        {!!item.top_up_amount && item.top_up_amount !== 0 && (
-          <Text style={styles.topUpAmount}>
-            {formatTopUp(item.top_up_amount)}
-          </Text>
-        )}
-        
-        <View style={styles.itemsContainer}>
-          {item.offer_items?.slice(0, 3).map((offerItem: any, index: number) => (
-            <View key={index} style={styles.itemPreview}>
-              <Text style={styles.itemTitle} numberOfLines={1}>
-                {offerItem.item?.title || ''}
+  const OfferRow = React.memo(
+    ({ item }: { item: Offer }) => {
+      const isSent = activeTab === 'sent';
+      const resolvedLanguage = (language ?? DEFAULT_LANGUAGE) as AppLanguage;
+      const entries = Array.isArray(item.offer_items) ? item.offer_items : [];
+      const requestedItems = entries.filter((entry: any) => entry?.side === 'requested');
+      const offeredItems = entries.filter((entry: any) => entry?.side === 'offered');
+      const primaryCollection = (isSent ? requestedItems : offeredItems).filter((entry: any) => entry?.item);
+      const fallbackCollection = (isSent ? offeredItems : requestedItems).filter((entry: any) => entry?.item);
+      const primaryItem = primaryCollection[0]?.item || fallbackCollection[0]?.item || undefined;
+
+      const imageUrl =
+        primaryItem?.item_images?.[0]?.image_url ||
+        primaryItem?.image_url ||
+        undefined;
+
+      const category =
+        primaryItem
+          ? resolveCategoryName(primaryItem, resolvedLanguage) ||
+            (typeof primaryItem.category_name === 'string' ? primaryItem.category_name : undefined) ||
+            (typeof primaryItem.category === 'string' ? primaryItem.category : undefined)
+          : undefined;
+
+      const primaryPrice =
+        typeof primaryItem?.price === 'number'
+          ? formatCurrency(primaryItem.price, primaryItem.currency || 'USD')
+          : null;
+
+      const fallbackCurrency =
+        primaryItem?.currency ||
+        primaryItem?.item_currency ||
+        'USD';
+
+      const topUpAmount = item.top_up_amount ?? 0;
+      const topUpAbs = Math.abs(topUpAmount);
+      const topUpText =
+        topUpAmount === 0
+          ? strings.evenSwap
+          : topUpAmount > 0
+            ? strings.topUpYouAdd.replace('{amount}', formatCurrency(topUpAbs, fallbackCurrency))
+            : strings.topUpTheyAdd.replace('{amount}', formatCurrency(topUpAbs, fallbackCurrency));
+
+      const priceLabel =
+        primaryPrice ??
+        (topUpAmount !== 0 ? formatCurrency(topUpAbs, fallbackCurrency) : strings.evenSwap);
+
+      const otherUser = isSent ? item.receiver : item.sender;
+      const displayNameParts = [
+        otherUser?.first_name ?? '',
+        otherUser?.last_name ?? '',
+      ].filter(Boolean);
+      const displayName = displayNameParts.join(' ') || otherUser?.username || '';
+      const initialsSource = displayName || otherUser?.username || '?';
+      const ownerInitials =
+        initialsSource
+          .split(' ')
+          .map((part) => part.charAt(0))
+          .join('')
+          .slice(0, 2)
+          .toUpperCase() || '?';
+
+      const description =
+        item.message && item.message.trim().length > 0 ? item.message : strings.noMessage;
+
+      const youGiveItems = isSent ? offeredItems : requestedItems;
+      const youReceiveItems = isSent ? requestedItems : offeredItems;
+
+      const statusColor = getStatusColor(item.status);
+      const statusText = getStatusText(item.status);
+      const userLabel = formatUserLabel(otherUser?.username || displayName || '', isSent);
+      const createdAtLabel = new Date(item.created_at).toLocaleDateString();
+
+      const renderItemsList = (list: any[]) => {
+        const titles = list
+          .map((entry) => entry?.item?.title)
+          .filter((title): title is string => Boolean(title && title.trim().length > 0));
+
+        if (titles.length === 0) {
+          return <Text style={styles.offerItemEmpty}>—</Text>;
+        }
+
+        const visible = titles.slice(0, 2);
+        const remaining = titles.length - visible.length;
+
+        return (
+          <View style={styles.offerItemsList}>
+            {visible.map((title, idx) => (
+              <Text key={`${title}-${idx}`} style={styles.offerItemText} numberOfLines={1}>
+                • {title}
               </Text>
+            ))}
+            {remaining > 0 ? (
+              <Text style={styles.offerMoreItems}>{formatMoreItems(remaining)}</Text>
+            ) : null}
+          </View>
+        );
+      };
+
+      return (
+        <TopMatchCard
+          title={primaryItem?.title || strings.types[isSent ? 'sent' : 'received']}
+          price={priceLabel}
+          description={description}
+          descriptionLines={2}
+          category={category}
+          condition={primaryItem?.condition}
+          imageUrl={imageUrl}
+          owner={{
+            username: otherUser?.username || displayName,
+            displayName,
+            initials: ownerInitials,
+          }}
+          onPress={noop}
+          disableLikeButton
+          containerStyle={styles.offerCard}
+          swapSuggestions={
+            <View style={styles.offerMetaSection}>
+              <View style={styles.offerMetaHeader}>
+                <View style={[styles.statusBadge, { backgroundColor: statusColor }]}>
+                  <Text style={styles.statusText}>{statusText}</Text>
+                </View>
+                <Text style={styles.offerMetaUser} numberOfLines={1}>
+                  {userLabel}
+                </Text>
+                <Text style={styles.offerMetaDate}>{createdAtLabel}</Text>
+              </View>
+              <View style={styles.offerMetaRow}>
+                <Text style={styles.offerMetaLabel}>{strings.youOffer}</Text>
+                <View style={styles.offerMetaContent}>{renderItemsList(youGiveItems)}</View>
+              </View>
+              <View style={styles.offerMetaRow}>
+                <Text style={styles.offerMetaLabel}>{strings.youWant}</Text>
+                <View style={styles.offerMetaContent}>{renderItemsList(youReceiveItems)}</View>
+              </View>
+              <View style={styles.offerTopUpRow}>
+                <Text style={styles.offerTopUpLabel}>{topUpText}</Text>
+              </View>
             </View>
-          ))}
-          {item.offer_items && item.offer_items.length > 3 && (
-            <Text style={styles.moreItems}>
-              {formatMoreItems(item.offer_items.length - 3)}
-            </Text>
-          )}
-        </View>
-        
-        <View style={styles.offerFooter}>
-          <Text style={styles.offerDate}>
-            {new Date(item.created_at).toLocaleDateString()}
-          </Text>
-          <Text style={styles.offerUser}>
-            {formatUserLabel(activeTab === 'sent' ? item.receiver?.username : item.sender?.username, activeTab === 'sent')}
-          </Text>
-        </View>
-      </View>
-    </TouchableOpacity>
-  ), (prev, next) => (
-    prev.item.id === next.item.id &&
-    prev.item.status === next.item.status &&
-    prev.item.top_up_amount === next.item.top_up_amount &&
-    (prev.item.offer_items?.length || 0) === (next.item.offer_items?.length || 0)
-  ));
+          }
+        />
+      );
+    },
+    (prev, next) =>
+      prev.item.id === next.item.id &&
+      prev.item.status === next.item.status &&
+      prev.item.top_up_amount === next.item.top_up_amount &&
+      (prev.item.offer_items?.length || 0) === (next.item.offer_items?.length || 0) &&
+      prev.item.message === next.item.message
+  );
 
   const renderOffer = useCallback(
     ({ item }: { item: Offer }) => <OfferRow item={item} />,
-    []
-  );
-
-  // Lightweight shimmer
-  const SkeletonLoader: React.FC<{ width?: number | string; height?: number; borderRadius?: number; style?: any }> = ({ width = '100%', height = 16, borderRadius = 6, style }) => {
-    const animatedValue = useRef(new (require('react-native').Animated.Value)(0)).current;
-    const { Animated } = require('react-native');
-    useEffect(() => {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(animatedValue, { toValue: 1, duration: 900, useNativeDriver: true }),
-          Animated.timing(animatedValue, { toValue: 0, duration: 900, useNativeDriver: true }),
-        ])
-      ).start();
-    }, [animatedValue]);
-    const opacity = animatedValue.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0.8] });
-    return (
-      <Animated.View
-        style={[{ width, height, borderRadius, backgroundColor: '#E1E9EE', opacity }, style]}
-      />
-    );
-  };
-
-  const OfferCardSkeleton: React.FC = () => (
-    <View style={styles.offerCard}>
-      <View style={styles.offerHeader}>
-        <SkeletonLoader width={110} height={16} />
-        <SkeletonLoader width={70} height={20} borderRadius={12} />
-      </View>
-      <View style={styles.offerContent}>
-        <SkeletonLoader width={'80%'} height={14} style={{ marginBottom: 10 }} />
-        <SkeletonLoader width={'50%'} height={16} style={{ marginBottom: 12 }} />
-        <View style={{ gap: 6 }}>
-          <SkeletonLoader width={'60%'} height={32} borderRadius={8} />
-          <SkeletonLoader width={'50%'} height={32} borderRadius={8} />
-          <SkeletonLoader width={'40%'} height={32} borderRadius={8} />
-        </View>
-        <View style={styles.offerFooter}>
-          <SkeletonLoader width={90} height={12} />
-          <SkeletonLoader width={120} height={12} />
-        </View>
-      </View>
-    </View>
+    [OfferRow]
   );
 
   if (loading) {
@@ -191,7 +243,7 @@ const OffersScreen: React.FC<OffersScreenProps> = memo(({ route }) => {
         <FlatList
           data={skeletons}
           keyExtractor={(i) => `skeleton-${i}`}
-          renderItem={() => <OfferCardSkeleton />}
+          renderItem={() => <TopMatchCardSkeleton style={styles.offerSkeletonCard} />}
           contentContainerStyle={styles.listContainer}
           showsVerticalScrollIndicator={false}
         />
@@ -299,86 +351,82 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   offerCard: {
-    backgroundColor: '#fff',
-    borderRadius: 15,
-    marginBottom: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  offerHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  offerType: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
+    width: width - 80,
+    marginHorizontal: 20,
+    marginBottom: 18,
   },
   statusBadge: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   statusText: {
     color: '#fff',
     fontSize: 12,
-    fontWeight: 'bold',
   },
-  offerContent: {
-    padding: 15,
+  offerMetaSection: {
+    gap: 12,
   },
-  offerMessage: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 10,
-  },
-  topUpAmount: {
-    fontSize: 16,
-    color: '#4CAF50',
-    fontWeight: 'bold',
-    marginBottom: 10,
-  },
-  itemsContainer: {
-    marginBottom: 10,
-  },
-  itemPreview: {
-    backgroundColor: '#f8f9fa',
-    padding: 8,
-    borderRadius: 8,
-    marginBottom: 5,
-  },
-  itemTitle: {
-    fontSize: 14,
-    color: '#333',
-  },
-  moreItems: {
-    fontSize: 12,
-    color: '#666',
-    fontStyle: 'italic',
-  },
-  offerFooter: {
+  offerMetaHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
+    justifyContent: 'space-between',
+    gap: 10,
   },
-  offerDate: {
+  offerMetaUser: {
+    flex: 1,
     fontSize: 12,
-    color: '#666',
+    color: '#475569',
+    fontWeight: '600',
   },
-  offerUser: {
+  offerMetaDate: {
     fontSize: 12,
-    color: '#007AFF',
+    color: '#94a3b8',
+  },
+  offerMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  offerMetaLabel: {
+    minWidth: 70,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  offerMetaContent: {
+    flex: 1,
+  },
+  offerItemsList: {
+    gap: 4,
+  },
+  offerItemText: {
+    fontSize: 12,
+    color: '#475569',
     fontWeight: '500',
+  },
+  offerItemEmpty: {
+    fontSize: 12,
+    color: '#cbd5f5',
+  },
+  offerMoreItems: {
+    fontSize: 12,
+    color: '#0ea5e9',
+    fontWeight: '600',
+  },
+  offerTopUpRow: {
+    marginTop: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    backgroundColor: '#f1f5f9',
+    borderRadius: 12,
+  },
+  offerTopUpLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#0f172a',
   },
   emptyContainer: {
     flex: 1,
@@ -396,6 +444,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     textAlign: 'center',
+  },
+  offerSkeletonCard: {
+    width: width - 40,
+    marginHorizontal: 20,
+    marginBottom: 18,
   },
 });
 

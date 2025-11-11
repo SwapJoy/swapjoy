@@ -299,12 +299,30 @@ export const useExploreScreenState = (): ExploreScreenState => {
       const currentRequestId = ++searchRequestIdRef.current;
       let fuzzyData: ExploreSearchItem[] = [];
 
+      const normalizeSearchItems = (items: ExploreSearchItem[]): ExploreSearchItem[] =>
+        items.map((item) => {
+          const condition =
+            (item as any).condition ?? // eslint-disable-line @typescript-eslint/no-explicit-any
+            (item as any).condition_label ?? // eslint-disable-line @typescript-eslint/no-explicit-any
+            (item as any).item_condition ?? // eslint-disable-line @typescript-eslint/no-explicit-any
+            'unknown';
+
+          if ((item as any).condition === condition) {
+            return item;
+          }
+
+          return {
+            ...item,
+            condition,
+          };
+        });
+
       try {
         const { data: kwData } = await ApiService.keywordSearch(query, 20);
         if (Array.isArray(kwData)) {
-          fuzzyData = kwData;
+          fuzzyData = normalizeSearchItems(kwData);
           if (currentRequestId === searchRequestIdRef.current) {
-            setSearchResults(kwData);
+            setSearchResults(fuzzyData);
           }
         }
       } catch {
@@ -349,7 +367,7 @@ export const useExploreScreenState = (): ExploreScreenState => {
 
           const merged = Object.values(byId);
           merged.sort((a, b) => (b._score ?? 0) - (a._score ?? 0));
-          setSearchResults(merged);
+          setSearchResults(normalizeSearchItems(merged));
         } else {
           setSearchResults(fuzzyData);
         }

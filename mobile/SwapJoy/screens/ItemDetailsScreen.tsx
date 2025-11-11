@@ -47,6 +47,15 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
       condition: item.condition,
       image_url: primaryImage,
       created_at: item.created_at || item.updated_at || null,
+      category_name:
+        item.category_name ??
+        item.category?.title ??
+        item.category?.name ??
+        null,
+      category_name_en: item.category_name_en ?? null,
+      category_name_ka: item.category_name_ka ?? null,
+      category: item.category ?? null,
+      categories: item.categories ?? null,
     };
   }, [item]);
 
