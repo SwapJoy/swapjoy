@@ -20,21 +20,17 @@ import type { CityOption, LocationSelection } from '../types/location';
 interface LocationSelectorProps {
   visible: boolean;
   onClose: () => void;
-  onSelectLocation: (selection: LocationSelection, radiusKm: number | null) => Promise<void> | void;
-  initialRadiusKm?: number | null;
+  onSelectLocation: (selection: LocationSelection) => Promise<void> | void;
   initialCityId?: string | null;
   mode?: 'user' | 'item';
-  onRadiusChange?: (radiusKm: number | null) => void;
 }
 
 const LocationSelector: React.FC<LocationSelectorProps> = ({
   visible,
   onClose,
   onSelectLocation,
-  initialRadiusKm = 50,
   initialCityId = null,
   mode = 'user',
-  onRadiusChange,
 }) => {
   const { t } = useLocalization();
   const [cities, setCities] = useState<CityOption[]>([]);
@@ -42,11 +38,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [loadingCities, setLoadingCities] = useState(false);
   const [processingSelection, setProcessingSelection] = useState(false);
-  const [radiusInput, setRadiusInput] = useState(
-    typeof initialRadiusKm === 'number' && !Number.isNaN(initialRadiusKm) ? String(initialRadiusKm) : ''
-  );
   const [selectedCityId, setSelectedCityId] = useState<string | null>(initialCityId);
-  const showRadiusInput = mode === 'user';
 
   const headerTitle = useMemo(
     () =>
@@ -59,12 +51,6 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
   const searchPlaceholder = t('locationSelector.searchPlaceholder', {
     defaultValue: 'Search cities',
   });
-  const radiusLabel = t('locationSelector.radiusLabel', {
-    defaultValue: 'Preferred radius (km)',
-  });
-  const radiusHint = t('locationSelector.radiusHint', {
-    defaultValue: 'Items outside this radius will be hidden.',
-  });
   const useCurrentLocationLabel = t('locationSelector.useCurrentLocation', {
     defaultValue: 'Use my current location',
   });
@@ -75,17 +61,6 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
     defaultValue: 'No cities match your search.',
   });
   const cancelLabel = t('common.cancel', { defaultValue: 'Cancel' });
-
-  const parsedRadius = useMemo(() => {
-    if (!showRadiusInput) {
-      return null;
-    }
-    const numeric = parseFloat(radiusInput);
-    if (Number.isNaN(numeric) || numeric < 0) {
-      return null;
-    }
-    return numeric;
-  }, [radiusInput, showRadiusInput]);
 
   useEffect(() => {
     if (!visible) {
@@ -150,25 +125,15 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
   useEffect(() => {
     if (visible) {
       setSelectedCityId(initialCityId);
-      if (showRadiusInput) {
-        setRadiusInput(
-          typeof initialRadiusKm === 'number' && !Number.isNaN(initialRadiusKm)
-            ? String(initialRadiusKm)
-            : ''
-        );
-      }
     }
-  }, [initialCityId, initialRadiusKm, showRadiusInput, visible]);
+  }, [initialCityId, visible]);
 
   const handleSelect = useCallback(
     async (selection: LocationSelection) => {
       try {
         setProcessingSelection(true);
-        await onSelectLocation(selection, parsedRadius);
+        await onSelectLocation(selection);
         setSelectedCityId(selection.cityId ?? null);
-        if (showRadiusInput && typeof parsedRadius === 'number' && onRadiusChange) {
-          onRadiusChange(parsedRadius);
-        }
         onClose();
       } catch (error: any) {
         console.error('[LocationSelector] Selection error:', error);
@@ -183,7 +148,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
         setProcessingSelection(false);
       }
     },
-    [onClose, onRadiusChange, onSelectLocation, parsedRadius, showRadiusInput, t]
+    [onClose, onSelectLocation, t]
   );
 
   const handleCityPress = useCallback(
@@ -226,8 +191,6 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
         console.warn('[LocationSelector] findNearestCity error:', error);
       }
 
-      const radiusForSelection = showRadiusInput ? parsedRadius : null;
-
       await onSelectLocation(
         {
           lat: latitude,
@@ -238,12 +201,8 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
           stateProvince: nearest?.state_province ?? null,
           source: 'device',
           distanceKm: nearest?.distance_km ?? null,
-        },
-        radiusForSelection
+        }
       );
-      if (showRadiusInput && typeof parsedRadius === 'number' && onRadiusChange) {
-        onRadiusChange(parsedRadius);
-      }
       onClose();
     } catch (error: any) {
       console.error('[LocationSelector] Current location error:', error);
@@ -257,7 +216,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
     } finally {
       setProcessingSelection(false);
     }
-  }, [onClose, onRadiusChange, onSelectLocation, parsedRadius, showRadiusInput, t]);
+  }, [onClose, onSelectLocation, t]);
 
   const renderCity = useCallback(
     ({ item }: { item: CityOption }) => {
@@ -295,29 +254,6 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
           </View>
 
           <View style={styles.content}>
-            {showRadiusInput ? (
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>{radiusLabel}</Text>
-                <TextInput
-                  style={styles.radiusInput}
-                  value={radiusInput}
-                  onChangeText={(text) => {
-                    setRadiusInput(text);
-                    const numeric = parseFloat(text);
-                    if (!Number.isNaN(numeric) && onRadiusChange) {
-                      onRadiusChange(numeric);
-                    }
-                  }}
-                  placeholder="50"
-                  keyboardType="numeric"
-                  inputMode="decimal"
-                  maxLength={6}
-                  editable={!processingSelection}
-                />
-                <Text style={styles.radiusHint}>{radiusHint}</Text>
-              </View>
-            ) : null}
-
             <TouchableOpacity
               style={styles.currentLocationButton}
               onPress={handleUseCurrentLocation}
@@ -402,27 +338,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 16,
     gap: 16,
-  },
-  inputGroup: {
-    gap: 6,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#0f172a',
-  },
-  radiusInput: {
-    borderWidth: 1,
-    borderColor: '#cbd5f5',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 16,
-    color: '#0f172a',
-  },
-  radiusHint: {
-    fontSize: 12,
-    color: '#64748b',
   },
   currentLocationButton: {
     flexDirection: 'row',

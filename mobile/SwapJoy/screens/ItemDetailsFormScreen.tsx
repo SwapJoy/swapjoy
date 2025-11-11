@@ -335,7 +335,7 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
   };
 
   const handleLocationSelected = useCallback(
-    async (selection: LocationSelection, _radiusKm: number | null) => {
+    async (selection: LocationSelection) => {
       const labelParts = [selection.cityName, selection.country].filter(Boolean);
       const fallbackLabel = t('locationSelector.coordinatesFallback', {
         defaultValue: 'Exact location',

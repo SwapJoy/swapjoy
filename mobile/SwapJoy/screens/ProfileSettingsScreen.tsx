@@ -1,17 +1,38 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Modal, TextInput, Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Modal, TextInput, Keyboard, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { ProfileSettingsScreenProps } from '../types/navigation';
 import { useAuth } from '../contexts/AuthContext';
 import { ApiService } from '../services/api';
 import { UserService } from '../services/userService';
 import { useLocalization } from '../localization';
 import { LanguageSelector } from '../components/LanguageSelector';
+import { CategoryService } from '../services/categoryService';
+
+const RADIUS_OPTIONS = [1, 2, 3, 5, 10, 15, 20, 30, 40, 50] as const;
+const DEFAULT_RADIUS_KM = 50;
+
+type CategoryOption = {
+  id: string;
+  name: string;
+  icon?: string | null;
+};
 
 const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigation }) => {
   const { signOut } = useAuth();
   const { t, language, setLanguage } = useLocalization();
   const [prompt, setPrompt] = useState<string>('');
   const [isPromptModalVisible, setPromptModalVisible] = useState(false);
+  const [profile, setProfile] = useState<any | null>(null);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [preferredRadius, setPreferredRadius] = useState<number>(DEFAULT_RADIUS_KM);
+  const [isRadiusModalVisible, setRadiusModalVisible] = useState(false);
+  const [savingRadius, setSavingRadius] = useState(false);
+  const [favoriteCategories, setFavoriteCategories] = useState<string[]>([]);
+  const [categoryOptions, setCategoryOptions] = useState<CategoryOption[]>([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(false);
+  const [savingCategoryId, setSavingCategoryId] = useState<string | null>(null);
   const charLimit = 500;
 
   const promptModalSubtitle = useMemo(
@@ -24,21 +45,122 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigatio
     [t]
   );
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await ApiService.getProfile();
-        const p = (res?.data as any)?.prompt || '';
-        setPrompt(p);
-      } catch {}
-    })();
-  }, []);
-
   const promptPreview = useMemo(() => {
     const trimmed = (prompt || '').trim();
     if (!trimmed) return t('settings.profile.swapPromptSubtitle');
     return trimmed.length <= 80 ? trimmed : trimmed.slice(0, 80) + '…';
   }, [prompt, t]);
+
+  const radiusSubtitle = useMemo(
+    () =>
+      t('settings.profile.radiusSubtitle', {
+        radius: preferredRadius,
+      }),
+    [preferredRadius, t]
+  );
+
+  const sortedCategories = useMemo(() => {
+    if (categoryOptions.length === 0) {
+      return [];
+    }
+    const selectedSet = new Set(favoriteCategories);
+    const selected = categoryOptions.filter((cat) => selectedSet.has(cat.id));
+    const unselected = categoryOptions.filter((cat) => !selectedSet.has(cat.id));
+    return [...selected, ...unselected];
+  }, [categoryOptions, favoriteCategories]);
+
+  const handleRadiusSelect = useCallback(
+    async (value: number) => {
+      if (value === preferredRadius) {
+        setRadiusModalVisible(false);
+        return;
+      }
+      if (savingRadius) {
+        return;
+      }
+      setSavingRadius(true);
+      try {
+        const { error } = await UserService.updateProfile({ preferred_radius_km: value });
+        if (error) {
+          throw new Error(error.message || 'Failed to update radius');
+        }
+        setPreferredRadius(value);
+        setProfile((prev) => (prev ? { ...prev, preferred_radius_km: value } : prev));
+        setRadiusModalVisible(false);
+      } catch (error: any) {
+        console.error('[ProfileSettings] Radius update error:', error);
+        Alert.alert(
+          t('common.error', { defaultValue: 'Error' }),
+          error?.message ||
+            t('settings.profile.radiusUpdateError', {
+              defaultValue: 'Could not update preferred radius. Please try again.',
+            })
+        );
+      } finally {
+        setSavingRadius(false);
+      }
+    },
+    [preferredRadius, savingRadius, t]
+  );
+
+  const toggleCategorySelection = useCallback(
+    async (categoryId: string) => {
+      let previousSelections: string[] = [];
+      let nextSelections: string[] = [];
+
+      setFavoriteCategories((current) => {
+        previousSelections = [...current];
+        if (current.includes(categoryId)) {
+          nextSelections = current.filter((id) => id !== categoryId);
+        } else {
+          nextSelections = [...current, categoryId];
+        }
+        return nextSelections;
+      });
+
+      setSavingCategoryId(categoryId);
+      try {
+        const payload = nextSelections.length > 0 ? nextSelections : null;
+        const { error } = await UserService.updateProfile({
+          favorite_categories: payload,
+        });
+        if (error) {
+          throw new Error(error.message || 'Failed to update categories');
+        }
+        setProfile((prev) =>
+          prev ? { ...prev, favorite_categories: nextSelections } : prev
+        );
+      } catch (error: any) {
+        console.error('[ProfileSettings] Favorite categories update error:', error);
+        setFavoriteCategories(previousSelections);
+        Alert.alert(
+          t('common.error', { defaultValue: 'Error' }),
+          error?.message ||
+            t('settings.profile.favoriteCategoriesErrorMessage', {
+              defaultValue: 'Could not update favorite categories. Please try again.',
+            })
+        );
+      } finally {
+        setSavingCategoryId(null);
+      }
+    },
+    [t]
+  );
+
+  const handleEditProfilePress = useCallback(() => {
+    if (!profile) {
+      return;
+    }
+    navigation.navigate('ProfileEdit', {
+      initialProfile: {
+        firstName: profile.first_name ?? '',
+        lastName: profile.last_name ?? '',
+        username: profile.username ?? '',
+        bio: profile.bio ?? '',
+        profileImageUrl: profile.profile_image_url ?? '',
+      },
+    });
+  }, [navigation, profile]);
 
   const confirmSignOut = useCallback(() => {
     Alert.alert(
@@ -71,8 +193,107 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigatio
     [setLanguage]
   );
 
-  const Item = ({ icon, title, subtitle, onPress }: { icon: string; title: string; subtitle?: string; onPress?: () => void }) => (
-    <TouchableOpacity style={styles.item} onPress={onPress}>
+  const resolveRadius = useCallback((raw: unknown): number => {
+    if (typeof raw === 'number' && Number.isFinite(raw)) {
+      if (RADIUS_OPTIONS.includes(raw as number)) {
+        return raw as number;
+      }
+      return RADIUS_OPTIONS.reduce((closest, option) => {
+        const diff = Math.abs(option - (raw as number));
+        const bestDiff = Math.abs(closest - (raw as number));
+        return diff < bestDiff ? option : closest;
+      }, DEFAULT_RADIUS_KM);
+    }
+    return DEFAULT_RADIUS_KM;
+  }, []);
+
+  const fetchProfile = useCallback(async () => {
+    try {
+      setProfileLoading(true);
+      const res = await ApiService.getProfile();
+      const data = res?.data as any;
+      if (!data) {
+        return;
+      }
+      setProfile(data);
+      setPrompt(typeof data.prompt === 'string' ? data.prompt : '');
+      setPreferredRadius(resolveRadius(data.preferred_radius_km));
+      const favorites = Array.isArray(data.favorite_categories)
+        ? (data.favorite_categories as any[]).filter((id) => typeof id === 'string')
+        : [];
+      setFavoriteCategories(favorites);
+    } catch (error) {
+      console.error('[ProfileSettings] Failed to load profile:', error);
+    } finally {
+      setProfileLoading(false);
+    }
+  }, [resolveRadius]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void fetchProfile();
+    }, [fetchProfile])
+  );
+
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
+      try {
+        setCategoriesLoading(true);
+        const { data, error } = await CategoryService.getCategories(language);
+        if (error) {
+          console.warn('[ProfileSettings] Failed to load categories:', error);
+        }
+        if (!isMounted) {
+          return;
+        }
+        const rows = Array.isArray(data)
+          ? (data as any[]).map((entry) => ({
+              id: String(entry.id),
+              name:
+                entry.name ||
+                entry.title ||
+                entry.title_en ||
+                entry.title_ka ||
+                t('settings.profile.unknownCategory', { defaultValue: 'Other' }),
+              icon: entry.icon ?? null,
+            }))
+          : [];
+        setCategoryOptions(rows);
+      } catch (error) {
+        console.error('[ProfileSettings] Category load error:', error);
+      } finally {
+        if (isMounted) {
+          setCategoriesLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [language, t]);
+
+  const Item = ({
+    icon,
+    title,
+    subtitle,
+    onPress,
+    rightContent,
+    disabled,
+  }: {
+    icon: string;
+    title: string;
+    subtitle?: string;
+    onPress?: () => void;
+    rightContent?: React.ReactNode;
+    disabled?: boolean;
+  }) => (
+    <TouchableOpacity
+      style={[styles.item, disabled && styles.itemDisabled]}
+      onPress={disabled ? undefined : onPress}
+      activeOpacity={disabled ? 1 : 0.7}
+    >
       <View style={styles.itemLeft}>
         <Text style={styles.itemIcon}>{icon}</Text>
         <View style={styles.itemTextWrap}>
@@ -80,7 +301,7 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigatio
           {subtitle ? <Text style={styles.itemSubtitle}>{subtitle}</Text> : null}
         </View>
       </View>
-      <Text style={styles.itemArrow}>›</Text>
+      {rightContent ?? <Text style={styles.itemArrow}>›</Text>}
     </TouchableOpacity>
   );
 
@@ -100,6 +321,75 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigatio
 
       <View style={styles.card}>
         <Item
+          icon="📍"
+          title={t('settings.profile.radiusTitle')}
+          subtitle={radiusSubtitle}
+          onPress={() => setRadiusModalVisible(true)}
+          rightContent={
+            savingRadius ? (
+              <ActivityIndicator size="small" color="#1f7ae0" />
+            ) : (
+              <Text style={styles.itemArrow}>›</Text>
+            )
+          }
+          disabled={profileLoading || savingRadius}
+        />
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>{t('settings.profile.favoriteCategoriesTitle')}</Text>
+        <Text style={styles.sectionSubtitle}>{t('settings.profile.favoriteCategoriesSubtitle')}</Text>
+        {categoriesLoading ? (
+          <View style={styles.categoriesLoading}>
+            <ActivityIndicator size="small" color="#1f7ae0" />
+          </View>
+        ) : sortedCategories.length === 0 ? (
+          <Text style={styles.categoriesEmptyText}>
+            {t('settings.profile.favoriteCategoriesEmpty')}
+          </Text>
+        ) : (
+          <View style={styles.categoryBubbleWrap}>
+            {sortedCategories.map((category) => {
+              const selected = favoriteCategories.includes(category.id);
+              const isSaving = savingCategoryId === category.id;
+              return (
+                <TouchableOpacity
+                  key={category.id}
+                  style={[
+                    styles.categoryBubble,
+                    selected && styles.categoryBubbleSelected,
+                  ]}
+                  onPress={() => toggleCategorySelection(category.id)}
+                  disabled={isSaving}
+                  activeOpacity={0.85}
+                >
+                  <View style={styles.categoryBubbleLeft}>
+                    {isSaving ? (
+                      <ActivityIndicator
+                        size="small"
+                        color={selected ? '#ffffff' : '#0f172a'}
+                      />
+                    ) : !selected ? (
+                      <Text style={styles.categoryBubblePlus}>+</Text>
+                    ) : null}
+                  </View>
+                  <Text
+                    style={[
+                      styles.categoryBubbleLabel,
+                      selected && styles.categoryBubbleLabelSelected,
+                    ]}
+                  >
+                    {category.name}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
+      </View>
+
+      <View style={styles.card}>
+        <Item
           icon="📝"
           title={t('settings.profile.swapPromptTitle')}
           subtitle={promptPreview}
@@ -112,19 +402,31 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigatio
           icon="👤"
           title={t('settings.profile.editProfileTitle')}
           subtitle={t('settings.profile.editProfileSubtitle')}
-          onPress={() => { /* navigate to edit profile subpage */ }}
+          onPress={handleEditProfilePress}
+          disabled={profileLoading || !profile}
+          rightContent={
+            profileLoading ? (
+              <ActivityIndicator size="small" color="#1f7ae0" />
+            ) : (
+              <Text style={styles.itemArrow}>›</Text>
+            )
+          }
         />
         <Item
           icon="🔔"
           title={t('settings.profile.notificationsTitle')}
           subtitle={t('settings.profile.notificationsSubtitle')}
-          onPress={() => { /* navigate to notifications settings */ }}
+          onPress={() => {
+            /* navigate to notifications settings */
+          }}
         />
         <Item
           icon="🔒"
           title={t('settings.profile.privacyTitle')}
           subtitle={t('settings.profile.privacySubtitle')}
-          onPress={() => { /* navigate to privacy */ }}
+          onPress={() => {
+            /* navigate to privacy */
+          }}
         />
       </View>
 
@@ -133,13 +435,17 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigatio
           icon="💬"
           title={t('settings.profile.helpTitle')}
           subtitle={t('settings.profile.helpSubtitle')}
-          onPress={() => { /* navigate to help */ }}
+          onPress={() => {
+            /* navigate to help */
+          }}
         />
         <Item
           icon="ℹ️"
           title={t('settings.profile.aboutTitle')}
           subtitle={t('settings.profile.aboutSubtitle')}
-          onPress={() => { /* navigate to about */ }}
+          onPress={() => {
+            /* navigate to about */
+          }}
         />
       </View>
 
@@ -159,6 +465,50 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigatio
           <Text style={styles.dangerText}>{t('settings.profile.signOut')}</Text>
         </TouchableOpacity>
       </View>
+
+      <Modal
+        visible={isRadiusModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setRadiusModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.choiceModalCard}>
+            <Text style={styles.choiceModalTitle}>{t('settings.profile.radiusModalTitle')}</Text>
+            <View style={styles.choiceOptionList}>
+              {RADIUS_OPTIONS.map((option) => {
+                const isActive = preferredRadius === option;
+                return (
+                  <TouchableOpacity
+                    key={option}
+                    style={[styles.choiceOption, isActive && styles.choiceOptionActive]}
+                    onPress={() => handleRadiusSelect(option)}
+                    disabled={savingRadius}
+                    activeOpacity={0.85}
+                  >
+                    <Text
+                      style={[
+                        styles.choiceOptionLabel,
+                        isActive && styles.choiceOptionLabelActive,
+                      ]}
+                    >
+                      {t('settings.profile.radiusOptionLabel', { radius: option })}
+                    </Text>
+                    {isActive ? <Ionicons name="checkmark" size={18} color="#1f2937" /> : null}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <TouchableOpacity
+              style={styles.choiceModalCancel}
+              onPress={() => setRadiusModalVisible(false)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.choiceModalCancelText}>{t('common.cancel')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       <Modal
         visible={isPromptModalVisible}
@@ -262,6 +612,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
+  itemDisabled: {
+    opacity: 0.5,
+  },
   itemLeft: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -291,11 +644,103 @@ const styles = StyleSheet.create({
   languageSelectorWrapper: {
     gap: 12,
   },
+  categoriesLoading: {
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  categoriesEmptyText: {
+    fontSize: 13,
+    color: '#94a3b8',
+  },
+  categoryBubbleWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 6,
+  },
+  categoryBubble: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    backgroundColor: '#f8fafc',
+  },
+  categoryBubbleSelected: {
+    backgroundColor: '#1f7ae0',
+    borderColor: '#1f7ae0',
+  },
+  categoryBubbleLeft: {
+    width: 16,
+    alignItems: 'center',
+    marginRight: 6,
+  },
+  categoryBubblePlus: {
+    fontSize: 16,
+    color: '#1f2937',
+    fontWeight: '600',
+    lineHeight: 16,
+  },
+  categoryBubbleLabel: {
+    fontSize: 13,
+    color: '#1f2937',
+    fontWeight: '500',
+  },
+  categoryBubbleLabelSelected: {
+    color: '#fff',
+  },
   dangerCard: { backgroundColor: '#fff', borderRadius: 12, padding: 12 },
   dangerButton: { backgroundColor: '#FF3B30', borderRadius: 10, alignItems: 'center', paddingVertical: 14 },
   dangerText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   modalCard: { backgroundColor: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 16, maxHeight: '80%' },
+  choiceModalCard: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 24,
+    maxHeight: '70%',
+  },
+  choiceModalTitle: { fontSize: 18, fontWeight: '700', color: '#0f172a', marginBottom: 12 },
+  choiceOptionList: { gap: 10 },
+  choiceOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+  },
+  choiceOptionActive: {
+    backgroundColor: '#eff6ff',
+    borderColor: '#bfdbfe',
+  },
+  choiceOptionLabel: {
+    fontSize: 15,
+    color: '#1f2937',
+    fontWeight: '500',
+  },
+  choiceOptionLabelActive: {
+    color: '#1d4ed8',
+  },
+  choiceModalCancel: {
+    marginTop: 16,
+    alignSelf: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 24,
+  },
+  choiceModalCancelText: {
+    fontSize: 15,
+    color: '#2563eb',
+    fontWeight: '600',
+  },
   modalScroll: { paddingBottom: 24 },
   modalTitle: { fontSize: 18, fontWeight: '700', color: '#1a1a1a' },
   modalSubtitle: { fontSize: 13, color: '#707070', marginTop: 6, marginBottom: 12 },

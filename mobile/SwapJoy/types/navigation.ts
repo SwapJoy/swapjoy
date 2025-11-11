@@ -31,6 +31,17 @@ export type RootStackParamList = {
     ownerId: string;
     bundleItems: Array<any>;
   };
+  ProfileEdit:
+    | {
+        initialProfile?: {
+          firstName?: string;
+          lastName?: string;
+          username?: string;
+          bio?: string;
+          profileImageUrl?: string;
+        };
+      }
+    | undefined;
   UserProfile: {
     userId: string;
   };
@@ -144,6 +155,11 @@ export type OfferPreviewScreenProps = {
 
 export type ProfileSettingsScreenProps = {
   navigation: NavigationProp<RootStackParamList, 'ProfileSettings'>;
+};
+
+export type ProfileEditScreenProps = {
+  navigation: NavigationProp<RootStackParamList, 'ProfileEdit'>;
+  route: RouteProp<RootStackParamList, 'ProfileEdit'>;
 };
 
 export type DevRecommendationSettingsScreenProps = {

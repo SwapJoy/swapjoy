@@ -18,6 +18,7 @@ import ItemDetailsFormScreen from '../screens/ItemDetailsFormScreen';
 import ItemPreviewScreen from '../screens/ItemPreviewScreen';
 import ItemDetailsScreen from '../screens/ItemDetailsScreen';
 import ProfileSettingsScreen from '../screens/ProfileSettingsScreen';
+import ProfileEditScreen from '../screens/ProfileEditScreen';
 import BundleItemsScreen from '../screens/BundleItemsScreen';
 import OfferCreateScreen from '../screens/OfferCreateScreen';
 import OfferPreviewScreen from '../screens/OfferPreviewScreen';
@@ -195,6 +196,11 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
               name="ProfileSettings" 
               component={ProfileSettingsScreen}
               options={{ title: 'Settings' }}
+            />
+            <Stack.Screen
+              name="ProfileEdit"
+              component={ProfileEditScreen}
+              options={{ title: 'Edit Profile', headerBackTitleVisible: false }}
             />
             <Stack.Screen 
               name="DevRecommendationSettings" 

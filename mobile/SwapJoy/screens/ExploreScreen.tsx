@@ -292,19 +292,16 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
     handleOpenLocationSelector,
     handleLocationModalClose,
     handleManualLocationSelect,
-    handleRadiusInputChange,
     locationLabel,
-    locationRadius,
-    pendingRadius,
     locationCityId,
     loadingLocation,
     updatingLocation,
   } = useExploreScreenState();
 
   const handleLocationSelect = useCallback(
-    async (selection: LocationSelection, radiusKm: number | null) => {
+    async (selection: LocationSelection) => {
       try {
-        await handleManualLocationSelect(selection, radiusKm);
+        await handleManualLocationSelect(selection);
       } catch (error: any) {
         console.error('[ExploreScreen] Failed to update manual location:', error);
         Alert.alert(
@@ -653,9 +650,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
         visible={locationModalVisible}
         onClose={handleLocationModalClose}
         onSelectLocation={handleLocationSelect}
-        initialRadiusKm={pendingRadius ?? locationRadius ?? 50}
         initialCityId={locationCityId}
-        onRadiusChange={handleRadiusInputChange}
       />
     </View>
   );

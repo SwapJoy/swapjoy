@@ -21,6 +21,9 @@ export class UserService {
     last_name: string;
     bio: string;
     profile_image_url: string;
+    prompt: string;
+    preferred_radius_km: number | null;
+    favorite_categories: string[] | null;
   }>) {
     return ApiService.updateProfile(updates);
   }

@@ -376,6 +376,7 @@ export class ApiService {
     profile_image_url: string;
     favorite_categories?: string[];
     prompt?: string;
+    preferred_radius_km?: number | null;
   }>) {
     return this.authenticatedCall(async (client) => {
       const currentUser = await AuthService.getCurrentUser();

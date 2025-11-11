@@ -53,12 +53,10 @@ export interface ExploreScreenState {
   locationModalVisible: boolean;
   handleOpenLocationSelector: () => void;
   handleLocationModalClose: () => void;
-  handleManualLocationSelect: (selection: LocationSelection, radiusKm: number | null) => Promise<void>;
-  handleRadiusInputChange: (value: number | null) => void;
+  handleManualLocationSelect: (selection: LocationSelection) => Promise<void>;
   locationLabel: string | null;
   locationCoords: { lat: number | null; lng: number | null };
   locationRadius: number | null;
-  pendingRadius: number | null;
   locationCityId: string | null;
   loadingLocation: boolean;
   updatingLocation: boolean;
@@ -178,7 +176,6 @@ export const useExploreScreenState = (): ExploreScreenState => {
     lng: null,
   });
   const [locationRadius, setLocationRadius] = useState<number | null>(null);
-  const [pendingRadius, setPendingRadius] = useState<number | null>(null);
   const [locationCityId, setLocationCityId] = useState<string | null>(null);
   const [loadingLocation, setLoadingLocation] = useState(false);
   const [updatingLocation, setUpdatingLocation] = useState(false);
@@ -238,7 +235,6 @@ export const useExploreScreenState = (): ExploreScreenState => {
 
       setLocationCoords({ lat, lng });
       setLocationRadius(radius);
-      setPendingRadius(null);
 
       if (lat !== null && lng !== null) {
         try {
@@ -422,27 +418,21 @@ export const useExploreScreenState = (): ExploreScreenState => {
   }, []);
 
   const handleOpenLocationSelector = useCallback(() => {
-    setPendingRadius(locationRadius ?? DEFAULT_RADIUS);
     setLocationModalVisible(true);
-  }, [locationRadius]);
+  }, []);
 
   const handleLocationModalClose = useCallback(() => {
     setLocationModalVisible(false);
-    setPendingRadius(null);
-  }, []);
-
-  const handleRadiusInputChange = useCallback((value: number | null) => {
-    setPendingRadius(value ?? null);
   }, []);
 
   const handleManualLocationSelect = useCallback(
-    async (selection: LocationSelection, radiusKm: number | null) => {
+    async (selection: LocationSelection) => {
       try {
         setUpdatingLocation(true);
         const nextRadius =
-          typeof radiusKm === 'number' && !Number.isNaN(radiusKm)
-            ? radiusKm
-            : pendingRadius ?? locationRadius ?? DEFAULT_RADIUS;
+          typeof locationRadius === 'number' && !Number.isNaN(locationRadius)
+            ? locationRadius
+            : DEFAULT_RADIUS;
         const { error } = await ApiService.updateManualLocation({
           lat: selection.lat,
           lng: selection.lng,
@@ -458,7 +448,6 @@ export const useExploreScreenState = (): ExploreScreenState => {
         setLocationLabel(label);
         setLocationCoords({ lat: selection.lat, lng: selection.lng });
         setLocationRadius(nextRadius);
-        setPendingRadius(null);
         setLocationCityId(selection.cityId ?? null);
 
         await refreshTopPicks();
@@ -469,7 +458,7 @@ export const useExploreScreenState = (): ExploreScreenState => {
         setUpdatingLocation(false);
       }
     },
-    [locationRadius, pendingRadius, refreshTopPicks, strings.location.badgePlaceholder]
+    [locationRadius, refreshTopPicks, strings.location.badgePlaceholder]
   );
 
   const onRefresh = useCallback(async () => {
@@ -519,11 +508,9 @@ export const useExploreScreenState = (): ExploreScreenState => {
     handleOpenLocationSelector,
     handleLocationModalClose,
     handleManualLocationSelect,
-    handleRadiusInputChange,
     locationLabel,
     locationCoords,
     locationRadius,
-    pendingRadius,
     locationCityId,
     loadingLocation,
     updatingLocation,
