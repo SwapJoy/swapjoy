@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ApiService } from '@services/api';
 import {
-  MATCH_PRICE_TOLERANCE,
-  findBundlesByAccuracy,
-  getUniqueBundlesForTarget,
+  MATCH_BUNDLE_TOLERANCE,
+  findAllBundles,
+  convertPriceToBase,
 } from '@utils/matchSuggestions';
+import type { ItemMini, Bundle } from '@utils/matchSuggestions';
+import { useMatchInventoryContext } from '@contexts/MatchInventoryContext';
 
 export interface SwapSuggestionItem {
   id: string;
@@ -50,6 +52,32 @@ export function useSwapSuggestions({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const { setItems: setInventoryItems, setBundles: setInventoryBundles, items: inventoryItems, bundles: inventoryBundles } = useMatchInventoryContext();
+
+  const findMatchingBundles = useCallback(
+    (
+      item: { price?: number | null; estimated_value?: number | null; currency?: string | null },
+      rates: Record<string, number>,
+      options?: { baseCurrency?: string; toleranceMultiplier?: number; bundles?: Bundle[] }
+    ) => {
+      if (!rates) return [];
+      const baseCurrency = options?.baseCurrency ?? 'USD';
+      const toleranceMultiplier = options?.toleranceMultiplier ?? MATCH_BUNDLE_TOLERANCE;
+      const sourceBundles = options?.bundles ?? inventoryBundles;
+      if (!sourceBundles || sourceBundles.length === 0) return [];
+      const price = Number(item.price ?? item.estimated_value ?? 0);
+      const currency = item.currency ?? baseCurrency;
+      if (!Number.isFinite(price) || price <= 0) return [];
+      const priceBase = convertPriceToBase(price, currency, rates, baseCurrency);
+      if (!Number.isFinite(priceBase) || priceBase <= 0) return [];
+      const toleranceValue = priceBase * toleranceMultiplier;
+      const min = Math.max(0, priceBase - toleranceValue);
+      const max = priceBase + toleranceValue;
+      return sourceBundles.filter((bundle) => bundle.totalBase >= min && bundle.totalBase <= max);
+    },
+    [inventoryBundles]
+  );
+
   // Create stable key for dependency and fetch-deduping
   const bundleKey = useMemo(() => {
     if (!bundleData?.bundle_items) return null;
@@ -87,29 +115,42 @@ export function useSwapSuggestions({
       });
       const rates = (ratesRes?.data || {}) as Record<string, number>;
 
-      const accuracy = 0.8;
       const base = 'USD';
 
-      const bundles = bundleData?.bundle_items && bundleData.bundle_items.length > 0
-        ? getUniqueBundlesForTarget(accuracy, bundleData.bundle_items as any[], rates, myItems, { baseCurrency: base, maxItemsPerBundle: 3, maxResults: 5 })
-        : findBundlesByAccuracy(
-            (() => {
-              const rBase = rates[base] ?? 1;
-              const rTarget = rates[targetItemCurrency] ?? 1;
-              return targetItemPrice * (rTarget / rBase);
-            })(),
-            myItems,
-            rates,
-            accuracy,
-            {
-              baseCurrency: base,
-              maxItemsPerBundle: 3,
-              maxResults: 5,
-              toleranceMultiplier: MATCH_PRICE_TOLERANCE,
-            }
-          );
+      const normalizedItems: ItemMini[] = myItems.map((item) => ({
+        id: item.id,
+        price: Number(item.price ?? 0) || 0,
+        currency: item.currency || base,
+      }));
 
-      const mapped: SwapSuggestion[] = bundles.map(b => {
+      if (inventoryItems.length === 0) {
+        setInventoryItems(normalizedItems);
+      }
+
+      let bundlePool = inventoryBundles.length > 0
+        ? inventoryBundles
+        : findAllBundles(normalizedItems, rates, {
+            baseCurrency: base,
+            maxItemsPerBundle: 3,
+          });
+
+      if (inventoryBundles.length === 0) {
+        setInventoryBundles(bundlePool);
+        bundlePool.forEach((bundle, index) => {
+          console.log(`Bundle${index + 1} Total : ${bundle.totalBase.toFixed(2)}$`);
+        });
+      }
+
+      const bundleMatches = findMatchingBundles(
+        { price: targetItemPrice, currency: targetItemCurrency },
+        rates,
+        {
+          baseCurrency: base,
+          bundles: bundlePool,
+        }
+      );
+
+      const mapped: SwapSuggestion[] = bundleMatches.map(b => {
         const itemsRaw = b.itemIds.map(id => myItems.find(m => m.id === id)).filter(Boolean) as any[];
         const seenIds = new Set<string>();
         const items = itemsRaw.filter((it) => {
@@ -146,7 +187,7 @@ export function useSwapSuggestions({
     } finally {
       setLoading(false);
     }
-  }, [userId, targetItemId, targetItemPrice, targetItemCurrency, bundleData, bundleKey]);
+  }, [userId, targetItemId, targetItemPrice, targetItemCurrency, bundleData, bundleKey, inventoryItems.length, inventoryBundles.length]);
 
   useEffect(() => {
     refetch();

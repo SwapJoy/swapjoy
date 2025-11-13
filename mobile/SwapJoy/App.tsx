@@ -12,6 +12,7 @@ import { PushNotificationService } from './services/pushNotificationService';
 import { NotificationNavigation } from './utils/notificationNavigation';
 import { RootStackParamList } from './types/navigation';
 import { LocalizationProvider, useLocalization } from './localization';
+import { MatchInventoryProvider } from './contexts/MatchInventoryContext';
 
 // Configure Google Sign-In as early as possible to ensure native config is set
 const WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID
@@ -86,7 +87,9 @@ export default function App() {
     <LocalizationProvider>
       <AuthProvider>
         <FavoritesProvider>
-          <AppContent />
+          <MatchInventoryProvider>
+            <AppContent />
+          </MatchInventoryProvider>
         </FavoritesProvider>
       </AuthProvider>
     </LocalizationProvider>

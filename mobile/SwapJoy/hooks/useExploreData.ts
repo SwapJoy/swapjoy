@@ -3,6 +3,11 @@ import { ApiService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useLocalization } from '../localization';
 import { resolveCategoryName } from '../utils/category';
+import { useMatchInventoryContext } from '../contexts/MatchInventoryContext';
+import { convertPriceToBase } from '../utils/matchSuggestions';
+
+const MATCH_PRICE_TOLERANCE = 1.0;
+const MATCH_BUNDLE_TOLERANCE = 2.5;
 
 export interface AIOffer {
   id: string;
@@ -44,6 +49,25 @@ export const useExploreData = (options?: UseExploreDataOptions) => {
   const hasFetchedRef = useRef(false);
   const forceBypassRef = useRef(false);
   const isFetchingRef = useRef(false);
+  const { items: inventoryItems, bundles: inventoryBundles } = useMatchInventoryContext();
+  const [rateMap, setRateMap] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    let isActive = true;
+    (async () => {
+      try {
+        const { data } = await ApiService.getRateMap();
+        if (isActive && data) {
+          setRateMap(data);
+        }
+      } catch (err) {
+        console.warn('[useExploreData] Failed to load rate map:', err);
+      }
+    })();
+    return () => {
+      isActive = false;
+    };
+  }, []);
 
 
   const calculateMatchScore = useCallback((item: any, currentUser: any) => {
@@ -142,6 +166,74 @@ export const useExploreData = (options?: UseExploreDataOptions) => {
 
     return reasons[Math.floor(Math.random() * reasons.length)];
   }, []);
+
+  const findMatchingBundles = useCallback(
+    (
+      item: { price?: number | null; estimated_value?: number | null; currency?: string | null },
+      rates: Record<string, number> = rateMap,
+      opts?: { baseCurrency?: string; maxItemsPerBundle?: number }
+    ) => {
+      if (!rates || Object.keys(rates).length === 0 || inventoryBundles.length === 0) {
+        return [];
+      }
+      const baseCurrency = opts?.baseCurrency ?? 'USD';
+      const price = Number(item.price ?? item.estimated_value ?? 0);
+      const currency = item.currency ?? baseCurrency;
+      if (!Number.isFinite(price) || price <= 0) {
+        return [];
+      }
+      const priceBase = convertPriceToBase(price, currency, rates, baseCurrency);
+      if (!Number.isFinite(priceBase) || priceBase <= 0) {
+        return [];
+      }
+      const toleranceValue = priceBase * MATCH_BUNDLE_TOLERANCE;
+      const min = Math.max(0, priceBase - toleranceValue);
+      const max = priceBase + toleranceValue;
+      const maxResults = opts?.maxItemsPerBundle ?? inventoryBundles.length;
+      return inventoryBundles
+        .filter((bundle) => bundle.totalBase >= min && bundle.totalBase <= max)
+        .slice(0, maxResults);
+    },
+    [inventoryBundles, rateMap]
+  );
+
+  const findMatchingItems = useCallback(
+    (
+      item: { price?: number | null; estimated_value?: number | null; currency?: string | null },
+      rates: Record<string, number> = rateMap,
+      opts?: { baseCurrency?: string; maxResults?: number }
+    ) => {
+      if (!rates || Object.keys(rates).length === 0 || inventoryItems.length === 0) {
+        return [];
+      }
+      const baseCurrency = opts?.baseCurrency ?? 'USD';
+      const price = Number(item.price ?? item.estimated_value ?? 0);
+      const currency = item.currency ?? baseCurrency;
+      if (!Number.isFinite(price) || price <= 0) {
+        return [];
+      }
+      const targetPriceBase = convertPriceToBase(price, currency, rates, baseCurrency);
+      if (!Number.isFinite(targetPriceBase) || targetPriceBase <= 0) {
+        return [];
+      }
+      const toleranceValue = targetPriceBase * MATCH_PRICE_TOLERANCE;
+      const min = Math.max(0, targetPriceBase - toleranceValue);
+      const max = targetPriceBase + toleranceValue;
+      const maxResults = opts?.maxResults ?? inventoryItems.length;
+      return inventoryItems
+        .filter((invItem) => {
+          const itemPriceBase = convertPriceToBase(
+            Number(invItem.price ?? 0),
+            invItem.currency ?? baseCurrency,
+            rates,
+            baseCurrency
+          );
+          return Number.isFinite(itemPriceBase) && itemPriceBase >= min && itemPriceBase <= max;
+        })
+        .slice(0, maxResults);
+    },
+    [inventoryItems, rateMap]
+  );
 
   const fetchAIOffers = useCallback(async () => {
     console.log('[useExploreData] fetchAIOffers start. user?', !!user);
@@ -362,8 +454,10 @@ export const useExploreData = (options?: UseExploreDataOptions) => {
     isFetching,
     hasData,
     isInitialized,
-    error, // ADD: Expose error for UI display
+    error,
     user,
     refreshData,
-  }), [aiOffers, loading, isFetching, hasData, isInitialized, error, user, refreshData]);
+    findMatchingBundles,
+    findMatchingItems,
+  }), [aiOffers, loading, isFetching, hasData, isInitialized, error, user, refreshData, findMatchingBundles, findMatchingItems]);
 };
