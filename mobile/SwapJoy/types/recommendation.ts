@@ -26,11 +26,11 @@ export interface RecommendationWeights {
 }
 
 export const DEFAULT_RECOMMENDATION_WEIGHTS: RecommendationWeights = {
-  category_score: 0.8,    // 80% weight on category matching
-  price_score: 0.6,       // 60% weight on price matching
-  location_lat: 0.4,      // 40% weight on location
-  location_lng: 0.4,      // 40% weight on location
-  similarity_weight: 1.0, // 100% weight on semantic similarity (base)
+  category_score: 0.9,    // 80% weight on category matching
+  price_score: 0.1,       // 60% weight on price matching
+  location_lat: 0.1,      // 40% weight on location
+  location_lng: 0.1,      // 40% weight on location
+  similarity_weight: 0.0, // 100% weight on semantic similarity (base)
 };
 
 // Clamp value between 0 and 1

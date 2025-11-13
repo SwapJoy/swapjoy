@@ -37,7 +37,7 @@ interface LocalizationContextValue {
   availableLanguages: readonly AppLanguage[];
   isLoading: boolean;
   setLanguage: (language: AppLanguage) => Promise<void>;
-  t: (key: string, options?: { defaultValue?: string }) => string;
+  t: (key: string, options?: TranslationOptions) => string;
   getLanguageLabel: (language: AppLanguage) => string;
 }
 
@@ -45,6 +45,11 @@ const LocalizationContext = createContext<LocalizationContextValue | undefined>(
 
 const isSupportedLanguage = (value: string): value is AppLanguage =>
   SUPPORTED_LANGUAGES.includes(value as AppLanguage);
+
+type TranslationOptions = {
+  defaultValue?: string;
+  [key: string]: any;
+};
 
 const resolveTranslation = (
   dictionary: TranslationDictionary,
@@ -93,6 +98,23 @@ const detectDeviceLanguage = (): AppLanguage => {
   }
 
   return DEFAULT_LANGUAGE;
+};
+
+const applyInterpolation = (template: string, options?: TranslationOptions): string => {
+  if (!options) {
+    return template;
+  }
+
+  return template.replace(/\{([^}]+)\}/g, (match, rawKey) => {
+    if (rawKey === 'defaultValue') {
+      return match;
+    }
+    const value = options[rawKey];
+    if (value === null || value === undefined) {
+      return match;
+    }
+    return String(value);
+  });
 };
 
 export const LocalizationProvider: React.FC<PropsWithChildren> = ({ children }) => {
@@ -161,21 +183,22 @@ export const LocalizationProvider: React.FC<PropsWithChildren> = ({ children }) 
   );
 
   const translate = useCallback(
-    (key: string, options?: { defaultValue?: string }) => {
+    (key: string, options?: TranslationOptions) => {
       const activeDictionary = translations[language];
       const fallbackDictionary = translations[DEFAULT_LANGUAGE];
 
       const value = resolveTranslation(activeDictionary, key);
       if (typeof value === 'string') {
-        return value;
+        return applyInterpolation(value, options);
       }
 
       const fallbackValue = resolveTranslation(fallbackDictionary, key);
       if (typeof fallbackValue === 'string') {
-        return fallbackValue;
+        return applyInterpolation(fallbackValue, options);
       }
 
-      return options?.defaultValue ?? key;
+      const fallback = options?.defaultValue ?? key;
+      return applyInterpolation(fallback, options);
     },
     [language]
   );

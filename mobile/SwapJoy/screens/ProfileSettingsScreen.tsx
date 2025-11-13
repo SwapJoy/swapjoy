@@ -33,6 +33,7 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigatio
   const [categoryOptions, setCategoryOptions] = useState<CategoryOption[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [savingCategoryId, setSavingCategoryId] = useState<string | null>(null);
+  const [isCategoryModalVisible, setCategoryModalVisible] = useState(false);
   const charLimit = 500;
 
   const promptModalSubtitle = useMemo(
@@ -58,6 +59,20 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigatio
       }),
     [preferredRadius, t]
   );
+
+  const categoryMap = useMemo(() => {
+    const map: Record<string, CategoryOption> = {};
+    categoryOptions.forEach((category) => {
+      map[category.id] = category;
+    });
+    return map;
+  }, [categoryOptions]);
+
+  const selectedCategoryObjects = useMemo(() => {
+    return favoriteCategories
+      .map((id) => categoryMap[id])
+      .filter((entry): entry is CategoryOption => Boolean(entry));
+  }, [categoryMap, favoriteCategories]);
 
   const sortedCategories = useMemo(() => {
     if (categoryOptions.length === 0) {
@@ -337,53 +352,39 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigatio
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.sectionTitle}>{t('settings.profile.favoriteCategoriesTitle')}</Text>
+        <View style={styles.categoryHeaderRow}>
+          <Text style={styles.sectionTitle}>{t('settings.profile.favoriteCategoriesTitle')}</Text>
+          <TouchableOpacity
+            onPress={() => setCategoryModalVisible(true)}
+            disabled={categoriesLoading}
+            style={styles.manageCategoriesButton}
+            activeOpacity={0.8}
+          >
+            {categoriesLoading ? (
+              <ActivityIndicator size="small" color="#1f7ae0" />
+            ) : (
+              <Text style={styles.manageCategoriesText}>
+                {t('settings.profile.favoriteCategoriesManage')}
+              </Text>
+            )}
+          </TouchableOpacity>
+        </View>
         <Text style={styles.sectionSubtitle}>{t('settings.profile.favoriteCategoriesSubtitle')}</Text>
         {categoriesLoading ? (
           <View style={styles.categoriesLoading}>
             <ActivityIndicator size="small" color="#1f7ae0" />
           </View>
-        ) : sortedCategories.length === 0 ? (
+        ) : selectedCategoryObjects.length === 0 ? (
           <Text style={styles.categoriesEmptyText}>
-            {t('settings.profile.favoriteCategoriesEmpty')}
+            {t('settings.profile.favoriteCategoriesNoneSelected')}
           </Text>
         ) : (
-          <View style={styles.categoryBubbleWrap}>
-            {sortedCategories.map((category) => {
-              const selected = favoriteCategories.includes(category.id);
-              const isSaving = savingCategoryId === category.id;
-              return (
-                <TouchableOpacity
-                  key={category.id}
-                  style={[
-                    styles.categoryBubble,
-                    selected && styles.categoryBubbleSelected,
-                  ]}
-                  onPress={() => toggleCategorySelection(category.id)}
-                  disabled={isSaving}
-                  activeOpacity={0.85}
-                >
-                  <View style={styles.categoryBubbleLeft}>
-                    {isSaving ? (
-                      <ActivityIndicator
-                        size="small"
-                        color={selected ? '#ffffff' : '#0f172a'}
-                      />
-                    ) : !selected ? (
-                      <Text style={styles.categoryBubblePlus}>+</Text>
-                    ) : null}
-                  </View>
-                  <Text
-                    style={[
-                      styles.categoryBubbleLabel,
-                      selected && styles.categoryBubbleLabelSelected,
-                    ]}
-                  >
-                    {category.name}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
+          <View style={styles.selectedCategoriesWrap}>
+            {selectedCategoryObjects.map((category) => (
+              <View key={category.id} style={styles.selectedCategoryChip}>
+                <Text style={styles.selectedCategoryChipText}>{category.name}</Text>
+              </View>
+            ))}
           </View>
         )}
       </View>
@@ -505,6 +506,78 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigatio
               activeOpacity={0.8}
             >
               <Text style={styles.choiceModalCancelText}>{t('common.cancel')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={isCategoryModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setCategoryModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.choiceModalCard}>
+            <Text style={styles.choiceModalTitle}>{t('settings.profile.favoriteCategoriesModalTitle')}</Text>
+            <Text style={styles.choiceModalSubtitle}>{t('settings.profile.favoriteCategoriesModalSubtitle')}</Text>
+            {categoriesLoading ? (
+              <View style={styles.categoriesLoading}>
+                <ActivityIndicator size="small" color="#1f7ae0" />
+              </View>
+            ) : sortedCategories.length === 0 ? (
+              <Text style={styles.categoriesEmptyText}>
+                {t('settings.profile.favoriteCategoriesEmpty')}
+              </Text>
+            ) : (
+              <ScrollView contentContainerStyle={styles.categoryModalList}>
+                <View style={styles.categoryBubbleWrap}>
+                  {sortedCategories.map((category) => {
+                    const selected = favoriteCategories.includes(category.id);
+                    const isSaving = savingCategoryId === category.id;
+                    return (
+                      <TouchableOpacity
+                        key={category.id}
+                        style={[
+                          styles.categoryBubble,
+                          selected && styles.categoryBubbleSelected,
+                        ]}
+                        onPress={() => toggleCategorySelection(category.id)}
+                        disabled={isSaving}
+                        activeOpacity={0.85}
+                      >
+                        <View style={styles.categoryBubbleLeft}>
+                          {isSaving ? (
+                            <ActivityIndicator
+                              size="small"
+                              color={selected ? '#ffffff' : '#0f172a'}
+                            />
+                          ) : !selected ? (
+                            <Text style={styles.categoryBubblePlus}>+</Text>
+                          ) : null}
+                        </View>
+                        <Text
+                          style={[
+                            styles.categoryBubbleLabel,
+                            selected && styles.categoryBubbleLabelSelected,
+                          ]}
+                        >
+                          {category.name}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </ScrollView>
+            )}
+            <TouchableOpacity
+              style={styles.choiceModalCancel}
+              onPress={() => setCategoryModalVisible(false)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.choiceModalCancelText}>
+                {t('settings.profile.favoriteCategoriesModalClose')}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -644,6 +717,25 @@ const styles = StyleSheet.create({
   languageSelectorWrapper: {
     gap: 12,
   },
+  categoryHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  manageCategoriesButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#1f7ae0',
+    backgroundColor: '#fff',
+  },
+  manageCategoriesText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#1f7ae0',
+  },
   categoriesLoading: {
     paddingVertical: 12,
     alignItems: 'center',
@@ -652,6 +744,23 @@ const styles = StyleSheet.create({
   categoriesEmptyText: {
     fontSize: 13,
     color: '#94a3b8',
+  },
+  selectedCategoriesWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 6,
+  },
+  selectedCategoryChip: {
+    backgroundColor: '#1f7ae0',
+    borderRadius: 16,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+  },
+  selectedCategoryChipText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
   categoryBubbleWrap: {
     flexDirection: 'row',
@@ -707,6 +816,10 @@ const styles = StyleSheet.create({
     maxHeight: '70%',
   },
   choiceModalTitle: { fontSize: 18, fontWeight: '700', color: '#0f172a', marginBottom: 12 },
+  choiceModalSubtitle: { fontSize: 13, color: '#64748b', marginBottom: 16 },
+  categoryModalList: {
+    paddingBottom: 8,
+  },
   choiceOptionList: { gap: 10 },
   choiceOption: {
     flexDirection: 'row',

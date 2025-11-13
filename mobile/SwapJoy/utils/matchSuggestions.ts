@@ -3,9 +3,31 @@ export type RateMap = Record<string, number>;
 
 export type Bundle = { itemIds: string[]; totalBase: number; score: number };
 
+/**
+ * Price tolerance multiplier used for match generation.
+ *
+ * Interpretation:
+ *   - Value is a scalar in the 0-100 range (but decimals are allowed).
+ *   - The allowed price window is calculated as:
+ *        toleranceValue = MATCH_PRICE_TOLERANCE * targetPrice
+ *        minPrice = targetPrice - toleranceValue (clamped at 0)
+ *        maxPrice = targetPrice + toleranceValue
+ *
+ * Examples (target price = 100):
+ *   MATCH_PRICE_TOLERANCE = 0.5  → window [50, 150]
+ *   MATCH_PRICE_TOLERANCE = 50   → window [0, 5_100]
+ */
+export const MATCH_PRICE_TOLERANCE = 2;
+
+/**
+ * Dedicated tolerance multiplier for bundle generation.
+ * Defaults to a wider window than single-item matches.
+ */
+export const MATCH_BUNDLE_TOLERANCE = 2.5;
+
 // Compute up to 5 unique bundles for a given target composed of bundle items.
 // Params:
-// - accuracy: number in [0,1]; higher means tighter tolerance to target price
+// - accuracy: number in [0,1]; higher means tighter tolerance to target price (retained for backwards compatibility but overridden by MATCH_PRICE_TOLERANCE)
 // - bundleItems: array of items that form the target (must include id/price/currency or compatible shape)
 // - rates: currency rate map
 // - userItems: current user's published items to use for composing bundles
@@ -45,8 +67,8 @@ export function findBundlesByAccuracy(
   targetPriceBase: number,
   userItems: ItemMini[],
   rates: RateMap,
-  accuracy: number,
-  opts?: { baseCurrency?: string; maxItemsPerBundle?: number; maxResults?: number }
+  _accuracy: number,
+  opts?: { baseCurrency?: string; maxItemsPerBundle?: number; maxResults?: number; toleranceMultiplier?: number }
 ): Bundle[] {
   const base = opts?.baseCurrency ?? "USD";
   const cap = Math.max(1, Math.min(3, opts?.maxItemsPerBundle ?? 3));
@@ -77,13 +99,24 @@ export function findBundlesByAccuracy(
 
   // ---- tolerance window
   const tCents = Math.round(targetPriceBase * 100);
-  const tol = Math.min(1, Math.max(0, 1 - accuracy)); // acc=1→0, acc=0→1
-  const minTotal = Math.max(0, Math.floor(tCents * (1 - tol)));
-  const maxTotal = Math.ceil(tCents * (1 + tol));
+  const toleranceMultiplier = Math.max(
+    0,
+    Math.min(100, opts?.toleranceMultiplier ?? MATCH_BUNDLE_TOLERANCE)
+  );
+  const tolBase = toleranceMultiplier * 100; // absolute currency amount in base units
+  const tolCents = Math.round(Math.max(0, tolBase) * 100);
 
-  // Score: 1 at perfect match, 0 at tolerance edge (stable at acc=1)
-  const denom = Math.max(1, Math.round(tCents * Math.max(tol, 1e-6)));
-  const scoreOf = (sumCents: number) => 1 - Math.abs(sumCents - tCents) / denom;
+  const minTotal = Math.max(0, tCents - tolCents);
+  const maxTotal = tCents + tolCents;
+
+  const scoreDenom = tolCents > 0 ? tolCents : Math.max(1, tCents);
+  const scoreOf = (sumCents: number) => {
+    const diff = Math.abs(sumCents - tCents);
+    if (tolCents === 0) {
+      return diff === 0 ? 1 : 0;
+    }
+    return Math.max(0, 1 - diff / scoreDenom);
+  };
 
   const keyOf = (ids: string[]) => ids.slice().sort().join(",");
   const seenKeys = new Set<string>();

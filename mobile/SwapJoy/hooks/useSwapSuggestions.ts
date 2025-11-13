@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ApiService } from '@services/api';
-import { findBundlesByAccuracy, getUniqueBundlesForTarget } from '@utils/matchSuggestions';
+import {
+  MATCH_PRICE_TOLERANCE,
+  findBundlesByAccuracy,
+  getUniqueBundlesForTarget,
+} from '@utils/matchSuggestions';
 
 export interface SwapSuggestionItem {
   id: string;
@@ -97,7 +101,12 @@ export function useSwapSuggestions({
             myItems,
             rates,
             accuracy,
-            { baseCurrency: base, maxItemsPerBundle: 3, maxResults: 5 }
+            {
+              baseCurrency: base,
+              maxItemsPerBundle: 3,
+              maxResults: 5,
+              toleranceMultiplier: MATCH_PRICE_TOLERANCE,
+            }
           );
 
       const mapped: SwapSuggestion[] = bundles.map(b => {
