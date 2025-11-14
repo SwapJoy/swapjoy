@@ -24,6 +24,7 @@ export class UserService {
     prompt: string;
     preferred_radius_km: number | null;
     favorite_categories: string[] | null;
+    preferred_currency: string;
   }>) {
     return ApiService.updateProfile(updates);
   }

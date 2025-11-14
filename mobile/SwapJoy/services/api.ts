@@ -304,6 +304,7 @@ export class ApiService {
     favorite_categories?: string[];
     prompt?: string;
     preferred_radius_km?: number | null;
+    preferred_currency?: string;
   }>) {
     return this.authenticatedCall(async (client) => {
       const currentUser = await AuthService.getCurrentUser();

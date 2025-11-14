@@ -20,6 +20,7 @@ import { ItemDetailsFormScreenProps } from '../types/navigation';
 import { DraftManager } from '../services/draftManager';
 import { ImageUploadService } from '../services/imageUpload';
 import { ApiService } from '../services/api';
+import { UserService } from '../services/userService';
 import { ItemDraft, ItemCondition, Category } from '../types/item';
 import { getCurrencySymbol } from '../utils';
 import { useLocalization } from '../localization';
@@ -150,6 +151,26 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
   const loadDraftAndCategories = useCallback(async () => {
     try {
       setLoadingCategories(true);
+      
+      // Load user profile to get preferred currency FIRST
+      let userPreferredCurrency = 'USD';
+      try {
+        const profileResult = await UserService.getProfile();
+        if (profileResult?.data && typeof profileResult.data === 'object') {
+          const profileData = profileResult.data as any;
+          if (typeof profileData.preferred_currency === 'string' && profileData.preferred_currency) {
+            userPreferredCurrency = profileData.preferred_currency;
+            console.log('[ItemDetailsForm] Loaded preferred currency from profile:', userPreferredCurrency);
+          } else {
+            console.log('[ItemDetailsForm] No preferred_currency in profile, using default USD');
+          }
+        } else {
+          console.warn('[ItemDetailsForm] Profile data is not an object:', profileResult);
+        }
+      } catch (error) {
+        console.warn('[ItemDetailsForm] Failed to load user profile for preferred currency:', error);
+      }
+      
       // Load draft
       const loadedDraft = await DraftManager.getDraft(draftId);
       if (loadedDraft) {
@@ -159,7 +180,20 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
         setCategory(loadedDraft.category_id);
         setCondition(loadedDraft.condition);
         setPrice(loadedDraft.price);
-        setCurrency(loadedDraft.currency || 'USD');
+        // Use draft currency only if it exists, is valid, AND is not the default USD
+        // Otherwise, always use preferred currency to ensure user's preference is respected
+        const draftCurrency = loadedDraft.currency;
+        const hasValidDraftCurrency = draftCurrency && typeof draftCurrency === 'string' && draftCurrency.trim() && draftCurrency !== 'USD';
+        const currencyToUse = hasValidDraftCurrency ? draftCurrency : userPreferredCurrency;
+        
+        console.log('[ItemDetailsForm] Draft currency:', draftCurrency, 'Preferred:', userPreferredCurrency, 'Using:', currencyToUse);
+        
+        setCurrency(currencyToUse);
+        // If we're using preferred currency (either because draft doesn't have one or it's the default USD), save it to the draft
+        if (currencyToUse === userPreferredCurrency && (!draftCurrency || draftCurrency === 'USD' || draftCurrency !== userPreferredCurrency)) {
+          console.log('[ItemDetailsForm] Updating draft with preferred currency:', currencyToUse);
+          await DraftManager.updateDraft(draftId, { currency: currencyToUse });
+        }
         setLocationCoords({
           lat: loadedDraft.location_lat,
           lng: loadedDraft.location_lng,
@@ -197,6 +231,10 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
       if (!loadedDraft) {
         setLocationCoords({ lat: null, lng: null });
         setLocationLabel(null);
+        // If no draft exists, use user's preferred currency
+        setCurrency(userPreferredCurrency);
+        // Also save it to the draft so it persists
+        await DraftManager.updateDraft(draftId, { currency: userPreferredCurrency });
       }
 
       // Load categories

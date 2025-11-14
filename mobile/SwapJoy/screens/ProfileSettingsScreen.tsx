@@ -13,6 +13,12 @@ import { CategoryService } from '../services/categoryService';
 const RADIUS_OPTIONS = [1, 2, 3, 5, 10, 15, 20, 30, 40, 50] as const;
 const DEFAULT_RADIUS_KM = 50;
 
+const CURRENCY_DEFS: { code: string; symbol: string }[] = [
+  { code: 'USD', symbol: '$' },
+  { code: 'EUR', symbol: '€' },
+  { code: 'GEL', symbol: '₾' },
+];
+
 type CategoryOption = {
   id: string;
   name: string;
@@ -34,6 +40,9 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigatio
   const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [savingCategoryId, setSavingCategoryId] = useState<string | null>(null);
   const [isCategoryModalVisible, setCategoryModalVisible] = useState(false);
+  const [preferredCurrency, setPreferredCurrency] = useState<string>('USD');
+  const [isCurrencyModalVisible, setCurrencyModalVisible] = useState(false);
+  const [savingCurrency, setSavingCurrency] = useState(false);
   const charLimit = 500;
 
   const promptModalSubtitle = useMemo(
@@ -83,6 +92,20 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigatio
     const unselected = categoryOptions.filter((cat) => !selectedSet.has(cat.id));
     return [...selected, ...unselected];
   }, [categoryOptions, favoriteCategories]);
+
+  const currencyOptions = useMemo(
+    () =>
+      CURRENCY_DEFS.map((curr) => ({
+        ...curr,
+        label: t(`addItem.currencies.${curr.code}` as const),
+      })),
+    [t]
+  );
+
+  const currencySubtitle = useMemo(() => {
+    const currency = currencyOptions.find((c) => c.code === preferredCurrency);
+    return currency ? `${currency.symbol} ${currency.label}` : preferredCurrency;
+  }, [preferredCurrency, currencyOptions]);
 
   const handleRadiusSelect = useCallback(
     async (value: number) => {
@@ -162,6 +185,40 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigatio
     [t]
   );
 
+  const handleCurrencySelect = useCallback(
+    async (currencyCode: string) => {
+      if (currencyCode === preferredCurrency) {
+        setCurrencyModalVisible(false);
+        return;
+      }
+      if (savingCurrency) {
+        return;
+      }
+      setSavingCurrency(true);
+      try {
+        const { error } = await UserService.updateProfile({ preferred_currency: currencyCode });
+        if (error) {
+          throw new Error(error.message || 'Failed to update currency');
+        }
+        setPreferredCurrency(currencyCode);
+        setProfile((prev) => (prev ? { ...prev, preferred_currency: currencyCode } : prev));
+        setCurrencyModalVisible(false);
+      } catch (error: any) {
+        console.error('[ProfileSettings] Currency update error:', error);
+        Alert.alert(
+          t('common.error', { defaultValue: 'Error' }),
+          error?.message ||
+            t('settings.profile.currencyUpdateError', {
+              defaultValue: 'Could not update preferred currency. Please try again.',
+            })
+        );
+      } finally {
+        setSavingCurrency(false);
+      }
+    },
+    [preferredCurrency, savingCurrency, t]
+  );
+
   const handleEditProfilePress = useCallback(() => {
     if (!profile) {
       return;
@@ -233,6 +290,11 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigatio
       setProfile(data);
       setPrompt(typeof data.prompt === 'string' ? data.prompt : '');
       setPreferredRadius(resolveRadius(data.preferred_radius_km));
+      setPreferredCurrency(
+        typeof data.preferred_currency === 'string' && data.preferred_currency
+          ? data.preferred_currency
+          : 'USD'
+      );
       const favorites = Array.isArray(data.favorite_categories)
         ? (data.favorite_categories as any[]).filter((id) => typeof id === 'string')
         : [];
@@ -348,6 +410,20 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigatio
             )
           }
           disabled={profileLoading || savingRadius}
+        />
+        <Item
+          icon="💵"
+          title={t('settings.profile.currencyTitle', { defaultValue: 'Preferred Currency' })}
+          subtitle={currencySubtitle}
+          onPress={() => setCurrencyModalVisible(true)}
+          rightContent={
+            savingCurrency ? (
+              <ActivityIndicator size="small" color="#1f7ae0" />
+            ) : (
+              <Text style={styles.itemArrow}>›</Text>
+            )
+          }
+          disabled={profileLoading || savingCurrency}
         />
       </View>
 
@@ -578,6 +654,48 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigatio
               <Text style={styles.choiceModalCancelText}>
                 {t('settings.profile.favoriteCategoriesModalClose')}
               </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={isCurrencyModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setCurrencyModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.choiceModalCard}>
+            <Text style={styles.choiceModalTitle}>
+              {t('settings.profile.currencyModalTitle', { defaultValue: 'Select Currency' })}
+            </Text>
+            <View style={styles.choiceOptionList}>
+              {currencyOptions.map((curr) => {
+                const isActive = preferredCurrency === curr.code;
+                return (
+                  <TouchableOpacity
+                    key={curr.code}
+                    style={[styles.choiceOption, isActive && styles.choiceOptionActive]}
+                    onPress={() => handleCurrencySelect(curr.code)}
+                    disabled={savingCurrency}
+                    activeOpacity={0.85}
+                  >
+                    <View style={styles.conditionItem}>
+                      <Text style={styles.modalItemText}>{curr.symbol}</Text>
+                      <Text style={styles.modalItemText}>{curr.label}</Text>
+                    </View>
+                    {isActive ? <Ionicons name="checkmark" size={18} color="#1f2937" /> : null}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <TouchableOpacity
+              style={styles.choiceModalCancel}
+              onPress={() => setCurrencyModalVisible(false)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.choiceModalCancelText}>{t('common.cancel')}</Text>
             </TouchableOpacity>
           </View>
         </View>
