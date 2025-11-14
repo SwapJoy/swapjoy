@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ApiService } from '@services/api';
 import {
-  MATCH_BUNDLE_TOLERANCE,
   findAllBundles,
   convertPriceToBase,
+  convertBaseToCurrency,
 } from '@utils/matchSuggestions';
 import type { ItemMini, Bundle } from '@utils/matchSuggestions';
 import { useMatchInventoryContext } from '@contexts/MatchInventoryContext';
+
+const MATCH_PRICE_TOLERANCE = 2.5;
+const MATCH_BUNDLE_TOLERANCE = 2.5;
 
 export interface SwapSuggestionItem {
   id: string;
@@ -58,11 +61,10 @@ export function useSwapSuggestions({
     (
       item: { price?: number | null; estimated_value?: number | null; currency?: string | null },
       rates: Record<string, number>,
-      options?: { baseCurrency?: string; toleranceMultiplier?: number; bundles?: Bundle[] }
+      options?: { baseCurrency?: string; bundles?: Bundle[] }
     ) => {
       if (!rates) return [];
       const baseCurrency = options?.baseCurrency ?? 'USD';
-      const toleranceMultiplier = options?.toleranceMultiplier ?? MATCH_BUNDLE_TOLERANCE;
       const sourceBundles = options?.bundles ?? inventoryBundles;
       if (!sourceBundles || sourceBundles.length === 0) return [];
       const price = Number(item.price ?? item.estimated_value ?? 0);
@@ -70,12 +72,75 @@ export function useSwapSuggestions({
       if (!Number.isFinite(price) || price <= 0) return [];
       const priceBase = convertPriceToBase(price, currency, rates, baseCurrency);
       if (!Number.isFinite(priceBase) || priceBase <= 0) return [];
-      const toleranceValue = priceBase * toleranceMultiplier;
-      const min = Math.max(0, priceBase - toleranceValue);
-      const max = priceBase + toleranceValue;
+      const { min, max } = computePriceWindow(priceBase, MATCH_BUNDLE_TOLERANCE);
       return sourceBundles.filter((bundle) => bundle.totalBase >= min && bundle.totalBase <= max);
     },
     [inventoryBundles]
+  );
+
+  function computePriceWindow(
+    targetPriceBase: number,
+    toleranceMultiplier: number
+  ): { min: number; max: number } {
+    if (!Number.isFinite(targetPriceBase) || targetPriceBase <= 0) {
+      return { min: 0, max: 0 };
+    }
+    if (toleranceMultiplier >= 1) {
+      return {
+        min: targetPriceBase / toleranceMultiplier,
+        max: targetPriceBase * toleranceMultiplier,
+      };
+    }
+    const toleranceValue = targetPriceBase * toleranceMultiplier;
+    return {
+      min: Math.max(0, targetPriceBase - toleranceValue),
+      max: targetPriceBase + toleranceValue,
+    };
+  }
+
+  const findMatchingItems = useCallback(
+    (
+      item: { price?: number | null; estimated_value?: number | null; currency?: string | null },
+      rates: Record<string, number>,
+      options?: { baseCurrency?: string; items?: ItemMini[] }
+    ) => {
+      if (!rates) return [];
+      const baseCurrency = options?.baseCurrency ?? 'USD';
+      const sourceItems = options?.items ?? inventoryItems;
+      if (!sourceItems || sourceItems.length === 0) return [];
+
+      const rawPrice = Number(item.price ?? item.estimated_value ?? 0);
+      const currency = item.currency ?? baseCurrency;
+      if (!Number.isFinite(rawPrice) || rawPrice <= 0) return [];
+
+      const targetPriceBase = convertPriceToBase(rawPrice, currency, rates, baseCurrency);
+      if (!Number.isFinite(targetPriceBase) || targetPriceBase <= 0) return [];
+
+      const { min, max } = computePriceWindow(targetPriceBase, MATCH_PRICE_TOLERANCE);
+  
+      const matches: typeof sourceItems = [];
+      const debugDetails: {
+        id: string | undefined;
+        price: number;
+        currency: string;
+        priceBase: number;
+        diff: number;
+      }[] = [];
+
+      for (const invItem of sourceItems) {
+        const price = Number((invItem as any).price ?? 0);
+        const itemCurrency = ((invItem as any).currency as string) ?? baseCurrency;
+
+        const priceBase = convertPriceToBase(price, itemCurrency, rates, baseCurrency);
+
+        if (Number.isFinite(priceBase) && priceBase >= min && priceBase <= max) {
+          matches.push(invItem);
+        }
+      }
+
+      return matches;
+    },
+    [inventoryItems]
   );
 
   // Create stable key for dependency and fetch-deduping
@@ -141,6 +206,47 @@ export function useSwapSuggestions({
         });
       }
 
+      const singleMatchDebugDetails: Array<{
+        id: string | undefined;
+        title?: string;
+        price: number;
+        currency: string;
+        priceBase: number;
+        diff: number;
+      }> = [];
+
+      const targetPrice = Number(targetItemPrice ?? 0);
+      const targetCurrency = targetItemCurrency ?? base;
+      const targetPriceBase = convertPriceToBase(targetPrice, targetCurrency, rates, base);
+
+      let singleItemMatches: typeof myItems = [];
+      if (rates && Number.isFinite(targetPriceBase) && targetPriceBase > 0 && myItems.length > 0) {
+        singleItemMatches = findMatchingItems(
+          { price: targetItemPrice, currency: targetItemCurrency },
+          rates,
+          {
+            baseCurrency: base,
+            items: myItems,
+          }
+        );
+
+        singleMatchDebugDetails.push(
+          ...singleItemMatches.map((match) => {
+            const price = Number(match.price ?? 0);
+            const itemCurrency = match.currency ?? base;
+            const itemPriceBase = convertPriceToBase(price, itemCurrency, rates, base);
+            return {
+              id: match.id,
+              title: match.title,
+              price,
+              currency: itemCurrency,
+              priceBase: itemPriceBase,
+              diff: Math.abs(itemPriceBase - targetPriceBase),
+            };
+          })
+        );
+      } 
+
       const bundleMatches = findMatchingBundles(
         { price: targetItemPrice, currency: targetItemCurrency },
         rates,
@@ -150,7 +256,42 @@ export function useSwapSuggestions({
         }
       );
 
-      const mapped: SwapSuggestion[] = bundleMatches.map(b => {
+      const singleSuggestions: SwapSuggestion[] = singleItemMatches
+        .sort((a, b) => {
+          const aBase = convertPriceToBase(Number(a.price ?? 0), a.currency ?? base, rates, base);
+          const bBase = convertPriceToBase(Number(b.price ?? 0), b.currency ?? base, rates, base);
+          const aDiff = Math.abs(aBase - targetPriceBase);
+          const bDiff = Math.abs(bBase - targetPriceBase);
+          return aDiff - bDiff;
+        })
+        .map((match) => {
+          const price = Number(match.price ?? 0) || 0;
+          const currency = match.currency ?? base;
+          const priceBase = convertPriceToBase(price, currency, rates, base);
+          const diff = Math.abs(priceBase - targetPriceBase);
+          const similarity = targetPriceBase > 0 ? Math.max(0, 1 - diff / targetPriceBase) : 0;
+
+          return {
+            items: [
+              {
+                id: match.id,
+                title: match.title,
+                price,
+                currency,
+                image_url: Array.isArray(match.item_images) && match.item_images.length > 0
+                  ? match.item_images[0]?.image_url
+                  : null,
+                condition: (match as any).condition,
+              },
+            ],
+            totalPriceUSD: convertBaseToCurrency(priceBase, 'USD', rates, base),
+            totalPriceGEL: convertBaseToCurrency(priceBase, 'GEL', rates, base),
+            similarity,
+            score: similarity,
+          };
+        });
+
+      const bundleSuggestions: SwapSuggestion[] = bundleMatches.map(b => {
         const itemsRaw = b.itemIds.map(id => myItems.find(m => m.id === id)).filter(Boolean) as any[];
         const seenIds = new Set<string>();
         const items = itemsRaw.filter((it) => {
@@ -181,7 +322,12 @@ export function useSwapSuggestions({
         };
       });
 
-      setSuggestions(mapped);
+      const combinedSuggestions =
+        singleSuggestions.length > 0 || bundleSuggestions.length > 0
+          ? [...singleSuggestions, ...bundleSuggestions]
+          : [];
+
+      setSuggestions(combinedSuggestions);
     } catch (e: any) {
       setError(e?.message || 'Failed to load suggestions');
     } finally {

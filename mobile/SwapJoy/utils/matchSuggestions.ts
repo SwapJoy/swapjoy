@@ -50,6 +50,45 @@ export function convertBaseToCurrency(
   return priceBase * (targetRate / baseRate);
 }
 
+export function filterBundlesByPrice(
+  sourceItem: { price?: number | null; estimated_value?: number | null; currency?: string | null },
+  rates: RateMap,
+  bundles: Bundle[],
+  opts?: { baseCurrency?: string; toleranceMultiplier?: number; maxResults?: number }
+): Bundle[] {
+  if (
+    !rates ||
+    Object.keys(rates).length === 0 ||
+    !bundles ||
+    bundles.length === 0
+  ) {
+    return [];
+  }
+
+  const baseCurrency = opts?.baseCurrency ?? 'USD';
+  const toleranceMultiplier = opts?.toleranceMultiplier ?? MATCH_BUNDLE_TOLERANCE;
+  const maxResults = Math.max(1, opts?.maxResults ?? bundles.length);
+
+  const rawPrice = Number(sourceItem.price ?? sourceItem.estimated_value ?? 0);
+  const currency = sourceItem.currency ?? baseCurrency;
+  if (!Number.isFinite(rawPrice) || rawPrice <= 0) {
+    return [];
+  }
+
+  const priceBase = convertPriceToBase(rawPrice, currency, rates, baseCurrency);
+  if (!Number.isFinite(priceBase) || priceBase <= 0) {
+    return [];
+  }
+
+  const toleranceValue = priceBase * toleranceMultiplier;
+  const min = Math.max(0, priceBase - toleranceValue);
+  const max = priceBase + toleranceValue;
+
+  return bundles
+    .filter((bundle) => Number.isFinite(bundle.totalBase) && bundle.totalBase >= min && bundle.totalBase <= max)
+    .slice(0, maxResults);
+}
+
 export function findAllBundles(
   userItems: ItemMini[],
   rates: RateMap,

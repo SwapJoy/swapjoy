@@ -3,11 +3,6 @@ import { ApiService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useLocalization } from '../localization';
 import { resolveCategoryName } from '../utils/category';
-import { useMatchInventoryContext } from '../contexts/MatchInventoryContext';
-import { convertPriceToBase } from '../utils/matchSuggestions';
-
-const MATCH_PRICE_TOLERANCE = 1.0;
-const MATCH_BUNDLE_TOLERANCE = 2.5;
 
 export interface AIOffer {
   id: string;
@@ -26,7 +21,6 @@ export interface AIOffer {
     last_name: string;
   };
   match_score: number;
-  reason: string;
   is_bundle?: boolean;
   bundle_items?: any[];
 }
@@ -49,7 +43,6 @@ export const useExploreData = (options?: UseExploreDataOptions) => {
   const hasFetchedRef = useRef(false);
   const forceBypassRef = useRef(false);
   const isFetchingRef = useRef(false);
-  const { items: inventoryItems, bundles: inventoryBundles } = useMatchInventoryContext();
   const [rateMap, setRateMap] = useState<Record<string, number>>({});
 
   useEffect(() => {
@@ -57,8 +50,10 @@ export const useExploreData = (options?: UseExploreDataOptions) => {
     (async () => {
       try {
         const { data } = await ApiService.getRateMap();
-        if (isActive && data) {
-          setRateMap(data);
+        if (isActive) {
+          const safeRates =
+            data && typeof data === 'object' ? (data as Record<string, number>) : {};
+          setRateMap(safeRates);
         }
       } catch (err) {
         console.warn('[useExploreData] Failed to load rate map:', err);
@@ -110,131 +105,6 @@ export const useExploreData = (options?: UseExploreDataOptions) => {
     return Math.min(100, Math.max(70, score));
   }, []);
 
-  const getMatchReason = useCallback((item: any, matchScore: number) => {
-    const reasons = [];
-    
-    // AI-specific reasons if similarity score is available
-    if (item.similarity_score !== undefined) {
-      if (matchScore >= 90) {
-        reasons.push('AI found perfect semantic match');
-        reasons.push('Highly similar to your items');
-        reasons.push('AI-powered perfect recommendation');
-      } else if (matchScore >= 80) {
-        reasons.push('AI detected strong similarity');
-        reasons.push('Semantic match to your interests');
-        reasons.push('AI-powered smart recommendation');
-      } else if (matchScore >= 70) {
-        reasons.push('AI found good match');
-        reasons.push('Similar to your preferences');
-        reasons.push('AI-powered recommendation');
-      } else {
-        reasons.push('AI suggested match');
-        reasons.push('Based on your item history');
-        reasons.push('AI-powered discovery');
-      }
-    } else {
-      // Fallback reasons for non-AI items
-      if (matchScore >= 90) {
-        reasons.push('Perfect match for your favorite categories');
-        reasons.push('Excellent condition and great value');
-        reasons.push('Highly recommended based on your interests');
-      } else if (matchScore >= 80) {
-        reasons.push('Great match from your favorite categories');
-        reasons.push('Good value within your preferred range');
-        reasons.push('Matches your interests perfectly');
-      } else {
-        reasons.push('From your favorite categories');
-        reasons.push('Good condition and fair price');
-        reasons.push('Worth considering');
-      }
-    }
-
-    // Add specific reasons based on item properties
-    if (item.condition === 'excellent') {
-      reasons.push('Excellent condition');
-    }
-    if (item.price && item.price >= 50 && item.price <= 200) {
-      reasons.push('Great price range');
-    }
-    
-    // Add recency reason
-    const daysSinceCreated = item.created_at ? 
-      (Date.now() - new Date(item.created_at).getTime()) / (1000 * 60 * 60 * 24) : 30;
-    if (daysSinceCreated < 7) {
-      reasons.push('Recently added');
-    }
-
-    return reasons[Math.floor(Math.random() * reasons.length)];
-  }, []);
-
-  const findMatchingBundles = useCallback(
-    (
-      item: { price?: number | null; estimated_value?: number | null; currency?: string | null },
-      rates: Record<string, number> = rateMap,
-      opts?: { baseCurrency?: string; maxItemsPerBundle?: number }
-    ) => {
-      if (!rates || Object.keys(rates).length === 0 || inventoryBundles.length === 0) {
-        return [];
-      }
-      const baseCurrency = opts?.baseCurrency ?? 'USD';
-      const price = Number(item.price ?? item.estimated_value ?? 0);
-      const currency = item.currency ?? baseCurrency;
-      if (!Number.isFinite(price) || price <= 0) {
-        return [];
-      }
-      const priceBase = convertPriceToBase(price, currency, rates, baseCurrency);
-      if (!Number.isFinite(priceBase) || priceBase <= 0) {
-        return [];
-      }
-      const toleranceValue = priceBase * MATCH_BUNDLE_TOLERANCE;
-      const min = Math.max(0, priceBase - toleranceValue);
-      const max = priceBase + toleranceValue;
-      const maxResults = opts?.maxItemsPerBundle ?? inventoryBundles.length;
-      return inventoryBundles
-        .filter((bundle) => bundle.totalBase >= min && bundle.totalBase <= max)
-        .slice(0, maxResults);
-    },
-    [inventoryBundles, rateMap]
-  );
-
-  const findMatchingItems = useCallback(
-    (
-      item: { price?: number | null; estimated_value?: number | null; currency?: string | null },
-      rates: Record<string, number> = rateMap,
-      opts?: { baseCurrency?: string; maxResults?: number }
-    ) => {
-      if (!rates || Object.keys(rates).length === 0 || inventoryItems.length === 0) {
-        return [];
-      }
-      const baseCurrency = opts?.baseCurrency ?? 'USD';
-      const price = Number(item.price ?? item.estimated_value ?? 0);
-      const currency = item.currency ?? baseCurrency;
-      if (!Number.isFinite(price) || price <= 0) {
-        return [];
-      }
-      const targetPriceBase = convertPriceToBase(price, currency, rates, baseCurrency);
-      if (!Number.isFinite(targetPriceBase) || targetPriceBase <= 0) {
-        return [];
-      }
-      const toleranceValue = targetPriceBase * MATCH_PRICE_TOLERANCE;
-      const min = Math.max(0, targetPriceBase - toleranceValue);
-      const max = targetPriceBase + toleranceValue;
-      const maxResults = opts?.maxResults ?? inventoryItems.length;
-      return inventoryItems
-        .filter((invItem) => {
-          const itemPriceBase = convertPriceToBase(
-            Number(invItem.price ?? 0),
-            invItem.currency ?? baseCurrency,
-            rates,
-            baseCurrency
-          );
-          return Number.isFinite(itemPriceBase) && itemPriceBase >= min && itemPriceBase <= max;
-        })
-        .slice(0, maxResults);
-    },
-    [inventoryItems, rateMap]
-  );
-
   const fetchAIOffers = useCallback(async () => {
     console.log('[useExploreData] fetchAIOffers start. user?', !!user);
     if (!user) {
@@ -284,24 +154,9 @@ export const useExploreData = (options?: UseExploreDataOptions) => {
         setError(null);
       }
 
-      // Log the raw data received from API
-      console.log('[useExploreData] Raw topPicks from API:', {
-        isArray: Array.isArray(topPicks),
-        length: topPicks?.length || 0,
-        firstItem: topPicks?.[0] ? {
-          id: topPicks[0].id,
-          title: topPicks[0].title,
-          hasUsers: !!topPicks[0].users,
-          hasUser: !!topPicks[0].user,
-          userId: topPicks[0].user_id
-        } : null
-      });
-
       // Transform items to AIOffer format
       const aiOffers: AIOffer[] = (Array.isArray(topPicks) ? topPicks : []).map((item: any, index: number) => {
         const matchScore = calculateMatchScore(item, user);
-        const reason = getMatchReason(item, matchScore);
-        
         
         // Force a realistic value if database value is missing or 0
         let displayValue = item.price;
@@ -323,20 +178,7 @@ export const useExploreData = (options?: UseExploreDataOptions) => {
 
         const imageUrl = item.image_url || item.item_images?.[0]?.image_url || 'https://via.placeholder.com/200x150';
         const primaryCategory = resolveCategoryName(item, language);
-        if (__DEV__) {
-          console.log('[useExploreData] resolved category', {
-            index,
-            itemId: item.id,
-            inputCategory: item.category,
-            primaryCategory,
-          });
-          console.log('[useExploreData] item condition', {
-            index,
-            itemId: item.id,
-            condition: item.condition,
-          });
-        }
-
+        
         return {
           id: item.id,
           title: item.title,
@@ -354,7 +196,6 @@ export const useExploreData = (options?: UseExploreDataOptions) => {
             last_name: item.users?.last_name || item.user?.last_name || '',
           },
           match_score: matchScore,
-          reason: reason,
           is_bundle: item.is_bundle || false, // Add bundle flag
           bundle_items: item.bundle_items || null, // Add bundle items
         };
@@ -408,7 +249,7 @@ export const useExploreData = (options?: UseExploreDataOptions) => {
       }
       isFetchingRef.current = false;
     }
-  }, [calculateMatchScore, getMatchReason, language, user?.id]);
+  }, [calculateMatchScore, language, user?.id]);
 
   useEffect(() => {
     console.log('[useExploreData] useEffect triggered:', {
@@ -457,7 +298,5 @@ export const useExploreData = (options?: UseExploreDataOptions) => {
     error,
     user,
     refreshData,
-    findMatchingBundles,
-    findMatchingItems,
-  }), [aiOffers, loading, isFetching, hasData, isInitialized, error, user, refreshData, findMatchingBundles, findMatchingItems]);
+  }), [aiOffers, loading, isFetching, hasData, isInitialized, error, user, refreshData]);
 };
