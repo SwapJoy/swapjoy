@@ -162,7 +162,8 @@ export class AuthService {
 
       const userPayload: Record<string, any> = {
         id: userId,
-        username: userData.username,
+        // Don't set username automatically - let user set it during onboarding
+        username: userData.username || null,
         first_name: userData.first_name,
         last_name: userData.last_name,
         status: 'active',
@@ -264,12 +265,13 @@ export class AuthService {
         : '') ??
       '';
 
-    const username: string =
+    // Don't auto-generate username - return null so it can be set during onboarding
+    const username: string | undefined =
       rawUser.username ??
       metadata.username ??
       googleMetadata.username ??
       (email ? email.split('@')[0] : undefined) ??
-      `user_${Date.now()}`;
+      undefined;
 
     const profileImageUrl: string | undefined =
       rawUser.profile_image_url ??
@@ -419,7 +421,7 @@ export class AuthService {
         const userExists = await this.checkUserExists(data.user.id);
         if (!userExists) {
           const userData: CreateUserData = {
-            username: data.user.user_metadata?.username || 'user_' + phone.replace('+', ''),
+            username: data.user.user_metadata?.username || null, // Don't auto-generate, let user set during onboarding
             first_name: data.user.user_metadata?.first_name || 'User',
             last_name: data.user.user_metadata?.last_name || '',
             phone: phone,
@@ -749,7 +751,7 @@ export class AuthService {
       const userExists = await this.checkUserExists(data.user.id);
       if (!userExists) {
         const userData: CreateUserData = {
-          username: data.user.user_metadata?.username || data.user.email?.split('@')[0] || 'user_' + Date.now(),
+          username: data.user.user_metadata?.username || null, // Don't auto-generate, let user set during onboarding
           first_name: data.user.user_metadata?.first_name || '',
           last_name: data.user.user_metadata?.last_name || '',
           phone: '',

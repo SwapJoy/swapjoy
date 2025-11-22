@@ -3,13 +3,19 @@ import { NavigationProp } from '@react-navigation/native';
 import { RouteProp } from '@react-navigation/native';
 
 export type RootStackParamList = {
-  Onboarding: undefined;
+  Intro: undefined;
   PhoneSignIn: undefined;
   EmailSignIn: undefined;
   EmailSignUp: undefined;
   OTPVerification: {
     phone: string;
   };
+  OnboardingUsername: undefined;
+  OnboardingName: undefined;
+  OnboardingBirthdate: undefined;
+  OnboardingGender: undefined;
+  OnboardingCategories: undefined;
+  OnboardingLocation: undefined;
   MainTabs: undefined;
   CreateListing: undefined;
   AddItem: undefined;
@@ -86,8 +92,8 @@ export type MainTabParamList = {
   Profile: undefined;
 };
 
-export type OnboardingScreenProps = {
-  navigation: NavigationProp<RootStackParamList, 'Onboarding'>;
+export type IntroScreenProps = {
+  navigation: NavigationProp<RootStackParamList, 'Intro'>;
 };
 
 export type PhoneSignInScreenProps = {

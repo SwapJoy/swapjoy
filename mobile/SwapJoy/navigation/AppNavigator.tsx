@@ -1,15 +1,22 @@
-import React, { forwardRef } from 'react';
+import React, { forwardRef, useState, useEffect } from 'react';
 import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { Platform, TouchableOpacity } from 'react-native';
+import { Platform, TouchableOpacity, ActivityIndicator, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../types/navigation';
 import { useAuth } from '../contexts/AuthContext';
-import OnboardingScreen from '../screens/OnboardingScreen';
+import { ApiService } from '../services/api';
+import IntroScreen from '../screens/IntroScreen';
 import PhoneSignInScreen from '../screens/PhoneSignInScreen';
 import EmailSignInScreen from '../screens/EmailSignInScreen';
 import EmailSignUpScreen from '../screens/EmailSignUpScreen';
 import OTPVerificationScreen from '../screens/OTPVerificationScreen';
+import UsernameScreen from '../screens/onboarding/UsernameScreen';
+import NameScreen from '../screens/onboarding/NameScreen';
+import BirthdateScreen from '../screens/onboarding/BirthdateScreen';
+import GenderScreen from '../screens/onboarding/GenderScreen';
+import CategoriesScreen from '../screens/onboarding/CategoriesScreen';
+import LocationScreen from '../screens/onboarding/LocationScreen';
 import MainPageContainer from '../screens/MainPageContainer';
 import CreateListingScreen from '../screens/CreateListingScreen';
 import AddItemScreen from '../screens/AddItemScreen';
@@ -36,12 +43,61 @@ interface AppNavigatorProps {
 }
 
 const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((props, ref) => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
+  const [hasUsername, setHasUsername] = useState<boolean | null>(null);
+  const [checkingUsername, setCheckingUsername] = useState(false);
 
-  // Show loading screen while checking authentication
-  if (isLoading) {
-    return null; // Or a loading component
+  // Check if user has username when authenticated
+  useEffect(() => {
+    const checkUsernameStatus = async () => {
+      if (!isAuthenticated || !user) {
+        setHasUsername(null);
+        return;
+      }
+
+      setCheckingUsername(true);
+      try {
+        const { data: profile, error } = await ApiService.getProfile();
+        if (error) {
+          console.warn('[AppNavigator] Error fetching profile:', error);
+          setHasUsername(true); // Default to true to avoid blocking
+        } else {
+          // If user has a username, assume onboarding was completed
+          setHasUsername(!!profile?.username);
+        }
+      } catch (error) {
+        console.error('[AppNavigator] Error checking username status:', error);
+        setHasUsername(true); // Default to true to avoid blocking
+      } finally {
+        setCheckingUsername(false);
+      }
+    };
+
+    if (isAuthenticated && !isLoading) {
+      checkUsernameStatus();
+    }
+  }, [isAuthenticated, user, isLoading]);
+
+  // Show loading screen while checking authentication or username
+  if (isLoading || (isAuthenticated && checkingUsername)) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
+        <ActivityIndicator size="large" color="#007AFF" />
+      </View>
+    );
   }
+
+  // Determine initial route
+  const getInitialRoute = (): keyof RootStackParamList => {
+    if (!isAuthenticated) {
+      return 'Intro';
+    }
+    // If user doesn't have a username, show onboarding
+    if (hasUsername === false) {
+      return 'OnboardingUsername';
+    }
+    return 'MainTabs';
+  };
 
   // Deep linking configuration for OAuth callbacks
   const linking = {
@@ -59,7 +115,7 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
   return (
     <NavigationContainer ref={ref} linking={linking}>
       <Stack.Navigator
-        initialRouteName={isAuthenticated ? "MainTabs" : "Onboarding"}
+        initialRouteName={getInitialRoute()}
         screenOptions={{
           headerShown: true,
           headerStyle: {
@@ -109,6 +165,41 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
         {isAuthenticated ? (
           // Authenticated screens
           <>
+            {/* Onboarding screens */}
+            {hasUsername === false && (
+              <>
+                <Stack.Screen 
+                  name="OnboardingUsername" 
+                  component={UsernameScreen}
+                  options={{ headerShown: false }}
+                />
+                <Stack.Screen 
+                  name="OnboardingName" 
+                  component={NameScreen}
+                  options={{ headerShown: false }}
+                />
+                <Stack.Screen 
+                  name="OnboardingBirthdate" 
+                  component={BirthdateScreen}
+                  options={{ headerShown: false }}
+                />
+                <Stack.Screen 
+                  name="OnboardingGender" 
+                  component={GenderScreen}
+                  options={{ headerShown: false }}
+                />
+                <Stack.Screen 
+                  name="OnboardingCategories" 
+                  component={CategoriesScreen}
+                  options={{ headerShown: false }}
+                />
+                <Stack.Screen 
+                  name="OnboardingLocation" 
+                  component={LocationScreen}
+                  options={{ headerShown: false }}
+                />
+              </>
+            )}
             <Stack.Screen 
               name="MainTabs" 
               component={MainPageContainer} 
@@ -227,8 +318,8 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
           // Unauthenticated screens
           <>
             <Stack.Screen 
-              name="Onboarding" 
-              component={OnboardingScreen}
+              name="Intro" 
+                  component={IntroScreen}
               options={{ headerShown: false }}
             />
             <Stack.Screen 

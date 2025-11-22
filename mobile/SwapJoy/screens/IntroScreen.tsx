@@ -8,15 +8,15 @@ import {
   TouchableOpacity,
   SafeAreaView,
 } from 'react-native';
-import { useOnboarding } from '../hooks/useOnboarding';
-import { OnboardingScreenProps } from '../types/navigation';
+import { useAppIntro } from '../hooks/useAppIntro';
+import { IntroScreenProps } from '../types/navigation';
 import { useLocalization } from '../localization';
 import { LanguageSelector } from '../components/LanguageSelector';
 
 const { width } = Dimensions.get('window');
 
-const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ navigation }) => {
-  const { slides, activeSlide, handleSlideChange, handleGetStarted } = useOnboarding();
+const IntroScreen: React.FC<IntroScreenProps> = ({ navigation }) => {
+  const { slides, activeSlide, handleSlideChange, handleGetStarted } = useAppIntro();
   const { t, language, setLanguage } = useLocalization();
 
   const handleGetStartedPress = () => {
@@ -222,4 +222,5 @@ const styles = StyleSheet.create({
   },
 });
 
-export default OnboardingScreen;
+export default IntroScreen;
+

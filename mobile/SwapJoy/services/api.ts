@@ -295,6 +295,28 @@ export class ApiService {
     return { data: updatedWeights, error: null };
   }
 
+  static async checkUsernameAvailability(username: string): Promise<{ available: boolean; error: any }> {
+    if (!username || username.trim().length === 0) {
+      return { available: false, error: { message: 'Username cannot be empty' } };
+    }
+
+    return this.authenticatedCall(async (client) => {
+      const { data, error } = await client
+        .from('users')
+        .select('username')
+        .eq('username', username.trim())
+        .maybeSingle();
+
+      if (error) {
+        console.warn('[ApiService.checkUsernameAvailability] Error checking username:', error);
+        return { available: false, error } as any;
+      }
+
+      // If data exists, username is taken
+      return { available: !data, error: null } as any;
+    });
+  }
+
   static async updateProfile(updates: Partial<{
     username: string;
     first_name: string;
@@ -305,6 +327,8 @@ export class ApiService {
     prompt?: string;
     preferred_radius_km?: number | null;
     preferred_currency?: string;
+    birth_date?: string | null;
+    gender?: string | null;
   }>) {
     return this.authenticatedCall(async (client) => {
       const currentUser = await AuthService.getCurrentUser();
@@ -341,6 +365,7 @@ export class ApiService {
       return result as any;
     });
   }
+
 
   static async getActiveCities() {
     return this.authenticatedCall(async (client) => {
