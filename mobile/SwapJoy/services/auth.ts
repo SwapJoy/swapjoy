@@ -10,7 +10,96 @@ const SESSION_KEY = 'supabase_session';
 const REFRESH_TOKEN_KEY = 'supabase_refresh_token';
 const ACCESS_TOKEN_KEY = 'supabase_access_token';
 
+// Gate keeper to prevent parallel token refresh requests
+// Singleton instance shared across AuthService and ApiService
+class RefreshGateKeeper {
+  private isRefreshing = false;
+  private refreshPromise: Promise<void> | null = null;
+  private refreshResolver: (() => void) | null = null;
+  private refreshRejector: ((error: any) => void) | null = null;
+  private lastRefreshTime: number = 0;
+  private readonly REFRESH_COOLDOWN_MS = 5000; // 5 seconds cooldown between refreshes
+
+  // Wait if refresh is in progress, otherwise proceed immediately
+  async waitIfNeeded(): Promise<void> {
+    if (this.refreshPromise) {
+      console.log('[RefreshGateKeeper] Waiting for refresh in progress...');
+      await this.refreshPromise;
+    }
+  }
+
+  // Start a refresh - returns a promise that resolves when refresh completes
+  // CRITICAL: Check and set must be atomic - use local variable to ensure atomicity
+  startRefresh(refreshFn: () => Promise<void>): Promise<void> {
+    // Store current promise in local variable (atomic read)
+    const currentPromise = this.refreshPromise;
+    
+    // If promise exists, return it (another call is refreshing)
+    if (currentPromise) {
+      console.log('[RefreshGateKeeper] Refresh already in progress, waiting for existing refresh...');
+      return currentPromise;
+    }
+
+    // CRITICAL: Check cooldown - don't refresh if we just refreshed recently
+    // This prevents multiple refreshes when the refreshed token still has time left
+    const now = Date.now();
+    const timeSinceLastRefresh = now - this.lastRefreshTime;
+    if (this.lastRefreshTime > 0 && timeSinceLastRefresh < this.REFRESH_COOLDOWN_MS) {
+      const remainingCooldown = this.REFRESH_COOLDOWN_MS - timeSinceLastRefresh;
+      console.log(`[RefreshGateKeeper] Refresh cooldown active (${Math.ceil(remainingCooldown / 1000)}s remaining) - skipping refresh`);
+      // Return a resolved promise since refresh just happened - session is already fresh
+      return Promise.resolve();
+    }
+
+    // CRITICAL: Create promise in local variable first, then assign to instance
+    // This ensures the promise is created before assignment
+    console.log('[RefreshGateKeeper] Acquiring lock and starting refresh - closing gate');
+    this.isRefreshing = true;
+    
+    const newPromise = new Promise<void>((resolve, reject) => {
+      this.refreshResolver = resolve;
+      this.refreshRejector = reject;
+    });
+    
+    // Assign to instance AFTER creation (atomic write)
+    this.refreshPromise = newPromise;
+    console.log('[RefreshGateKeeper] Lock acquired, promise created');
+
+    // Execute refresh in background - when done, resolve the promise
+    (async () => {
+      try {
+        await refreshFn();
+        // Resolve the promise
+        if (this.refreshResolver) {
+          this.refreshResolver();
+        }
+      } catch (error) {
+        // Reject the promise on error
+        if (this.refreshRejector) {
+          this.refreshRejector(error);
+        }
+        throw error;
+      } finally {
+        // Clear everything when done
+        this.isRefreshing = false;
+        this.refreshPromise = null;
+        this.refreshResolver = null;
+        this.refreshRejector = null;
+        this.lastRefreshTime = Date.now(); // Update last refresh time
+        console.log('[RefreshGateKeeper] Refresh completed - opening gate');
+      }
+    })();
+
+    return newPromise;
+  }
+}
+
+// Singleton instance - shared across AuthService and ApiService
+export const refreshGateKeeper = new RefreshGateKeeper();
+
 export class AuthService {
+  // Gate keeper to prevent parallel refresh attempts
+  private static refreshGate = refreshGateKeeper;
   // Store session securely
   private static async storeSession(session: AuthSession): Promise<void> {
     try {
@@ -25,16 +114,26 @@ export class AuthService {
   // Retrieve session from secure storage
   private static async getStoredSession(): Promise<AuthSession | null> {
     try {
+      // Wait if gate is closed (refresh in progress)
+      await this.refreshGate.waitIfNeeded();
+
+      // CRITICAL: After waiting, re-read session - it might have been refreshed
+      // by another call while we were waiting
       const sessionData = await SecureStore.getItemAsync(SESSION_KEY);
       if (sessionData) {
         const session = JSON.parse(sessionData) as AuthSession;
         const now = Date.now();
         const expiresAtMs = session.expires_at ? session.expires_at * 1000 : 0;
-        const refreshThresholdMs = 60 * 60 * 1000; // 1 hour
+        const refreshThresholdMs = 60 * 5 * 1000; // 1 hour (temporarily, user will change back to 5 min)
         const hasRefreshToken = !!session.refresh_token;
         const isExpired = !!expiresAtMs && now >= expiresAtMs;
+        const timeUntilExpiry = expiresAtMs - now;
+        const minutesUntilExpiry = Math.floor(timeUntilExpiry / (60 * 1000));
+        
+        console.log(`[AuthService] Token will expire in: ${minutesUntilExpiry} minutes (${Math.floor(timeUntilExpiry / 1000)}s)`);
+        
         const needsProactiveRefresh =
-          !!expiresAtMs && !isExpired && expiresAtMs - now <= refreshThresholdMs;
+          !!expiresAtMs && !isExpired && timeUntilExpiry <= refreshThresholdMs;
 
         if (!hasRefreshToken) {
           console.warn('[AuthService] Stored session missing refresh token');
@@ -46,17 +145,49 @@ export class AuthService {
           return session;
         }
 
+        // CRITICAL: Check if refresh is still needed AFTER waiting
+        // The session might have been refreshed by another call while we were waiting
         if (isExpired || needsProactiveRefresh) {
+          const timeRemaining = Math.max(timeUntilExpiry, 0);
+          const minutesRemaining = Math.floor(timeRemaining / (60 * 1000));
           console.log(
-            `[AuthService] Stored session ${
+            `[AuthService] Session ${
               isExpired ? 'expired' : 'approaching expiry'
-            } (${Math.max(expiresAtMs - now, 0)}ms remaining) - attempting refresh`
+            } (${minutesRemaining} minutes remaining) - checking if refresh needed`
           );
 
-          const refreshedSession = await this.refreshSession(session.refresh_token);
-          if (refreshedSession) {
-            console.log('[AuthService] Session refreshed successfully');
-            return refreshedSession;
+          // CRITICAL: Wait at gate ONE MORE TIME right before refreshing
+          // Another call might have started refresh between our check and now
+          await this.refreshGate.waitIfNeeded();
+
+          // CRITICAL: Re-read session AFTER final gate wait
+          // If another call refreshed while we were waiting, we should use the refreshed session
+          const finalSessionData = await SecureStore.getItemAsync(SESSION_KEY);
+          if (finalSessionData) {
+            const finalSession = JSON.parse(finalSessionData) as AuthSession;
+            const finalNow = Date.now();
+            const finalExpiresAtMs = finalSession.expires_at ? finalSession.expires_at * 1000 : 0;
+            const finalTimeUntilExpiry = finalExpiresAtMs - finalNow;
+            const finalIsExpired = !!finalExpiresAtMs && finalNow >= finalExpiresAtMs;
+            const finalNeedsRefresh = finalIsExpired || (!!finalExpiresAtMs && !finalIsExpired && finalTimeUntilExpiry <= refreshThresholdMs);
+
+            // If session was refreshed by another call, use it
+            if (!finalNeedsRefresh) {
+              console.log('[AuthService] Session was refreshed by another call, using refreshed session');
+              return finalSession;
+            }
+
+            // Still needs refresh - proceed with refresh using final session's refresh token
+            const refreshedSession = await this.refreshSessionWithGate(finalSession.refresh_token);
+            if (refreshedSession) {
+              return refreshedSession;
+            }
+          } else {
+            // No session found, try with original session's refresh token
+            const refreshedSession = await this.refreshSessionWithGate(session.refresh_token);
+            if (refreshedSession) {
+              return refreshedSession;
+            }
           }
 
           if (isExpired) {
@@ -65,9 +196,7 @@ export class AuthService {
             return null;
           }
 
-          console.warn(
-            '[AuthService] Proactive refresh failed - keeping current session until expiry'
-          );
+          console.warn('[AuthService] Proactive refresh failed - keeping current session');
           return session;
         }
 
@@ -88,6 +217,27 @@ export class AuthService {
     } catch (error) {
       console.error('Error clearing session:', error);
     }
+  }
+
+  // Refresh session with gate mechanism to prevent parallel refreshes
+  private static async refreshSessionWithGate(refreshToken: string): Promise<AuthSession | null> {
+    // Use the gate to ensure only one refresh happens at a time
+    // startRefresh() will either start a new refresh or return the existing refresh promise
+    const refreshPromise = this.refreshGate.startRefresh(async () => {
+      console.log('[AuthService] Starting token refresh');
+      const session = await this.refreshSession(refreshToken);
+      console.log('[AuthService] Token refresh completed');
+    });
+
+    // Wait for refresh to complete (whether we started it or waited for existing one)
+    await refreshPromise;
+
+    // After refresh completes, get the refreshed session
+    const sessionData = await SecureStore.getItemAsync(SESSION_KEY);
+    if (sessionData) {
+      return JSON.parse(sessionData) as AuthSession;
+    }
+    return null;
   }
 
   // Refresh session using refresh token

@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import { AuthService } from './auth';
+import { AuthService, refreshGateKeeper } from './auth';
 import { RedisCache } from './redisCache';
 import {
   RecommendationWeights,
@@ -87,6 +87,10 @@ export class ApiService {
     apiCall: (client: typeof supabase) => Promise<{ data: T | null; error: any }>
   ): Promise<{ data: T | null; error: any }> {
     try {
+      // CRITICAL: Wait for any ongoing token refresh BEFORE making any API calls
+      // This ensures all parallel API calls wait for a single refresh to complete
+      await refreshGateKeeper.waitIfNeeded();
+      
       const client = await this.getAuthenticatedClient();
       try {
         const sess = await client.auth.getSession();
