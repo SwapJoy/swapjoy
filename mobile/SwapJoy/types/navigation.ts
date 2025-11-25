@@ -7,6 +7,9 @@ export type RootStackParamList = {
   PhoneSignIn: undefined;
   EmailSignIn: undefined;
   EmailSignUp: undefined;
+  EmailVerification: {
+    email: string;
+  };
   OTPVerification: {
     phone: string;
   };
@@ -106,6 +109,11 @@ export type EmailSignInScreenProps = {
 
 export type EmailSignUpScreenProps = {
   navigation: NavigationProp<RootStackParamList, 'EmailSignUp'>;
+};
+
+export type EmailVerificationScreenProps = {
+  navigation: NavigationProp<RootStackParamList, 'EmailVerification'>;
+  route: RouteProp<RootStackParamList, 'EmailVerification'>;
 };
 
 export type OTPVerificationScreenProps = {

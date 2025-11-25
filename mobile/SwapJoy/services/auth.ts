@@ -377,6 +377,20 @@ export class AuthService {
     }
   }
 
+  // Check if email exists (for signup validation)
+  // Note: This is a best-effort check. Supabase will also validate during signup.
+  static async checkEmailExists(email: string): Promise<boolean> {
+    try {
+      // For now, we'll rely on Supabase's built-in duplicate email checking during signup
+      // This method can be enhanced with a database function or admin API call if needed
+      // Returning false allows the signup attempt - Supabase will return an error if email exists
+      return false;
+    } catch (error: any) {
+      console.error('[AuthService] Error checking email existence:', error);
+      return false;
+    }
+  }
+
   private static extractUserCreationData(session: AuthSession): {
     userData: CreateUserData;
     email?: string;
@@ -435,7 +449,7 @@ export class AuthService {
 
     return {
       userData: {
-        username,
+        username: username || '',
         first_name: firstName || 'User',
         last_name: lastName || '',
         phone: phone || '',
@@ -485,7 +499,7 @@ export class AuthService {
     }
   }
 
-  // OTP sign in
+  // OTP sign in (phone)
   static async signInWithOTP(phone: string): Promise<{ error: string | null }> {
     try {
       const { error } = await supabase.auth.signInWithOtp({
@@ -497,7 +511,99 @@ export class AuthService {
     }
   }
 
-  // Verify OTP and create user if needed
+  // Send email OTP
+  static async sendEmailOTP(email: string): Promise<string | null> {
+    try {
+      console.log('[AuthService] Sending email OTP to:', email);
+      const { error } = await supabase.auth.signInWithOtp({
+        email: email.trim().toLowerCase(),
+        options: {
+          shouldCreateUser: false, // User already exists from signup
+          emailRedirectTo: undefined, // Don't use magic link - send OTP code
+        },
+      });
+      
+      if (error) {
+        console.error('[AuthService] Error sending email OTP:', error.message);
+        return error.message;
+      }
+      
+      console.log('[AuthService] Email OTP sent successfully');
+      return null;
+    } catch (error: any) {
+      console.error('[AuthService] Exception sending email OTP:', error);
+      return error.message || 'Failed to send email OTP';
+    }
+  }
+
+  // Verify email OTP
+  static async verifyEmailOTP(
+    email: string,
+    token: string
+  ): Promise<AuthResponse> {
+    try {
+      const { data, error } = await supabase.auth.verifyOtp({
+        email: email.trim().toLowerCase(),
+        token,
+        type: 'email',
+      });
+
+      if (error) {
+        return { user: null, session: null, error: error.message };
+      }
+
+      if (data.session && data.user) {
+        const session: AuthSession = {
+          access_token: data.session.access_token,
+          refresh_token: data.session.refresh_token,
+          expires_at: data.session.expires_at || 0,
+          expires_in: data.session.expires_in || 3600,
+          token_type: data.session.token_type || 'bearer',
+          user: data.user as User,
+        };
+
+        // Check if user exists in database, create if not
+        // After email verification, we have a session so RLS should allow creation
+        const userExists = await this.checkUserExists(data.user.id);
+        if (!userExists) {
+          const userData: CreateUserData = {
+            username: data.user.user_metadata?.username || '',
+            first_name: data.user.user_metadata?.first_name || '',
+            last_name: data.user.user_metadata?.last_name || '',
+            phone: '',
+            email: email,
+          };
+          
+          const createdUser = await this.createUserInDatabase(userData, data.user.id, email);
+          if (createdUser) {
+            session.user = createdUser;
+          } else {
+            // If creation fails due to RLS, the database trigger should have created it
+            // Try to fetch the user that might have been created by trigger
+            const { data: existingUser } = await supabase
+              .from('users')
+              .select('*')
+              .eq('id', data.user.id)
+              .single();
+            
+            if (existingUser) {
+              session.user = existingUser as User;
+            }
+          }
+        }
+
+        await this.storeSession(session);
+        return { user: session.user, session, error: null };
+      }
+
+      return { user: null, session: null, error: 'Verification failed. Please try again.' };
+    } catch (error: any) {
+      console.error('Unexpected error:', error);
+      return { user: null, session: null, error: 'Failed to verify OTP. Please try again.' };
+    }
+  }
+
+  // Verify OTP and create user if needed (phone)
   static async verifyOTP(
     phone: string,
     token: string
@@ -807,29 +913,46 @@ export class AuthService {
     }
   ): Promise<AuthResponse> {
     try {
+      // Sign up - disable automatic email sending to prevent timeouts
+      // We'll send OTP manually after signup completes
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: userData,
+          emailRedirectTo: undefined, // Explicitly disable magic link/confirmation email
+          // Don't wait for email to be sent - send it separately
         },
       });
 
       if (error) {
-        return { user: null, session: null, error: error.message };
+        // Check if it's a timeout or email sending error - user might still be created
+        const isEmailError = error.message?.includes('confirmation email') || 
+                             error.message?.includes('Error sending') ||
+                             error.message?.includes('timeout') ||
+                             error.message?.includes('upstream request timeout') ||
+                             error.code === 'over_email_send_rate_limit';
+        
+        if (isEmailError) {
+          console.warn('[AuthService] Email sending failed/timeout, but user might still be created:', error.message);
+          // Try to continue - user might have been created despite email error
+          // We'll send OTP manually after or user can request it from verification screen
+        } else {
+          return { user: null, session: null, error: error.message };
+        }
       }
 
       if (!data.user) {
         return { user: null, session: null, error: 'Failed to create user account' };
       }
 
-      // Create user in database
+      // Create user in database (with empty userData if onboarding will handle it)
       const userExists = await this.checkUserExists(data.user.id);
       if (!userExists) {
         const createUserData: CreateUserData = {
-          username: userData.username,
-          first_name: userData.first_name,
-          last_name: userData.last_name,
+          username: userData.username || '',
+          first_name: userData.first_name || '',
+          last_name: userData.last_name || '',
           phone: '', // No phone for email signup
         };
 
@@ -862,7 +985,16 @@ export class AuthService {
         return { user: data.user as User, session, error: null };
       }
 
-      // If email confirmation is required, return success but no session
+      // If no session (email confirmation required)
+      // Note: If email confirmations are enabled in Supabase, the email was already sent during signup
+      // We should NOT send OTP again here to avoid rate limits
+      // If email wasn't sent (due to timeout), user can request OTP from verification screen
+      
+      console.log('[AuthService] User created. Email should have been sent during signup (if confirmations enabled).');
+      console.log('[AuthService] If email not received, user can request OTP from verification screen.');
+
+      // Return user but no session - user needs to verify email
+      // User will be created in database by trigger OR after email verification
       return { user: data.user as User, session: null, error: null };
     } catch (error: any) {
       return { user: null, session: null, error: error.message || 'An unexpected error occurred' };

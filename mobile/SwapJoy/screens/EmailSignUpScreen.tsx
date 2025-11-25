@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -9,99 +9,37 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '../contexts/AuthContext';
 import { EmailSignUpScreenProps } from '../types/navigation';
 import { useLocalization } from '../localization';
+import { useEmailSignUp } from '../hooks/useEmailSignUp';
 
 const EmailSignUpScreen: React.FC<EmailSignUpScreenProps> = ({ navigation }) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [username, setUsername] = useState('');
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const { signUpWithEmail } = useAuth();
   const { t } = useLocalization();
-
-  const validateForm = (): boolean => {
-    if (!email.trim() || !password.trim() || !confirmPassword.trim()) {
-      setError(t('auth.signUp.errors.missingFields'));
-      return false;
-    }
-
-    if (!email.includes('@')) {
-      setError(t('auth.signUp.errors.invalidEmail'));
-      return false;
-    }
-
-    if (password.length < 6) {
-      setError(t('auth.signUp.errors.passwordShort'));
-      return false;
-    }
-
-    if (password !== confirmPassword) {
-      setError(t('auth.signUp.errors.passwordMismatch'));
-      return false;
-    }
-
-    if (!username.trim()) {
-      setError(t('auth.signUp.errors.missingUsername'));
-      return false;
-    }
-
-    if (!firstName.trim()) {
-      setError(t('auth.signUp.errors.missingFirstName'));
-      return false;
-    }
-
-    return true;
-  };
+  const {
+    email,
+    setEmail,
+    password,
+    setPassword,
+    confirmPassword,
+    setConfirmPassword,
+    isLoading,
+    error,
+    setError,
+    showPassword,
+    setShowPassword,
+    showConfirmPassword,
+    setShowConfirmPassword,
+    signUp,
+  } = useEmailSignUp();
 
   const handleSignUp = async () => {
-    setError(null);
-
-    if (!validateForm()) {
-      return;
-    }
-
-    setIsLoading(true);
-
-    try {
-      const result = await signUpWithEmail(
-        email.trim(),
-        password,
-        {
-          username: username.trim(),
-          first_name: firstName.trim(),
-          last_name: lastName.trim(),
-        }
-      );
-
-      if (result.error) {
-        setError(result.error);
-      } else if (result.success) {
-        // If email confirmation is required, show message
-        if (!result.session) {
-          Alert.alert(
-            t('auth.signUp.alerts.checkEmailTitle'),
-            t('auth.signUp.alerts.checkEmailDescription'),
-            [{ text: t('auth.signUp.alerts.ok'), onPress: () => navigation.navigate('EmailSignIn') }]
-          );
-        } else {
-          // Navigation will be handled by AuthContext/auth state change
-        }
-      }
-    } catch (err: any) {
-      setError(err.message || t('auth.signUp.errors.unexpected'));
-    } finally {
-      setIsLoading(false);
+    const result = await signUp();
+    
+    if (result.success && result.email) {
+      // Navigate to email verification screen
+      navigation.navigate('EmailVerification', { email: result.email });
     }
   };
 
@@ -153,56 +91,6 @@ const EmailSignUpScreen: React.FC<EmailSignUpScreenProps> = ({ navigation }) => 
                 autoCorrect={false}
                 autoFocus
               />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Ionicons name="person-outline" size={20} color="#666" style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder={t('auth.common.usernamePlaceholder')}
-                placeholderTextColor="#999"
-                value={username}
-                onChangeText={(text) => {
-                  setUsername(text);
-                  setError(null);
-                }}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-            </View>
-
-            <View style={styles.row}>
-              <View style={[styles.inputContainer, styles.halfWidth]}>
-                <Ionicons name="person-outline" size={20} color="#666" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder={t('auth.common.firstNamePlaceholder')}
-                  placeholderTextColor="#999"
-                  value={firstName}
-                  onChangeText={(text) => {
-                    setFirstName(text);
-                    setError(null);
-                  }}
-                  autoCapitalize="words"
-                  autoCorrect={false}
-                />
-              </View>
-
-              <View style={[styles.inputContainer, styles.halfWidth]}>
-                <Ionicons name="person-outline" size={20} color="#666" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder={t('auth.common.lastNamePlaceholder')}
-                  placeholderTextColor="#999"
-                  value={lastName}
-                  onChangeText={(text) => {
-                    setLastName(text);
-                    setError(null);
-                  }}
-                  autoCapitalize="words"
-                  autoCorrect={false}
-                />
-              </View>
             </View>
 
             <View style={styles.inputContainer}>
@@ -267,7 +155,7 @@ const EmailSignUpScreen: React.FC<EmailSignUpScreenProps> = ({ navigation }) => 
               {isLoading ? (
                 <ActivityIndicator color="white" />
               ) : (
-              <Text style={styles.signUpButtonText}>{t('auth.common.buttons.signUp')}</Text>
+                <Text style={styles.signUpButtonText}>{t('auth.common.buttons.signUp')}</Text>
               )}
             </TouchableOpacity>
 
@@ -372,14 +260,6 @@ const styles = StyleSheet.create({
   },
   eyeIcon: {
     padding: 5,
-  },
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 10,
-  },
-  halfWidth: {
-    flex: 1,
   },
   signUpButton: {
     backgroundColor: '#007AFF',

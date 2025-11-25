@@ -50,8 +50,9 @@ const customFetch = async (url: RequestInfo | URL, options?: RequestInit) => {
   const isRedisInvalidatePattern = urlString.includes('redis-invalidate-pattern');
   
   // Add timeout to prevent hanging requests (using Promise.race instead of AbortController for React Native compatibility)
-  // Use longer timeout for cache invalidation since it can take time
-  const timeout = isRedisInvalidatePattern ? 60000 : 30000; // 60 seconds for cache invalidation, 30 for others
+  // Use longer timeout for cache invalidation and auth operations (email sending can be slow)
+  const isAuthOperation = urlString.includes('/auth/v1/') && (urlString.includes('signup') || urlString.includes('otp') || urlString.includes('signin'));
+  const timeout = isRedisInvalidatePattern ? 60000 : (isAuthOperation ? 60000 : 30000); // 60 seconds for cache invalidation and auth, 30 for others
   const timeoutPromise = new Promise<never>((_, reject) => {
     setTimeout(() => {
       // For redis-invalidate-pattern, return a timeout response instead of throwing

@@ -10,6 +10,7 @@ import IntroScreen from '../screens/IntroScreen';
 import PhoneSignInScreen from '../screens/PhoneSignInScreen';
 import EmailSignInScreen from '../screens/EmailSignInScreen';
 import EmailSignUpScreen from '../screens/EmailSignUpScreen';
+import EmailVerificationScreen from '../screens/EmailVerificationScreen';
 import OTPVerificationScreen from '../screens/OTPVerificationScreen';
 import UsernameScreen from '../screens/onboarding/UsernameScreen';
 import NameScreen from '../screens/onboarding/NameScreen';
@@ -106,6 +107,7 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
       screens: {
         EmailSignIn: 'auth/callback',
         EmailSignUp: 'auth/callback',
+        EmailVerification: 'auth/callback',
         PhoneSignIn: 'auth/callback',
         OTPVerification: 'auth/callback',
       },
@@ -336,6 +338,11 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
               name="EmailSignUp" 
               component={EmailSignUpScreen}
               options={{ title: 'Sign Up' }}
+            />
+            <Stack.Screen 
+              name="EmailVerification" 
+              component={EmailVerificationScreen}
+              options={{ title: 'Verify Email' }}
             />
             <Stack.Screen 
               name="OTPVerification" 
