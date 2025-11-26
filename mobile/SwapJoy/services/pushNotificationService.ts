@@ -4,6 +4,7 @@ import { Platform } from 'react-native';
 import { NavigationContainerRef } from '@react-navigation/native';
 import { RootStackParamList } from '../types/navigation';
 import { NotificationNavigation } from '../utils/notificationNavigation';
+import { ApiService } from './api';
 
 /**
  * Notification type enum values
@@ -88,6 +89,13 @@ export class PushNotificationService {
 
       // Use shared navigation utility
       NotificationNavigation.navigateFromNotification(notification);
+
+      // Best-effort: mark notification as read when opened from push
+      if (notificationId) {
+        ApiService.markNotificationAsRead(notificationId).catch((error) => {
+          console.warn('[PushNotificationService] Failed to mark notification as read from push:', error);
+        });
+      }
     } catch (error) {
       console.error('Error navigating from notification:', error);
       // Fallback handled by NotificationNavigation

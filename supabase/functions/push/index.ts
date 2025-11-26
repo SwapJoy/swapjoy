@@ -81,6 +81,7 @@ async function sendFCMNotification(
     title: string
     body: string
     data?: Record<string, string>
+    badge?: number
   }
 ): Promise<{ success: boolean; error?: string }> {
   try {
@@ -103,6 +104,21 @@ async function sendFCMNotification(
               Object.fromEntries(
                 Object.entries(notification.data).map(([k, v]) => [k, String(v)])
               ) : undefined,
+            // Include badge count for iOS & Android if provided
+            apns: notification.badge !== undefined ? {
+              payload: {
+                aps: {
+                  // iOS app icon badge count
+                  badge: notification.badge,
+                },
+              },
+            } : undefined,
+            android: notification.badge !== undefined ? {
+              notification: {
+                // Shown as a badge on supported Android launchers
+                notificationCount: notification.badge,
+              },
+            } : undefined,
           },
         }),
       }
@@ -230,6 +246,26 @@ Deno.serve(async (req) => {
 
     console.log(`Found ${devices.length} device(s) for user ${userId}`)
 
+    // Compute unread notifications count to use for badge
+    let unreadCount = 0
+    try {
+      const { error: unreadError, count } = await supabaseClient
+        .from('notifications')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .eq('is_read', false)
+
+      if (unreadError) {
+        console.warn('Failed to compute unread notifications count:', unreadError.message)
+      } else if (typeof count === 'number') {
+        unreadCount = count
+      }
+    } catch (countError) {
+      console.warn('Exception while computing unread notifications count:', countError)
+    }
+
+    console.log(`Unread notifications for user ${userId}: ${unreadCount}`)
+
     // Get Firebase service account and access token
     const serviceAccount = getServiceAccount()
     const projectId = serviceAccount.project_id
@@ -245,6 +281,7 @@ Deno.serve(async (req) => {
     const notificationData: Record<string, string> = {
       type: notification.type,
       notificationId: notification.id,
+      badge: String(unreadCount),
       ...(notification.data ? 
         Object.fromEntries(
           Object.entries(notification.data).map(([k, v]) => [k, String(v)])
@@ -264,6 +301,7 @@ Deno.serve(async (req) => {
               title: notificationTitle,
               body: notificationBody,
               data: notificationData,
+              badge: unreadCount,
             }
           ),
           3, // max retries

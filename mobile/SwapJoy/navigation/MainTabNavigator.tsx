@@ -8,6 +8,7 @@ import OffersScreen from '../screens/OffersScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import { styles, colors } from './MainTabNavigator.styles';
+import { useNotifications } from '../contexts/NotificationsContext';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
@@ -16,6 +17,8 @@ interface MainTabNavigatorProps {
 }
 
 const MainTabNavigator: React.FC<MainTabNavigatorProps> = ({ onNavigateToAdd }) => {
+  const { unreadCount } = useNotifications();
+
   return (
     <Tab.Navigator
       screenOptions={({ route, navigation }) => ({
@@ -84,6 +87,7 @@ const MainTabNavigator: React.FC<MainTabNavigatorProps> = ({ onNavigateToAdd }) 
         name="Notifications"
         component={NotificationsScreen}
         options={{
+          tabBarBadge: unreadCount > 0 ? (unreadCount > 99 ? '99+' : unreadCount) : undefined,
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons 
               name={focused ? "notifications" : "notifications-outline"} 

@@ -8,6 +8,7 @@ import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import AppNavigator from './navigation/AppNavigator';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { FavoritesProvider } from './contexts/FavoritesContext';
+import { NotificationsProvider } from './contexts/NotificationsContext';
 import { PushNotificationService } from './services/pushNotificationService';
 import { NotificationNavigation } from './utils/notificationNavigation';
 import { RootStackParamList } from './types/navigation';
@@ -86,11 +87,13 @@ export default function App() {
   return (
     <LocalizationProvider>
       <AuthProvider>
-        <FavoritesProvider>
-          <MatchInventoryProvider>
-            <AppContent />
-          </MatchInventoryProvider>
-        </FavoritesProvider>
+        <NotificationsProvider>
+          <FavoritesProvider>
+            <MatchInventoryProvider>
+              <AppContent />
+            </MatchInventoryProvider>
+          </FavoritesProvider>
+        </NotificationsProvider>
       </AuthProvider>
     </LocalizationProvider>
   );

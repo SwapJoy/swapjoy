@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,12 @@ import {
   Image,
   ScrollView,
 } from 'react-native';
-import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
+import {
+  Camera,
+  useCameraDevices,
+  useCameraPermission,
+  useCameraFormat,
+} from 'react-native-vision-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { CameraScreenProps } from '../types/navigation';
@@ -21,12 +26,21 @@ const { width, height } = Dimensions.get('window');
 const MAX_PHOTOS = 5;
 
 const CameraScreen: React.FC<CameraScreenProps> = ({ navigation }) => {
-  const [permission, requestPermission] = useCameraPermissions();
-  const [cameraType, setCameraType] = useState<CameraType>('back');
+  const { hasPermission, requestPermission } = useCameraPermission();
+  const devices = useCameraDevices();
+  const [cameraPosition, setCameraPosition] = useState<'back' | 'front'>('back');
   const [flashMode, setFlashMode] = useState<'off' | 'on'>('off');
   const [isCapturing, setIsCapturing] = useState(false);
   const [capturedPhotos, setCapturedPhotos] = useState<string[]>([]);
-  const cameraRef = useRef<CameraView>(null);
+  const cameraRef = useRef<Camera>(null);
+
+  const backDevice = devices.back;
+  const frontDevice = devices.front;
+  const activeDevice = cameraPosition === 'back' ? backDevice : frontDevice;
+
+  const format = useCameraFormat(activeDevice, [
+    { photoResolution: { width: 1600, height: 1200 } },
+  ]);
 
   const takePicture = async () => {
     if (cameraRef.current && !isCapturing) {
@@ -37,11 +51,16 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ navigation }) => {
 
       setIsCapturing(true);
       try {
-        const photo = await cameraRef.current.takePictureAsync({
-          quality: 0.8,
-          base64: false,
+        const photo = await cameraRef.current.takePhoto({
+          flash: flashMode === 'on' ? 'on' : 'off',
         });
-        setCapturedPhotos([...capturedPhotos, photo.uri]);
+
+        const uri = (photo as any).path ?? (photo as any).uri;
+        if (!uri) {
+          throw new Error('No photo path returned');
+        }
+
+        setCapturedPhotos([...capturedPhotos, uri]);
       } catch (error) {
         console.error('Error taking picture:', error);
         Alert.alert('Error', 'Failed to take picture. Please try again.');
@@ -112,7 +131,7 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ navigation }) => {
   };
 
   const toggleCameraType = () => {
-    setCameraType(current => 
+    setCameraPosition(current => 
       current === 'back' ? 'front' : 'back'
     );
   };
@@ -123,7 +142,7 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ navigation }) => {
     );
   };
 
-  if (!permission) {
+  if (!hasPermission) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.permissionContainer}>
@@ -133,7 +152,7 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ navigation }) => {
     );
   }
 
-  if (!permission.granted) {
+  if (!hasPermission) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.permissionContainer}>
@@ -155,12 +174,15 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <CameraView
-        ref={cameraRef}
-        style={styles.camera}
-        facing={cameraType}
-        flash={flashMode}
-      >
+      {activeDevice && (
+        <Camera
+          ref={cameraRef}
+          style={styles.camera}
+          device={activeDevice}
+          isActive={true}
+          photo={true}
+          format={format}
+        >
         {/* Top Controls */}
         <View style={styles.topControls}>
           <TouchableOpacity
@@ -252,7 +274,8 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ navigation }) => {
           </TouchableOpacity>
         </View>
 
-      </CameraView>
+        </Camera>
+      )}
     </SafeAreaView>
   );
 };

@@ -47,7 +47,15 @@
           "cameraPermission": "Allow SwapJoy to access your camera to take photos for your item listings."
         }
       ],
-      "expo-localization"
+      [
+        "react-native-vision-camera",
+        {
+          "cameraPermissionText": "SwapJoy needs access to your camera to take photos for your item listings.",
+          "enableMicrophonePermission": false
+        }
+      ],
+      "expo-localization",
+      "expo-notifications"
     ]
   }
 }

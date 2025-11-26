@@ -1,4 +1,4 @@
-import React, { memo, useCallback } from 'react';
+import React, { memo, useCallback, useEffect } from 'react';
 import { useNavigation } from '@react-navigation/native';
 import {
   View,
@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   TextInput,
   Alert,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ExploreScreenProps, RootStackParamList } from '../types/navigation';
@@ -28,6 +29,7 @@ import type { LocationSelection } from '../types/location';
 import { useExploreScreenState } from '../hooks/useExploreScreenState';
 import type { AppLanguage } from '../types/language';
 import ItemCardCollection from '../components/ItemCardCollection';
+import { DeviceService } from '../services/deviceService';
 
 const { width } = Dimensions.get('window');
 const ITEM_WIDTH = width * 0.7;
@@ -252,6 +254,23 @@ const RecentItemCardItem: React.FC<RecentItemCardProps> = memo(({ item, navigati
 });
 
 const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
+  // Request push notification permission when user reaches the main Explore screen (post-onboarding)
+  useEffect(() => {
+    const requestPushPermission = async () => {
+      if (Platform.OS !== 'ios') {
+        return;
+      }
+
+      try {
+        await DeviceService.requestNotificationPermissions();
+      } catch (error) {
+        console.warn('Failed to request push notification permission on main screen:', error);
+      }
+    };
+
+    void requestPushPermission();
+  }, []);
+
   const rootNavigation = useNavigation<NavigationProp<RootStackParamList>>();
   const {
     t,

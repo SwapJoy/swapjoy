@@ -53,6 +53,7 @@ export class DeviceService {
    */
   static async requestNotificationPermissions(): Promise<boolean> {
     try {
+      console.log('🔔 DeviceService.requestNotificationPermissions called');
       // Wait for Firebase to be ready
       const isReady = await this.waitForFirebase();
       if (!isReady) {
@@ -61,27 +62,31 @@ export class DeviceService {
       }
 
       if (Platform.OS === 'ios') {
-        const requestPermission = (messaging() as any)?.requestPermission;
-        if (typeof requestPermission !== 'function') {
-          console.warn('messaging().requestPermission is not available on this build; skipping permission request');
-          return false;
-        }
-        let authStatus: number | undefined;
         try {
-          authStatus = await requestPermission.call(messaging());
+          console.log('🔔 Requesting iOS notification permission via Firebase Messaging');
+          // Ensure device is registered for remote messages (required on iOS)
+          try {
+            await messaging().registerDeviceForRemoteMessages();
+          } catch (regError: any) {
+            console.warn('Failed to registerDeviceForRemoteMessages (continuing):', regError?.message || regError);
+          }
+
+          const authStatus: number = await (messaging() as any).requestPermission();
+          console.log('🔔 iOS notification authStatus:', authStatus);
+
+          const enabled =
+            authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
+            authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+
+          return enabled;
         } catch (permError: any) {
           const msg = permError?.message || '';
+          console.warn('Error requesting iOS notification permission:', msg);
           if (msg.includes('this.native.requestPermission is not a function')) {
-            console.warn('Native iOS requestPermission not available; skipping permission request on this build');
-            return false;
+            console.warn('Native iOS requestPermission not available; check Firebase iOS setup / version');
           }
-          throw permError;
+          return false;
         }
-        const enabled =
-          authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
-          authStatus === messaging.AuthorizationStatus.PROVISIONAL;
-
-        return enabled;
       }
 
       // Android: permissions are granted by default

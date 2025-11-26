@@ -8,10 +8,11 @@ import {
   RefreshControl,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { CommonActions } from '@react-navigation/native';
 import { NotificationsScreenProps, RootStackParamList } from '../types/navigation';
-import { useNotificationsData, Notification } from '../hooks/useNotificationsData';
+import { Notification } from '../hooks/useNotificationsData';
+import { useNotifications } from '../contexts/NotificationsContext';
 import CachedImage from '../components/CachedImage';
 import { NotificationNavigation } from '../utils/notificationNavigation';
 
@@ -21,13 +22,19 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = memo(() => {
     notifications,
     loading,
     refreshing,
-    unreadCount,
     onRefresh,
     markAsRead,
     getNotificationIcon,
     getNotificationColor,
     formatTimeAgo,
-  } = useNotificationsData();
+  } = useNotifications();
+
+  // Always refresh notifications (and thus unread counts/badges) when this screen gains focus
+  useFocusEffect(
+    React.useCallback(() => {
+      onRefresh();
+    }, [onRefresh])
+  );
 
   const handleNotificationPress = (item: Notification) => {
     console.log('[NotificationsScreen] Notification pressed:', { 
