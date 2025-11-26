@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,41 +11,78 @@ import {
   Image,
   ScrollView,
 } from 'react-native';
+import Toast from 'react-native-toast-message';
 import {
   Camera,
-  useCameraDevices,
+  useCameraDevice,
   useCameraPermission,
   useCameraFormat,
 } from 'react-native-vision-camera';
 import * as ImagePicker from 'expo-image-picker';
+import * as MediaLibrary from 'expo-media-library';
 import { Ionicons } from '@expo/vector-icons';
-import { CameraScreenProps } from '../types/navigation';
+import { useNavigation, NavigationProp } from '@react-navigation/native';
+import { RootStackParamList } from '../types/navigation';
 import { DraftManager } from '../services/draftManager';
 
 const { width, height } = Dimensions.get('window');
-const MAX_PHOTOS = 5;
+const MAX_PHOTOS = 10;
 
-const CameraScreen: React.FC<CameraScreenProps> = ({ navigation }) => {
+type CameraScreenOwnProps = {
+  onNavigateToMain?: () => void;
+};
+
+const CameraScreen: React.FC<CameraScreenOwnProps> = ({ onNavigateToMain }) => {
+  const navigation = useNavigation<NavigationProp<RootStackParamList, 'Camera'>>();
   const { hasPermission, requestPermission } = useCameraPermission();
-  const devices = useCameraDevices();
-  const [cameraPosition, setCameraPosition] = useState<'back' | 'front'>('back');
+  // Prefer the main wide‑angle back camera, fall back to default back, plus front camera
+
+  const backDefaultDevice = useCameraDevice('back');
   const [flashMode, setFlashMode] = useState<'off' | 'on'>('off');
   const [isCapturing, setIsCapturing] = useState(false);
   const [capturedPhotos, setCapturedPhotos] = useState<string[]>([]);
+  const [galleryPermission, setGalleryPermission] = useState<boolean>(false);
+  const [lastGalleryImage, setLastGalleryImage] = useState<string | null>(null);
   const cameraRef = useRef<Camera>(null);
+  const activeDevice = backDefaultDevice;
 
-  const backDevice = devices.back;
-  const frontDevice = devices.front;
-  const activeDevice = cameraPosition === 'back' ? backDevice : frontDevice;
+  // Get last photo from device gallery
+  useEffect(() => {
+    const getLastGalleryPhoto = async () => {
+      try {
+        const { status } = await MediaLibrary.requestPermissionsAsync();
+        if (status === 'granted') {
+          setGalleryPermission(true);
+          // Get the most recent photo
+          const assets = await MediaLibrary.getAssetsAsync({
+            mediaType: MediaLibrary.MediaType.photo,
+            sortBy: MediaLibrary.SortBy.creationTime,
+            first: 1,
+          });
+          if (assets.assets.length > 0) {
+            setLastGalleryImage(assets.assets[0].uri);
+          }
+        }
+      } catch (error) {
+        console.error('Error getting last gallery photo:', error);
+      }
+    };
+    getLastGalleryPhoto();
+  }, []);
 
   const format = useCameraFormat(activeDevice, [
-    { photoResolution: { width: 1600, height: 1200 } },
+    { photoResolution: { width: 1920, height: 1080 } },
   ]);
 
   const takePicture = async () => {
     if (cameraRef.current && !isCapturing) {
       if (capturedPhotos.length >= MAX_PHOTOS) {
-        Alert.alert('Maximum Photos Reached', `You can only add up to ${MAX_PHOTOS} photos.`);
+        Toast.show({
+          type: 'warning',
+          text1: 'Maximum Photos Reached',
+          text2: `You can only add up to ${MAX_PHOTOS} photos.`,
+          position: 'top',
+        });
         return;
       }
 
@@ -60,7 +97,18 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ navigation }) => {
           throw new Error('No photo path returned');
         }
 
-        setCapturedPhotos([...capturedPhotos, uri]);
+        const newPhotos = [...capturedPhotos, uri];
+        setCapturedPhotos(newPhotos);
+
+        // Show toast when reaching the limit
+        if (newPhotos.length >= MAX_PHOTOS) {
+          Toast.show({
+            type: 'warning',
+            text1: 'Maximum Photos Reached',
+            text2: `You can only add up to ${MAX_PHOTOS} photos.`,
+            position: 'top',
+          });
+        }
       } catch (error) {
         console.error('Error taking picture:', error);
         Alert.alert('Error', 'Failed to take picture. Please try again.');
@@ -74,12 +122,19 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ navigation }) => {
     try {
       const remainingSlots = MAX_PHOTOS - capturedPhotos.length;
       if (remainingSlots <= 0) {
-        Alert.alert('Maximum Photos Reached', `You can only add up to ${MAX_PHOTOS} photos.`);
+        Toast.show({
+          type: 'warning',
+          text1: 'Maximum Photos Reached',
+          text2: `You can only add up to ${MAX_PHOTOS} photos.`,
+          position: 'top',
+        });
         return;
       }
 
       // Request media library permissions
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      setGalleryPermission(status === 'granted');
+      
       if (status !== 'granted') {
         Alert.alert(
           'Permission Required',
@@ -100,6 +155,10 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ navigation }) => {
       if (!result.canceled && result.assets) {
         const newUris = result.assets.map((asset) => asset.uri);
         setCapturedPhotos([...capturedPhotos, ...newUris]);
+        // Update last gallery image to the most recent selection
+        if (result.assets.length > 0) {
+          setLastGalleryImage(result.assets[result.assets.length - 1].uri);
+        }
       }
     } catch (error) {
       console.error('Error selecting from gallery:', error);
@@ -128,12 +187,6 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ navigation }) => {
       console.error('Error creating draft:', error);
       Alert.alert('Error', 'Failed to create draft. Please try again.');
     }
-  };
-
-  const toggleCameraType = () => {
-    setCameraPosition(current => 
-      current === 'back' ? 'front' : 'back'
-    );
   };
 
   const toggleFlash = () => {
@@ -173,52 +226,54 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ navigation }) => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       {activeDevice && (
         <Camera
           ref={cameraRef}
-          style={styles.camera}
+          style={StyleSheet.absoluteFill}
           device={activeDevice}
           isActive={true}
           photo={true}
           format={format}
-        >
+          torch={flashMode === 'on' ? 'on' : 'off'}
+        />
+      )}
+
+      {/* Overlays on top of camera */}
+      <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
         {/* Top Controls */}
         <View style={styles.topControls}>
           <TouchableOpacity
             style={styles.topButton}
-            onPress={() => navigation.goBack()}
+            onPress={() => {
+              if (onNavigateToMain) {
+                onNavigateToMain();
+              } else if (navigation) {
+                navigation.goBack();
+              }
+            }}
           >
-            <Ionicons name="close" size={24} color="#fff" />
+            <Ionicons name="close" size={28} color="#fff" />
           </TouchableOpacity>
 
-          <View style={styles.topRightControls}>
+          {capturedPhotos.length > 0 && (
             <TouchableOpacity
-              style={styles.topButton}
-              onPress={toggleFlash}
+              style={[styles.topButton, styles.nextButton]}
+              onPress={handleNext}
             >
-              <Ionicons 
-                name={flashMode === 'on' ? "flash" : "flash-off"} 
-                size={24} 
-                color="#fff" 
-              />
+              <Text style={styles.nextButtonText}>Next</Text>
             </TouchableOpacity>
-            
-            {capturedPhotos.length > 0 && (
-              <TouchableOpacity
-                style={[styles.topButton, styles.nextButton]}
-                onPress={handleNext}
-              >
-                <Text style={styles.nextButtonText}>Next</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+          )}
         </View>
 
         {/* Thumbnail Carousel */}
         {capturedPhotos.length > 0 && (
           <View style={styles.thumbnailContainer}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.thumbnailScrollContent}
+            >
               {capturedPhotos.map((uri, index) => (
                 <View key={index} style={styles.thumbnailWrapper}>
                   <Image source={{ uri }} style={styles.thumbnail} />
@@ -231,11 +286,6 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ navigation }) => {
                 </View>
               ))}
             </ScrollView>
-            <View style={styles.photoCount}>
-              <Text style={styles.photoCountText}>
-                {capturedPhotos.length}/{MAX_PHOTOS}
-              </Text>
-            </View>
           </View>
         )}
 
@@ -243,19 +293,59 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ navigation }) => {
         <View style={styles.bottomControls}>
           {/* Left Gallery Button */}
           <TouchableOpacity
-            style={styles.sideButton}
-            onPress={selectFromGallery}
+            style={[
+              styles.circleButton,
+              capturedPhotos.length >= MAX_PHOTOS && styles.circleButtonDisabled
+            ]}
+            onPress={() => {
+              if (capturedPhotos.length >= MAX_PHOTOS) {
+                Toast.show({
+                  type: 'warning',
+                  text1: 'Maximum Photos Reached',
+                  text2: `You can only add up to ${MAX_PHOTOS} photos.`,
+                  position: 'top',
+                });
+                return;
+              }
+              selectFromGallery();
+            }}
+            disabled={capturedPhotos.length >= MAX_PHOTOS}
           >
-            <View style={styles.imagePlaceholder}>
-              <Ionicons name="images-outline" size={20} color="#fff" />
-            </View>
+            {lastGalleryImage ? (
+              <Image
+                source={{ uri: lastGalleryImage }}
+                style={[
+                  styles.circleButtonImage,
+                  capturedPhotos.length >= MAX_PHOTOS && styles.circleButtonImageDisabled
+                ]}
+              />
+            ) : (
+              <Ionicons 
+                name="images-outline" 
+                size={24} 
+                color={capturedPhotos.length >= MAX_PHOTOS ? 'rgba(255, 255, 255, 0.5)' : '#fff'} 
+              />
+            )}
           </TouchableOpacity>
 
           {/* Capture Button */}
           <TouchableOpacity
             style={styles.captureButton}
-            onPress={takePicture}
-            disabled={isCapturing || capturedPhotos.length >= MAX_PHOTOS}
+            onPress={() => {
+              if (capturedPhotos.length >= MAX_PHOTOS) {
+                Toast.show({
+                  type: 'warning',
+                  text1: 'Maximum Photos Reached',
+                  text2: `You can only add up to ${MAX_PHOTOS} photos.`,
+                  position: 'top',
+                });
+                return;
+              }
+              if (!isCapturing) {
+                takePicture();
+              }
+            }}
+            disabled={isCapturing}
           >
             <View style={[
               styles.captureButtonInner,
@@ -263,20 +353,35 @@ const CameraScreen: React.FC<CameraScreenProps> = ({ navigation }) => {
             ]} />
           </TouchableOpacity>
 
-          {/* Right Camera Toggle */}
+          {/* Right Flash Button */}
           <TouchableOpacity
-            style={styles.sideButton}
-            onPress={toggleCameraType}
+            style={[
+              styles.circleButton,
+              capturedPhotos.length >= MAX_PHOTOS && styles.circleButtonDisabled
+            ]}
+            onPress={() => {
+              if (capturedPhotos.length >= MAX_PHOTOS) {
+                Toast.show({
+                  type: 'warning',
+                  text1: 'Maximum Photos Reached',
+                  text2: `You can only add up to ${MAX_PHOTOS} photos.`,
+                  position: 'top',
+                });
+                return;
+              }
+              toggleFlash();
+            }}
+            disabled={capturedPhotos.length >= MAX_PHOTOS}
           >
-            <View style={styles.imagePlaceholder}>
-              <Ionicons name="camera-reverse" size={20} color="#fff" />
-            </View>
+            <Ionicons 
+              name={flashMode === 'on' ? "flash" : "flash-off"} 
+              size={24} 
+              color={capturedPhotos.length >= MAX_PHOTOS ? 'rgba(255, 255, 255, 0.5)' : '#fff'} 
+            />
           </TouchableOpacity>
         </View>
-
-        </Camera>
-      )}
-    </SafeAreaView>
+      </View>
+    </View>
   );
 };
 
@@ -337,9 +442,9 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   topButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -359,27 +464,42 @@ const styles = StyleSheet.create({
     bottom: Platform.OS === 'ios' ? 160 : 140,
     left: 0,
     right: 0,
-    height: 100,
+    height: 120,
     paddingHorizontal: 20,
+    paddingTop: 12,
     zIndex: 1,
   },
+  thumbnailScrollContent: {
+    paddingVertical: 12,
+    paddingRight: 12,
+    paddingLeft: 12,
+  },
   thumbnailWrapper: {
-    marginRight: 10,
+    marginRight: 12,
     position: 'relative',
+    width: 80,
+    height: 80,
+    marginTop: 12,
+    marginBottom: 12,
   },
   thumbnail: {
     width: 80,
     height: 80,
-    borderRadius: 8,
+    borderRadius: 40,
     borderWidth: 2,
     borderColor: '#fff',
   },
   removeThumbnail: {
     position: 'absolute',
-    top: -8,
-    right: -8,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    top: -12,
+    right: -12,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
     borderRadius: 12,
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
   },
   photoCount: {
     position: 'absolute',
@@ -406,21 +526,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
     zIndex: 1,
   },
-  sideButton: {
-    width: 60,
-    height: 60,
+  circleButton: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
-  imagePlaceholder: {
-    width: 50,
-    height: 50,
-    borderRadius: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.5)',
+  circleButtonImage: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+  },
+  circleButtonDisabled: {
+    opacity: 0.5,
+  },
+  circleButtonImageDisabled: {
+    opacity: 0.5,
   },
   captureButton: {
     width: 80,

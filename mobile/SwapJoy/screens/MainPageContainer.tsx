@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { View, Dimensions, StyleSheet } from 'react-native';
 import { ScrollView } from 'react-native-gesture-handler';
-import CameraScreenTest from './CameraScreenTest';
+import CameraScreen from './CameraScreen';
 import MainTabNavigator from '../navigation/MainTabNavigator';
 
 const { width } = Dimensions.get('window');
@@ -35,7 +35,7 @@ const MainPageContainer: React.FC = () => {
     >
       {/* Page 1: Camera Screen */}
       <View style={styles.page}>
-        <CameraScreenTest onNavigateToMain={() => scrollToPage(1)} />
+        <CameraScreen onNavigateToMain={() => scrollToPage(1)} />
       </View>
       
       {/* Page 2: MainTabs (default) */}

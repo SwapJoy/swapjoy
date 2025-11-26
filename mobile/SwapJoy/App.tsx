@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { View, Text, StyleSheet, ActivityIndicator, Platform } from 'react-native';
 import { NavigationContainerRef } from '@react-navigation/native';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import Toast, { BaseToast } from 'react-native-toast-message';
 // React Native Firebase is initialized natively via FirebaseApp.configure() in AppDelegate.swift
 import AppNavigator from './navigation/AppNavigator';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -31,6 +32,42 @@ GoogleSignin.configure({
   offlineAccess: true,
   scopes: ['profile', 'email'],
 });
+
+// Toast configuration with custom types
+const toastConfig = {
+  warning: (props: any) => (
+    <BaseToast
+      {...props}
+      style={{ borderLeftColor: '#FF9500' }}
+      contentContainerStyle={{ paddingHorizontal: 15 }}
+      text1Style={{
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#000',
+      }}
+      text2Style={{
+        fontSize: 13,
+        color: '#666',
+      }}
+    />
+  ),
+  info: (props: any) => (
+    <BaseToast
+      {...props}
+      style={{ borderLeftColor: '#007AFF' }}
+      contentContainerStyle={{ paddingHorizontal: 15 }}
+      text1Style={{
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#000',
+      }}
+      text2Style={{
+        fontSize: 13,
+        color: '#666',
+      }}
+    />
+  ),
+};
 
 function AppContent() {
   const { isLoading: authIsLoading } = useAuth();
@@ -79,6 +116,7 @@ function AppContent() {
     <>
       <AppNavigator ref={navigationRef} />
       <StatusBar style="auto" />
+      <Toast config={toastConfig} />
     </>
   );
 }
