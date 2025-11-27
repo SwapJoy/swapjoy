@@ -10,9 +10,6 @@ import {
   Platform,
   Alert,
   Modal,
-  Animated,
-  ScrollView,
-  PanResponder,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
@@ -23,6 +20,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useLocalization } from '../localization';
 import CachedImage from '../components/CachedImage';
 import { ImageUploadService } from '../services/imageUpload';
+import ImageView from 'react-native-image-viewing';
 
 const ChatScreen: React.FC<ChatScreenProps> = ({ route }) => {
   const { chatId, offerId, otherUserId, offer: initialOffer } = route.params as any;
@@ -32,7 +30,6 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route }) => {
   const listRef = useRef<FlatList<any> | null>(null);
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const [previewVisible, setPreviewVisible] = useState(false);
-  const previewPan = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
 
   // Use offer passed via params when available for header context
   const [offer, setOffer] = React.useState<any | null>(initialOffer || null);
@@ -58,64 +55,13 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route }) => {
 
   const openImagePreview = (url: string) => {
     setPreviewImageUrl(url);
-    previewPan.setValue({ x: 0, y: 0 });
     setPreviewVisible(true);
   };
 
   const closeImagePreview = () => {
-    Animated.timing(previewPan, {
-      toValue: { x: 0, y: 180 },
-      duration: 140,
-      useNativeDriver: true,
-    }).start(() => {
-      previewPan.setValue({ x: 0, y: 0 });
-      setPreviewVisible(false);
-      setPreviewImageUrl(null);
-    });
+    setPreviewVisible(false);
+    setPreviewImageUrl(null);
   };
-
-  const previewPanResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        // Only start drag-dismiss on mostly vertical, single-finger swipes
-        const isVertical = Math.abs(gestureState.dy) > Math.abs(gestureState.dx);
-        return (
-          gestureState.numberActiveTouches === 1 &&
-          isVertical &&
-          Math.abs(gestureState.dy) > 4
-        );
-      },
-      onPanResponderMove: Animated.event(
-        [null, { dy: previewPan.y }],
-        { useNativeDriver: false },
-      ),
-      onPanResponderRelease: (_, gestureState) => {
-        const distanceThreshold = 35;
-        const velocityThreshold = 0.6;
-        const movedFarEnough = Math.abs(gestureState.dy) > distanceThreshold;
-        const fastSwipe = Math.abs(gestureState.vy) > velocityThreshold;
-
-        if (movedFarEnough || fastSwipe) {
-          const direction = gestureState.dy > 0 ? 1 : -1;
-          Animated.timing(previewPan, {
-            toValue: { x: 0, y: 320 * direction },
-            duration: 140,
-            useNativeDriver: true,
-          }).start(() => {
-            previewPan.setValue({ x: 0, y: 0 });
-            setPreviewVisible(false);
-            setPreviewImageUrl(null);
-          });
-        } else {
-          Animated.timing(previewPan, {
-            toValue: { x: 0, y: 0 },
-            duration: 140,
-            useNativeDriver: true,
-          }).start();
-        }
-      },
-    })
-  ).current;
 
   const handlePickImage = async () => {
     try {
@@ -229,61 +175,13 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route }) => {
         onEndReachedThreshold={0.1}
       />
 
-      {/* Fullscreen image preview */}
-      <Modal
+      {/* Fullscreen image preview via react-native-image-viewing */}
+      <ImageView
+        images={previewImageUrl ? [{ uri: previewImageUrl }] : []}
+        imageIndex={0}
         visible={previewVisible}
-        transparent
-        animationType="fade"
         onRequestClose={closeImagePreview}
-      >
-        <View style={styles.previewContainer}>
-          <Animated.View
-            style={[
-              styles.previewInner,
-              {
-                transform: [{ translateY: previewPan.y }],
-                opacity: previewPan.y.interpolate({
-                  inputRange: [-200, 0, 200],
-                  outputRange: [0.4, 1, 0.4],
-                  extrapolate: 'clamp',
-                }),
-              },
-            ]}
-            {...previewPanResponder.panHandlers}
-          >
-            {/* Close (X) button */}
-            <TouchableOpacity
-              style={styles.previewCloseButton}
-              onPress={closeImagePreview}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Ionicons name="close" size={26} color="#FFFFFF" />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              activeOpacity={1}
-              style={styles.previewTouchable}
-              onPress={closeImagePreview}
-            >
-              <ScrollView
-                style={styles.previewScroll}
-                contentContainerStyle={styles.previewScrollContent}
-                minimumZoomScale={1}
-                maximumZoomScale={3}
-                centerContent
-              >
-                {previewImageUrl && (
-                  <CachedImage
-                    uri={previewImageUrl}
-                    style={styles.previewImage}
-                    resizeMode="contain"
-                  />
-                )}
-              </ScrollView>
-            </TouchableOpacity>
-          </Animated.View>
-        </View>
-      </Modal>
+      />
 
       <View style={styles.composer}>
         <TouchableOpacity style={styles.attachButton} onPress={handlePickImage}>
@@ -407,47 +305,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     backgroundColor: '#d1d5db',
   },
-  previewContainer: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.9)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  previewInner: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  previewCloseButton: {
-    position: 'absolute',
-    top: 52,
-    right: 20,
-    zIndex: 10,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  previewTouchable: {
-    flex: 1,
-    width: '100%',
-  },
-  previewScroll: {
-    flex: 1,
-  },
-  previewScrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
-  },
-  previewImage: {
-    width: '100%',
-    height: '100%',
-  },
+  // preview styles no longer needed; ImageView handles layout
   composer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
