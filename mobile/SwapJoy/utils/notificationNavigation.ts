@@ -37,6 +37,17 @@ export class NotificationNavigation {
       console.log('[NotificationNavigation] Navigating from notification:', { type, data });
 
       switch (type) {
+        case 'chat_message':
+          if (data?.chatId && data?.offerId) {
+            this.navigationRef.navigate('Chat', {
+              chatId: data.chatId,
+              offerId: data.offerId,
+            });
+          } else {
+            this.navigationRef.navigate('MainTabs');
+          }
+          break;
+
         case 'new_follower':
           // Navigate to user profile
           // Try different possible field names for userId

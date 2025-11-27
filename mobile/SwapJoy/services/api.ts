@@ -304,7 +304,7 @@ export class ApiService {
       return { available: false, error: { message: 'Username cannot be empty' } };
     }
 
-    return this.authenticatedCall(async (client) => {
+    const result = await this.authenticatedCall(async (client) => {
       const { data, error } = await client
         .from('users')
         .select('username')
@@ -319,6 +319,8 @@ export class ApiService {
       // If data exists, username is taken
       return { available: !data, error: null } as any;
     });
+
+    return (result as unknown) as { available: boolean; error: any };
   }
 
   static async updateProfile(updates: Partial<{
@@ -2299,6 +2301,267 @@ export class ApiService {
       }
       
       return { data, error: null };
+    });
+  }
+
+  /**
+   * Ensure a chat exists for a given offer and participant pair, and return its id.
+   * Used when starting chat from the offer details screen.
+   */
+  static async ensureChatForOffer(params: {
+    offerId: string;
+    otherUserId: string;
+  }) {
+    const { offerId, otherUserId } = params;
+
+    return this.authenticatedCall(async (client) => {
+      const currentUser = await AuthService.getCurrentUser();
+      if (!currentUser?.id) {
+        console.warn('[ApiService.ensureChatForOffer] No current user found');
+        return { data: null, error: { message: 'Not authenticated' } };
+      }
+
+      const me = currentUser.id;
+
+      // Fetch offer to confirm participants
+      const { data: offer, error: offerError } = await client
+        .from('offers')
+        .select('id, sender_id, receiver_id')
+        .eq('id', offerId)
+        .single();
+
+      if (offerError || !offer) {
+        console.warn('[ApiService.ensureChatForOffer] Offer not found:', offerError);
+        return { data: null, error: offerError || { message: 'Offer not found' } };
+      }
+
+      const senderId = offer.sender_id;
+      const receiverId = offer.receiver_id;
+
+      if (
+        ![senderId, receiverId].includes(me) ||
+        ![senderId, receiverId].includes(otherUserId) ||
+        me === otherUserId
+      ) {
+        console.warn('[ApiService.ensureChatForOffer] Invalid participants for chat', {
+          me,
+          otherUserId,
+          senderId,
+          receiverId,
+        });
+        return { data: null, error: { message: 'Invalid participants for chat' } };
+      }
+
+      // Normalize buyer/seller roles in the same way as chats table: sender=buyer, receiver=seller
+      const buyerId = senderId;
+      const sellerId = receiverId;
+
+      // Try to find existing chat
+      const { data: existing, error: chatError } = await client
+        .from('chats')
+        .select('id')
+        .eq('offer_id', offerId)
+        .eq('buyer_id', buyerId)
+        .eq('seller_id', sellerId)
+        .maybeSingle();
+
+      if (chatError) {
+        console.error('[ApiService.ensureChatForOffer] Error querying chats:', chatError);
+        return { data: null, error: chatError };
+      }
+
+      if (existing?.id) {
+        return { data: { chatId: existing.id }, error: null };
+      }
+
+      // No chat yet → create one
+      const { data: inserted, error: insertError } = await client
+        .from('chats')
+        .insert({
+          offer_id: offerId,
+          buyer_id: buyerId,
+          seller_id: sellerId,
+        })
+        .select('id')
+        .single();
+
+      if (insertError || !inserted) {
+        console.error('[ApiService.ensureChatForOffer] Failed to create chat:', insertError);
+        return { data: null, error: insertError || { message: 'Failed to create chat' } };
+      }
+
+      return { data: { chatId: inserted.id }, error: null };
+    });
+  }
+
+  /**
+   * Get chats for the current user with unread counts and basic offer/counterpart info
+   */
+  static async getChats() {
+    return this.authenticatedCall(async (client) => {
+      const currentUser = await AuthService.getCurrentUser();
+      if (!currentUser?.id) {
+        console.warn('[ApiService.getChats] No current user found');
+        return { data: [], error: { message: 'Not authenticated' } };
+      }
+
+      const userId = currentUser.id;
+
+      // Fetch chats where user is buyer or seller
+      const { data, error } = await client
+        .from('chats')
+        .select(`
+          id,
+          offer_id,
+          buyer_id,
+          seller_id,
+          last_message_at,
+          offer:offers (
+            id,
+            message
+          ),
+          buyer:users!chats_buyer_id_fkey (
+            id,
+            username,
+            first_name,
+            last_name,
+            profile_image_url
+          ),
+          seller:users!chats_seller_id_fkey (
+            id,
+            username,
+            first_name,
+            last_name,
+            profile_image_url
+          ),
+          messages:chat_messages (
+            id,
+            sender_id,
+            content_text,
+            is_read,
+            created_at
+          )
+        `)
+        .or(`buyer_id.eq.${userId},seller_id.eq.${userId}`)
+        .order('last_message_at', { ascending: false });
+
+      if (error) {
+        console.error('[ApiService.getChats] Error:', error);
+        return { data: [], error };
+      }
+
+      const mapped = (data || []).map((row: any) => {
+        const counterpart =
+          row.buyer_id === userId ? row.seller : row.buyer;
+
+        const messages = row.messages || [];
+        const lastMessage = messages.sort(
+          (a: any, b: any) =>
+            new Date(b.created_at).getTime() -
+            new Date(a.created_at).getTime()
+        )[0];
+
+        const unread_count = messages.filter(
+          (m: any) => !m.is_read && m.sender_id !== userId
+        ).length;
+
+        return {
+          id: row.id,
+          offer_id: row.offer_id,
+          buyer_id: row.buyer_id,
+          seller_id: row.seller_id,
+          last_message_at: row.last_message_at,
+          unread_count,
+          counterpart_user: counterpart || null,
+          offer: row.offer || null,
+          last_message_preview: lastMessage?.content_text || null,
+        };
+      });
+
+      return { data: mapped, error: null };
+    });
+  }
+
+  /**
+   * Mark all messages in a chat as read for the current user
+   */
+  static async markChatAsRead(chatId: string) {
+    return this.authenticatedCall(async (client) => {
+      const currentUser = await AuthService.getCurrentUser();
+      if (!currentUser?.id) {
+        console.warn('[ApiService.markChatAsRead] No current user found');
+        return { data: null, error: { message: 'Not authenticated' } };
+      }
+
+      const { error } = await client
+        .from('chat_messages')
+        .update({ is_read: true })
+        .eq('chat_id', chatId)
+        .neq('sender_id', currentUser.id);
+
+      if (error) {
+        console.error('[ApiService.markChatAsRead] Error:', error);
+        return { data: null, error };
+      }
+
+      return { data: null, error: null };
+    });
+  }
+
+  /**
+   * Send a chat message via RPC (creates chat lazily if needed)
+   */
+  static async sendChatMessage(params: {
+    offerId: string;
+    receiverId?: string;
+    contentText: string | null;
+    contentType: 'text' | 'image';
+    mediaUrl?: string | null;
+  }) {
+    const { offerId, contentText, contentType, mediaUrl } = params;
+    return this.authenticatedCall(async (client) => {
+      let receiverId = params.receiverId;
+
+      // If receiverId not provided, derive it from the offer and current user
+      if (!receiverId) {
+        const currentUser = await AuthService.getCurrentUser();
+        if (!currentUser?.id) {
+          console.warn('[ApiService.sendChatMessage] No current user found');
+          return { data: null, error: { message: 'Not authenticated' } };
+        }
+
+        const { data: offer, error: offerError } = await client
+          .from('offers')
+          .select('sender_id, receiver_id')
+          .eq('id', offerId)
+          .single();
+
+        if (offerError || !offer) {
+          console.error('[ApiService.sendChatMessage] Failed to load offer for receiver derivation:', offerError);
+          return { data: null, error: offerError || { message: 'Offer not found' } };
+        }
+
+        if (currentUser.id === offer.sender_id) {
+          receiverId = offer.receiver_id;
+        } else if (currentUser.id === offer.receiver_id) {
+          receiverId = offer.sender_id;
+        } else {
+          console.error('[ApiService.sendChatMessage] Current user is not a participant of the offer');
+          return { data: null, error: { message: 'User not participant of offer' } };
+        }
+      }
+
+      const { data, error } = await client.rpc('send_chat_message', {
+        p_offer_id: offerId,
+        p_receiver_id: receiverId,
+        p_content_text: contentText,
+        p_content_type: contentType,
+        p_media_url: mediaUrl ?? null,
+      });
+      if (error) {
+        console.error('[ApiService.sendChatMessage] Error:', error);
+      }
+      return { data, error };
     });
   }
 

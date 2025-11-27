@@ -5,6 +5,7 @@ import { MainTabParamList } from '../types/navigation';
 import { Ionicons } from '@expo/vector-icons';
 import ExploreScreen from '../screens/ExploreScreen';
 import OffersScreen from '../screens/OffersScreen';
+import ChatListScreen from '../screens/ChatListScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import { styles, colors } from './MainTabNavigator.styles';
@@ -17,7 +18,7 @@ interface MainTabNavigatorProps {
 }
 
 const MainTabNavigator: React.FC<MainTabNavigatorProps> = ({ onNavigateToAdd }) => {
-  const { unreadCount } = useNotifications();
+  const { unreadCount, totalUnreadChats } = useNotifications();
 
   return (
     <Tab.Navigator
@@ -77,6 +78,20 @@ const MainTabNavigator: React.FC<MainTabNavigatorProps> = ({ onNavigateToAdd }) 
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons 
               name={focused ? "swap-horizontal" : "swap-horizontal-outline"} 
+              size={size} 
+              color={color} 
+            />
+          ),
+        }}
+      />
+      <Tab.Screen
+        name="Chats"
+        component={ChatListScreen}
+        options={{
+          tabBarBadge: totalUnreadChats > 0 ? (totalUnreadChats > 99 ? '99+' : totalUnreadChats) : undefined,
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons 
+              name={focused ? "chatbubbles" : "chatbubbles-outline"} 
               size={size} 
               color={color} 
             />

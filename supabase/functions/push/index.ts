@@ -247,7 +247,7 @@ Deno.serve(async (req) => {
     console.log(`Found ${devices.length} device(s) for user ${userId}`)
 
     // Compute unread notifications count to use for badge
-    let unreadCount = 0
+    let unreadNotifications = 0
     try {
       const { error: unreadError, count } = await supabaseClient
         .from('notifications')
@@ -258,13 +258,35 @@ Deno.serve(async (req) => {
       if (unreadError) {
         console.warn('Failed to compute unread notifications count:', unreadError.message)
       } else if (typeof count === 'number') {
-        unreadCount = count
+        unreadNotifications = count
       }
     } catch (countError) {
       console.warn('Exception while computing unread notifications count:', countError)
     }
 
-    console.log(`Unread notifications for user ${userId}: ${unreadCount}`)
+    console.log(`Unread notifications for user ${userId}: ${unreadNotifications}`)
+
+    // Compute chats with unread messages for consolidated badge
+    let unreadChats = 0
+    try {
+      const { data: chatsWithUnread, error: unreadChatError } = await supabaseClient
+        .from('chat_messages')
+        .select('chat_id, sender_id, is_read')
+        .eq('is_read', false)
+        .neq('sender_id', userId)
+
+      if (!unreadChatError && Array.isArray(chatsWithUnread)) {
+        const uniqueChatIds = new Set<string>()
+        chatsWithUnread.forEach((row: any) => {
+          uniqueChatIds.add(row.chat_id)
+        })
+        unreadChats = uniqueChatIds.size
+      }
+    } catch (err) {
+      console.warn('Failed to compute unread chats count:', err)
+    }
+
+    const totalBadge = unreadNotifications + unreadChats
 
     // Get Firebase service account and access token
     const serviceAccount = getServiceAccount()
@@ -281,7 +303,7 @@ Deno.serve(async (req) => {
     const notificationData: Record<string, string> = {
       type: notification.type,
       notificationId: notification.id,
-      badge: String(unreadCount),
+      badge: String(totalBadge),
       ...(notification.data ? 
         Object.fromEntries(
           Object.entries(notification.data).map(([k, v]) => [k, String(v)])
@@ -301,7 +323,7 @@ Deno.serve(async (req) => {
               title: notificationTitle,
               body: notificationBody,
               data: notificationData,
-              badge: unreadCount,
+              badge: totalBadge,
             }
           ),
           3, // max retries

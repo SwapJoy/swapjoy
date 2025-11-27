@@ -40,7 +40,7 @@
 		</dict>
 	</array>
 	<key>CFBundleVersion</key>
-	<string>1</string>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>GIDClientID</key>
 	<string>96140617553-lcohn29aagtb7ed3h8898lh0vivtuns6.apps.googleusercontent.com</string>
 	<key>LSApplicationQueriesSchemes</key>

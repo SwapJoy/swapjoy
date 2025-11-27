@@ -36,6 +36,8 @@ import DevRecommendationSettingsScreen from '../screens/DevRecommendationSetting
 import SuggestionDetailsScreen from '../screens/SuggestionDetailsScreen';
 import OffersScreen from '../screens/OffersScreen';
 import RecentlyListedScreen from '../screens/RecentlyListedScreen';
+import ChatScreen from '../screens/ChatScreen';
+import OfferDetailsScreen from '../screens/OfferDetailsScreen';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -309,6 +311,16 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
               name="Offers"
               component={OffersScreen}
               options={{ title: 'Offers' }}
+            />
+            <Stack.Screen
+              name="OfferDetails"
+              component={OfferDetailsScreen}
+              options={{ title: 'Offer Details' }}
+            />
+            <Stack.Screen
+              name="Chat"
+              component={ChatScreen}
+              options={{ title: 'Chat' }}
             />
             <Stack.Screen 
               name="SuggestionDetails" 

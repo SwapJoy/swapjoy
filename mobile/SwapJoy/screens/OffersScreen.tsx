@@ -20,7 +20,7 @@ import { DEFAULT_LANGUAGE } from '../types/language';
 const { width } = Dimensions.get('window');
 const noop = () => {};
 
-const OffersScreen: React.FC<OffersScreenProps> = memo(({ route }) => {
+const OffersScreen: React.FC<OffersScreenProps> = memo(({ route, navigation }) => {
   const { sentOffers, receivedOffers, loading, refreshing, onRefresh, getStatusColor, getStatusText } = useOffersData();
   const { t, language } = useLocalization();
   const strings = useMemo(
@@ -176,7 +176,9 @@ const OffersScreen: React.FC<OffersScreenProps> = memo(({ route }) => {
             displayName,
             initials: ownerInitials,
           }}
-          onPress={noop}
+          onPress={() => {
+            (navigation as any).navigate('OfferDetails', { offer: item });
+          }}
           disableLikeButton
           containerStyle={styles.offerCard}
           swapSuggestions={

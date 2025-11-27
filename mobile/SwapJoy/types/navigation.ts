@@ -62,6 +62,9 @@ export type RootStackParamList = {
   Offers: {
     initialTab?: 'sent' | 'received';
   } | undefined;
+  OfferDetails: {
+    offer: any;
+  };
   ProfileSettings: undefined;
   DevRecommendationSettings: undefined;
   // Offer flow
@@ -86,11 +89,18 @@ export type RootStackParamList = {
     signature: string;
     targetTitle?: string;
   };
+  Chat: {
+    chatId: string;
+    offerId: string;
+    otherUserId?: string;
+    offer?: any;
+  };
 };
 
 export type MainTabParamList = {
   Explore: undefined;
   Offers: undefined;
+  Chats: undefined;
   Notifications: undefined;
   Profile: undefined;
 };
@@ -130,12 +140,17 @@ export type ExploreScreenProps = {
 };
 
 export type OffersScreenProps = {
-  navigation: NavigationProp<RootStackParamList | MainTabParamList, 'Offers'>;
-  route?: RouteProp<RootStackParamList | MainTabParamList, 'Offers'>;
+  navigation: NavigationProp<RootStackParamList, 'Offers'>;
+  route?: RouteProp<RootStackParamList, 'Offers'>;
 };
 
 export type NotificationsScreenProps = {
   navigation: NavigationProp<MainTabParamList, 'Notifications'>;
+};
+
+export type ChatScreenProps = {
+  navigation: NavigationProp<RootStackParamList, 'Chat'>;
+  route: RouteProp<RootStackParamList, 'Chat'>;
 };
 
 export type ProfileScreenProps = {

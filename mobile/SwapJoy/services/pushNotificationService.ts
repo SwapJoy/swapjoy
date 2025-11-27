@@ -14,7 +14,8 @@ export type NotificationType =
   | 'offer_decision'
   | 'new_follower'
   | 'swap_confirmed'
-  | 'followed_user_new_item';
+  | 'followed_user_new_item'
+  | 'chat_message';
 
 /**
  * Notification data structure from FCM payload
@@ -24,6 +25,7 @@ interface NotificationData {
   notificationId: string;
   itemId?: string;
   offerId?: string;
+  chatId?: string;
   userId?: string;
   [key: string]: string | undefined;
 }

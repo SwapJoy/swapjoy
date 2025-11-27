@@ -201,7 +201,9 @@ export class DeviceService {
 
       const platform = this.getPlatform();
 
-      // Upsert device in Supabase
+      // Upsert device in Supabase, using fcm_token as the unique key:
+      // - Ensures a token is stored only once in the devices table
+      // - If the same device/token is already registered, we simply update metadata
       const { data, error } = await supabase
         .from('devices')
         .upsert(
@@ -214,7 +216,7 @@ export class DeviceService {
             last_seen: new Date().toISOString(),
           },
           {
-            onConflict: 'user_id,device_id',
+            onConflict: 'fcm_token',
             ignoreDuplicates: false,
           }
         )
