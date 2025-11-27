@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useEffect } from 'react';
+import React, { useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -98,17 +98,12 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route }) => {
 
       <FlatList
         ref={listRef}
-        data={messages}
+         inverted
+         data={[...messages].slice().reverse()}
         renderItem={renderMessage}
         keyExtractor={(item) => String(item.id)}
         contentContainerStyle={styles.messagesContainer}
         onEndReachedThreshold={0.1}
-        onContentSizeChange={() => {
-          // Auto-scroll to bottom when new messages arrive
-          if (listRef.current && messages.length > 0) {
-            listRef.current.scrollToEnd({ animated: true });
-          }
-        }}
       />
 
       <View style={styles.composer}>
