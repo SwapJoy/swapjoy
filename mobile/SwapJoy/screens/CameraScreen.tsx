@@ -1,275 +1,138 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
-  Dimensions,
-  Alert,
   Platform,
   Image,
   ScrollView,
-  Linking,
+  Animated,
 } from 'react-native';
-import Toast from 'react-native-toast-message';
-import {
-  Camera,
-  useCameraDevice,
-  useCameraPermission,
-  useCameraFormat,
-} from 'react-native-vision-camera';
-import * as ImagePicker from 'expo-image-picker';
-import * as MediaLibrary from 'expo-media-library';
+import { BlurView } from 'expo-blur';
+import { Camera } from 'react-native-vision-camera';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation, NavigationProp } from '@react-navigation/native';
-import { RootStackParamList } from '../types/navigation';
-import { DraftManager } from '../services/draftManager';
-
-const { width, height } = Dimensions.get('window');
-const MAX_PHOTOS = 10;
+import { useCamera, MAX_PHOTOS } from '../hooks/useCamera';
 
 type CameraScreenOwnProps = {
   onNavigateToMain?: () => void;
+  isVisible?: boolean; // For MainPageContainer to control camera activation
 };
 
-const CameraScreen: React.FC<CameraScreenOwnProps> = ({ onNavigateToMain }) => {
-  const navigation = useNavigation<NavigationProp<RootStackParamList, 'Camera'>>();
-  const { hasPermission, requestPermission } = useCameraPermission();
-  // Prefer the main wide‑angle back camera, fall back to default back, plus front camera
-
-  const backDefaultDevice = useCameraDevice('back');
-  const [flashMode, setFlashMode] = useState<'off' | 'on'>('off');
-  const [isCapturing, setIsCapturing] = useState(false);
-  const [capturedPhotos, setCapturedPhotos] = useState<string[]>([]);
-  const [galleryPermission, setGalleryPermission] = useState<boolean>(false);
-  const [lastGalleryImage, setLastGalleryImage] = useState<string | null>(null);
-  const [cameraPermissionDenied, setCameraPermissionDenied] = useState<boolean>(false);
-  const [galleryPermissionDenied, setGalleryPermissionDenied] = useState<boolean>(false);
-  const cameraRef = useRef<Camera>(null);
-  const activeDevice = backDefaultDevice;
-
-  const format = useCameraFormat(activeDevice, [
-    { photoResolution: { width: 1920, height: 1080 } },
-  ]);
-
-  // Reset denied state when permission is granted (e.g., user granted from settings)
-  useEffect(() => {
-    if (hasPermission && cameraPermissionDenied) {
-      setCameraPermissionDenied(false);
-    }
-  }, [hasPermission, cameraPermissionDenied]);
-
-  const takePicture = async () => {
-    if (cameraRef.current && !isCapturing) {
-      if (capturedPhotos.length >= MAX_PHOTOS) {
-        Toast.show({
-          type: 'warning',
-          text1: 'Maximum Photos Reached',
-          text2: `You can only add up to ${MAX_PHOTOS} photos.`,
-          position: 'top',
-        });
-        return;
-      }
-
-      setIsCapturing(true);
-      try {
-        const photo = await cameraRef.current.takePhoto({
-          flash: flashMode === 'on' ? 'on' : 'off',
-        });
-
-        const uri = (photo as any).path ?? (photo as any).uri;
-        if (!uri) {
-          throw new Error('No photo path returned');
-        }
-
-        const newPhotos = [...capturedPhotos, uri];
-        setCapturedPhotos(newPhotos);
-
-        // Show toast when reaching the limit
-        if (newPhotos.length >= MAX_PHOTOS) {
-          Toast.show({
-            type: 'warning',
-            text1: 'Maximum Photos Reached',
-            text2: `You can only add up to ${MAX_PHOTOS} photos.`,
-            position: 'top',
-          });
-        }
-      } catch (error) {
-        console.error('Error taking picture:', error);
-        Alert.alert('Error', 'Failed to take picture. Please try again.');
-      } finally {
-        setIsCapturing(false);
-      }
-    }
-  };
-
-  const handleOpenSettings = () => {
-    Linking.openSettings();
-  };
-
-  const handleRequestCameraPermission = async () => {
-    // If permission was previously denied, show alert immediately
-    if (cameraPermissionDenied) {
-      Alert.alert(
-        'Camera Permission Required',
-        'To take photos, please enable camera access in your device settings.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Settings', onPress: handleOpenSettings },
-        ]
-      );
-      return;
-    }
-
-    try {
-      const result = await requestPermission();
-      if (!result) {
-        // Permission was denied, mark as denied but don't show alert yet
-        setCameraPermissionDenied(true);
-      } else {
-        setCameraPermissionDenied(false);
-      }
-    } catch (error) {
-      console.error('Error requesting camera permission:', error);
-      // Mark as denied but don't show alert
-      setCameraPermissionDenied(true);
-    }
-  };
-
-  const selectFromGallery = async () => {
-    try {
-      const remainingSlots = MAX_PHOTOS - capturedPhotos.length;
-      if (remainingSlots <= 0) {
-        Toast.show({
-          type: 'warning',
-          text1: 'Maximum Photos Reached',
-          text2: `You can only add up to ${MAX_PHOTOS} photos.`,
-          position: 'top',
-        });
-        return;
-      }
-
-      // Check current permission status first
-      const { status: currentStatus } = await ImagePicker.getMediaLibraryPermissionsAsync();
+const CameraScreen: React.FC<CameraScreenOwnProps> = ({ onNavigateToMain, isVisible }) => {
+  const {
+    activeDevice,
+    hasPermission,
+    format,
+    cameraRef,
+    isActive,
+    flashMode,
+    isCapturing,
+    capturedPhotos,
+    lastGalleryImage,
+    lastFrameBase64,
+    takePicture,
+    handleRequestCameraPermission,
+    selectFromGallery,
+    removePhoto,
+    handleNext,
+    toggleFlash,
+    handleClose,
+  } = useCamera(onNavigateToMain, isVisible);
+  
+  // Track camera ready state to fade out blurred last frame
+  const [isCameraReady, setIsCameraReady] = React.useState(false);
+  const readyTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+  const overlayOpacity = React.useRef(new Animated.Value(1)).current; // Start fully visible
+  
+  // Handle camera initialization
+  const handleCameraInitialized = React.useCallback(() => {
+    setIsCameraReady(true);
+    // Smoothly fade out the blurred overlay when camera is ready
+    Animated.timing(overlayOpacity, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  }, [overlayOpacity]);
+  
+  React.useEffect(() => {
+    // When camera becomes active, reset ready state and show overlay
+    if (isActive) {
+      setIsCameraReady(false);
+      // Reset opacity to fully visible
+      overlayOpacity.setValue(1);
       
-      // If permission was previously denied (either from state or current status), show alert immediately
-      if (galleryPermissionDenied || currentStatus === 'denied') {
-        setGalleryPermissionDenied(true);
-        Alert.alert(
-          'Gallery Permission Required',
-          'To select photos from your gallery, please enable photo library access in your device settings.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Settings', onPress: handleOpenSettings },
-          ]
-        );
-        return;
+      // Clear any existing timer
+      if (readyTimerRef.current) {
+        clearTimeout(readyTimerRef.current);
       }
       
-      if (currentStatus !== 'granted') {
-        // Request media library permissions (status is 'undetermined')
-        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        setGalleryPermission(status === 'granted');
-        
-        if (status === 'denied') {
-          // Permission was denied, mark as denied but don't show alert yet
-          setGalleryPermissionDenied(true);
-          return;
-        } else if (status !== 'granted') {
-          // Permission request was cancelled or failed
-          return;
-        } else {
-          setGalleryPermissionDenied(false);
+      // Fallback: If camera doesn't call onInitialized, mark as ready after delay
+      readyTimerRef.current = setTimeout(() => {
+        setIsCameraReady(true);
+        Animated.timing(overlayOpacity, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }).start();
+      }, 300);
+      
+      return () => {
+        if (readyTimerRef.current) {
+          clearTimeout(readyTimerRef.current);
         }
-      } else {
-        setGalleryPermission(true);
-        setGalleryPermissionDenied(false);
+      };
+    } else {
+      // When camera becomes inactive, reset ready state and show overlay
+      setIsCameraReady(false);
+      overlayOpacity.setValue(1);
+      if (readyTimerRef.current) {
+        clearTimeout(readyTimerRef.current);
       }
-
-      // Get last gallery image if we have permission
-      try {
-        const { status: mediaStatus } = await MediaLibrary.getPermissionsAsync();
-        if (mediaStatus === 'granted') {
-          const assets = await MediaLibrary.getAssetsAsync({
-            mediaType: MediaLibrary.MediaType.photo,
-            sortBy: MediaLibrary.SortBy.creationTime,
-            first: 1,
-          });
-          if (assets.assets.length > 0) {
-            setLastGalleryImage(assets.assets[0].uri);
-          }
-        }
-      } catch (error) {
-        // Ignore error for getting last gallery image
-        console.log('Could not get last gallery image:', error);
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsMultipleSelection: true,
-        selectionLimit: remainingSlots,
-        quality: 0.8,
-        allowsEditing: false,
-      });
-
-      if (!result.canceled && result.assets) {
-        const newUris = result.assets.map((asset) => asset.uri);
-        setCapturedPhotos([...capturedPhotos, ...newUris]);
-        // Update last gallery image to the most recent selection
-        if (result.assets.length > 0) {
-          setLastGalleryImage(result.assets[result.assets.length - 1].uri);
-        }
-      }
-    } catch (error) {
-      console.error('Error selecting from gallery:', error);
-      Alert.alert('Error', 'Failed to select photos. Please try again.');
     }
-  };
-
-  const removePhoto = (index: number) => {
-    setCapturedPhotos(capturedPhotos.filter((_, i) => i !== index));
-  };
-
-  const handleNext = async () => {
-    if (capturedPhotos.length === 0) {
-      Alert.alert('No Photos', 'Please take at least one photo to continue.');
-      return;
-    }
-
-    try {
-      // Create draft and navigate to form
-      const draft = await DraftManager.createDraft(capturedPhotos);
-      navigation.navigate('ItemDetailsForm', {
-        draftId: draft.id,
-        imageUris: capturedPhotos,
-      });
-    } catch (error) {
-      console.error('Error creating draft:', error);
-      Alert.alert('Error', 'Failed to create draft. Please try again.');
-    }
-  };
-
-  const toggleFlash = () => {
-    setFlashMode(current => 
-      current === 'off' ? 'on' : 'off'
-    );
-  };
+  }, [isActive, overlayOpacity]);
+  
 
 
   return (
     <View style={styles.container}>
-      {activeDevice && hasPermission && (
-        <Camera
-          ref={cameraRef}
-          style={StyleSheet.absoluteFill}
-          device={activeDevice}
-          isActive={true}
-          photo={true}
-          format={format}
-          torch={flashMode === 'on' ? 'on' : 'off'}
-        />
-      )}
+      {/* Always render camera when device and permission are available to prevent flickering */}
+      {activeDevice && hasPermission ? (
+        <>
+          <Camera
+            ref={cameraRef}
+            style={StyleSheet.absoluteFill}
+            device={activeDevice}
+            isActive={isActive}
+            photo={true}
+            format={format}
+            torch={flashMode === 'on' ? 'on' : 'off'}
+            onInitialized={handleCameraInitialized}
+          />
+          {/* Last frame with native blur effect - always rendered when available, opacity controls visibility */}
+          {lastFrameBase64 ? (
+            <Animated.View
+              style={[
+                StyleSheet.absoluteFill,
+                { opacity: overlayOpacity },
+              ]}
+              pointerEvents="none"
+            >
+              <Image
+                source={{ uri: lastFrameBase64 }}
+                style={StyleSheet.absoluteFill}
+                resizeMode="cover"
+              />
+              <BlurView
+                intensity={70}
+                tint="light"
+                style={StyleSheet.absoluteFill}
+              />
+            </Animated.View>
+          ) : null}
+        </>
+      ) : null}
 
       {/* Camera Permission Overlay - only covers camera area, doesn't block controls */}
       {!hasPermission && (
@@ -296,13 +159,7 @@ const CameraScreen: React.FC<CameraScreenOwnProps> = ({ onNavigateToMain }) => {
         <View style={styles.topControls}>
           <TouchableOpacity
             style={styles.topButton}
-            onPress={() => {
-              if (onNavigateToMain) {
-                onNavigateToMain();
-              } else if (navigation) {
-                navigation.goBack();
-              }
-            }}
+            onPress={handleClose}
           >
             <Ionicons name="close" size={28} color="#fff" />
           </TouchableOpacity>
@@ -348,18 +205,7 @@ const CameraScreen: React.FC<CameraScreenOwnProps> = ({ onNavigateToMain }) => {
               styles.circleButton,
               capturedPhotos.length >= MAX_PHOTOS && styles.circleButtonDisabled
             ]}
-            onPress={() => {
-              if (capturedPhotos.length >= MAX_PHOTOS) {
-                Toast.show({
-                  type: 'warning',
-                  text1: 'Maximum Photos Reached',
-                  text2: `You can only add up to ${MAX_PHOTOS} photos.`,
-                  position: 'top',
-                });
-                return;
-              }
-              selectFromGallery();
-            }}
+            onPress={selectFromGallery}
             disabled={capturedPhotos.length >= MAX_PHOTOS}
           >
             {lastGalleryImage ? (
@@ -390,18 +236,7 @@ const CameraScreen: React.FC<CameraScreenOwnProps> = ({ onNavigateToMain }) => {
                 handleRequestCameraPermission();
                 return;
               }
-              if (capturedPhotos.length >= MAX_PHOTOS) {
-                Toast.show({
-                  type: 'warning',
-                  text1: 'Maximum Photos Reached',
-                  text2: `You can only add up to ${MAX_PHOTOS} photos.`,
-                  position: 'top',
-                });
-                return;
-              }
-              if (!isCapturing) {
-                takePicture();
-              }
+              takePicture();
             }}
             disabled={isCapturing || !hasPermission}
           >
@@ -420,15 +255,6 @@ const CameraScreen: React.FC<CameraScreenOwnProps> = ({ onNavigateToMain }) => {
             onPress={() => {
               if (!hasPermission) {
                 handleRequestCameraPermission();
-                return;
-              }
-              if (capturedPhotos.length >= MAX_PHOTOS) {
-                Toast.show({
-                  type: 'warning',
-                  text1: 'Maximum Photos Reached',
-                  text2: `You can only add up to ${MAX_PHOTOS} photos.`,
-                  position: 'top',
-                });
                 return;
               }
               toggleFlash();
