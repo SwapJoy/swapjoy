@@ -10,6 +10,7 @@ import {
   Platform,
   Image,
   ScrollView,
+  Linking,
 } from 'react-native';
 import Toast from 'react-native-toast-message';
 import {
@@ -43,36 +44,21 @@ const CameraScreen: React.FC<CameraScreenOwnProps> = ({ onNavigateToMain }) => {
   const [capturedPhotos, setCapturedPhotos] = useState<string[]>([]);
   const [galleryPermission, setGalleryPermission] = useState<boolean>(false);
   const [lastGalleryImage, setLastGalleryImage] = useState<string | null>(null);
+  const [cameraPermissionDenied, setCameraPermissionDenied] = useState<boolean>(false);
+  const [galleryPermissionDenied, setGalleryPermissionDenied] = useState<boolean>(false);
   const cameraRef = useRef<Camera>(null);
   const activeDevice = backDefaultDevice;
-
-  // Get last photo from device gallery
-  useEffect(() => {
-    const getLastGalleryPhoto = async () => {
-      try {
-        const { status } = await MediaLibrary.requestPermissionsAsync();
-        if (status === 'granted') {
-          setGalleryPermission(true);
-          // Get the most recent photo
-          const assets = await MediaLibrary.getAssetsAsync({
-            mediaType: MediaLibrary.MediaType.photo,
-            sortBy: MediaLibrary.SortBy.creationTime,
-            first: 1,
-          });
-          if (assets.assets.length > 0) {
-            setLastGalleryImage(assets.assets[0].uri);
-          }
-        }
-      } catch (error) {
-        console.error('Error getting last gallery photo:', error);
-      }
-    };
-    getLastGalleryPhoto();
-  }, []);
 
   const format = useCameraFormat(activeDevice, [
     { photoResolution: { width: 1920, height: 1080 } },
   ]);
+
+  // Reset denied state when permission is granted (e.g., user granted from settings)
+  useEffect(() => {
+    if (hasPermission && cameraPermissionDenied) {
+      setCameraPermissionDenied(false);
+    }
+  }, [hasPermission, cameraPermissionDenied]);
 
   const takePicture = async () => {
     if (cameraRef.current && !isCapturing) {
@@ -118,6 +104,39 @@ const CameraScreen: React.FC<CameraScreenOwnProps> = ({ onNavigateToMain }) => {
     }
   };
 
+  const handleOpenSettings = () => {
+    Linking.openSettings();
+  };
+
+  const handleRequestCameraPermission = async () => {
+    // If permission was previously denied, show alert immediately
+    if (cameraPermissionDenied) {
+      Alert.alert(
+        'Camera Permission Required',
+        'To take photos, please enable camera access in your device settings.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Settings', onPress: handleOpenSettings },
+        ]
+      );
+      return;
+    }
+
+    try {
+      const result = await requestPermission();
+      if (!result) {
+        // Permission was denied, mark as denied but don't show alert yet
+        setCameraPermissionDenied(true);
+      } else {
+        setCameraPermissionDenied(false);
+      }
+    } catch (error) {
+      console.error('Error requesting camera permission:', error);
+      // Mark as denied but don't show alert
+      setCameraPermissionDenied(true);
+    }
+  };
+
   const selectFromGallery = async () => {
     try {
       const remainingSlots = MAX_PHOTOS - capturedPhotos.length;
@@ -131,17 +150,59 @@ const CameraScreen: React.FC<CameraScreenOwnProps> = ({ onNavigateToMain }) => {
         return;
       }
 
-      // Request media library permissions
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      setGalleryPermission(status === 'granted');
+      // Check current permission status first
+      const { status: currentStatus } = await ImagePicker.getMediaLibraryPermissionsAsync();
       
-      if (status !== 'granted') {
+      // If permission was previously denied (either from state or current status), show alert immediately
+      if (galleryPermissionDenied || currentStatus === 'denied') {
+        setGalleryPermissionDenied(true);
         Alert.alert(
-          'Permission Required',
-          'Please grant permission to access your photo library.',
-          [{ text: 'OK' }]
+          'Gallery Permission Required',
+          'To select photos from your gallery, please enable photo library access in your device settings.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Settings', onPress: handleOpenSettings },
+          ]
         );
         return;
+      }
+      
+      if (currentStatus !== 'granted') {
+        // Request media library permissions (status is 'undetermined')
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        setGalleryPermission(status === 'granted');
+        
+        if (status === 'denied') {
+          // Permission was denied, mark as denied but don't show alert yet
+          setGalleryPermissionDenied(true);
+          return;
+        } else if (status !== 'granted') {
+          // Permission request was cancelled or failed
+          return;
+        } else {
+          setGalleryPermissionDenied(false);
+        }
+      } else {
+        setGalleryPermission(true);
+        setGalleryPermissionDenied(false);
+      }
+
+      // Get last gallery image if we have permission
+      try {
+        const { status: mediaStatus } = await MediaLibrary.getPermissionsAsync();
+        if (mediaStatus === 'granted') {
+          const assets = await MediaLibrary.getAssetsAsync({
+            mediaType: MediaLibrary.MediaType.photo,
+            sortBy: MediaLibrary.SortBy.creationTime,
+            first: 1,
+          });
+          if (assets.assets.length > 0) {
+            setLastGalleryImage(assets.assets[0].uri);
+          }
+        }
+      } catch (error) {
+        // Ignore error for getting last gallery image
+        console.log('Could not get last gallery image:', error);
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -195,39 +256,10 @@ const CameraScreen: React.FC<CameraScreenOwnProps> = ({ onNavigateToMain }) => {
     );
   };
 
-  if (!hasPermission) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.permissionContainer}>
-          <Text style={styles.permissionText}>Requesting camera permission...</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  if (!hasPermission) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.permissionContainer}>
-          <Ionicons name="camera-outline" size={64} color="#666" />
-          <Text style={styles.permissionTitle}>Camera Access Required</Text>
-          <Text style={styles.permissionText}>
-            Please enable camera access in your device settings to take photos for your listings.
-          </Text>
-          <TouchableOpacity
-            style={styles.permissionButton}
-            onPress={requestPermission}
-          >
-            <Text style={styles.permissionButtonText}>Grant Permission</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    );
-  }
 
   return (
     <View style={styles.container}>
-      {activeDevice && (
+      {activeDevice && hasPermission && (
         <Camera
           ref={cameraRef}
           style={StyleSheet.absoluteFill}
@@ -237,6 +269,25 @@ const CameraScreen: React.FC<CameraScreenOwnProps> = ({ onNavigateToMain }) => {
           format={format}
           torch={flashMode === 'on' ? 'on' : 'off'}
         />
+      )}
+
+      {/* Camera Permission Overlay - only covers camera area, doesn't block controls */}
+      {!hasPermission && (
+        <View style={styles.permissionOverlay} pointerEvents="box-none">
+          <View style={styles.permissionOverlayContent}>
+            <Ionicons name="camera-outline" size={64} color="#fff" />
+            <Text style={styles.permissionOverlayTitle}>Camera Access Required</Text>
+            <Text style={styles.permissionOverlayText}>
+              Please grant camera permission to take photos for your listings.
+            </Text>
+            <TouchableOpacity
+              style={styles.permissionOverlayButton}
+              onPress={handleRequestCameraPermission}
+            >
+              <Text style={styles.permissionOverlayButtonText}>Grant Permission</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       )}
 
       {/* Overlays on top of camera */}
@@ -330,8 +381,15 @@ const CameraScreen: React.FC<CameraScreenOwnProps> = ({ onNavigateToMain }) => {
 
           {/* Capture Button */}
           <TouchableOpacity
-            style={styles.captureButton}
+            style={[
+              styles.captureButton,
+              !hasPermission && styles.captureButtonDisabled
+            ]}
             onPress={() => {
+              if (!hasPermission) {
+                handleRequestCameraPermission();
+                return;
+              }
               if (capturedPhotos.length >= MAX_PHOTOS) {
                 Toast.show({
                   type: 'warning',
@@ -345,11 +403,11 @@ const CameraScreen: React.FC<CameraScreenOwnProps> = ({ onNavigateToMain }) => {
                 takePicture();
               }
             }}
-            disabled={isCapturing}
+            disabled={isCapturing || !hasPermission}
           >
             <View style={[
               styles.captureButtonInner,
-              capturedPhotos.length >= MAX_PHOTOS && styles.captureButtonDisabled
+              (capturedPhotos.length >= MAX_PHOTOS || !hasPermission) && styles.captureButtonInnerDisabled
             ]} />
           </TouchableOpacity>
 
@@ -357,9 +415,13 @@ const CameraScreen: React.FC<CameraScreenOwnProps> = ({ onNavigateToMain }) => {
           <TouchableOpacity
             style={[
               styles.circleButton,
-              capturedPhotos.length >= MAX_PHOTOS && styles.circleButtonDisabled
+              (capturedPhotos.length >= MAX_PHOTOS || !hasPermission) && styles.circleButtonDisabled
             ]}
             onPress={() => {
+              if (!hasPermission) {
+                handleRequestCameraPermission();
+                return;
+              }
               if (capturedPhotos.length >= MAX_PHOTOS) {
                 Toast.show({
                   type: 'warning',
@@ -371,12 +433,12 @@ const CameraScreen: React.FC<CameraScreenOwnProps> = ({ onNavigateToMain }) => {
               }
               toggleFlash();
             }}
-            disabled={capturedPhotos.length >= MAX_PHOTOS}
+            disabled={capturedPhotos.length >= MAX_PHOTOS || !hasPermission}
           >
             <Ionicons 
               name={flashMode === 'on' ? "flash" : "flash-off"} 
               size={24} 
-              color={capturedPhotos.length >= MAX_PHOTOS ? 'rgba(255, 255, 255, 0.5)' : '#fff'} 
+              color={(capturedPhotos.length >= MAX_PHOTOS || !hasPermission) ? 'rgba(255, 255, 255, 0.5)' : '#fff'} 
             />
           </TouchableOpacity>
         </View>
@@ -393,34 +455,40 @@ const styles = StyleSheet.create({
   camera: {
     flex: 1,
   },
-  permissionContainer: {
-    flex: 1,
+  permissionOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#f5f5f5',
+    zIndex: 0,
   },
-  permissionTitle: {
-    fontSize: 20,
+  permissionOverlayContent: {
+    alignItems: 'center',
+    padding: 30,
+    maxWidth: 300,
+  },
+  permissionOverlayTitle: {
+    fontSize: 22,
     fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 10,
+    color: '#fff',
+    marginTop: 20,
+    marginBottom: 12,
     textAlign: 'center',
   },
-  permissionText: {
+  permissionOverlayText: {
     fontSize: 16,
-    color: '#666',
+    color: '#ccc',
     textAlign: 'center',
     lineHeight: 24,
     marginBottom: 30,
   },
-  permissionButton: {
+  permissionOverlayButton: {
     backgroundColor: '#007AFF',
     paddingHorizontal: 30,
     paddingVertical: 15,
     borderRadius: 8,
   },
-  permissionButtonText: {
+  permissionOverlayButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
@@ -434,7 +502,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    zIndex: 1,
+    zIndex: 10,
   },
   topRightControls: {
     flexDirection: 'row',
@@ -467,7 +535,7 @@ const styles = StyleSheet.create({
     height: 120,
     paddingHorizontal: 20,
     paddingTop: 12,
-    zIndex: 1,
+    zIndex: 10,
   },
   thumbnailScrollContent: {
     paddingVertical: 12,
@@ -524,7 +592,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 40,
-    zIndex: 1,
+    zIndex: 10,
   },
   circleButton: {
     width: 52,
@@ -563,6 +631,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   captureButtonDisabled: {
+    opacity: 0.5,
+  },
+  captureButtonInnerDisabled: {
     backgroundColor: '#ccc',
   },
 });

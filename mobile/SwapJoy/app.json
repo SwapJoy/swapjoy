@@ -17,6 +17,7 @@
       "infoPlist": {
         "NSCameraUsageDescription": "This app needs access to camera to take photos for your item listings.",
         "NSPhotoLibraryUsageDescription": "This app needs access to your photo library to select photos for your item listings.",
+        "NSLocationWhenInUseUsageDescription": "SwapJoy needs your location to help you find nearby swaps and matches with other users in your area.",
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": true,
           "NSAllowsLocalNetworking": true
