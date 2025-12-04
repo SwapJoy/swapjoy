@@ -2,13 +2,7 @@
 
 ## Overview
 
-`getTopPicksForUser` is a recommendation engine that generates personalized item recommendations for a user based on category preferences, price matching, and location proximity. The function uses weighted scoring algorithms and intelligent filtering to deliver relevant swap suggestions.
-
-**Key Features**:
-- Category preference filtering (favorite categories)
-- Price compatibility scoring (based on user's average item value)
-- Location-aware filtering
-- Single recommendation source: favorite category items
+`getTopPicksForUser` is a recommendation engine that generates personalized item recommendations for users based on category preferences, price matching, and location proximity. The function uses weighted scoring algorithms and intelligent filtering to deliver relevant swap suggestions.
 
 **Location**: `mobile/SwapJoy/services/api.ts`  
 **Class**: `ApiService`  
@@ -50,7 +44,7 @@ Each item in the `data` array includes:
 - Item images
 - Owner/user information
 - Scoring metadata:
-  - `similarity_score`: Semantic similarity (0-1)
+  - `similarity_score`: Similarity score (0-1)
   - `category_match_score`: Category preference match (0-1)
   - `price_match_score`: Price compatibility (0-1)
   - `location_match_score`: Location proximity (0-1)
@@ -85,7 +79,7 @@ Fetches initial data in parallel using `Promise.all()`:
 
 4. **Recommendation Weights**
    - User-specific scoring weights:
-     - `similarity_weight`: Importance of semantic similarity (0-1)
+     - `similarity_weight`: Importance of similarity (0-1)
      - `category_score`: Importance of category matching (0-1)
      - `price_score`: Importance of price matching (0-1)
      - `location_lat` / `location_lng`: Importance of location (0-1)
@@ -93,7 +87,6 @@ Fetches initial data in parallel using `Promise.all()`:
 ### Stage 2: Price Calculation
 
 Calculates the average value of user's items in GEL for price compatibility scoring:
-- Fetches user's available items (with embeddings)
 - Converts each item's price to GEL using exchange rates
 - Sums total value
 - Calculates average: `totalValueGEL / itemCount`
@@ -107,7 +100,7 @@ Collects recommendations from one source:
 
 #### 3.1 Favorite Category Items
 
-**Purpose**: Ensure items from favorite categories appear even if similarity is low
+**Purpose**: Fetch items directly from user's favorite categories
 
 **Process**:
 1. Only executes if:
@@ -128,6 +121,7 @@ Collects recommendations from one source:
    - Location: Calculated from distance
    - Overall: Weighted combination
 
+**When Used**: Only when `category_score < 0.99` and user has favorite categories
 
 ### Stage 4: Deduplication and Filtering
 
@@ -314,7 +308,6 @@ Cache is invalidated when:
 
 1. **Helper Functions**
    - `getFavoriteCategoryItems()`: Handles favorite category logic
-   - `getWeightedMatchesFromUserItems()`: Handles weighted matching
    - `fetchItemDetailsWithJoins()`: Handles final data enrichment
    - Improves readability and maintainability
 
@@ -335,6 +328,18 @@ Fetches and scores items from user's favorite categories.
 - Applies weighted scoring
 - Returns scored items with metadata
 
+**Parameters**:
+- `client`: Supabase client
+- `userId`: User ID
+- `favoriteCategories`: Array of category IDs
+- `limit`: Maximum items to fetch
+- `userLat`, `userLng`: User location coordinates
+- `maxRadiusKm`: Maximum search radius
+- `avgUserItemValueGEL`: Average user item value for price scoring
+- `rateMap`: Currency exchange rates
+- `weights`: Recommendation weights
+
+**Returns**: Array of scored items
 
 ### `fetchItemDetailsWithJoins()`
 
@@ -344,6 +349,15 @@ Fetches full item details with all related data in a single query.
 - Single query with joins
 - Includes categories, images, and users
 - Applies strict category filtering if needed
+
+**Parameters**:
+- `client`: Supabase client
+- `itemIds`: Array of item IDs to fetch
+- `uniqueItems`: Items with scoring metadata
+- `favoriteCategories`: User's favorite categories
+- `strictCategoryFilter`: Whether to apply strict category filtering
+
+**Returns**: Array of items with full details and scores
 
 ### `deduplicateAndSort()`
 
@@ -446,8 +460,6 @@ result.data?.forEach(item => {
 - Without cache: 100-300ms (depending on data volume)
 - Fallback: 100-300ms
 
-**Performance Improvement**: Removed prompt-based and user-item matching reduces execution time significantly.
-
 ---
 
 ## Limitations and Considerations
@@ -471,8 +483,8 @@ result.data?.forEach(item => {
    - May result in fewer recommendations
 
 5. **Price Filtering**
-   - Only applies when `price_score >= 0.2`
-   - Very low price weights disable price filtering
+   - Price scoring always applied (uses 0.5 if no user items)
+   - Price weight determines how much price affects overall score
 
 6. **Cache Dependency**
    - Requires Redis for optimal performance
@@ -513,8 +525,8 @@ result.data?.forEach(item => {
 
 ## Version History
 
-- **v2.2** (Current): Removed prompt-based recommendations; recommendations now based solely on favorite category items
-- **v2.1**: Removed user-item matching; recommendations based on user profile embedding and favorite categories
+- **v2.2** (Current): Recommendations based solely on favorite category items with price and location scoring
+- **v2.1**: Removed user-item matching
 - **v2.0**: Optimized with helper functions, batch queries, and single join query
 - **v1.0**: Initial implementation with sequential queries
 
@@ -522,7 +534,6 @@ result.data?.forEach(item => {
 
 ## Author Notes
 
-This function is a critical component of SwapJoy's recommendation system. It balances multiple factors to provide personalized, relevant swap suggestions while maintaining good performance through caching and query optimization.
+This function is a critical component of SwapJoy's recommendation system. It provides personalized swap suggestions based on user preferences, price compatibility, and location proximity while maintaining good performance through caching and query optimization.
 
 For questions or issues, refer to the code comments or contact the development team.
-

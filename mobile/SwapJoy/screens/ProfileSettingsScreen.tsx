@@ -28,8 +28,6 @@ type CategoryOption = {
 const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigation }) => {
   const { signOut } = useAuth();
   const { t, language, setLanguage } = useLocalization();
-  const [prompt, setPrompt] = useState<string>('');
-  const [isPromptModalVisible, setPromptModalVisible] = useState(false);
   const [profile, setProfile] = useState<any | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
   const [preferredRadius, setPreferredRadius] = useState<number>(DEFAULT_RADIUS_KM);
@@ -43,23 +41,6 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigatio
   const [preferredCurrency, setPreferredCurrency] = useState<string>('USD');
   const [isCurrencyModalVisible, setCurrencyModalVisible] = useState(false);
   const [savingCurrency, setSavingCurrency] = useState(false);
-  const charLimit = 500;
-
-  const promptModalSubtitle = useMemo(
-    () => t('settings.profile.promptModalSubtitle').replace('{charLimit}', String(charLimit)),
-    [charLimit, t]
-  );
-
-  const promptPlaceholder = useMemo(
-    () => t('settings.profile.promptPlaceholder'),
-    [t]
-  );
-
-  const promptPreview = useMemo(() => {
-    const trimmed = (prompt || '').trim();
-    if (!trimmed) return t('settings.profile.swapPromptSubtitle');
-    return trimmed.length <= 80 ? trimmed : trimmed.slice(0, 80) + '…';
-  }, [prompt, t]);
 
   const radiusSubtitle = useMemo(
     () =>
@@ -288,7 +269,6 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigatio
         return;
       }
       setProfile(data);
-      setPrompt(typeof data.prompt === 'string' ? data.prompt : '');
       setPreferredRadius(resolveRadius(data.preferred_radius_km));
       setPreferredCurrency(
         typeof data.preferred_currency === 'string' && data.preferred_currency
@@ -463,15 +443,6 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigatio
             ))}
           </View>
         )}
-      </View>
-
-      <View style={styles.card}>
-        <Item
-          icon="📝"
-          title={t('settings.profile.swapPromptTitle')}
-          subtitle={promptPreview}
-          onPress={() => setPromptModalVisible(true)}
-        />
       </View>
 
       <View style={styles.card}>
@@ -699,71 +670,6 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigatio
             </TouchableOpacity>
           </View>
         </View>
-      </Modal>
-
-      <Modal
-        visible={isPromptModalVisible}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setPromptModalVisible(false)}
-      >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.modalOverlay}
-        >
-          <View style={styles.modalCard}>
-            <ScrollView
-              contentContainerStyle={styles.modalScroll}
-              keyboardShouldPersistTaps="handled"
-            >
-              <Text style={styles.modalTitle}>{t('settings.profile.promptModalTitle')}</Text>
-              <Text style={styles.modalSubtitle}>{promptModalSubtitle}</Text>
-              <TextInput
-                style={styles.textInput}
-                placeholder={promptPlaceholder}
-                multiline
-                maxLength={charLimit}
-                value={prompt}
-                onChangeText={setPrompt}
-                textAlignVertical="top"
-                returnKeyType="done"
-                blurOnSubmit
-              />
-              <View style={styles.modalFooter}>
-                <Text style={styles.charCount}>
-                  {prompt.length}/{charLimit}
-                </Text>
-                <View style={styles.modalButtons}>
-                  <TouchableOpacity
-                    style={[styles.modalButton, styles.cancelBtn]}
-                    onPress={() => setPromptModalVisible(false)}
-                  >
-                    <Text style={styles.cancelText}>{t('common.cancel')}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.modalButton, styles.saveBtn]}
-                    onPress={async () => {
-                      const trimmed = (prompt || '').trim();
-                      Keyboard.dismiss();
-                      setPromptModalVisible(false);
-                      try {
-                        const { error } = await UserService.updateProfile({ prompt: trimmed });
-                        if (error) throw error;
-                      } catch (e: any) {
-                        Alert.alert(
-                          t('settings.profile.promptSaveErrorTitle'),
-                          e?.message || t('settings.profile.promptSaveErrorMessage')
-                        );
-                      }
-                    }}
-                  >
-                    <Text style={styles.saveText}>{t('common.save')}</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </ScrollView>
-          </View>
-        </KeyboardAvoidingView>
       </Modal>
     </ScrollView>
   );

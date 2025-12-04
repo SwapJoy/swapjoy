@@ -330,7 +330,6 @@ export class ApiService {
     bio: string;
     profile_image_url: string;
     favorite_categories?: string[];
-    prompt?: string;
     preferred_radius_km?: number | null;
     preferred_currency?: string;
     birth_date?: string | null;
@@ -496,195 +495,100 @@ export class ApiService {
   }
 
   // AI-Powered Vector-Based Recommendations
+  // Uses single database function that combines all queries
   static async getTopPicksForUser(userId: string, limit: number = 10, options?: { bypassCache?: boolean }) {
     const fetchFn = async () => {
       const startTime = Date.now();
       try {
         const result = await this.authenticatedCall(async (client) => {
           try {
-            // Fetch initial data in parallel
-            const [userData, userItemsData, ratesData, weights] = await Promise.all([
+            // Get user preferences and weights
+            const [userData, weights] = await Promise.all([
               client.from('users')
                 .select('favorite_categories, manual_location_lat, manual_location_lng, preferred_radius_km')
                 .eq('id', userId)
                 .maybeSingle(),
-              client.from('items')
-                .select('id, embedding, price, currency, title, description, category_id')
-                .eq('user_id', userId)
-                .eq('status', 'available')
-                .not('embedding', 'is', null),
-              client.from('currencies').select('code, rate'),
               this.getRecommendationWeights(userId)
             ]);
 
             const user = userData.data;
-            const userItems = Array.isArray(userItemsData.data) ? userItemsData.data : [];
-            const userItemsCount = userItems.length;
-            const favoriteCategories = Array.isArray(user?.favorite_categories) ? user.favorite_categories : [];
             const userLat = user?.manual_location_lat ?? null;
             const userLng = user?.manual_location_lng ?? null;
             const maxRadiusKm = user?.preferred_radius_km ?? 50.0;
-            const strictCategoryFilter = weights.category_score >= 0.99 && favoriteCategories.length > 0;
 
-            // Build rate map
-            const rateMap: { [key: string]: number } = {};
-            ratesData.data?.forEach((r: any) => { rateMap[r.code] = parseFloat(r.rate); });
+            // Call the comprehensive database function
+            const { data, error } = await client.rpc('get_top_picks_for_user', {
+              p_user_id: userId,
+              p_limit: limit,
+              p_user_lat: userLat,
+              p_user_lng: userLng,
+              p_radius_km: maxRadiusKm,
+              p_match_threshold: 0.7,
+              p_similarity_weight: weights.similarity_weight,
+              p_category_score_weight: weights.category_score,
+              p_price_score_weight: weights.price_score,
+              p_location_score_weight: (weights.location_lat + weights.location_lng) / 2
+            });
 
-            // Calculate average user item value in GEL
-            let totalUserValueGEL = 0;
-            for (const item of userItems) {
-              if (item.price && item.currency) {
-                totalUserValueGEL += parseFloat(item.price) * (rateMap[item.currency] || 1);
-              }
-            }
-            const avgUserItemValueGEL = userItemsCount > 0 ? totalUserValueGEL / userItemsCount : 0;
-
-            // Collect recommendations from multiple sources
-            const allRecommendations: any[] = [];
-
-            // Prompt/profile embedding candidates: use vector RPC directly when available
-            const promptCandidates: any[] = [];
-
-            try {
-              const { data: promptTop, error: promptErr } = await client.rpc('match_items_to_user_prompt', {
-                p_user_id: userId,
-                p_match_count: Math.max(limit * 4, 40),
-                p_exclude_user: userId
-              });
-              if (promptErr) {
-                console.warn('[TopPicks] Prompt RPC error:', promptErr?.message || promptErr);
-              }
-              if (!promptErr && Array.isArray(promptTop) && promptTop.length > 0) {
-                const sortedBySim = [...promptTop].sort((a: any, b: any) => (b.similarity || 0) - (a.similarity || 0));
-                const topIds = sortedBySim.slice(0, Math.max(limit * 2, 20)).map((it: any) => it.id);
-                let enriched: any[] = [];
-                if (topIds.length > 0) {
-                  const { data: items } = await client
-                    .from('items')
-                    .select('*, category:categories!items_category_id_fkey(title_en, title_ka), item_images(image_url), users!items_user_id_fkey(id, username, first_name, last_name)')
-                    .in('id', topIds);
-                  const simMap: Record<string, number> = {};
-                  for (const r of promptTop) simMap[r.id] = r.similarity || 0;
-                  enriched = (items || []).map((it: any) => ({
-                    ...it,
-                    similarity_score: simMap[it.id] || 0,
-                    overall_score: simMap[it.id] || 0,
-                  }));
-
-                  if (strictCategoryFilter) {
-                    enriched = enriched.filter((it: any) => {
-                      const categoryId = it.category_id ?? (it.category as any)?.id ?? null;
-                      return typeof categoryId === 'string' && favoriteCategories.includes(categoryId);
-                    });
-                  }
-                }
-
-                enriched = await this.applyLocationRadiusFilter(client, enriched, userLat, userLng, maxRadiusKm);
-
-                const scoredPrompt = enriched.map((item: any) => {
-                  const categoryId = item.category_id ?? (item.category as any)?.id ?? null;
-                  const categoryMatchScore = calculateCategoryScore(categoryId, favoriteCategories);
-
-                  const rawPrice = parseFloat(item.price ?? item.estimated_value ?? 0) || 0;
-                  const priceMatchScore = avgUserItemValueGEL > 0
-                    ? calculatePriceScore(avgUserItemValueGEL, rawPrice, 0.3)
-                    : 0.5;
-
-                  const locationMatchScore = calculateLocationScore(
-                    userLat,
-                    userLng,
-                    item.location_lat ?? null,
-                    item.location_lng ?? null,
-                    maxRadiusKm
-                  );
-
-                  const overallScore = calculateWeightedScore(
-                    item.similarity_score ?? item.similarity ?? 0,
-                    categoryMatchScore,
-                    priceMatchScore,
-                    locationMatchScore,
-                    weights
-                  );
-
-                  return {
-                    ...item,
-                    category_match_score: categoryMatchScore,
-                    price_match_score: priceMatchScore,
-                    location_match_score: locationMatchScore,
-                    overall_score: overallScore,
-                    from_prompt: true,
-                    from_favorite_category: categoryMatchScore === 1.0,
-                  };
-                });
-
-                const finalByPrompt = scoredPrompt
-                  .sort((a, b) => (b.overall_score || 0) - (a.overall_score || 0))
-                  .slice(0, limit);
-
-                promptCandidates.push(...finalByPrompt);
-              }
-            } catch (e) {
-              console.warn('[TopPicks] Error in prompt matching:', e);
-            }
-
-            if (promptCandidates.length > 0) {
-              allRecommendations.push(...promptCandidates);
-            }
-            // Get favorite category items (if category_score < 0.99)
-            if (favoriteCategories.length > 0 && weights.category_score < 0.99) {
-              const favoriteItems = await this.getFavoriteCategoryItems(
-                client,
-                userId,
-                favoriteCategories,
-                limit,
+            if (error) {
+              console.error('[TopPicks] RPC error:', error);
+              // Fallback to category-based recommendations
+              return await this.getFallbackRecommendations(client, userId, limit, {
                 userLat,
                 userLng,
-                maxRadiusKm,
-                avgUserItemValueGEL,
-                rateMap,
-                weights
-              );
-              allRecommendations.push(...favoriteItems);
-            }
-            // Deduplicate and filter
-            let filteredRecommendations = allRecommendations;
-            if (strictCategoryFilter && favoriteCategories.length > 0) {
-              filteredRecommendations = allRecommendations.filter((item: any) => {
-                return item.from_favorite_category || item.is_favorite_category ||
-                  (item.category_id && favoriteCategories.includes(item.category_id));
+                radiusKm: maxRadiusKm,
               });
             }
 
-            const uniqueItems = this.deduplicateAndSort(filteredRecommendations);
-            const itemIds = uniqueItems.map((item: any) => item.id);
-
-            // Fetch full item details with joins (single query)
-            const finalResults = await this.fetchItemDetailsWithJoins(
-              client,
-              itemIds,
-              uniqueItems,
-              favoriteCategories,
-              strictCategoryFilter
-            );
-
-            // Sort, filter by location, and limit
-            const sortedResults = finalResults.sort((a, b) => (b.overall_score || 0) - (a.overall_score || 0));
-            const locationFiltered = await this.applyLocationRadiusFilter(client, sortedResults, userLat, userLng, maxRadiusKm);
-            const limitedResults = locationFiltered.slice(0, limit);
-
-            if (limitedResults.length > 0) {
-              return { data: limitedResults, error: null };
+            if (!data || data.length === 0) {
+              console.warn('[TopPicks] No matches found, using fallback recommendations');
+              return await this.getFallbackRecommendations(client, userId, limit, {
+                userLat,
+                userLng,
+                radiusKm: maxRadiusKm,
+              });
             }
 
-            // Fallback if no matches found
-            console.warn('[TopPicks] No matches found, using fallback recommendations');
-            return await this.getFallbackRecommendations(client, userId, limit, {
-              userLat,
-              userLng,
-              radiusKm: maxRadiusKm,
-            });
+            // Transform database results to match expected format
+            const transformed = data.map((item: any) => ({
+              id: item.id,
+              title: item.title,
+              description: item.description,
+              price: item.price,
+              currency: item.currency,
+              condition: item.condition,
+              status: item.status,
+              location_lat: item.location_lat,
+              location_lng: item.location_lng,
+              created_at: item.created_at,
+              updated_at: item.updated_at,
+              category_id: item.category_id,
+              category: item.category_id ? {
+                id: item.category_id,
+                title_en: item.category_title_en,
+                title_ka: item.category_title_ka
+              } : null,
+              image_url: item.image_url,
+              item_images: item.image_url ? [{ image_url: item.image_url }] : [],
+              user: {
+                id: item.user_id,
+                username: item.username,
+                first_name: item.first_name,
+                last_name: item.last_name,
+                profile_image_url: item.profile_image_url
+              },
+              similarity_score: item.similarity_score,
+              overall_score: item.overall_score,
+              category_match_score: item.category_match_score,
+              price_match_score: item.price_match_score,
+              location_match_score: item.location_match_score,
+              distance_km: item.distance_km,
+              is_favorite_category: item.category_match_score === 1.0,
+              from_favorite_category: item.category_match_score === 1.0
+            }));
+
+            return { data: transformed, error: null };
           } catch (error: any) {
-            // Single catch for all errors - fallback to recommendations
             const errorMsg = error?.message || String(error);
             const isNetworkError = errorMsg.includes('Network request failed') || errorMsg.includes('network') || errorMsg.includes('fetch');
             console.error('[TopPicks] QUERY EXCEPTION:', {
@@ -694,7 +598,6 @@ export class ApiService {
             });
 
             // Fallback to category-based recommendations on any error
-            // Note: userLat, userLng, maxRadiusKm may not be in scope here, but getFallbackRecommendations handles nulls
             try {
               return await this.getFallbackRecommendations(client, userId, limit, {
                 userLat: null,
