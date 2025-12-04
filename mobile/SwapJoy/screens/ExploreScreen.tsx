@@ -1,17 +1,6 @@
-import React, { memo, useCallback, useEffect } from 'react';
+import React, { memo, useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { useNavigation } from '@react-navigation/native';
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  Dimensions,
-  ActivityIndicator,
-  TextInput,
-  Alert,
-  Platform,
-} from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Dimensions, ActivityIndicator, Alert, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ExploreScreenProps, RootStackParamList } from '../types/navigation';
 import { AIOffer } from '../hooks/useExploreData';
@@ -30,6 +19,7 @@ import { useExploreScreenState } from '../hooks/useExploreScreenState';
 import type { AppLanguage } from '../types/language';
 import ItemCardCollection from '../components/ItemCardCollection';
 import { DeviceService } from '../services/deviceService';
+import SearchModal from '../components/SearchModal';
 
 const { width } = Dimensions.get('window');
 const ITEM_WIDTH = width * 0.7;
@@ -108,15 +98,6 @@ const AIOfferCardItem: React.FC<AIOfferCardItemProps> = memo(
         ? item.category.trim()
         : undefined;
 
-    const swapSuggestionsNode = (
-      <SwapSuggestions
-        label={swapSuggestionsLabel}
-        targetItemId={item.id}
-        targetItemPrice={item.price || item.estimated_value || 0}
-        targetItemCurrency={item.currency || 'USD'}
-      />
-    );
-
     const createdAt =
       (item as any)?.created_at ?? // eslint-disable-line @typescript-eslint/no-explicit-any
       (item as any)?.updated_at ?? // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -170,7 +151,6 @@ const AIOfferCardItem: React.FC<AIOfferCardItemProps> = memo(
         likeIconColor="#1f2933"
         likeActiveColor="#ef4444"
         isLikeActive={isFavorite(item.id)}
-        swapSuggestions={swapSuggestionsNode}
       />
     );
   }
@@ -317,6 +297,51 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
     updatingLocation,
   } = useExploreScreenState();
 
+  const [searchModalVisible, setSearchModalVisible] = useState(false);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerTitle: undefined,
+      headerShown: !searchModalVisible,
+      headerRight: () =>
+        !searchModalVisible ? (
+          <View style={styles.navRightGroup}>
+            <TouchableOpacity
+              style={styles.navIconButton}
+              onPress={() => setSearchModalVisible(true)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="search-outline" size={18} color="#0369a1" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.navIconButton, styles.navLocationButton]}
+              onPress={handleOpenLocationSelector}
+              disabled={updatingLocation || loadingLocation}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="location-outline" size={18} color="#0369a1" />
+            </TouchableOpacity>
+          </View>
+        ) : null,
+    });
+  }, [
+    navigation,
+    handleOpenLocationSelector,
+    loadingLocation,
+    updatingLocation,
+    searchModalVisible,
+  ]);
+
+  useEffect(() => {
+    const parent = navigation.getParent?.();
+    if (!parent) return;
+
+    parent.setOptions({
+      // Hide tab bar while the search overlay is visible
+      tabBarStyle: searchModalVisible ? { display: 'none' } : undefined,
+    });
+  }, [navigation, searchModalVisible]);
+
   const handleLocationSelect = useCallback(
     async (selection: LocationSelection) => {
       try {
@@ -418,94 +443,15 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
     );
   }, [loadingMore]);
 
-  const searchResultsNode = hasSearchQuery ? (
-    <View style={styles.searchResultsContainer}>
-      {!searchLoading && searchResults.length === 0 ? (
-        <View style={styles.searchStatusContainer}>
-          <Text style={styles.searchStatusTitle}>{searchStrings.noResultsTitle}</Text>
-          <Text style={styles.searchStatusSubtitle}>{searchStrings.noResultsSubtitle}</Text>
-        </View>
-      ) : (
-        <ItemCardCollection
-          items={searchResults}
-          t={t}
-          language={language as AppLanguage}
-          onItemPress={handleItemPress}
-          favoriteButtonRenderer={renderFavoriteButton}
-          metaRightResolver={resolveSimilarityLabel}
-          placeholderLabel={searchStrings.noImage}
-          categoryFallback={strings.labels.categoryFallback}
-          horizontalPadding={8}
-          parentHorizontalPadding={40}
-          columnSpacing={16}
-          rowSpacing={18}
-          scrollEnabled={false}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.searchResultsContent}
-          flatListProps={{
-            removeClippedSubviews: false,
-          }}
-        />
-      )}
-      {searchError ? <Text style={styles.searchErrorText}>{searchError}</Text> : null}
-    </View>
-  ) : null;
-
   const heroSection = (
     <View>
       <View style={styles.heroContainer}>
-        <View style={styles.searchRow}>
-          <View style={styles.searchBar}>
-            <Ionicons name="search-outline" size={18} color="#64748b" />
-            <TextInput
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              style={styles.searchInputField}
-              placeholder={strings.hero.searchPlaceholder || searchStrings.placeholder}
-              placeholderTextColor="#94a3b8"
-              autoCorrect={false}
-              autoCapitalize="none"
-              returnKeyType="search"
-              onSubmitEditing={() => performSearch(searchQuery)}
-            />
-            {hasSearchQuery ? (
-              <TouchableOpacity
-                onPress={handleClearSearch}
-                style={styles.searchClearButton}
-                accessibilityLabel={t('common.clear', { defaultValue: 'Clear search' })}
-              >
-                <Ionicons name="close-circle" size={18} color="#94a3b8" />
-              </TouchableOpacity>
-            ) : null}
-          </View>
-        </View>
-        {searchResultsNode}
       </View>
       {!hasSearchQuery && (
         <View style={styles.listHeader}>
           <View style={styles.sectionCard}>
             <View style={styles.sectionHeaderRow}>
               <Text style={styles.sectionTitle}>{strings.sections.topMatches}</Text>
-              <TouchableOpacity
-                style={styles.locationBadge}
-                onPress={handleOpenLocationSelector}
-                disabled={updatingLocation || loadingLocation}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="location-outline" size={16} color="#0369a1" />
-                <Text style={styles.locationBadgeText} numberOfLines={1}>
-                  {updatingLocation
-                    ? strings.location.updating
-                    : locationLabel || strings.location.badgePlaceholder}
-                </Text>
-                {(loadingLocation || updatingLocation) && (
-                  <ActivityIndicator
-                    size="small"
-                    color="#0369a1"
-                    style={styles.locationBadgeSpinner}
-                  />
-                )}
-              </TouchableOpacity>
             </View>
             {(() => {
               if (topPicksError) {
@@ -654,7 +600,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
         onRefresh={onRefresh}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.mainContent}
-        horizontalPadding={20}
+        horizontalPadding={12}
         columnSpacing={20}
         rowSpacing={18}
         flatListProps={{
@@ -670,6 +616,24 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
         onClose={handleLocationModalClose}
         onSelectLocation={handleLocationSelect}
         initialCityId={locationCityId}
+      />
+      <SearchModal
+        visible={searchModalVisible}
+        onClose={() => setSearchModalVisible(false)}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        searchStrings={searchStrings}
+        strings={strings}
+        t={t}
+        language={language}
+        searchResults={searchResults}
+        searchLoading={searchLoading}
+        searchError={searchError}
+        hasSearchQuery={hasSearchQuery}
+        onClearSearch={handleClearSearch}
+        onItemPress={handleItemPress}
+        renderFavoriteButton={renderFavoriteButton}
+        resolveSimilarityLabel={resolveSimilarityLabel}
       />
     </View>
   );
@@ -702,9 +666,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#ffffff',
-    borderRadius: 16,
+    borderRadius: 4,
     paddingVertical: 14,
-    paddingHorizontal: 18,
+    paddingHorizontal: 8,
     shadowColor: '#0f172a',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
@@ -718,7 +682,6 @@ const styles = StyleSheet.create({
     color: '#0f172a',
   },
   heroContainer: {
-    paddingTop: 12,
     paddingBottom: 12,
   },
   heroTopRow: {
@@ -817,41 +780,6 @@ const styles = StyleSheet.create({
   searchInlineActivity: {
     marginLeft: 8,
   },
-  searchResultsContainer: {
-    marginTop: 16
-  },
-  searchResultsContent: {
-    paddingTop: 8,
-    paddingBottom: 4,
-  },
-  searchStatusContainer: {
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  searchStatusTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#0f172a',
-  },
-  searchStatusSubtitle: {
-    fontSize: 13,
-    color: '#64748b',
-    marginTop: 4,
-    textAlign: 'center',
-  },
-  searchErrorText: {
-    marginTop: 12,
-    fontSize: 13,
-    color: '#b91c1c',
-    textAlign: 'center',
-  },
-  searchInlineSpinner: {
-    paddingVertical: 8,
-    alignItems: 'center',
-  },
-  searchResultCard: {
-    marginBottom: 12,
-  },
   heroStatsScroll: {
     paddingTop: 18,
     paddingBottom: 6,
@@ -882,9 +810,8 @@ const styles = StyleSheet.create({
   },
   sectionHeaderRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: 6,
   },
   sectionRowInset: {
     marginTop: 12,
@@ -924,6 +851,46 @@ const styles = StyleSheet.create({
   locationBadgeSpinner: {
     marginLeft: 8,
   },
+  navSearchWrapper: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    height: 40,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    marginVertical: 4,
+  },
+  navSearchInput: {
+    flex: 1,
+    marginLeft: 8,
+    fontSize: 14,
+    color: '#0f172a',
+  },
+  navSearchClearButton: {
+    marginLeft: 6,
+  },
+  navSearchSpinner: {
+    marginLeft: 6,
+  },
+  navLocationButton: {
+    marginLeft: 8,
+  },
+  navRightGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  navIconButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#e0f2fe',
+  },
   quickFiltersScroll: {
     paddingVertical: 6,
     paddingRight: 20,
@@ -962,8 +929,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   sectionCard: {
-    paddingHorizontal: 12,
-    paddingTop: 12,
     shadowColor: '#0f172a',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.08,
@@ -974,19 +939,18 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   horizontalScroller: {
-    marginHorizontal: -20,
   },
   horizontalList: {
     flexDirection: 'row',
     paddingTop: 6,
     paddingBottom: 6,
-    paddingHorizontal: 12,
+    paddingLeft: 6,
   },
   recentList: {
     flexDirection: 'row',
     paddingTop: 6,
     paddingBottom: 6,
-    paddingHorizontal: 12,
+    paddingHorizontal: 6,
   },
   emptyText: {
     fontSize: 14,
@@ -1055,9 +1019,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.4,
     textTransform: 'uppercase',
-  },
-  topMatchContent: {
-    paddingHorizontal: 20,
   },
   topMatchHeader: {
     flexDirection: 'row',

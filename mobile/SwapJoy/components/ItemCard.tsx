@@ -246,7 +246,7 @@ ItemCard.displayName = 'ItemCard';
 const styles = StyleSheet.create({
   container: {
     backgroundColor: '#ffffff',
-    borderRadius: 20,
+    borderRadius: 4,
     overflow: 'hidden',
     shadowColor: '#0f172a',
     shadowOffset: { width: 0, height: 4 },
@@ -428,7 +428,7 @@ export const ItemCardSkeleton = memo(
       <View style={[styles.container, styles.skeletonCard, style]}>
         <FadePlaceholder
           style={[styles.skeletonImage, { height: imageHeight }]}
-          borderRadius={20}
+          borderRadius={4}
         />
         <View style={styles.content}>
           <FadePlaceholder style={styles.skeletonTitle} />

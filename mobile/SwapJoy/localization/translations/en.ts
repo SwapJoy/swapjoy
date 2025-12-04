@@ -156,7 +156,7 @@ const en = {
   },
   explore: {
     sections: {
-      topMatches: 'Top Matches',
+      topMatches: 'Top picks for you',
       recentlyListed: 'Recently Listed',
       topCategories: 'Top Categories',
       exploreMore: 'Explore More',

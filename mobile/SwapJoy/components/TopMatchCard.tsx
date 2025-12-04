@@ -86,7 +86,6 @@ interface TopMatchCardProps {
   likeActiveColor?: string;
   isLikeActive?: boolean;
   disableLikeButton?: boolean;
-  swapSuggestions?: React.ReactNode;
 }
 
 const TopMatchCard: React.FC<TopMatchCardProps> = ({
@@ -106,35 +105,24 @@ const TopMatchCard: React.FC<TopMatchCardProps> = ({
   likeActiveColor = '#ef4444',
   isLikeActive = false,
   disableLikeButton,
-  swapSuggestions,
 }) => {
   const { language, t } = useLocalization();
   const displayTitle = (title ?? '').trim() || 'Untitled item';
   const ownerUsername = owner.username?.trim() || owner.displayName?.trim() || '';
 
-  const chips = useMemo(() => {
-    const entries: Array<{ label: string; backgroundColor: string; textColor: string }> = [];
-
-    const conditionPresentation = getConditionPresentation({
+  const { conditionPresentation, normalizedCategory } = useMemo(() => {
+    const conditionPresentationResult = getConditionPresentation({
       condition,
       language,
       translate: t,
     });
 
-    if (conditionPresentation) {
-      entries.push(conditionPresentation);
-    }
+    const normalizedCategoryResult = category?.trim();
 
-    const normalizedCategory = category?.trim();
-    if (normalizedCategory) {
-      entries.push({
-        label: normalizedCategory,
-        backgroundColor: '#e2e8f0',
-        textColor: '#0f172a',
-      });
-    }
-
-    return entries;
+    return {
+      conditionPresentation: conditionPresentationResult,
+      normalizedCategory: normalizedCategoryResult,
+    };
   }, [category, condition, language, t]);
 
   return (
@@ -150,11 +138,6 @@ const TopMatchCard: React.FC<TopMatchCardProps> = ({
           resizeMode="cover"
           fallbackUri="https://picsum.photos/320/240?random=7"
         />
-
-        <View style={styles.priceBadge}>
-          <Text style={styles.priceBadgeText}>{price}</Text>
-        </View>
-
         {!disableLikeButton && (
           <TouchableOpacity
             style={[styles.likeButton, isLikeActive ? styles.likeButtonActive : null]}
@@ -168,17 +151,6 @@ const TopMatchCard: React.FC<TopMatchCardProps> = ({
             />
           </TouchableOpacity>
         )}
-
-        {ownerUsername.length > 0 ? (
-          <View style={styles.ownerOverlay}>
-            <View style={styles.ownerAvatar}>
-              <Text style={styles.ownerAvatarText}>{owner.initials}</Text>
-            </View>
-            <Text style={styles.ownerName} numberOfLines={1}>
-              {ownerUsername}
-            </Text>
-          </View>
-        ) : null}
       </View>
 
       <View style={styles.content}>
@@ -196,24 +168,59 @@ const TopMatchCard: React.FC<TopMatchCardProps> = ({
           </Text>
         ) : null}
 
-        {chips.length > 0 ? (
-          <View style={styles.chipsRow}>
-            {chips.map((chip) => (
-              <View
-                key={`${chip.label}-${chip.backgroundColor}`}
-                style={[styles.chip, { backgroundColor: chip.backgroundColor }]}
-              >
-                <Text style={[styles.chipText, { color: chip.textColor }]}>
-                  {chip.label}
-                </Text>
-              </View>
-            ))}
+        {ownerUsername.length > 0 ? (
+          <View style={styles.ownerSection}>
+            <Text style={styles.metaLabel}>Owner</Text>
+            <Text style={styles.ownerValue} numberOfLines={1}>
+              {ownerUsername}
+            </Text>
           </View>
         ) : null}
 
-        {swapSuggestions ? (
-          <View style={styles.suggestionsSlot}>{swapSuggestions}</View>
-        ) : null}
+        {(conditionPresentation || normalizedCategory || price) && (
+          <View style={styles.metaSection}>
+            {conditionPresentation ? (
+              <View style={styles.metaRow}>
+                <Text style={styles.metaLabel}>Condition</Text>
+                <View
+                  style={[
+                    styles.chip,
+                    { backgroundColor: conditionPresentation.backgroundColor },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.chipText,
+                      { color: conditionPresentation.textColor },
+                    ]}
+                  >
+                    {conditionPresentation.label}
+                  </Text>
+                </View>
+              </View>
+            ) : null}
+
+            {normalizedCategory ? (
+              <View style={styles.metaRow}>
+                <Text style={styles.metaLabel}>Category</Text>
+                <View
+                  style={[styles.chip, { backgroundColor: '#e2e8f0' }]}
+                >
+                  <Text style={[styles.chipText, { color: '#0f172a' }]}>
+                    {normalizedCategory}
+                  </Text>
+                </View>
+              </View>
+            ) : null}
+
+            {price ? (
+              <View style={styles.metaRow}>
+                <Text style={styles.metaLabel}>Price</Text>
+                <Text style={styles.priceText}>{price}</Text>
+              </View>
+            ) : null}
+          </View>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -223,8 +230,8 @@ const styles = StyleSheet.create({
   card: {
     width: TOP_MATCH_CARD_WIDTH,
     backgroundColor: '#ffffff',
-    borderRadius: 16,
-    marginRight: 16,
+    borderRadius: 2,
+    marginRight: 8,
     shadowColor: '#0f172a',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.08,
@@ -303,6 +310,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#0f172a',
   },
+  ownerSection: {
+    marginTop: 8,
+  },
+  ownerValue: {
+    marginTop: 2,
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#0f172a',
+  },
   content: {
     paddingHorizontal: 16,
     paddingVertical: 14,
@@ -334,6 +350,26 @@ const styles = StyleSheet.create({
   chipText: {
     fontSize: 11,
     fontWeight: '600',
+    color: '#0f172a',
+  },
+  metaSection: {
+    marginTop: 10,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  metaLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#6b7280',
+    textTransform: 'uppercase',
+    marginRight: 8,
+  },
+  priceText: {
+    fontSize: 18,
+    fontWeight: '700',
     color: '#0f172a',
   },
   suggestionsSlot: {

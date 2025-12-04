@@ -467,7 +467,7 @@ export const useExploreScreenState = (): ExploreScreenState => {
     setRefreshing(false);
   }, [refreshOthers, refreshRecent, refreshTopPicks]);
 
-  const listData = hasSearchQuery ? [] : otherItems || [];
+  const listData = otherItems || [];
 
   return {
     strings,
