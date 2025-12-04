@@ -2,14 +2,13 @@
 
 ## Overview
 
-`getTopPicksForUser` is an AI-powered recommendation engine that generates personalized item recommendations for a user based on multiple factors including semantic similarity (via user profile embedding), category preferences, price matching, and location proximity. The function uses vector embeddings, weighted scoring algorithms, and intelligent filtering to deliver highly relevant swap suggestions.
+`getTopPicksForUser` is a recommendation engine that generates personalized item recommendations for a user based on category preferences, price matching, and location proximity. The function uses weighted scoring algorithms and intelligent filtering to deliver relevant swap suggestions.
 
 **Key Features**:
-- Profile-based semantic matching using user's profile embedding
-- Category preference filtering
+- Category preference filtering (favorite categories)
 - Price compatibility scoring (based on user's average item value)
 - Location-aware filtering
-- Two recommendation sources: prompt-based and favorite category items
+- Single recommendation source: favorite category items
 
 **Location**: `mobile/SwapJoy/services/api.ts`  
 **Class**: `ApiService`  
@@ -104,35 +103,9 @@ Calculates the average value of user's items in GEL for price compatibility scor
 
 ### Stage 3: Recommendation Sources
 
-Collects recommendations from two independent sources:
+Collects recommendations from one source:
 
-#### 3.1 Prompt-Based Recommendations
-
-**Purpose**: Find items semantically similar to user's profile/preferences
-
-**Process**:
-1. Calls `match_items_to_user_prompt` RPC function
-   - Uses user's profile embedding
-   - Returns top `limit * 4` (minimum 40) similar items
-2. Sorts by similarity score (descending)
-3. Takes top `limit * 2` (minimum 20) item IDs
-4. Fetches full item details with joins:
-   - Item data
-   - Category information
-   - Item images
-   - Owner/user information
-5. Applies strict category filter if enabled
-6. Filters by location radius
-7. Calculates weighted scores:
-   - Category match score
-   - Price match score
-   - Location match score
-   - Overall weighted score
-8. Sorts by overall score and limits to `limit` items
-
-**When Used**: Always (if RPC succeeds)
-
-#### 3.2 Favorite Category Items
+#### 3.1 Favorite Category Items
 
 **Purpose**: Ensure items from favorite categories appear even if similarity is low
 
@@ -219,9 +192,9 @@ If no recommendations found:
 Each recommendation receives four component scores (0-1 range):
 
 1. **Similarity Score** (`similarity_score`)
-   - Semantic similarity from vector embeddings
-   - Cosine similarity between item embeddings
-   - Range: 0 (dissimilar) to 1 (identical)
+   - Fixed baseline score for favorite category items (0.7)
+   - Not used for semantic matching (no vector embeddings)
+   - Range: 0-1
 
 2. **Category Match Score** (`category_match_score`)
    - 1.0 if item is in user's favorite categories
@@ -259,6 +232,8 @@ Where:
 - `total_weight = similarity_weight + category_score + price_score + avg_location_weight`
 
 The score is normalized to 0-1 range.
+
+**Note**: For favorite category items, `similarity_score` is fixed at 0.7 as a baseline value since semantic matching is not performed.
 
 ---
 
@@ -433,20 +408,21 @@ result.data?.forEach(item => {
 ### Required Tables
 
 - `users`: User preferences and location
-- `items`: Item data and embeddings
+- `items`: Item data
 - `categories`: Category information
 - `item_images`: Item images
 - `currencies`: Exchange rates
 
 ### Required RPC Functions
 
-- `match_items_to_user_prompt`: Prompt-based matching using user profile embedding
 - `filter_items_by_radius`: Location-based filtering
 
 ### Required Indexes
 
-- Items: `user_id`, `status`, `category_id`, `embedding` (vector)
+- Items: `user_id`, `status`, `category_id`
 - Users: `id`, `manual_location_lat`, `manual_location_lng`
+
+**Note**: Vector embeddings are no longer required for recommendations.
 
 ---
 
@@ -455,7 +431,6 @@ result.data?.forEach(item => {
 ### Time Complexity
 
 - Initial queries: O(1) - Parallel execution
-- Prompt matching: O(n log n) - Sorting
 - Favorite category items: O(n) - Linear processing
 - Deduplication: O(n) - Map-based
 - Final query: O(1) - Single query with joins
@@ -468,10 +443,10 @@ result.data?.forEach(item => {
 ### Typical Execution Time
 
 - With cache: < 50ms
-- Without cache: 150-400ms (depending on data volume)
+- Without cache: 100-300ms (depending on data volume)
 - Fallback: 100-300ms
 
-**Performance Improvement**: Removed user-item matching loop reduces execution time by ~30-50ms per user item.
+**Performance Improvement**: Removed prompt-based and user-item matching reduces execution time significantly.
 
 ---
 
@@ -480,21 +455,26 @@ result.data?.forEach(item => {
 1. **Price Calculation Dependency**
    - User items are fetched for price calculation only
    - If user has no items, price matching defaults to 0.5 (neutral score)
-   - Items without embeddings are excluded from price calculation
+   - Items without price/currency data are excluded from price calculation
 
-2. **Location Dependency**
+2. **Favorite Categories Requirement**
+   - Recommendations are primarily based on favorite categories
+   - If user has no favorite categories and `category_score >= 0.99`, no recommendations will be returned
+   - Falls back to recently listed items if no category-based matches found
+
+3. **Location Dependency**
    - Location filtering requires user location data
    - Falls back gracefully if location missing
 
-3. **Category Strictness**
+4. **Category Strictness**
    - When `category_score >= 0.99`, only favorite categories shown
    - May result in fewer recommendations
 
-4. **Price Filtering**
+5. **Price Filtering**
    - Only applies when `price_score >= 0.2`
    - Very low price weights disable price filtering
 
-5. **Cache Dependency**
+6. **Cache Dependency**
    - Requires Redis for optimal performance
    - Falls back to direct queries if cache unavailable
 
@@ -502,9 +482,9 @@ result.data?.forEach(item => {
 
 ## Future Improvements
 
-1. **Machine Learning Integration**
-   - Learn optimal weights per user
-   - Adaptive similarity thresholds
+1. **Semantic Matching**
+   - Re-introduce vector-based semantic matching
+   - Profile-based or item-based similarity scoring
 
 2. **Real-time Updates**
    - WebSocket-based cache invalidation
@@ -533,7 +513,8 @@ result.data?.forEach(item => {
 
 ## Version History
 
-- **v2.1** (Current): Removed user-item matching; recommendations now based solely on user profile embedding and favorite categories
+- **v2.2** (Current): Removed prompt-based recommendations; recommendations now based solely on favorite category items
+- **v2.1**: Removed user-item matching; recommendations based on user profile embedding and favorite categories
 - **v2.0**: Optimized with helper functions, batch queries, and single join query
 - **v1.0**: Initial implementation with sequential queries
 
