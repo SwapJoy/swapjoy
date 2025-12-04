@@ -18,7 +18,7 @@ export class ApiService {
   private static isAuthReady: boolean = false;
   private static readonly UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   private static recommendationWeightsOverride: RecommendationWeights | null = null;
-  
+
   // Reset auth ready state when session changes
   static resetAuthState() {
     this.isAuthReady = false;
@@ -43,12 +43,12 @@ export class ApiService {
     this.authInitInFlight = (async () => {
       // Get stored session from SecureStore
       let session: any = await AuthService.getCurrentSession();
-      
+
       if (!session?.access_token) {
         console.warn('[ApiService] No stored session found - user needs to sign in');
         throw new Error('No access token available. Please sign in.');
       }
-      
+
       // CRITICAL: Set session on Supabase client so RLS policies work
       // RLS uses auth.uid() which comes from the Supabase client's session
       // Without this, auth.uid() returns null and RLS blocks all queries
@@ -57,7 +57,7 @@ export class ApiService {
           access_token: session.access_token,
           refresh_token: session.refresh_token,
         });
-        
+
         if (setSessionError) {
           console.warn('[ApiService] Error setting session on Supabase client:', setSessionError.message);
           // Continue anyway - the session might still work for RLS
@@ -68,10 +68,10 @@ export class ApiService {
         console.warn('[ApiService] Exception setting session:', setSessionErr?.message);
         // Continue anyway
       }
-      
+
       const who = session?.user?.id || 'unknown';
       console.log('[ApiService] auth ready. user:', who, 'tokenLen:', session.access_token.length);
-      
+
       this.isAuthReady = true;
     })();
     try {
@@ -90,7 +90,7 @@ export class ApiService {
       // CRITICAL: Wait for any ongoing token refresh BEFORE making any API calls
       // This ensures all parallel API calls wait for a single refresh to complete
       await refreshGateKeeper.waitIfNeeded();
-      
+
       const client = await this.getAuthenticatedClient();
       try {
         const sess = await client.auth.getSession();
@@ -149,13 +149,13 @@ export class ApiService {
         isNetworkError,
         stack: error?.stack?.substring(0, 200)
       });
-      return { 
-        data: null, 
-        error: { 
+      return {
+        data: null,
+        error: {
           message: isNetworkError ? 'Network request failed. Please check your internet connection.' : (error.message || 'API call failed'),
           code: isNetworkError ? 'NETWORK_ERROR' : 'API_ERROR',
           originalError: error
-        } 
+        }
       };
     }
   }
@@ -349,7 +349,7 @@ export class ApiService {
         .eq('id', currentUser.id)
         .select('*')
         .single();
-      
+
       // Invalidate personalization caches when profile changes
       // Fire and forget - don't wait for cache invalidation to complete
       if (result?.data) {
@@ -367,7 +367,7 @@ export class ApiService {
           }
         })();
       }
-      
+
       return result as any;
     });
   }
@@ -497,728 +497,192 @@ export class ApiService {
 
   // AI-Powered Vector-Based Recommendations
   static async getTopPicksForUser(userId: string, limit: number = 10, options?: { bypassCache?: boolean }) {
-    console.log('fetching [getTopPicksForUser]');
-    
     const fetchFn = async () => {
-      console.log('[TopPicks] fetchFn ENTRY - starting query execution');
       const startTime = Date.now();
-      let favoriteCategories: string[] = [];
-      let userLat: number | null = null;
-      let userLng: number | null = null;
-      let maxRadiusKm: number = 50;
       try {
         const result = await this.authenticatedCall(async (client) => {
           try {
-      console.log('[ApiService.getTopPicksForUser] begin for user', userId, 'limit', limit);
-            
-      // Sanity: ensure auth header present
-      try {
-        const sess = await client.auth.getSession();
-        console.log('[TopPicks] client session present?', !!sess?.data?.session, 'tokenLen:', sess?.data?.session?.access_token?.length || 0);
-      } catch (e) {
-        console.warn('[TopPicks] unable to read client session:', (e as any)?.message || e);
-      }
+            // Fetch initial data in parallel
+            const [userData, userItemsData, ratesData, weights] = await Promise.all([
+              client.from('users')
+                .select('favorite_categories, manual_location_lat, manual_location_lng, preferred_radius_km')
+                .eq('id', userId)
+                .maybeSingle(),
+              client.from('items')
+                .select('id, embedding, price, currency, title, description, category_id')
+                .eq('user_id', userId)
+                .eq('status', 'available')
+                .not('embedding', 'is', null),
+              client.from('currencies').select('code, rate'),
+              this.getRecommendationWeights(userId)
+            ]);
 
-      // Get user's items to find similar matches
-      const { data: userItemsData, error: userItemsError } = await client
-        .from('items')
-        .select('id, embedding, price, currency, title, description, category_id')
-        .eq('user_id', userId)
-        .eq('status', 'available')
-        .not('embedding', 'is', null);
+            const user = userData.data;
+            const userItems = Array.isArray(userItemsData.data) ? userItemsData.data : [];
+            const userItemsCount = userItems.length;
+            const favoriteCategories = Array.isArray(user?.favorite_categories) ? user.favorite_categories : [];
+            const userLat = user?.manual_location_lat ?? null;
+            const userLng = user?.manual_location_lng ?? null;
+            const maxRadiusKm = user?.preferred_radius_km ?? 50.0;
+            const strictCategoryFilter = weights.category_score >= 0.99 && favoriteCategories.length > 0;
 
-      const userItems = Array.isArray(userItemsData) ? userItemsData : [];
-      const userItemsCount = userItems.length;
+            // Build rate map
+            const rateMap: { [key: string]: number } = {};
+            ratesData.data?.forEach((r: any) => { rateMap[r.code] = parseFloat(r.rate); });
 
-      if (userItemsError || !Array.isArray(userItemsData)) {
-        console.warn('[TopPicks] userItems error:', userItemsError?.message || userItemsError);
-      } else {
-        console.log('[TopPicks] userItems count:', userItemsCount);
-      }
-
-      // Get user's preferences including favorite categories and location
-      const { data: user, error: userError } = await client
-        .from('users')
-        .select('favorite_categories, manual_location_lat, manual_location_lng, preferred_radius_km')
-        .eq('id', userId)
-        .maybeSingle();
-      if (userError) {
-        console.warn('[ApiService.getTopPicksForUser] users lookup error:', userError?.message || userError);
-      }
-
-      favoriteCategories = Array.isArray(user?.favorite_categories) ? user.favorite_categories : [];
-      
-      // Get user location (only manual_location columns exist in database)
-      userLat = user?.manual_location_lat ?? null;
-      userLng = user?.manual_location_lng ?? null;
-      maxRadiusKm = user?.preferred_radius_km ?? 50.0;
-      
-      // Get recommendation weights
-      const weights = await this.getRecommendationWeights(userId);
-      console.log(`[SCORING] Using weights:`, weights);
-      console.log(`[SCORING] User location: lat=${userLat}, lng=${userLng}, radius=${maxRadiusKm}km`);
-      console.log(`[SCORING] Category score: ${weights.category_score}, Favorite categories: ${favoriteCategories.length}`);
-      const strictCategoryFilter = weights.category_score >= 0.99 && favoriteCategories.length > 0;
-      if (strictCategoryFilter) {
-        console.log(`[FILTER] STRICT MODE enabled (category_score >= 0.99). Favorite categories:`, favoriteCategories);
-      }
-      
-      const allRecommendations: any[] = [];
-
-      // Prompt/profile embedding candidates: use vector RPC directly when available
-      const promptCandidates: any[] = [];
-
-      try {
-        const { data: promptTop, error: promptErr } = await client.rpc('match_items_to_user_prompt', {
-          p_user_id: userId,
-          p_match_count: Math.max(limit * 4, 40),
-          p_exclude_user: userId
-        });
-        if (promptErr) {
-          console.warn('[TopPicks] prompt RPC error:', promptErr?.message || promptErr);
-        }
-        if (!promptErr && Array.isArray(promptTop) && promptTop.length > 0) {
-          console.log('[TopPicks] promptTop count:', promptTop.length);
-          const sortedBySim = [...promptTop].sort((a: any, b: any) => (b.similarity || 0) - (a.similarity || 0));
-          const topIds = sortedBySim.slice(0, Math.max(limit * 2, 20)).map((it: any) => it.id);
-          let enriched: any[] = [];
-          if (topIds.length > 0) {
-            const { data: items } = await client
-              .from('items')
-              .select('*, category:categories!items_category_id_fkey(title_en, title_ka), item_images(image_url), users!items_user_id_fkey(id, username, first_name, last_name)')
-              .in('id', topIds);
-            const simMap: Record<string, number> = {};
-            for (const r of promptTop) simMap[r.id] = r.similarity || 0;
-            enriched = (items || []).map((it: any) => ({
-              ...it,
-              similarity_score: simMap[it.id] || 0,
-              overall_score: simMap[it.id] || 0,
-            }));
-
-            if (strictCategoryFilter) {
-              const beforeFilter = enriched.length;
-              enriched = enriched.filter((it: any) => {
-                const categoryId = it.category_id ?? (it.category as any)?.id ?? null;
-                const isFavorite = typeof categoryId === 'string' && favoriteCategories.includes(categoryId);
-                if (!isFavorite) {
-                  console.log(`[PROMPT-FILTER] Dropping non-favorite category item from prompt results: ${it.id} (category_id=${categoryId})`);
-                }
-                return isFavorite;
-              });
-              console.log(`[PROMPT-FILTER] Strict category filter applied to prompt results. before=${beforeFilter}, after=${enriched.length}`);
-            }
-          }
-
-          enriched = await this.applyLocationRadiusFilter(client, enriched, userLat, userLng, maxRadiusKm);
-
-          const scoredPrompt = enriched.map((item: any) => {
-            const categoryId = item.category_id ?? (item.category as any)?.id ?? null;
-            const categoryMatchScore = calculateCategoryScore(categoryId, favoriteCategories);
-
-            const rawPrice = parseFloat(item.price ?? item.estimated_value ?? 0) || 0;
-            const priceMatchScore = avgUserItemValueGEL > 0
-              ? calculatePriceScore(avgUserItemValueGEL, rawPrice, 0.3)
-              : 0.5;
-
-            const locationMatchScore = calculateLocationScore(
-              userLat,
-              userLng,
-              item.location_lat ?? null,
-              item.location_lng ?? null,
-              maxRadiusKm
-            );
-
-            const overallScore = calculateWeightedScore(
-              item.similarity_score ?? item.similarity ?? 0,
-              categoryMatchScore,
-              priceMatchScore,
-              locationMatchScore,
-              weights
-            );
-
-            return {
-              ...item,
-              category_match_score: categoryMatchScore,
-              price_match_score: priceMatchScore,
-              location_match_score: locationMatchScore,
-              overall_score: overallScore,
-              from_prompt: true,
-              from_favorite_category: categoryMatchScore === 1.0,
-            };
-          });
-
-          const finalByPrompt = scoredPrompt
-            .sort((a, b) => (b.overall_score || 0) - (a.overall_score || 0))
-            .slice(0, limit);
-
-          promptCandidates.push(...finalByPrompt);
-        }
-      } catch (e) {
-        console.warn('[PROMPT-SHORTCIRCUIT] Exception:', e);
-      }
-
-      if (userError) {
-        console.error(`[DEBUG] Error fetching user data:`, userError);
-      }
-
-      // Get exchange rates once
-      const { data: rates, error: ratesErr } = await client.from('currencies').select('code, rate');
-      if (ratesErr) {
-        console.warn('[TopPicks] currencies error:', ratesErr?.message || ratesErr);
-      }
-      const rateMap: { [key: string]: number } = {};
-      rates?.forEach((r: any) => { rateMap[r.code] = parseFloat(r.rate); });
-
-      // Calculate total value of user's items (all converted to GEL for comparison)
-      let totalUserValueGEL = 0;
-      let userCurrency = 'USD'; // Default
-      
-      for (const item of userItems) {
-        if (item.price && item.currency) {
-          userCurrency = item.currency;
-          const rate = rateMap[item.currency] || 1;
-          totalUserValueGEL += parseFloat(item.price) * rate;
-        }
-      }
-      
-      console.log('Total user items value in GEL:', totalUserValueGEL, userCurrency);
-      const avgUserItemValueGEL = userItemsCount > 0 ? totalUserValueGEL / userItemsCount : 0;
-      console.log('Average user item value in GEL:', avgUserItemValueGEL);
-      
-      if (promptCandidates.length > 0) {
-        allRecommendations.push(...promptCandidates);
-      }
-      
-      // IMPORTANT: If user has favorite categories AND category_score < 0.99, also fetch items directly from those categories
-      // This ensures items from favorite categories appear even if they don't match similarity threshold
-      // BUT: If category_score >= 0.99, SQL function already filters to only favorite categories, so skip this
-      if (favoriteCategories.length > 0 && weights.category_score < 0.99) {
-        console.log('[FAV-CAT-FETCH] Fetching items directly from favorite categories (category_score < 1.0):', favoriteCategories);
-          const { data: favoriteCategoryItems, error: favError } = await client
-            .from('items')
-            .select('id, title, description, price, currency, category_id, embedding, user_id, category:categories!items_category_id_fkey(title_en, title_ka)')
-            .in('category_id', favoriteCategories)
-            .eq('status', 'available')
-            .neq('user_id', userId)
-            .limit(limit * 2); // Get more items to ensure we have enough
-          
-          if (!favError && favoriteCategoryItems && favoriteCategoryItems.length > 0) {
-            console.log(`Found ${favoriteCategoryItems.length} items from favorite categories`);
-            
-            // Add favorite category items with weighted scores
-            const favoriteItems = await Promise.all(favoriteCategoryItems.map(async (item: any) => {
-              // Calculate weighted scores for favorite category items
-              const similarityScore = 0.7; // Base similarity for favorite category items
-              const categoryMatchScore = calculateCategoryScore(item.category_id, favoriteCategories);
-              
-              // Price match score
-              const avgUserPrice = userItemsCount > 0 ? totalUserValueGEL / userItemsCount : 0;
-              const itemPriceGEL = parseFloat(item.price || 0) * (rateMap[item.currency] || 1);
-              const priceMatchScore = calculatePriceScore(avgUserPrice, itemPriceGEL, 0.3);
-              
-              // Location match score
-              let locationMatchScore = 0.5;
-              if (userLat && userLng && ApiService.isValidUserId(item.user_id)) {
-                try {
-                  const { data: itemUser } = await client
-                    .from('users')
-                    .select('manual_location_lat, manual_location_lng')
-                    .eq('id', item.user_id)
-                    .single();
-                  
-                  if (itemUser) {
-                    const itemLat = itemUser.manual_location_lat;
-                    const itemLng = itemUser.manual_location_lng;
-                    if (itemLat && itemLng) {
-                      locationMatchScore = calculateLocationScore(userLat, userLng, itemLat, itemLng, maxRadiusKm);
-                    }
-                  }
-                } catch (locationError) {
-                  console.warn(`Error fetching location for favorite item ${item.id}:`, locationError);
-                }
+            // Calculate average user item value in GEL
+            let totalUserValueGEL = 0;
+            for (const item of userItems) {
+              if (item.price && item.currency) {
+                totalUserValueGEL += parseFloat(item.price) * (rateMap[item.currency] || 1);
               }
-              
-              // Calculate weighted overall score
-              const overallScore = calculateWeightedScore(
-                similarityScore,
-                categoryMatchScore,
-                priceMatchScore,
-                locationMatchScore,
+            }
+            const avgUserItemValueGEL = userItemsCount > 0 ? totalUserValueGEL / userItemsCount : 0;
+
+            // Collect recommendations from multiple sources
+            const allRecommendations: any[] = [];
+
+            // Prompt/profile embedding candidates: use vector RPC directly when available
+            const promptCandidates: any[] = [];
+
+            try {
+              const { data: promptTop, error: promptErr } = await client.rpc('match_items_to_user_prompt', {
+                p_user_id: userId,
+                p_match_count: Math.max(limit * 4, 40),
+                p_exclude_user: userId
+              });
+              if (promptErr) {
+                console.warn('[TopPicks] Prompt RPC error:', promptErr?.message || promptErr);
+              }
+              if (!promptErr && Array.isArray(promptTop) && promptTop.length > 0) {
+                const sortedBySim = [...promptTop].sort((a: any, b: any) => (b.similarity || 0) - (a.similarity || 0));
+                const topIds = sortedBySim.slice(0, Math.max(limit * 2, 20)).map((it: any) => it.id);
+                let enriched: any[] = [];
+                if (topIds.length > 0) {
+                  const { data: items } = await client
+                    .from('items')
+                    .select('*, category:categories!items_category_id_fkey(title_en, title_ka), item_images(image_url), users!items_user_id_fkey(id, username, first_name, last_name)')
+                    .in('id', topIds);
+                  const simMap: Record<string, number> = {};
+                  for (const r of promptTop) simMap[r.id] = r.similarity || 0;
+                  enriched = (items || []).map((it: any) => ({
+                    ...it,
+                    similarity_score: simMap[it.id] || 0,
+                    overall_score: simMap[it.id] || 0,
+                  }));
+
+                  if (strictCategoryFilter) {
+                    enriched = enriched.filter((it: any) => {
+                      const categoryId = it.category_id ?? (it.category as any)?.id ?? null;
+                      return typeof categoryId === 'string' && favoriteCategories.includes(categoryId);
+                    });
+                  }
+                }
+
+                enriched = await this.applyLocationRadiusFilter(client, enriched, userLat, userLng, maxRadiusKm);
+
+                const scoredPrompt = enriched.map((item: any) => {
+                  const categoryId = item.category_id ?? (item.category as any)?.id ?? null;
+                  const categoryMatchScore = calculateCategoryScore(categoryId, favoriteCategories);
+
+                  const rawPrice = parseFloat(item.price ?? item.estimated_value ?? 0) || 0;
+                  const priceMatchScore = avgUserItemValueGEL > 0
+                    ? calculatePriceScore(avgUserItemValueGEL, rawPrice, 0.3)
+                    : 0.5;
+
+                  const locationMatchScore = calculateLocationScore(
+                    userLat,
+                    userLng,
+                    item.location_lat ?? null,
+                    item.location_lng ?? null,
+                    maxRadiusKm
+                  );
+
+                  const overallScore = calculateWeightedScore(
+                    item.similarity_score ?? item.similarity ?? 0,
+                    categoryMatchScore,
+                    priceMatchScore,
+                    locationMatchScore,
+                    weights
+                  );
+
+                  return {
+                    ...item,
+                    category_match_score: categoryMatchScore,
+                    price_match_score: priceMatchScore,
+                    location_match_score: locationMatchScore,
+                    overall_score: overallScore,
+                    from_prompt: true,
+                    from_favorite_category: categoryMatchScore === 1.0,
+                  };
+                });
+
+                const finalByPrompt = scoredPrompt
+                  .sort((a, b) => (b.overall_score || 0) - (a.overall_score || 0))
+                  .slice(0, limit);
+
+                promptCandidates.push(...finalByPrompt);
+              }
+            } catch (e) {
+              console.warn('[TopPicks] Error in prompt matching:', e);
+            }
+
+            if (promptCandidates.length > 0) {
+              allRecommendations.push(...promptCandidates);
+            }
+            // Get favorite category items (if category_score < 0.99)
+            if (favoriteCategories.length > 0 && weights.category_score < 0.99) {
+              const favoriteItems = await this.getFavoriteCategoryItems(
+                client,
+                userId,
+                favoriteCategories,
+                limit,
+                userLat,
+                userLng,
+                maxRadiusKm,
+                avgUserItemValueGEL,
+                rateMap,
                 weights
               );
-              
-              return {
-                ...item,
-                similarity: similarityScore,
-                similarity_score: similarityScore,
-                category_match_score: categoryMatchScore,
-                price_match_score: priceMatchScore,
-                location_match_score: locationMatchScore,
-                overall_score: overallScore,
-                is_favorite_category: true,
-                from_favorite_category: true
-              };
-            }));
-            
-            allRecommendations.push(...favoriteItems);
-            console.log(`Added ${favoriteItems.length} items from favorite categories to recommendations`);
-          } else if (favError) {
-            console.error('Error fetching favorite category items:', favError);
-          }
-        }
-      // PRODUCTION-READY: Use SQL-level weighted matching function
-      // All filtering and scoring happens in the database, not in application code
-        for (const userItem of userItems) {
-          // PRODUCTION-READY: When price_score = 0, price doesn't matter, so don't filter by price
-          // When price_score > 0, use flexible price range for better matching
-          let minValue = null;
-          let maxValue = null;
-          
-          const hasUserValue = avgUserItemValueGEL > 0;
-          const shouldApplyPriceFilter = hasUserValue && weights.price_score >= 0.2;
-
-          if (shouldApplyPriceFilter) {
-            // Price carries meaningful weight, so apply a dynamic range.
-            // Range widens as price weight decreases to avoid excluding obvious matches.
-            const loosenessFactor = 1 + (1 - weights.price_score) * 3; // 1x (strict) → 4x (loose)
-            minValue = Math.max(0, avgUserItemValueGEL * 0.05 / Math.max(weights.price_score, 0.2));
-            maxValue = avgUserItemValueGEL * 20 * loosenessFactor;
-          } else {
-            // Treat very small price weights as "price agnostic"
-            minValue = null;
-            maxValue = null;
-          }
-          // When price filter disabled, SQL receives NULL (no filtering)
-          
-          console.log(`[SQL-WEIGHTED] Searching for items similar to ${userItem.title}`);
-          console.log(`[SQL-WEIGHTED] Weights:`, weights);
-          console.log(`[SQL-WEIGHTED] category_score_weight = ${weights.category_score} (should filter to favorite categories if >= 0.99)`);
-          console.log(`[SQL-WEIGHTED] price_score_weight = ${weights.price_score} (price filtering: ${shouldApplyPriceFilter ? 'enabled' : 'disabled'})`);
-          console.log(`[SQL-WEIGHTED] Favorite categories:`, favoriteCategories);
-          console.log(`[SQL-WEIGHTED] Value range: ${minValue !== null ? `${minValue}-${maxValue} GEL` : 'NO PRICE FILTER (insufficient user value or low weight)'}`);
-          console.log(`[SQL-WEIGHTED] Location: lat=${userLat}, lng=${userLng}, radius=${maxRadiusKm}km`);
-          
-          // PRODUCTION-READY: When similarity_weight is high but we want category-only items,
-          // Lower similarity threshold to allow more items from favorite categories
-          // If category_score >= 0.99, similarity threshold doesn't matter as much
-          const similarityThreshold = strictCategoryFilter ? 0.1 : 0.6; // Lower threshold when strict category mode
-          
-          const { data: similarItems, error: similarError } = await client.rpc('match_items_weighted', {
-            query_embedding: userItem.embedding,
-            match_threshold: similarityThreshold, // Lower threshold when category-only mode
-            match_count: Math.ceil(limit / Math.max(userItemsCount, 1)) * 5, // Get more items since we're filtering strictly
-            min_value_gel: minValue, // NULL when price_score = 0 (no filtering)
-            max_value_gel: maxValue, // NULL when price_score = 0 (no filtering)
-            exclude_user_id: userId,
-            // Filtering parameters (applied in SQL WHERE clause)
-            favorite_categories: favoriteCategories.length > 0 ? favoriteCategories : null,
-            user_lat: userLat,
-            user_lng: userLng,
-            max_radius_km: maxRadiusKm,
-            // Scoring weights (0-1) - SQL uses these to filter AND score
-            // IMPORTANT: Pass exact values, ensure category_score_weight >= 0.99 is passed correctly
-            similarity_weight: Number(weights.similarity_weight),
-            category_score_weight: Number(weights.category_score),
-            price_score_weight: Number(weights.price_score),
-            location_score_weight: Number((weights.location_lat + weights.location_lng) / 2), // Average location weight
-          });
-          
-          console.log(`[SQL-WEIGHTED] Called match_items_weighted with category_score_weight = ${Number(weights.category_score)}`);
-
-          if (!similarError && similarItems && Array.isArray(similarItems)) {
-            console.log(`[SQL-WEIGHTED] Found ${similarItems.length} items from SQL function`);
-            
-            // Items are already filtered and scored by SQL function!
-            // Just map them to expected format
-            const enhancedItems = similarItems.map((item: any) => {
-              const isFavoriteCategory = item.category_match_score === 1.0;
-              
-              return {
-                ...item,
-                similarity_score: item.similarity,
-                category_match_score: item.category_match_score,
-                price_match_score: item.price_match_score,
-                location_match_score: item.location_match_score,
-                overall_score: item.overall_score,
-                is_favorite_category: isFavoriteCategory,
-                from_favorite_category: isFavoriteCategory
-              };
-            });
-            
-            allRecommendations.push(...enhancedItems);
-          } else if (similarError) {
-            console.error(`[SQL-WEIGHTED] Error calling match_items_weighted:`, similarError);
-          } else {
-            console.log(`[SQL-WEIGHTED] No similar items found for ${userItem.title}`);
-          }
-      }
-
-      // Generate virtual bundles from user's items
-      // PRODUCTION-READY: Generate bundles even in strict mode, but only from favorite category items
-      // The generateVirtualBundles function should filter items by category when strictCategoryFilter is true
-        const virtualBundles = await this.generateVirtualBundles(
-          client, 
-          userItems, 
-          userId, 
-          limit, 
-          totalUserValueGEL, 
-          rateMap,
-          favoriteCategories.length > 0 ? favoriteCategories : null, // Always pass favorite categories if available
-          weights // Always pass weights to respect category_score
-        );
-        console.log(`[BUNDLES] Generated ${virtualBundles.length} virtual bundles`);
-        if (virtualBundles && Array.isArray(virtualBundles)) {
-          // In strict mode, filter bundles to ensure all items are from favorite categories
-          if (strictCategoryFilter) {
-            const filteredBundles = virtualBundles.filter((bundle: any) => {
-              if (bundle.bundle_items && Array.isArray(bundle.bundle_items)) {
-                const allItemsFavorite = bundle.bundle_items.every((item: any) => 
-                  item.category_id && favoriteCategories.includes(item.category_id)
-                );
-                if (!allItemsFavorite) {
-                  console.log(`[BUNDLES] Removing bundle ${bundle.id} - not all items from favorite categories`);
-                }
-                return allItemsFavorite;
-              }
-              // If bundle has direct category_id, check that
-              return bundle.category_id && favoriteCategories.includes(bundle.category_id);
-            });
-            console.log(`[BUNDLES] Filtered bundles: ${filteredBundles.length} from ${virtualBundles.length} (strict mode)`);
-            allRecommendations.push(...filteredBundles);
-          } else {
-            allRecommendations.push(...virtualBundles);
-          }
-      }
-
-      // Remove duplicates and sort by overall score
-      // PRODUCTION-READY: SQL function already filtered and scored items
-      // But add safety check: if category_score = 1.0, filter any items that somehow slipped through
-      console.log(`[SQL-WEIGHTED] Total recommendations before deduplication: ${allRecommendations.length}`);
-      console.log(`[SQL-WEIGHTED] Favorite category items: ${allRecommendations.filter((r: any) => r.from_favorite_category).length}`);
-      
-      let filteredRecommendations = allRecommendations;
-      
-      // SAFETY CHECK: If category_score = 1.0, ensure ONLY favorite category items
-      // This should not be needed if SQL function works correctly, but adding as safety net
-      if (strictCategoryFilter && favoriteCategories.length > 0) {
-        const beforeFilter = allRecommendations.length;
-        filteredRecommendations = allRecommendations.filter((item: any) => {
-          const isFavorite = item.from_favorite_category || item.is_favorite_category || 
-                            (item.category_id && favoriteCategories.includes(item.category_id));
-          if (!isFavorite) {
-            console.error(`[SAFETY-FILTER] Removing non-favorite category item that slipped through: ${item.id} (${item.title}) - category_id: ${item.category_id}`);
-          }
-          return isFavorite;
-        });
-        if (beforeFilter !== filteredRecommendations.length) {
-          console.warn(`[SAFETY-FILTER] Filtered ${beforeFilter} to ${filteredRecommendations.length} items (category_score=1.0)`);
-        }
-      }
-      
-      const uniqueItems = this.deduplicateAndSort(filteredRecommendations || []);
-      
-      console.log(`Total unique items after deduplication: ${uniqueItems.length}`);
-      console.log(`Favorite category items after deduplication: ${uniqueItems.filter((r: any) => r.from_favorite_category).length}`);
-      console.log(`Favorite category item IDs: ${uniqueItems.filter((r: any) => r.from_favorite_category).map((r: any) => r.id).join(', ')}`);
-      
-      // Separate bundles from single items
-      const bundles = uniqueItems.filter((item: any) => item.is_bundle);
-      const singleItemIds = uniqueItems
-        .filter((item: any) => !item.is_bundle)
-        .map((item: any) => item.id);
-      
-      console.log(`Single item IDs to fetch: ${singleItemIds.length}, IDs: ${singleItemIds.join(', ')}`);
-      
-      const finalResults = [];
-      
-      // Get full item details for single items
-      if (singleItemIds.length > 0) {
-        console.log('API: Fetching items with IDs:', singleItemIds);
-        
-        // Fetch data separately and combine manually
-        console.log('API: Fetching items separately for IDs:', singleItemIds);
-        
-        // Get items
-        const { data: items, error: itemsError } = await client
-          .from('items')
-          .select('*, category:categories!items_category_id_fkey(title_en, title_ka)')
-          .in('id', singleItemIds);
-
-        if (itemsError) {
-          console.error('API: Error fetching items:', itemsError);
-        }
-
-        if (!itemsError && items) {
-          console.log('API: Items fetched:', items.length);
-          
-          // Get images for these items
-          const { data: images, error: imagesError } = await client
-            .from('item_images')
-            .select('item_id, image_url')
-            .in('item_id', singleItemIds);
-
-          if (imagesError) {
-            console.error('API: Error fetching images:', imagesError);
-          }
-
-          // Get users for these items
-          const userIds = [...new Set(items.map(item => item.user_id))];
-          const { data: users, error: usersError } = await client
-            .from('users')
-            .select('id, username, first_name, last_name')
-            .in('id', userIds);
-
-          if (usersError) {
-            console.error('API: Error fetching users:', usersError);
-          }
-
-          console.log('API: Images fetched:', images?.length || 0);
-          console.log('API: Users fetched:', users?.length || 0);
-          
-          // Combine the data
-          const itemsWithScores = items.map(item => {
-            const similarityData = uniqueItems.find((u: any) => u.id === item.id);
-            const itemImages = images?.filter(img => img.item_id === item.id) || [];
-            const itemUser = users?.find(user => user.id === item.user_id);
-            const imageUrl = itemImages[0]?.image_url || null;
-            
-            // CRITICAL: Check category_id from actual database item, not just from similarityData
-            // This ensures we correctly identify favorite category items even after database fetch
-            const isFavoriteCategory = 
-              similarityData?.from_favorite_category || 
-              similarityData?.is_favorite_category || 
-              (item.category_id && favoriteCategories.includes(item.category_id)) ||
-              false;
-            
-            // If we're in strict mode, double-check the category
-            if (strictCategoryFilter && !isFavoriteCategory) {
-              console.log(`[FILTER] Item ${item.id} (${item.title}) has category_id ${item.category_id}, not in favorites:`, favoriteCategories);
+              allRecommendations.push(...favoriteItems);
             }
-            
-            console.log('API: Item', item.title, '- category_id:', item.category_id, 'isFavoriteCategory:', isFavoriteCategory, 'overall_score:', similarityData?.overall_score);
-            
-            return {
-              ...item,
-              image_url: imageUrl,
-              item_images: itemImages,
-              user: itemUser ? { // ensure consistent 'user' shape
-                id: itemUser.id,
-                username: itemUser.username,
-                first_name: itemUser.first_name,
-                last_name: itemUser.last_name,
-              } : { id: item.user_id },
-              similarity_score: similarityData?.similarity || 0,
-              overall_score: similarityData?.overall_score || 0,
-              is_favorite_category: isFavoriteCategory,
-              from_favorite_category: isFavoriteCategory
-            };
-          });
-          
-          // PRODUCTION-READY: If category_score >= 0.99, filter out items that don't match favorite categories
-          // This is a CRITICAL safety check - SQL should filter, but this ensures nothing slips through
-          if (strictCategoryFilter) {
-            const beforeFilter = itemsWithScores.length;
-            const filteredItems = itemsWithScores.filter((item: any) => {
-              // Check actual category_id from database item, not just flags
-              const isFavorite = item.category_id && favoriteCategories.includes(item.category_id);
-              if (!isFavorite) {
-                console.error(`[SAFETY-FILTER] Removing non-favorite category item from final results: ${item.id} (${item.title}) - category_id: ${item.category_id}, expected categories:`, favoriteCategories);
-              }
-              return isFavorite;
-            });
-            if (beforeFilter !== filteredItems.length) {
-              console.warn(`[SAFETY-FILTER] Filtered items from ${beforeFilter} to ${filteredItems.length} (strict category mode, category_score >= 0.99)`);
-            }
-            finalResults.push(...filteredItems);
-          } else {
-            finalResults.push(...itemsWithScores);
-          }
-          
-        }
-      }
-      
-      // Add bundles directly (they already have all needed data)
-      // PRODUCTION-READY: If category_score >= 0.99, ONLY show bundles from favorite categories
-      if (strictCategoryFilter) {
-        // Filter bundles to only include those from favorite categories
-        // ALL bundle items must be from favorite categories (not just some)
-        const favoriteCategoryBundles = bundles.filter((bundle: any) => {
-          // Check if bundle items are from favorite categories
-          if (bundle.bundle_items && Array.isArray(bundle.bundle_items)) {
-            const allItemsFavorite = bundle.bundle_items.every((item: any) => 
-              item.category_id && favoriteCategories.includes(item.category_id)
-            );
-            if (!allItemsFavorite) {
-              console.log(`[FILTER] Removing bundle ${bundle.id} (${bundle.title}) - not all items from favorite categories`);
-              console.log(`[FILTER] Bundle items categories:`, bundle.bundle_items.map((i: any) => i.category_id));
-            }
-            return allItemsFavorite;
-          }
-          // If bundle has direct category_id, check that
-          const hasFavoriteCategory = bundle.category_id && favoriteCategories.includes(bundle.category_id);
-          if (!hasFavoriteCategory) {
-            console.log(`[FILTER] Removing bundle ${bundle.id} (${bundle.title}) - category_id ${bundle.category_id} not in favorites`);
-          }
-          return hasFavoriteCategory;
-        });
-        console.log(`[FILTER] Filtered bundles: ${favoriteCategoryBundles.length} from ${bundles.length} total (strict mode: category_score >= 0.99)`);
-        finalResults.push(...favoriteCategoryBundles);
-      } else {
-        finalResults.push(...bundles);
-      }
-      
-      // Fallback: also construct bundles from owners who have multiple items (single-owner bundles)
-      // Skip if we're in strict category mode (category_score = 1.0)
-      if (!strictCategoryFilter) {
-        try {
-          const { data: ownerItems } = await client
-            .from('items')
-            .select('id, title, price, user_id, category_id, item_images(image_url)')
-            .eq('status', 'available')
-            .neq('user_id', userId)
-            .limit(120);
-
-          if (Array.isArray(ownerItems) && ownerItems.length > 0) {
-            const byOwner: Record<string, any[]> = {};
-            for (const it of ownerItems) {
-              if (!byOwner[it.user_id]) byOwner[it.user_id] = [];
-              byOwner[it.user_id].push(it);
-            }
-
-            // Fetch user data for all bundle owners
-            const ownerIds = Object.keys(byOwner);
-            const { data: bundleOwners } = await client
-              .from('users')
-              .select('id, username, first_name, last_name')
-              .in('id', ownerIds);
-
-            const ownerMap: Record<string, any> = {};
-            if (bundleOwners) {
-              bundleOwners.forEach((owner: any) => {
-                ownerMap[owner.id] = owner;
+            // Deduplicate and filter
+            let filteredRecommendations = allRecommendations;
+            if (strictCategoryFilter && favoriteCategories.length > 0) {
+              filteredRecommendations = allRecommendations.filter((item: any) => {
+                return item.from_favorite_category || item.is_favorite_category ||
+                  (item.category_id && favoriteCategories.includes(item.category_id));
               });
             }
 
-            let constructed = 0;
-            for (const [owner, itemsArr] of Object.entries(byOwner)) {
-              if (constructed >= 5) break;
-              if ((itemsArr as any[]).length < 2) continue;
+            const uniqueItems = this.deduplicateAndSort(filteredRecommendations);
+            const itemIds = uniqueItems.map((item: any) => item.id);
 
-              // Sort by price desc to build stronger value bundles
-              const sorted = [...(itemsArr as any[])].sort((a, b) => (b.price || 0) - (a.price || 0));
-              const topPairs = sorted.slice(0, 4); // take top 4 to mix pairs
-              for (let i = 0; i < topPairs.length - 1 && constructed < 5; i++) {
-                const a = topPairs[i];
-                const b = topPairs[i + 1];
-                if (!a || !b) continue;
+            // Fetch full item details with joins (single query)
+            const finalResults = await this.fetchItemDetailsWithJoins(
+              client,
+              itemIds,
+              uniqueItems,
+              favoriteCategories,
+              strictCategoryFilter
+            );
 
-                const bundleTotalValue = (parseFloat(a.price) || 0) + (parseFloat(b.price) || 0);
-                const bundleDiscount = Math.min(bundleTotalValue * 0.1, 100);
-                const bundleValue = bundleTotalValue - bundleDiscount;
-                const imageUrl = a.item_images?.[0]?.image_url || b.item_images?.[0]?.image_url || null;
+            // Sort, filter by location, and limit
+            const sortedResults = finalResults.sort((a, b) => (b.overall_score || 0) - (a.overall_score || 0));
+            const locationFiltered = await this.applyLocationRadiusFilter(client, sortedResults, userLat, userLng, maxRadiusKm);
+            const limitedResults = locationFiltered.slice(0, limit);
 
-                // Get full user data for the bundle owner
-                const bundleOwner = ownerMap[owner];
-
-                console.log(`[OWNER-BUNDLE] Creating bundle: "${a.title}" (${a.price}) + "${b.title}" (${b.price}) = Total: ${bundleTotalValue}, Discount: ${bundleDiscount}, Display Price: ${bundleTotalValue}`);
-
-                const bundle = {
-                  id: `owner_bundle_${owner}_${a.id}_${b.id}`,
-                  title: `${a.title} + ${b.title}`,
-                  description: `Bundle: ${a.title} and ${b.title}`,
-                  price: bundleTotalValue, // Display full total price (not discounted)
-                  estimated_value: bundleTotalValue, // Display full total price (not discounted)
-                  currency: a.currency || b.currency || 'USD', // Add currency field
-                  is_bundle: true,
-                  bundle_items: [a, b],
-                  similarity_score: 0.6, // heuristic baseline
-                  overall_score: 0.65, // slight boost to surface
-                  match_score: Math.round(0.65 * 100),
-                  reason: 'Same owner bundle - good combined value',
-                  category_id: null,
-                  user_id: owner,
-                  user: bundleOwner ? {
-                    id: bundleOwner.id,
-                    username: bundleOwner.username,
-                    first_name: bundleOwner.first_name,
-                    last_name: bundleOwner.last_name,
-                  } : { id: owner },
-                  image_url: imageUrl,
-                  created_at: new Date().toISOString(),
-                  status: 'available'
-                };
-
-                finalResults.push(bundle);
-                constructed++;
-              }
+            if (limitedResults.length > 0) {
+              return { data: limitedResults, error: null };
             }
-          }
-        } catch (e) {
-          console.log('Owner bundle fallback failed:', e);
-        }
-      } else {
-        console.log(`[FILTER] Skipping owner bundle generation - using strict category filter (category_score=1.0)`);
-      }
-      
-      console.log(`Final results: ${finalResults.length} items (${finalResults.filter(r => r.is_bundle).length} bundles, ${finalResults.filter(r => !r.is_bundle).length} single items)`);
-      console.log(`Favorite category items in final results: ${finalResults.filter((r: any) => r.is_favorite_category || r.from_favorite_category || (r.category_id && favoriteCategories.includes(r.category_id))).length}`);
-      
-      // Remove bundles entirely from Explore top picks results
-      const singleResults = finalResults.filter((item: any) => !item.is_bundle);
 
-      // Sort by weighted overall_score (includes all weighted factors: similarity, category, price, location)
-      // The weighted score already accounts for category_score, price_score, location weights
-      let sortedResults = singleResults.sort((a, b) => {
-        // Primary sort: weighted overall_score (descending)
-        const scoreDiff = (b.overall_score || 0) - (a.overall_score || 0);
-        
-        return scoreDiff;
-      });
-
-      sortedResults = await this.applyLocationRadiusFilter(client, sortedResults, userLat, userLng, maxRadiusKm);
-      console.log(`[LOCATION-FILTER] After radius filter (${maxRadiusKm}km): ${sortedResults.length} items (from ${singleResults.length})`);
-      
-      console.log(`After sorting - Total items: ${sortedResults.length}, Favorite category items: ${sortedResults.filter((r: any) => r.is_favorite_category || r.from_favorite_category || (r.category_id && favoriteCategories.includes(r.category_id))).length}`);
-      console.log(`Favorite category item IDs after sorting: ${sortedResults.filter((r: any) => r.is_favorite_category || r.from_favorite_category || (r.category_id && favoriteCategories.includes(r.category_id))).map((r: any) => r.id).join(', ')}`);
-      
-            // Top Picks no longer filters by swap suggestions - show all recommendations based on scoring
-      // Limit results (already sorted by weighted overall_score)
-            const limitedResults = sortedResults.slice(0, limit);
-      console.log(`Final limited results: ${limitedResults.length}, Favorite category items in limited: ${limitedResults.filter((r: any) => r.is_favorite_category || r.from_favorite_category || (r.category_id && favoriteCategories.includes(r.category_id))).length}`);
-      console.log(`Final favorite category item IDs: ${limitedResults.filter((r: any) => r.is_favorite_category || r.from_favorite_category || (r.category_id && favoriteCategories.includes(r.category_id))).map((r: any) => r.id).join(', ')}`);
-      
-      // Log the first 10 items in order to verify sorting
-      console.log(`First ${Math.min(10, limitedResults.length)} items in order:`);
-      limitedResults.slice(0, 10).forEach((item: any, index: number) => {
-        const isFav = item.is_favorite_category || item.from_favorite_category || (item.category_id && favoriteCategories.includes(item.category_id));
-        console.log(`  ${index + 1}. ${item.title || item.id} - isFavorite: ${isFav}, isBundle: ${item.is_bundle || false}, score: ${item.overall_score || 0}`);
-      });
-
-      if (limitedResults.length > 0) {
-              console.log('[TopPicks] QUERY SUCCESS - final limited results count:', limitedResults.length);
-        return { data: limitedResults, error: null };
-      }
-
-      // Fallback if no vector matches found
-            console.warn('[TopPicks] QUERY RETURNED EMPTY - calling fallback');
-      const fb2 = await this.getFallbackRecommendations(client, userId, limit, {
-        userLat,
-        userLng,
-        radiusKm: maxRadiusKm,
-      });
-            const fallbackCount = Array.isArray((fb2 as any)?.data) ? (fb2 as any).data.length : 0;
-            const fallbackError = !!(fb2 as any)?.error;
-            console.log('[TopPicks] Fallback result:', {
-              count: fallbackCount,
-              hasError: fallbackError,
-              errorMessage: (fb2 as any)?.error?.message || null
+            // Fallback if no matches found
+            console.warn('[TopPicks] No matches found, using fallback recommendations');
+            return await this.getFallbackRecommendations(client, userId, limit, {
+              userLat,
+              userLng,
+              radiusKm: maxRadiusKm,
             });
-            if (fallbackError) {
-              console.error('[TopPicks] Fallback ERROR:', (fb2 as any).error);
-            } else if (fallbackCount === 0) {
-              console.warn('[TopPicks] Fallback returned EMPTY data');
-            }
-      return fb2;
           } catch (error: any) {
             // Single catch for all errors - fallback to recommendations
             const errorMsg = error?.message || String(error);
@@ -1228,30 +692,23 @@ export class ApiService {
               isNetworkError,
               stack: error?.stack?.substring(0, 300)
             });
-            
+
             // Fallback to category-based recommendations on any error
+            // Note: userLat, userLng, maxRadiusKm may not be in scope here, but getFallbackRecommendations handles nulls
             try {
-              console.log('[TopPicks] Attempting fallback after error');
-              const fb = await this.getFallbackRecommendations(client, userId, limit, {
-                userLat,
-                userLng,
-                radiusKm: maxRadiusKm,
+              return await this.getFallbackRecommendations(client, userId, limit, {
+                userLat: null,
+                userLng: null,
+                radiusKm: null,
               });
-              const fallbackCount = Array.isArray((fb as any)?.data) ? (fb as any).data.length : 0;
-              console.log('[TopPicks] Error fallback result:', {
-                count: fallbackCount,
-                hasError: !!(fb as any)?.error,
-                errorMessage: (fb as any)?.error?.message || null
-              });
-              return fb;
             } catch (fallbackError: any) {
               const fallbackErrorMsg = fallbackError?.message || String(fallbackError);
               console.error('[TopPicks] Fallback also FAILED:', {
                 message: fallbackErrorMsg,
                 originalError: errorMsg
               });
-              return { 
-                data: [], 
+              return {
+                data: [],
                 error: {
                   message: isNetworkError ? 'Network request failed. Please check your internet connection.' : errorMsg,
                   code: isNetworkError ? 'NETWORK_ERROR' : 'QUERY_ERROR',
@@ -1262,7 +719,7 @@ export class ApiService {
             }
           }
         });
-        
+
         const duration = Date.now() - startTime;
         const dataCount = Array.isArray(result?.data) ? result.data.length : 0;
         const hasError = !!result?.error;
@@ -1296,8 +753,8 @@ export class ApiService {
           stack: fetchErr?.stack?.substring(0, 300)
         });
         // Return empty data instead of throwing to prevent loading screen hanging
-        return { 
-          data: [], 
+        return {
+          data: [],
           error: {
             message: isNetworkError ? 'Network request failed. Please check your internet connection.' : errorMsg,
             code: isNetworkError ? 'NETWORK_ERROR' : 'QUERY_ERROR',
@@ -1311,24 +768,24 @@ export class ApiService {
     const bypassCache = options?.bypassCache ?? false;
     if (bypassCache) {
       console.log('[TopPicks] bypassing cache, calling fetchFn directly');
-    return fetchFn();
+      return fetchFn();
     }
-    
+
     // Try cache first
     const cached = await RedisCache.get('topPicks', userId, limit);
     if (cached) {
       console.log('[TopPicks] cache hit, returning cached data');
       return { data: cached, error: null };
     }
-    
+
     console.log('[TopPicks] cache miss, calling fetchFn');
     const result = await fetchFn();
-    
+
     // Store in cache if successful
     if (result.data && !result.error) {
       await RedisCache.set('topPicks', result.data, userId, limit);
     }
-    
+
     return result;
   }
 
@@ -1426,24 +883,24 @@ export class ApiService {
     console.log('[TopPicks Fallback] hasFavs:', hasFavs, 'favCount:', hasFavs ? user.favorite_categories.length : 0);
     const query = hasFavs
       ? client
-          .from('items')
-          .select(baseSelect)
-          .in('category_id', user.favorite_categories)
-          .eq('status', 'available')
-          .neq('user_id', userId)
-          .order('created_at', { ascending: false })
-          .limit(limit)
+        .from('items')
+        .select(baseSelect)
+        .in('category_id', user.favorite_categories)
+        .eq('status', 'available')
+        .neq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(limit)
       : client
-          .from('items')
-          .select(baseSelect)
-          .eq('status', 'available')
-          .neq('user_id', userId)
-          .order('created_at', { ascending: false })
-          .limit(limit);
+        .from('items')
+        .select(baseSelect)
+        .eq('status', 'available')
+        .neq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(limit);
 
     const { data, error } = await query;
     console.log('[TopPicks Fallback] query result count:', (data || []).length, 'error?', !!error);
-    
+
     if (error) {
       console.error('Fallback query error:', error);
       return { data: null, error };
@@ -1453,6 +910,140 @@ export class ApiService {
     const filteredData = await this.applyLocationRadiusFilter(client, data || [], userLat, userLng, radiusKm);
 
     return { data: filteredData, error: null };
+  }
+
+  // Helper: Get favorite category items (fixes N+1 problem)
+  private static async getFavoriteCategoryItems(
+    client: any,
+    userId: string,
+    favoriteCategories: string[],
+    limit: number,
+    userLat: number | null,
+    userLng: number | null,
+    maxRadiusKm: number,
+    avgUserItemValueGEL: number,
+    rateMap: { [key: string]: number },
+    weights: RecommendationWeights
+  ): Promise<any[]> {
+    const { data: favoriteCategoryItems, error: favError } = await client
+      .from('items')
+      .select('id, title, description, price, currency, category_id, embedding, user_id, category:categories!items_category_id_fkey(title_en, title_ka)')
+      .in('category_id', favoriteCategories)
+      .eq('status', 'available')
+      .neq('user_id', userId)
+      .limit(limit * 2);
+
+    if (favError || !favoriteCategoryItems || favoriteCategoryItems.length === 0) {
+      return [];
+    }
+
+    // Batch fetch all user locations at once (fixes N+1 problem)
+    const userIds = [...new Set(favoriteCategoryItems.map((item: any) => item.user_id))];
+    const { data: itemUsers } = await client
+      .from('users')
+      .select('id, manual_location_lat, manual_location_lng')
+      .in('id', userIds);
+
+    const locationMap = new Map<string, { lat: number; lng: number }>();
+    itemUsers?.forEach((user: any) => {
+      if (user.manual_location_lat && user.manual_location_lng) {
+        locationMap.set(user.id, { lat: user.manual_location_lat, lng: user.manual_location_lng });
+      }
+    });
+
+    // Score all items
+    return favoriteCategoryItems.map((item: any) => {
+      const similarityScore = 0.7;
+      const categoryMatchScore = calculateCategoryScore(item.category_id, favoriteCategories);
+      const itemPriceGEL = parseFloat(item.price || 0) * (rateMap[item.currency] || 1);
+      const priceMatchScore = calculatePriceScore(avgUserItemValueGEL, itemPriceGEL, 0.3);
+
+      let locationMatchScore = 0.5;
+      const itemLocation = locationMap.get(item.user_id);
+      if (userLat && userLng && itemLocation) {
+        locationMatchScore = calculateLocationScore(userLat, userLng, itemLocation.lat, itemLocation.lng, maxRadiusKm);
+      }
+
+      const overallScore = calculateWeightedScore(
+        similarityScore,
+        categoryMatchScore,
+        priceMatchScore,
+        locationMatchScore,
+        weights
+      );
+
+      return {
+        ...item,
+        similarity_score: similarityScore,
+        category_match_score: categoryMatchScore,
+        price_match_score: priceMatchScore,
+        location_match_score: locationMatchScore,
+        overall_score: overallScore,
+        is_favorite_category: true,
+        from_favorite_category: true
+      };
+    });
+  }
+
+  // Helper: Fetch item details with joins (single optimized query)
+  private static async fetchItemDetailsWithJoins(
+    client: any,
+    itemIds: string[],
+    uniqueItems: any[],
+    favoriteCategories: string[],
+    strictCategoryFilter: boolean
+  ): Promise<any[]> {
+    if (itemIds.length === 0) return [];
+
+    // Single query with all joins
+    const { data: items, error: itemsError } = await client
+      .from('items')
+      .select('*, category:categories!items_category_id_fkey(title_en, title_ka), item_images(image_url), users!items_user_id_fkey(id, username, first_name, last_name)')
+      .in('id', itemIds);
+
+    if (itemsError || !items) return [];
+
+    // Create lookup maps
+    const similarityMap = new Map(uniqueItems.map((item: any) => [item.id, item]));
+
+    // Combine data
+    const itemsWithScores = items.map((item: any) => {
+      const similarityData = similarityMap.get(item.id);
+      const itemImages = item.item_images || [];
+      const imageUrl = itemImages[0]?.image_url || null;
+      const itemUser = item.users;
+
+      const isFavoriteCategory =
+        similarityData?.from_favorite_category ||
+        similarityData?.is_favorite_category ||
+        (item.category_id && favoriteCategories.includes(item.category_id)) ||
+        false;
+
+      return {
+        ...item,
+        image_url: imageUrl,
+        item_images: itemImages,
+        user: itemUser ? {
+          id: itemUser.id,
+          username: itemUser.username,
+          first_name: itemUser.first_name,
+          last_name: itemUser.last_name,
+        } : { id: item.user_id },
+        similarity_score: similarityData?.similarity_score || similarityData?.similarity || 0,
+        overall_score: similarityData?.overall_score || 0,
+        is_favorite_category: isFavoriteCategory,
+        from_favorite_category: isFavoriteCategory
+      };
+    });
+
+    // Filter by category if strict mode
+    if (strictCategoryFilter) {
+      return itemsWithScores.filter((item: any) =>
+        item.category_id && favoriteCategories.includes(item.category_id)
+      );
+    }
+
+    return itemsWithScores;
   }
 
   private static async applyLocationRadiusFilter(
@@ -1527,7 +1118,7 @@ export class ApiService {
   // Helper method to deduplicate and sort recommendations
   static deduplicateAndSort(items: any[]) {
     const seen = new Map<string, any>();
-    
+
     // Process items, keeping the one with highest overall_score when duplicates exist
     items.forEach(item => {
       const existing = seen.get(item.id);
@@ -1538,15 +1129,15 @@ export class ApiService {
         // Prioritize items from favorite categories
         const existingScore = existing.overall_score || existing.similarity || 0;
         const itemScore = item.overall_score || item.similarity || 0;
-        
+
         if (itemScore > existingScore || (item.from_favorite_category && !existing.from_favorite_category)) {
           seen.set(item.id, item);
         }
       }
     });
-    
+
     const unique = Array.from(seen.values());
-    
+
     // Sort by overall_score descending, with favorite category items prioritized
     return unique.sort((a, b) => {
       // If both have favorite_category flag, compare scores
@@ -1602,22 +1193,22 @@ export class ApiService {
 
   // Generate virtual bundles from user's items
   static async generateVirtualBundles(
-    client: any, 
-    userItems: any[], 
-    userId: string, 
-    limit: number, 
-    userTotalValue: number, 
+    client: any,
+    userItems: any[],
+    userId: string,
+    limit: number,
+    userTotalValue: number,
     rateMap: { [key: string]: number },
     favoriteCategories: string[] | null = null, // Optional: filter bundles to favorite categories
     weights: RecommendationWeights | null = null // Optional: use weights for filtering
   ) {
     console.log(`[BUNDLES] Starting bundle generation - userItems: ${userItems.length}, userTotalValue: ${userTotalValue.toFixed(2)} GEL, favoriteCategories: ${favoriteCategories?.length || 0}`);
-    
+
     // NEW APPROACH: If we have favorite categories, directly find items in those categories
     // and create bundles from items owned by the same person
     if (favoriteCategories && favoriteCategories.length > 0) {
       console.log(`[BUNDLES] Using category-based bundle generation for categories: ${favoriteCategories.join(', ')}`);
-      
+
       // Get all items in favorite categories
       const { data: categoryItems, error: categoryError } = await client
         .from('items')
@@ -1627,12 +1218,12 @@ export class ApiService {
         .neq('user_id', userId)
         .not('embedding', 'is', null)
         .limit(200); // Get more items to find bundle combinations
-      
+
       if (categoryError || !categoryItems || categoryItems.length < 2) {
         console.log(`[BUNDLES] Category-based approach: Found ${categoryItems?.length || 0} items (need at least 2)`);
       } else {
         console.log(`[BUNDLES] Category-based approach: Found ${categoryItems.length} items in favorite categories`);
-        
+
         // Group items by owner
         const itemsByOwner: Record<string, any[]> = {};
         for (const item of categoryItems) {
@@ -1641,9 +1232,9 @@ export class ApiService {
           }
           itemsByOwner[item.user_id].push(item);
         }
-        
+
         console.log(`[BUNDLES] Grouped items by ${Object.keys(itemsByOwner).length} owners`);
-        
+
         // Fetch user data for all bundle owners
         const ownerIds = Object.keys(itemsByOwner);
         const { data: bundleOwners } = await client
@@ -1657,43 +1248,43 @@ export class ApiService {
             ownerMap[owner.id] = owner;
           });
         }
-        
+
         const bundles: any[] = [];
         const maxBundles = Math.min(5, Math.floor(limit / 2));
-        
+
         // Create bundles from items owned by the same person
         for (const [ownerId, ownerItems] of Object.entries(itemsByOwner)) {
           if (bundles.length >= maxBundles) break;
           if (ownerItems.length < 2) continue;
-          
+
           // Get full user data for the bundle owner
           const bundleOwner = ownerMap[ownerId];
-          
+
           // Try combinations of items from this owner
           for (let i = 0; i < ownerItems.length - 1 && bundles.length < maxBundles; i++) {
             for (let j = i + 1; j < ownerItems.length && bundles.length < maxBundles; j++) {
               const itemA = ownerItems[i];
               const itemB = ownerItems[j];
-              
+
               // Convert prices to GEL
               const itemARate = rateMap[itemA.currency] || 1;
               const itemBRate = rateMap[itemB.currency] || 1;
               const bundleTotalValueGEL = parseFloat(itemA.price || 0) * itemARate + parseFloat(itemB.price || 0) * itemBRate;
               const bundleDiscount = Math.min(bundleTotalValueGEL * 0.1, 271);
               const bundleValue2 = bundleTotalValueGEL - bundleDiscount;
-              
+
               // Check price range
               const minPrice = userTotalValue * 0.6;
               const maxPrice = userTotalValue * 1.6;
-              const priceFilterPass = weights && weights.price_score === 0 
-                ? true 
+              const priceFilterPass = weights && weights.price_score === 0
+                ? true
                 : bundleValue2 >= minPrice && bundleValue2 <= maxPrice;
-              
+
               if (!priceFilterPass) {
                 console.log(`[BUNDLES] Skipping bundle: "${itemA.title}" + "${itemB.title}" - price ${bundleValue2.toFixed(2)} GEL outside range [${minPrice.toFixed(2)}, ${maxPrice.toFixed(2)}]`);
                 continue;
               }
-              
+
               // Calculate similarity to user's items (optional - use for scoring)
               let avgSimilarity = 0.6; // Default baseline
               if (userItems.length > 0 && itemA.embedding && itemB.embedding) {
@@ -1701,10 +1292,10 @@ export class ApiService {
                   // Try to average embeddings if both are arrays
                   const embA = Array.isArray(itemA.embedding) ? itemA.embedding : null;
                   const embB = Array.isArray(itemB.embedding) ? itemB.embedding : null;
-                  
+
                   if (embA && embB && embA.length > 0 && embB.length > 0 && embA.length === embB.length) {
                     const bundleEmbedding = this.averageEmbeddings([embA, embB]);
-                    
+
                     if (bundleEmbedding.length > 0) {
                       const similarities: number[] = [];
                       for (const userItem of userItems) {
@@ -1734,15 +1325,15 @@ export class ApiService {
                   console.warn(`[BUNDLES] Error calculating similarity:`, e);
                 }
               }
-              
+
               console.log(`[BUNDLES] Creating bundle: "${itemA.title}" + "${itemB.title}" - total price: ${bundleTotalValueGEL.toFixed(2)} GEL (discount: ${bundleDiscount.toFixed(2)}), similarity: ${avgSimilarity.toFixed(3)}`);
-              
+
               // Convert bundleTotalValueGEL back to original currency for display
               // Determine currency from items (prefer USD if mixed)
               const bundleCurrency = itemA.currency || itemB.currency || 'USD';
               const bundleRate = rateMap[bundleCurrency] || 1;
               const bundlePriceUSD = bundleTotalValueGEL / bundleRate; // Convert GEL back to display currency
-              
+
               const bundle = {
                 id: `bundle_${itemA.id}_${itemB.id}`,
                 title: `${itemA.title} + ${itemB.title}`,
@@ -1768,17 +1359,17 @@ export class ApiService {
                 created_at: new Date().toISOString(),
                 status: 'available'
               };
-              
+
               bundles.push(bundle);
             }
           }
         }
-        
+
         console.log(`[BUNDLES] Category-based generation: Created ${bundles.length} bundles`);
         return bundles;
       }
     }
-    
+
     // FALLBACK: Original approach - find similar items to user's items
     if (userItems.length < 2) {
       return []; // Need at least 2 items to create bundles
@@ -1791,7 +1382,7 @@ export class ApiService {
     for (let i = 0; i < Math.min(maxBundles, userItems.length - 1); i++) {
       const item1 = userItems[i];
       const item2 = userItems[i + 1];
-      
+
       // Calculate bundle embedding by averaging
       const bundleEmbedding = this.averageEmbeddings([
         item1.embedding,
@@ -1809,10 +1400,10 @@ export class ApiService {
       // PRODUCTION-READY: Use weighted function if favorite categories are specified
       const item1PriceGEL = (item1.price || 0) * item1Rate;
       const item2PriceGEL = (item2.price || 0) * item2Rate;
-      
+
       let similarItems1: any[] = [];
       let similarItems2: any[] = [];
-      
+
       // Use weighted function if we have favorite categories (strict mode)
       if (favoriteCategories && favoriteCategories.length > 0 && weights) {
         // Use match_items_weighted to filter by favorite categories
@@ -1849,7 +1440,7 @@ export class ApiService {
           price_score_weight: 0,
           location_score_weight: 0,
         });
-        
+
         // Map weighted results to expected format
         similarItems1 = weightedItems1?.map((item: any) => ({
           id: item.id,
@@ -1859,7 +1450,7 @@ export class ApiService {
           category_id: item.category_id,
           similarity: item.similarity,
         })) || [];
-        
+
         similarItems2 = weightedItems2?.map((item: any) => ({
           id: item.id,
           title: item.title,
@@ -1887,7 +1478,7 @@ export class ApiService {
           user_currency: item2.currency || 'USD',
           exclude_user_id: userId
         });
-        
+
         similarItems1 = items1 || [];
         similarItems2 = items2 || [];
       }
@@ -1907,7 +1498,7 @@ export class ApiService {
               if (itemA.id !== itemB.id) {
                 const fullItemA = fullItems.find((it: any) => it.id === itemA.id);
                 const fullItemB = fullItems.find((it: any) => it.id === itemB.id);
-                
+
                 if (fullItemA && fullItemB) {
                   // Only bundle items from the same owner
                   if (fullItemA.user_id !== fullItemB.user_id) {
@@ -1923,10 +1514,10 @@ export class ApiService {
 
                   // PRODUCTION-READY: Flexible price range for bundles
                   // When price_score = 0, don't filter by price; otherwise use flexible range
-                  const priceFilterPass = weights && weights.price_score === 0 
+                  const priceFilterPass = weights && weights.price_score === 0
                     ? true // No price filtering when price_score = 0
                     : bundleValue2 >= userTotalValue * 0.6 && bundleValue2 <= userTotalValue * 1.6; // Normal range
-                  
+
                   if (priceFilterPass) {
                     const bundleOwnerId = fullItemA.user_id;
                     const imageA = fullItemA.item_images?.[0]?.image_url;
@@ -1941,7 +1532,7 @@ export class ApiService {
                     const bundleCurrency2 = itemA.currency || itemB.currency || 'USD';
                     const bundleRate2 = rateMap[bundleCurrency2] || 1;
                     const bundlePriceUSD2 = bundleTotalValueGEL / bundleRate2; // Convert GEL back to display currency
-                    
+
                     const bundle = {
                       id: `bundle_${itemA.id}_${itemB.id}`,
                       title: `${itemA.title} + ${itemB.title}`,
@@ -2025,7 +1616,7 @@ export class ApiService {
         .limit(limit);
 
       if (error) return { data: [], error };
-      
+
       // Flatten image URLs
       const itemsWithImages = items?.map(item => ({
         ...item,
@@ -2233,7 +1824,7 @@ export class ApiService {
         // Best-effort cleanup if items insert fails
         try {
           await client.from('offers').delete().eq('id', offer.id);
-        } catch {}
+        } catch { }
         return { data: null, error: itemsError } as any;
       }
 
@@ -2245,7 +1836,7 @@ export class ApiService {
     return this.authenticatedCall(async (client) => {
       return await client
         .from('offers')
-        .update({ 
+        .update({
           status,
           status_updated_at: new Date().toISOString()
         })
@@ -2275,7 +1866,7 @@ export class ApiService {
       } catch (sessionError) {
         console.warn('[ApiService.getNotifications] Could not get session:', sessionError);
       }
-      
+
       // RLS policy automatically filters by auth.uid() = user_id
       // So we don't need to explicitly filter - RLS handles it
       const { data, error } = await client
@@ -2299,7 +1890,7 @@ export class ApiService {
         console.warn(`  2. Session user ID: ${sessionUserId}`);
         console.warn(`  3. Expected user ID: ${currentUser.id}`);
       }
-      
+
       return { data, error: null };
     });
   }
@@ -2583,7 +2174,7 @@ export class ApiService {
           .update({ is_read: true })
           .eq('id', notificationId)
           .eq('user_id', currentUser.id); // Ensure we own this notification
-        
+
         // Check if update actually succeeded by checking if any rows were affected
         // Note: Without .select(), we can't check the data, but we can check for errors
         if (updateResult.error) {
@@ -2591,7 +2182,7 @@ export class ApiService {
           console.error('[ApiService.markNotificationAsRead] Error details:', JSON.stringify(updateResult.error, null, 2));
           return { data: null, error: updateResult.error };
         }
-        
+
         // Verify update worked by checking if notification exists and is read
         // We'll do this in a separate query to avoid response reading issues
         setTimeout(async () => {
@@ -2601,7 +2192,7 @@ export class ApiService {
               .select('id, is_read')
               .eq('id', notificationId)
               .single();
-            
+
             if (verify?.is_read) {
               console.log('[ApiService.markNotificationAsRead] Verified: notification marked as read in DB');
             } else {
@@ -2611,7 +2202,7 @@ export class ApiService {
             // Ignore verification errors
           }
         }, 500);
-        
+
         console.log('[ApiService.markNotificationAsRead] Update call completed for:', notificationId);
         return { data: { id: notificationId, is_read: true }, error: null };
       } catch (err: any) {
@@ -2621,7 +2212,7 @@ export class ApiService {
     }).catch((err) => {
       console.error('[ApiService.markNotificationAsRead] Promise rejection:', err);
     });
-    
+
     // Return success immediately for UI (optimistic update)
     return { data: { id: notificationId, is_read: true }, error: null };
   }
@@ -2718,22 +2309,22 @@ export class ApiService {
       'user-ratings',
       [userId],
       () => this.authenticatedCall(async (client) => {
-      console.log('ApiService: Getting user ratings for user:', userId);
-      
-      // Just return default values for now - no complex queries
-      const result = {
-        average_rating: 0,
-        total_ratings: 0,
-      };
+        console.log('ApiService: Getting user ratings for user:', userId);
 
-      console.log('ApiService: Returning ratings:', result);
+        // Just return default values for now - no complex queries
+        const result = {
+          average_rating: 0,
+          total_ratings: 0,
+        };
 
-      return {
-        data: result,
-        error: null,
-      };
-    }),
-    true // allow bypass flag as needed by caller (no TTL param anymore)
+        console.log('ApiService: Returning ratings:', result);
+
+        return {
+          data: result,
+          error: null,
+        };
+      }),
+      true // allow bypass flag as needed by caller (no TTL param anymore)
     );
   }
 
@@ -2788,14 +2379,14 @@ export class ApiService {
       ];
 
       const results = [];
-      
+
       for (const item of sampleItems) {
         // First, get a random category ID from existing categories
         const { data: categories, error: catError } = await client
           .from('categories')
           .select('id')
           .limit(1);
-        
+
         if (catError || !categories || categories.length === 0) {
           console.error('No categories found, skipping item:', item.title);
           continue;
@@ -2839,8 +2430,8 @@ export class ApiService {
         return { data: null, error: 'No available items found' };
       }
 
-      const results: Array<{item: string; success: boolean; error?: string; price?: any}> = [];
-      
+      const results: Array<{ item: string; success: boolean; error?: string; price?: any }> = [];
+
       for (const item of availableItems) {
         const { error: updateError } = await client
           .from('items')
@@ -2891,14 +2482,14 @@ export class ApiService {
       ];
 
       const results = [];
-      
+
       for (const item of sampleItems) {
         // First, get a random category ID from existing categories
         const { data: categories, error: catError } = await client
           .from('categories')
           .select('id')
           .limit(1);
-        
+
         if (catError || !categories || categories.length === 0) {
           console.error('No categories found, skipping item:', item.title);
           continue;
@@ -2983,7 +2574,7 @@ export class ApiService {
           created_at,
           category_id,
           categories:categories!items_category_id_fkey(title_en, title_ka)
-        `) 
+        `)
         .eq('user_id', userId)
         .eq('status', 'available')
         .order('created_at', { ascending: false });
@@ -3051,7 +2642,7 @@ export class ApiService {
           updated_at,
           category_id,
           categories:categories!items_category_id_fkey(title_en, title_ka)
-        `) 
+        `)
         .eq('user_id', userId)
         .eq('status', 'draft')
         .order('updated_at', { ascending: false });
@@ -3156,8 +2747,8 @@ export class ApiService {
       // Sort images: prefer primary, then lowest sort_order
       Object.keys(imagesByItem).forEach(k => {
         imagesByItem[k] = imagesByItem[k]
-          .sort((a, b) => 
-            (b.is_primary === true ? 1 : 0) - (a.is_primary === true ? 1 : 0) || 
+          .sort((a, b) =>
+            (b.is_primary === true ? 1 : 0) - (a.is_primary === true ? 1 : 0) ||
             (a.sort_order || 0) - (b.sort_order || 0)
           );
       });
@@ -3378,7 +2969,7 @@ export class ApiService {
       }
 
       const results = [];
-      
+
       for (const item of itemsWithoutEmbeddings) {
         try {
           // Call the Edge Function to generate embedding
@@ -3562,7 +3153,7 @@ export class ApiService {
           }
 
           const avgSimilarity = count > 0 ? totalSimilarity / count : 0.5;
-          
+
           // Boost score for more recent items
           const daysSinceCreated = (Date.now() - new Date(item.created_at).getTime()) / (1000 * 60 * 60 * 24);
           const recencyBoost = Math.max(0, (30 - daysSinceCreated) / 30) * 0.2; // Up to 0.2 boost
@@ -3803,8 +3394,8 @@ export class ApiService {
   static async getOtherItemsSafe(userId: string, page: number = 1, limit: number = 10) {
     try {
       const result = await this.getOtherItems(userId, page, limit);
-       const cnt = Array.isArray((result as any)?.data?.items) ? (result as any).data.items.length : 0;
-       console.log('[OtherItemsSafe] items count:', cnt, 'page', page, 'error?', !!result?.error);
+      const cnt = Array.isArray((result as any)?.data?.items) ? (result as any).data.items.length : 0;
+      console.log('[OtherItemsSafe] items count:', cnt, 'page', page, 'error?', !!result?.error);
       return {
         data: result?.data || { items: [], pagination: { page, limit, total: 0, totalPages: 0, hasMore: false } },
         error: result?.error || null
@@ -3964,7 +3555,7 @@ export class ApiService {
       let category = null;
       let user = null;
       let images: any[] = [];
-      
+
       // Get category if category_id exists
       if (item.category_id) {
         const localizedColumn = lang === 'ka' ? 'title_ka' : 'title_en';
