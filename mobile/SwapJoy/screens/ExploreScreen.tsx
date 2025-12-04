@@ -7,7 +7,6 @@ import { AIOffer } from '../hooks/useExploreData';
 import TopMatchCard, { TOP_MATCH_CARD_WIDTH, TopMatchCardSkeleton } from '../components/TopMatchCard';
 import { formatCurrency } from '../utils';
 import { Ionicons } from '@expo/vector-icons';
-import SwapSuggestions from '../components/SwapSuggestions';
 import type { NavigationProp } from '@react-navigation/native';
 import { getConditionPresentation } from '../utils/conditions';
 import { resolveCategoryName } from '../utils/category';
@@ -358,29 +357,57 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
   );
 
   const renderAIOffer = useCallback(
-    ({ item }: { item: AIOffer }) => {
+    ({ item, index }: { item: AIOffer; index: number }) => {
       if (item.is_bundle) {
         return null;
       }
 
+      const total = aiOffers?.length ?? 0;
+      const isFirst = index === 0;
+      const isLast = index === total - 1;
+      const sideInset = 12; // match header horizontal padding
+      const betweenSpacing = 8;
+
       return (
-        <AIOfferCardItem
-          item={item}
-          navigation={navigation}
-          toggleFavorite={toggleFavorite}
-          isFavorite={isFavorite}
-          swapSuggestionsLabel={strings.labels.swapSuggestions}
-        />
+        <View
+          style={{
+            marginLeft: isFirst ? sideInset : 0,
+            marginRight: isLast ? sideInset : betweenSpacing,
+          }}
+        >
+          <AIOfferCardItem
+            item={item}
+            navigation={navigation}
+            toggleFavorite={toggleFavorite}
+            isFavorite={isFavorite}
+            swapSuggestionsLabel={strings.labels.swapSuggestions}
+          />
+        </View>
       );
     },
-    [isFavorite, navigation, strings.labels.swapSuggestions, toggleFavorite]
+    [aiOffers?.length, isFavorite, navigation, strings.labels.swapSuggestions, toggleFavorite]
   );
 
   const renderRecentItem = useCallback(
-    ({ item }: { item: any }) => (
-      <RecentItemCardItem item={item} navigation={navigation} language={language} t={t} />
-    ),
-    [language, navigation, t]
+    ({ item, index }: { item: any; index: number }) => {
+      const total = recentItems?.length ?? 0;
+      const isFirst = index === 0;
+      const isLast = index === total - 1;
+      const sideInset = 12; // match header horizontal padding
+      const betweenSpacing = 8;
+
+      return (
+        <View
+          style={{
+            marginLeft: isFirst ? sideInset : 0,
+            marginRight: isLast ? sideInset : betweenSpacing,
+          }}
+        >
+          <RecentItemCardItem item={item} navigation={navigation} language={language} t={t} />
+        </View>
+      );
+    },
+    [language, navigation, recentItems?.length, t]
   );
 
   const handleItemPress = useCallback(
@@ -450,8 +477,10 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
       {!hasSearchQuery && (
         <View style={styles.listHeader}>
           <View style={styles.sectionCard}>
-            <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitle}>{strings.sections.topMatches}</Text>
+            <View style={styles.sectionHeaderInner}>
+              <View style={styles.sectionHeaderRow}>
+                <Text style={styles.sectionTitle}>{strings.sections.topMatches}</Text>
+              </View>
             </View>
             {(() => {
               if (topPicksError) {
@@ -500,16 +529,18 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
           </View>
 
           <View style={[styles.sectionCard, styles.sectionCardSpacer]}>
-            <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitle}>{strings.sections.recentlyListed}</Text>
-              {!!recentItems.length && (
-                <TouchableOpacity
-                  onPress={() => rootNavigation.navigate('RecentlyListed')}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.sectionAction}>{strings.actions.viewAll}</Text>
-                </TouchableOpacity>
-              )}
+            <View style={styles.sectionHeaderInner}>
+              <View style={styles.sectionHeaderRow}>
+                <Text style={styles.sectionTitle}>{strings.sections.recentlyListed}</Text>
+                {!!recentItems.length && (
+                  <TouchableOpacity
+                    onPress={() => rootNavigation.navigate('RecentlyListed')}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.sectionAction}>{strings.actions.viewAll}</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
             {recentError ? (
               <ErrorDisplay
@@ -881,7 +912,7 @@ const styles = StyleSheet.create({
   navRightGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: 8,
   },
   navIconButton: {
     width: 32,
@@ -890,6 +921,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#e0f2fe',
+    marginBottom: 6,
   },
   quickFiltersScroll: {
     paddingVertical: 6,
@@ -934,6 +966,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 12,
     elevation: 4,
+    marginHorizontal: -12,
+  },
+  sectionHeaderInner: {
+    paddingHorizontal: 12,
+    paddingTop: 4,
+    paddingBottom: 4,
   },
   sectionCardSpacer: {
     marginTop: 16,
@@ -944,13 +982,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingTop: 6,
     paddingBottom: 6,
-    paddingLeft: 6,
   },
   recentList: {
     flexDirection: 'row',
     paddingTop: 6,
     paddingBottom: 6,
-    paddingHorizontal: 6,
   },
   emptyText: {
     fontSize: 14,
