@@ -11,6 +11,36 @@ export interface DraftImage {
   uploadError?: string;
 }
 
+export interface ImageAnalysisResult {
+  imageUrl: string;
+  imageId?: string;
+  detectedObjects: string[];
+  suggestedCategory: {
+    id: string;
+    name: string;
+    confidence: number;
+  } | null;
+  suggestedTitle: string;
+  suggestedDescription: string;
+  suggestedCondition: 'new' | 'like_new' | 'good' | 'fair' | 'poor' | null;
+  confidence: number;
+}
+
+export interface ImageAnalysisResponse {
+  results: ImageAnalysisResult[];
+  aggregated: {
+    detectedObjects: string[];
+    suggestedCategory: {
+      id: string;
+      name: string;
+      confidence: number;
+    } | null;
+    suggestedTitle: string;
+    suggestedDescription: string;
+    suggestedCondition: 'new' | 'like_new' | 'good' | 'fair' | 'poor' | null;
+  };
+}
+
 export interface ItemDraft {
   id: string;
   title: string;
@@ -23,6 +53,8 @@ export interface ItemDraft {
   location_lng: number | null;
   location_label?: string | null;
   images: DraftImage[];
+  imageAnalysis?: ImageAnalysisResponse; // Store analysis results
+  aiPrefilled?: boolean; // Flag to indicate AI suggestions
   created_at: string;
   updated_at: string;
 }
@@ -63,6 +95,18 @@ export interface ItemImage {
   thumbnail_url: string | null;
   sort_order: number;
   is_primary: boolean;
+  meta?: {
+    detectedObjects?: string[];
+    suggestedCategory?: {
+      id: string;
+      name: string;
+      confidence: number;
+    } | null;
+    suggestedTitle?: string;
+    suggestedDescription?: string;
+    confidence?: number;
+    analyzedAt?: string;
+  } | null;
   created_at: string;
 }
 

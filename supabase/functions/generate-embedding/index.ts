@@ -68,9 +68,53 @@ serve(async (req) => {
       console.warn('Warning: Category not found for item, proceeding without category name.');
     }
 
-    // Create text for embedding
+    // Get item images with meta data
+    const { data: itemImages, error: imagesError } = await supabaseClient
+      .from('item_images')
+      .select('meta')
+      .eq('item_id', itemId)
+      .order('sort_order', { ascending: true });
+
+    if (imagesError) {
+      console.warn('Warning: Failed to fetch item images:', imagesError);
+    }
+
+    // Extract image analysis information from meta
+    const imageInfo: string[] = [];
+    const detectedObjectsSet = new Set<string>();
+
+    if (itemImages && itemImages.length > 0) {
+      itemImages.forEach((img) => {
+        if (img.meta) {
+          // Add detected objects
+          if (Array.isArray(img.meta.detectedObjects)) {
+            img.meta.detectedObjects.forEach((obj: string) => detectedObjectsSet.add(obj));
+          }
+
+          // Add description if available
+          if (img.meta.suggestedDescription) {
+            imageInfo.push(img.meta.suggestedDescription);
+          }
+        }
+      });
+    }
+
+    // Build image context string
+    const detectedObjects = Array.from(detectedObjectsSet);
+    const imageContext = detectedObjects.length > 0
+      ? `Detected objects: ${detectedObjects.join(', ')}.`
+      : '';
+    const imageDescriptions = imageInfo.length > 0
+      ? `Image descriptions: ${imageInfo.join(' ')}.`
+      : '';
+
+    // Create text for embedding with image information
     const categoryName = category ? category.name : '';
-    const text = `${item.title}. ${item.description}. Category: ${categoryName}`;
+    let text = `${item.title}. ${item.description}. Category: ${categoryName}`;
+    
+    if (imageContext || imageDescriptions) {
+      text += ` Images: ${imageContext} ${imageDescriptions}`.trim();
+    }
 
     // Generate embedding using OpenAI
     const openaiResponse = await fetch('https://api.openai.com/v1/embeddings', {

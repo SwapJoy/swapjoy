@@ -19,6 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { ItemDetailsFormScreenProps } from '../types/navigation';
 import { DraftManager } from '../services/draftManager';
 import { ImageUploadService } from '../services/imageUpload';
+import { ImageAnalysisService } from '../services/imageAnalysis';
 import { ApiService } from '../services/api';
 import { UserService } from '../services/userService';
 import { ItemDraft, ItemCondition, Category } from '../types/item';
@@ -26,6 +27,8 @@ import { getCurrencySymbol } from '../utils';
 import { useLocalization } from '../localization';
 import LocationSelector from '../components/LocationSelector';
 import type { LocationSelection } from '../types/location';
+import { Switch } from 'react-native';
+import { useCategories } from '../hooks/useCategories';
 
 const { width } = Dimensions.get('window');
 
@@ -136,8 +139,8 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
   });
   const [resolvingLocation, setResolvingLocation] = useState(false);
   
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [loadingCategories, setLoadingCategories] = useState(true);
+  // Use categories hook for centralized category management
+  const { categories, loading: loadingCategories } = useCategories();
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [showConditionPicker, setShowConditionPicker] = useState(false);
   const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
@@ -147,10 +150,20 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
   
   const [isSaving, setIsSaving] = useState(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // AI Analysis state
+  const [aiEnabled, setAiEnabled] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [originalValues, setOriginalValues] = useState<{
+    title: string;
+    description: string;
+    category_id: string | null;
+    condition: ItemCondition | null;
+  } | null>(null);
 
   const loadDraftAndCategories = useCallback(async () => {
     try {
-      setLoadingCategories(true);
+      // Categories are now loaded via useCategories hook, no need to manage loading state here
       
       // Load user profile to get preferred currency FIRST
       let userPreferredCurrency = 'USD';
@@ -175,11 +188,19 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
       const loadedDraft = await DraftManager.getDraft(draftId);
       if (loadedDraft) {
         setDraft(loadedDraft);
-        setTitle(loadedDraft.title);
-        setDescription(loadedDraft.description);
-        setCategory(loadedDraft.category_id);
+        setTitle(loadedDraft.title || '');
+        setDescription(loadedDraft.description || '');
+        console.log('[ItemDetailsForm] Loading draft - category_id:', loadedDraft.category_id, 'condition:', loadedDraft.condition, 'title:', loadedDraft.title);
+        
+        // Set category - ensure it's a valid string or null
+        const categoryId = loadedDraft.category_id && typeof loadedDraft.category_id === 'string' ? loadedDraft.category_id : null;
+        setCategory(categoryId);
+        if (categoryId) {
+          console.log('[ItemDetailsForm] Category set to:', categoryId);
+        }
+        
         setCondition(loadedDraft.condition);
-        setPrice(loadedDraft.price);
+        setPrice(loadedDraft.price || '');
         // Use draft currency only if it exists, is valid, AND is not the default USD
         // Otherwise, always use preferred currency to ensure user's preference is respected
         const draftCurrency = loadedDraft.currency;
@@ -237,21 +258,11 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
         await DraftManager.updateDraft(draftId, { currency: userPreferredCurrency });
       }
 
-      // Load categories
-      const { data: categoriesData, error } = await ApiService.getCategories(language);
-      if (error) {
-        console.error('Error loading categories:', error);
-        // Don't block the UI, just show empty categories
-        setCategories([]);
-      } else if (categoriesData) {
-        setCategories(categoriesData);
-      }
+      // Categories are now loaded via useCategories hook, no need to fetch here
+      // The hook will provide categories automatically
     } catch (error) {
       console.error('Error loading data:', error);
-      // Don't block the UI
-      setCategories([]);
-    } finally {
-      setLoadingCategories(false);
+      // Don't block the UI - categories are handled by useCategories hook
     }
   }, [draftId, language]);
 
@@ -274,6 +285,8 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
       return;
     }
 
+    const uploadedImageIds: string[] = [];
+    
     await ImageUploadService.uploadMultipleImages(
       imagesToUpload,
       draftId,
@@ -288,6 +301,7 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
           supabaseUrl: url,
           uploadProgress: 100,
         });
+        uploadedImageIds.push(imageId);
         // Reload draft to update UI
         const updatedDraft = await DraftManager.getDraft(draftId);
         if (updatedDraft) {
@@ -312,6 +326,84 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
     const latestDraft = await DraftManager.getDraft(draftId);
     if (latestDraft) {
       setDraft(latestDraft);
+      
+      // Auto-trigger AI analysis after all images are uploaded
+      const allUploaded = latestDraft.images.filter((img) => img.uploaded && img.supabaseUrl);
+      if (allUploaded.length > 0 && !latestDraft.imageAnalysis) {
+        console.log('[ItemDetailsForm] Auto-triggering AI analysis for', allUploaded.length, 'uploaded images');
+        // Trigger analysis automatically
+        try {
+          const imageUrls = allUploaded.map((img) => img.supabaseUrl!);
+          const analysisResult = await ImageAnalysisService.analyzeImages(imageUrls);
+
+          // Store analysis in draft
+          await DraftManager.updateDraft(draftId, {
+            imageAnalysis: analysisResult,
+          });
+
+          // Prefill fields with AI suggestions
+          const updates: Partial<ItemDraft> = {};
+
+          if (analysisResult.aggregated.suggestedTitle) {
+            setTitle(analysisResult.aggregated.suggestedTitle);
+            updates.title = analysisResult.aggregated.suggestedTitle;
+          }
+
+          if (analysisResult.aggregated.suggestedDescription) {
+            setDescription(analysisResult.aggregated.suggestedDescription);
+            updates.description = analysisResult.aggregated.suggestedDescription;
+          }
+
+          if (analysisResult.aggregated.suggestedCategory) {
+            const categoryId = analysisResult.aggregated.suggestedCategory.id;
+            const categoryName = analysisResult.aggregated.suggestedCategory.name;
+            console.log('[ItemDetailsForm] Auto-analysis: Setting category_id:', categoryId, 'category name:', categoryName);
+            console.log('[ItemDetailsForm] Auto-analysis: Categories loaded:', categories.length, 'categories available');
+            
+            // Always set the category_id - even if categories list isn't loaded yet, it will be validated later
+            setCategory(categoryId);
+            updates.category_id = categoryId;
+            
+            // Verify category exists in our categories list (for logging)
+            const categoryExists = categories.find(cat => cat.id === categoryId);
+            if (categoryExists) {
+              console.log('[ItemDetailsForm] Auto-analysis: Category verified:', categoryId, 'name:', categoryExists.name);
+            } else {
+              console.warn('[ItemDetailsForm] Auto-analysis: Category ID not found in categories list yet (may be timing issue):', categoryId);
+              console.warn('[ItemDetailsForm] Auto-analysis: Available category IDs:', categories.slice(0, 5).map(c => c.id));
+            }
+          } else {
+            console.warn('[ItemDetailsForm] Auto-analysis: No suggested category in result');
+            console.warn('[ItemDetailsForm] Auto-analysis: Full aggregated result:', JSON.stringify(analysisResult.aggregated));
+          }
+
+          if (analysisResult.aggregated.suggestedCondition) {
+            setCondition(analysisResult.aggregated.suggestedCondition);
+            updates.condition = analysisResult.aggregated.suggestedCondition;
+            console.log('[ItemDetailsForm] Auto-analysis: Condition set to:', analysisResult.aggregated.suggestedCondition);
+          }
+
+          if (Object.keys(updates).length > 0) {
+            console.log('[ItemDetailsForm] Auto-analysis: Updating draft with:', JSON.stringify(updates));
+            await DraftManager.updateDraft(draftId, updates);
+            
+            // Reload draft and update state
+            const finalDraft = await DraftManager.getDraft(draftId);
+            if (finalDraft) {
+              setDraft(finalDraft);
+              if (finalDraft.category_id) {
+                setCategory(finalDraft.category_id);
+                console.log('[ItemDetailsForm] Auto-analysis: Final category state:', finalDraft.category_id);
+              }
+            }
+          }
+          
+          setAiEnabled(true);
+        } catch (error) {
+          console.error('[ItemDetailsForm] Auto-analysis failed:', error);
+          // Don't show error to user - they can still use manual toggle
+        }
+      }
     }
     setUploading(false);
   }, [draftId, imageUris]);
@@ -323,6 +415,19 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
   useEffect(() => {
     startImageUploads();
   }, [startImageUploads]);
+
+  // Re-validate category when categories are loaded (in case category was set before categories loaded)
+  useEffect(() => {
+    if (category && categories.length > 0) {
+      const categoryExists = categories.find(cat => cat.id === category);
+      if (!categoryExists) {
+        console.warn('[ItemDetailsForm] Category ID not found after categories loaded:', category);
+        console.warn('[ItemDetailsForm] Available category IDs:', categories.slice(0, 5).map(c => c.id));
+      } else {
+        console.log('[ItemDetailsForm] Category validated after categories loaded:', categoryExists.name);
+      }
+    }
+  }, [category, categories]);
 
   // Auto-save draft with debounce
   const saveDraft = async (updates: Partial<ItemDraft>) => {
@@ -370,6 +475,140 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
     const filtered = text.replace(/[^0-9.]/g, '');
     setPrice(filtered);
     saveDraft({ price: filtered });
+  };
+
+  const handleAiToggle = async (enabled: boolean) => {
+    if (!draft) return;
+
+    if (enabled) {
+      // Save original values before AI fills (only if not already saved)
+      if (!originalValues) {
+        setOriginalValues({
+          title,
+          description,
+          category_id: category,
+          condition,
+        });
+      }
+
+      // Check if images are uploaded
+      const uploadedImages = draft.images.filter((img) => img.uploaded && img.supabaseUrl);
+      if (uploadedImages.length === 0) {
+        Alert.alert('No Images', 'Please wait for images to upload before using AI analysis.');
+        setAiEnabled(false);
+        return;
+      }
+
+      setAnalyzing(true);
+      try {
+        const imageUrls = uploadedImages.map((img) => img.supabaseUrl!);
+        const analysisResult = await ImageAnalysisService.analyzeImages(imageUrls);
+
+        // Store analysis in draft
+        await DraftManager.updateDraft(draftId, {
+          imageAnalysis: analysisResult,
+        });
+
+        // Prefill fields with AI suggestions
+        const updates: Partial<ItemDraft> = {};
+
+        if (analysisResult.aggregated.suggestedTitle) {
+          setTitle(analysisResult.aggregated.suggestedTitle);
+          updates.title = analysisResult.aggregated.suggestedTitle;
+        }
+
+        if (analysisResult.aggregated.suggestedDescription) {
+          setDescription(analysisResult.aggregated.suggestedDescription);
+          updates.description = analysisResult.aggregated.suggestedDescription;
+        }
+
+        if (analysisResult.aggregated.suggestedCategory) {
+          const categoryId = analysisResult.aggregated.suggestedCategory.id;
+          const categoryName = analysisResult.aggregated.suggestedCategory.name;
+          console.log('[ItemDetailsForm] AI setting category_id:', categoryId, 'category name:', categoryName);
+          
+          // Verify category exists in our categories list
+          const categoryExists = categories.find(cat => cat.id === categoryId);
+          if (categoryExists) {
+            setCategory(categoryId);
+            updates.category_id = categoryId;
+            console.log('[ItemDetailsForm] Category verified and set to:', categoryId, 'name:', categoryExists.name);
+          } else {
+            console.warn('[ItemDetailsForm] Category ID not found in categories list:', categoryId, 'name:', categoryName);
+            console.warn('[ItemDetailsForm] Available category IDs:', categories.slice(0, 5).map(c => c.id));
+            // Still try to set it - might be a timing issue
+            setCategory(categoryId);
+            updates.category_id = categoryId;
+          }
+        } else {
+          console.warn('[ItemDetailsForm] No suggested category in analysis result. Full result:', JSON.stringify(analysisResult.aggregated));
+        }
+
+        if (analysisResult.aggregated.suggestedCondition) {
+          setCondition(analysisResult.aggregated.suggestedCondition);
+          updates.condition = analysisResult.aggregated.suggestedCondition;
+          console.log('[ItemDetailsForm] AI set condition:', analysisResult.aggregated.suggestedCondition);
+        }
+
+        console.log('[ItemDetailsForm] Updating draft with:', JSON.stringify(updates));
+        await DraftManager.updateDraft(draftId, updates);
+        
+        // Reload draft to ensure state is in sync
+        const updatedDraft = await DraftManager.getDraft(draftId);
+        if (updatedDraft) {
+          setDraft(updatedDraft);
+          console.log('[ItemDetailsForm] Draft reloaded, category_id:', updatedDraft.category_id);
+          // Ensure category is set in state
+          if (updatedDraft.category_id) {
+            setCategory(updatedDraft.category_id);
+            console.log('[ItemDetailsForm] Category state updated to:', updatedDraft.category_id);
+          }
+        }
+        
+        setAiEnabled(true);
+      } catch (error) {
+        console.error('AI analysis failed:', error);
+        Alert.alert('Analysis Failed', 'Could not analyze images. Please try again or fill in the details manually.');
+        setAiEnabled(false);
+      } finally {
+        setAnalyzing(false);
+      }
+    } else {
+      // Revert to original values
+      if (originalValues) {
+        setTitle(originalValues.title);
+        setDescription(originalValues.description);
+        setCategory(originalValues.category_id);
+        setCondition(originalValues.condition);
+
+        await DraftManager.updateDraft(draftId, {
+          title: originalValues.title,
+          description: originalValues.description,
+          category_id: originalValues.category_id,
+          condition: originalValues.condition,
+        });
+        
+        // Reload draft to ensure state is in sync
+        const updatedDraft = await DraftManager.getDraft(draftId);
+        if (updatedDraft) {
+          setDraft(updatedDraft);
+        }
+      } else {
+        // If no original values, clear AI-filled fields
+        setTitle('');
+        setDescription('');
+        setCategory(null);
+        setCondition(null);
+
+        await DraftManager.updateDraft(draftId, {
+          title: '',
+          description: '',
+          category_id: null,
+          condition: null,
+        });
+      }
+      setAiEnabled(false);
+    }
   };
 
   const handleLocationSelected = useCallback(
@@ -514,9 +753,16 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
   };
 
   const getCategoryName = () => {
-    if (!category) return strings.placeholders.category;
+    if (!category) {
+      return strings.placeholders.category;
+    }
     const cat = categories.find((c) => c.id === category);
-    return cat ? cat.name : strings.placeholders.category;
+    if (cat) {
+      return cat.name;
+    } else {
+      console.warn('[ItemDetailsForm] getCategoryName: Category not found. ID:', category, 'Categories loaded:', categories.length);
+      return strings.placeholders.category;
+    }
   };
 
   const getConditionLabel = () => {
@@ -615,6 +861,28 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
               ))}
             </ScrollView>
           </View>
+
+          {/* AI Analysis Toggle */}
+          {draft.images.some((img) => img.uploaded && img.supabaseUrl) && (
+            <View style={styles.aiToggleContainer}>
+              <View style={styles.aiToggleContent}>
+                <View style={styles.aiToggleTextContainer}>
+                  <Ionicons name="sparkles" size={20} color="#007AFF" style={styles.aiToggleIcon} />
+                  <Text style={styles.aiToggleLabel}>Fill the information with SwapJoy AI</Text>
+                </View>
+                {analyzing ? (
+                  <ActivityIndicator size="small" color="#007AFF" />
+                ) : (
+                  <Switch
+                    value={aiEnabled}
+                    onValueChange={handleAiToggle}
+                    trackColor={{ false: '#E5E5E5', true: '#007AFF' }}
+                    thumbColor="#fff"
+                  />
+                )}
+              </View>
+            </View>
+          )}
 
           {/* Form Fields */}
           <View style={styles.formContainer}>
@@ -997,6 +1265,32 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 4,
     right: 4,
+  },
+  aiToggleContainer: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+  },
+  aiToggleContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  aiToggleTextContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  aiToggleIcon: {
+    marginRight: 8,
+  },
+  aiToggleLabel: {
+    fontSize: 16,
+    color: '#1a1a1a',
+    fontWeight: '500',
   },
   formContainer: {
     backgroundColor: '#fff',

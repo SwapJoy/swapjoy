@@ -106,8 +106,15 @@ export class DraftManager {
         throw new Error('Draft not found');
       }
 
+      console.log('[DraftManager] Updating draft:', draftId, 'with updates:', JSON.stringify(updates));
       const updatedDraft = this.ensureLocationDefaults({ ...draft, ...updates });
+      console.log('[DraftManager] Updated draft category_id:', updatedDraft.category_id);
       await this.saveDraft(updatedDraft);
+      
+      // Verify it was saved
+      const verified = await this.getDraft(draftId);
+      console.log('[DraftManager] Verified saved draft category_id:', verified?.category_id);
+      
       return updatedDraft;
     } catch (error) {
       console.error('Error updating draft:', error);

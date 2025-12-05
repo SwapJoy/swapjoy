@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { ItemPreviewScreenProps } from '../types/navigation';
 import { DraftManager } from '../services/draftManager';
 import { ApiService } from '../services/api';
+import { ImageAnalysisService } from '../services/imageAnalysis';
 import { ItemDraft, Category, ItemCondition } from '../types/item';
 import { formatCurrency } from '../utils';
 import { useLocalization } from '../localization';
@@ -149,17 +150,175 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
         throw new Error(itemError?.message || 'Failed to create item');
       }
 
-      // Create item images
+      // Create item images with meta data from analysis
       const imageData = draft.images
         .filter((img) => img.uploaded && img.supabaseUrl)
-        .map((img, index) => ({
-          item_id: item.id,
-          image_url: img.supabaseUrl!,
-          sort_order: index,
-          is_primary: index === 0,
-        }));
+        .map((img, index) => {
+          // Find corresponding analysis result for this image by URL
+          // Try exact match first, then try partial match (in case URLs differ slightly)
+          let analysisResult = draft.imageAnalysis?.results.find(
+            (result) => {
+              const resultUrl = result.imageUrl;
+              const imgUrl = img.supabaseUrl;
+              if (!resultUrl || !imgUrl) return false;
+              // Exact match
+              if (resultUrl === imgUrl) return true;
+              // Partial match - check if URLs contain the same path
+              const resultPath = resultUrl.split('/').slice(-2).join('/'); // Get last 2 path segments
+              const imgPath = imgUrl.split('/').slice(-2).join('/');
+              return resultPath === imgPath;
+            }
+          );
 
-      const { error: imagesError } = await ApiService.createItemImages(imageData);
+          // Fallback: try matching by index if URL matching fails
+          if (!analysisResult && draft.imageAnalysis && draft.imageAnalysis.results[index]) {
+            analysisResult = draft.imageAnalysis.results[index];
+            console.log('[ItemPreview] Using fallback index matching for image', index);
+          }
+
+          const meta = analysisResult
+            ? {
+                detectedObjects: analysisResult.detectedObjects || [],
+                suggestedCategory: analysisResult.suggestedCategory,
+                suggestedTitle: analysisResult.suggestedTitle,
+                suggestedDescription: analysisResult.suggestedDescription,
+                suggestedCondition: analysisResult.suggestedCondition,
+                confidence: analysisResult.confidence,
+                analyzedAt: new Date().toISOString(),
+              }
+            : null;
+
+          if (meta) {
+            console.log('[ItemPreview] Meta data for image', index, ':', JSON.stringify(meta).substring(0, 100));
+          } else {
+            console.warn('[ItemPreview] No meta data for image', index, 'URL:', img.supabaseUrl);
+          }
+
+          const imagePayload: any = {
+            item_id: item.id,
+            image_url: img.supabaseUrl!,
+            sort_order: index,
+            is_primary: index === 0,
+          };
+          
+          // Only include meta if it exists (Supabase handles null/undefined differently)
+          if (meta) {
+            imagePayload.meta = meta;
+          }
+          
+          return imagePayload;
+        });
+
+      console.log('[ItemPreview] Creating', imageData.length, 'images with meta data');
+      const { data: createdImages, error: imagesError } = await ApiService.createItemImages(imageData);
+      
+      if (imagesError) {
+        console.error('[ItemPreview] Error creating images:', imagesError);
+      } else {
+        console.log('[ItemPreview] Created', createdImages?.length || 0, 'images');
+        // Log meta from created images
+        createdImages?.forEach((img: any, idx: number) => {
+          console.log('[ItemPreview] Image', idx, 'meta:', img.meta ? 'EXISTS' : 'NULL', 'id:', img.id);
+        });
+      }
+
+      // Store meta data in item_images after creation
+      if (createdImages && draft.imageAnalysis && !imagesError) {
+        console.log('[ItemPreview] Storing meta data for', createdImages.length, 'images');
+        
+        const client = await ApiService.getAuthenticatedClient();
+        
+        // Map created images back to analysis results and update meta
+        for (let i = 0; i < createdImages.length; i++) {
+          const createdImage = createdImages[i];
+          const draftImage = draft.images.find((img) => img.supabaseUrl === createdImage.image_url);
+          
+          if (draftImage && draft.imageAnalysis) {
+            // Try to find analysis result by URL matching
+            const analysisResult = draft.imageAnalysis.results.find(
+              (result) => {
+                const resultUrl = result.imageUrl;
+                const imgUrl = draftImage.supabaseUrl;
+                if (!resultUrl || !imgUrl) return false;
+                // Exact match
+                if (resultUrl === imgUrl) return true;
+                // Partial match - check if URLs contain the same path segments
+                try {
+                  const resultPath = resultUrl.split('/').slice(-3).join('/'); // Get last 3 path segments
+                  const imgPath = imgUrl.split('/').slice(-3).join('/');
+                  return resultPath === imgPath;
+                } catch (e) {
+                  return false;
+                }
+              }
+            );
+
+            if (analysisResult) {
+              console.log('[ItemPreview] Found analysis result for image', createdImage.id);
+              const metaData = {
+                detectedObjects: analysisResult.detectedObjects,
+                suggestedCategory: analysisResult.suggestedCategory,
+                suggestedTitle: analysisResult.suggestedTitle,
+                suggestedDescription: analysisResult.suggestedDescription,
+                suggestedCondition: analysisResult.suggestedCondition,
+                confidence: analysisResult.confidence,
+                analyzedAt: new Date().toISOString(),
+              };
+              
+              // Update the meta field directly in the database
+              const { error: metaError } = await client
+                .from('item_images')
+                .update({ meta: metaData })
+                .eq('id', createdImage.id);
+
+              if (metaError) {
+                console.error('[ItemPreview] Error updating meta for image', createdImage.id, ':', metaError);
+              } else {
+                console.log('[ItemPreview] Successfully stored meta for image', createdImage.id, ':', JSON.stringify(metaData).substring(0, 100));
+              }
+            } else {
+              console.warn('[ItemPreview] No analysis result found for image', createdImage.image_url);
+              // Try to match by index as fallback
+              if (draft.imageAnalysis.results[i]) {
+                const fallbackResult = draft.imageAnalysis.results[i];
+                const metaData = {
+                  detectedObjects: fallbackResult.detectedObjects,
+                  suggestedCategory: fallbackResult.suggestedCategory,
+                  suggestedTitle: fallbackResult.suggestedTitle,
+                  suggestedDescription: fallbackResult.suggestedDescription,
+                  suggestedCondition: fallbackResult.suggestedCondition,
+                  confidence: fallbackResult.confidence,
+                  analyzedAt: new Date().toISOString(),
+                };
+                
+                const { error: metaError } = await client
+                  .from('item_images')
+                  .update({ meta: metaData })
+                  .eq('id', createdImage.id);
+
+                if (metaError) {
+                  console.error('[ItemPreview] Error updating meta (fallback) for image', createdImage.id, ':', metaError);
+                } else {
+                  console.log('[ItemPreview] Successfully stored meta (fallback) for image', createdImage.id);
+                }
+              }
+            }
+          }
+        }
+
+        // Also call analyze-images function with itemId and imageIds to ensure meta is stored
+        if (draft.imageAnalysis && createdImages.length > 0) {
+          try {
+            const imageUrls = createdImages.map((img) => img.image_url);
+            const imageIds = createdImages.map((img) => img.id);
+            
+            console.log('[ItemPreview] Calling analyze-images to store meta with itemId:', item.id);
+            await ImageAnalysisService.analyzeImages(imageUrls, item.id, imageIds);
+          } catch (error) {
+            console.warn('[ItemPreview] Failed to call analyze-images for meta storage (non-critical):', error);
+          }
+        }
+      }
 
       if (imagesError) {
         console.error('Error creating images:', imagesError);

@@ -3429,6 +3429,7 @@ export class ApiService {
     image_url: string;
     sort_order: number;
     is_primary: boolean;
+    meta?: any; // JSONB metadata for image analysis results
   }>) {
     return this.authenticatedCall(async (client) => {
       return await client
