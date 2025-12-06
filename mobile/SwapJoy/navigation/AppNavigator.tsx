@@ -27,6 +27,7 @@ import ItemPreviewScreen from '../screens/ItemPreviewScreen';
 import ItemDetailsScreen from '../screens/ItemDetailsScreen';
 import ProfileSettingsScreen from '../screens/ProfileSettingsScreen';
 import ProfileEditScreen from '../screens/ProfileEditScreen';
+import CategorySelectorScreen from '../screens/CategorySelectorScreen';
 import BundleItemsScreen from '../screens/BundleItemsScreen';
 import OfferCreateScreen from '../screens/OfferCreateScreen';
 import OfferPreviewScreen from '../screens/OfferPreviewScreen';
@@ -293,6 +294,11 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
               name="ProfileSettings" 
               component={ProfileSettingsScreen}
               options={{ title: 'Settings' }}
+            />
+            <Stack.Screen
+              name="CategorySelector"
+              component={CategorySelectorScreen}
+              options={{ title: 'Select Categories', headerBackTitleVisible: false }}
             />
             <Stack.Screen
               name="ProfileEdit"

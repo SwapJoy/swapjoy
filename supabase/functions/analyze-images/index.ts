@@ -1,36 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-interface ImageAnalysisResult {
-  imageUrl: string;
-  imageId?: string;
-  detectedObjects: string[];
-  suggestedCategory: {
-    id: string;
-    name: string;
-    confidence: number;
-  } | null;
-  suggestedTitle: string;
-  suggestedDescription: string;
-  suggestedCondition: 'new' | 'like_new' | 'good' | 'fair' | 'poor' | null;
-  confidence: number;
-}
-
-interface ImageAnalysisResponse {
-  results: ImageAnalysisResult[];
-  aggregated: {
-    detectedObjects: string[];
-    suggestedCategory: {
-      id: string;
-      name: string;
-      confidence: number;
-    } | null;
-    suggestedTitle: string;
-    suggestedDescription: string;
-    suggestedCondition: 'new' | 'like_new' | 'good' | 'fair' | 'poor' | null;
-  };
-}
-
 serve(async (req) => {
   if (req.method !== 'POST') {
     return new Response('Method Not Allowed', { status: 405 });
@@ -42,7 +12,7 @@ serve(async (req) => {
   );
 
   try {
-    const { imageUrls, itemId, imageIds } = await req.json();
+    const { imageUrls, imageIds } = await req.json();
 
     if (!imageUrls || !Array.isArray(imageUrls) || imageUrls.length === 0) {
       return new Response(
@@ -53,6 +23,45 @@ serve(async (req) => {
         }
       );
     }
+
+    // Fetch categories from database
+    const { data: categories, error: categoriesError } = await supabaseClient
+      .from('categories')
+      .select('id, title_en')
+      .eq('is_active', true)
+
+    if (categoriesError) {
+      console.error('[analyze-images] Error fetching categories:', JSON.stringify(categoriesError));
+      console.error('[analyze-images] Error details:', {
+        message: categoriesError.message,
+        details: categoriesError.details,
+        hint: categoriesError.hint,
+        code: categoriesError.code,
+      });
+      return new Response(
+        JSON.stringify({ 
+          error: 'Failed to fetch categories from database',
+          details: categoriesError.message 
+        }),
+        {
+          headers: { 'Content-Type': 'application/json' },
+          status: 500,
+        }
+      );
+    }
+
+    if (!categories || categories.length === 0) {
+      console.warn('[analyze-images] Warning: No active categories found in database.');
+      return new Response(
+        JSON.stringify({ error: 'No categories available' }),
+        {
+          headers: { 'Content-Type': 'application/json' },
+          status: 500,
+        }
+      );
+    }
+
+    console.log(`[analyze-images] Loaded ${categories.length} categories from database`);
 
     // Analyze images in parallel for better performance
     const analysisPromises = imageUrls.map(async (imageUrl: string, i: number) => {
@@ -75,18 +84,26 @@ serve(async (req) => {
                 content: [
                   {
                     type: 'text',
-                    text: `Analyze this image and provide item details in JSON format.
+                    text: `You are a product listing extractor. Extract ONLY inherent product information — ignore actions or context from the photo (e.g., ignore charging, being held, background, lighting, reflections).  AVAILABLE CATEGORIES (you MUST select the best matching one):
+${categories.map((cat: any, idx: number) => {
+  return `${idx + 1}. ${cat.title_en} (ID: ${cat.id})`;
+}).join('\n')}
 
-Return JSON:
+Return ONLY this exact JSON:
 {
-  "detectedObjects": ["object1", "object2"],
-  "suggestedTitle": "Item Title (3-8 words)",
-  "suggestedDescription": "Description (2-3 sentences) including condition, color, material, brand, size, features, defects",
-  "suggestedCondition": "new|like_new|good|fair|poor",
-  "confidence": 0.85
+  "title": "",
+  "categoryId": "EXACT-UUID-FROM-LIST-ABOVE",
+  "description": "",
+  "error": NULL
 }
 
-Be specific about condition and details.`
+Rules:
+- title: short (<= 5 words), combine brand + product type if visible. if not found empty
+- categoryId: MUST be the exact UUID from the categories list above. Select the best matching category, if not found null
+- description: <= 10 words, describe the object. if not found empty.
+- error: If there's a human, animal, nude, violence, etc. in the image, return "Invalid image".
+- NEVER mention actions, charging, cables, background objects, scenery, or any inferred usage situation.
+- ALWAYS return valid JSON, no explanations, no markdown.`
                   },
                   {
                     type: 'image_url',
@@ -98,7 +115,7 @@ Be specific about condition and details.`
               },
             ],
             response_format: { type: 'json_object' },
-            max_tokens: 300, // Reduced from 500 for faster response
+            max_tokens: 200, // Reduced from 500 for faster response
           }),
         });
 
@@ -124,36 +141,13 @@ Be specific about condition and details.`
           return null;
         }
 
-        // No category matching - category will be selected by user
-
-        // Validate and normalize condition
-        let suggestedCondition: 'new' | 'like_new' | 'good' | 'fair' | 'poor' | null = null;
-        if (analysisData.suggestedCondition) {
-          const condition = analysisData.suggestedCondition.toLowerCase().trim();
-          if (['new', 'like_new', 'good', 'fair', 'poor'].includes(condition)) {
-            suggestedCondition = condition as 'new' | 'like_new' | 'good' | 'fair' | 'poor';
-          } else if (condition.includes('like new') || condition.includes('like-new')) {
-            suggestedCondition = 'like_new';
-          } else if (condition.includes('good')) {
-            suggestedCondition = 'good';
-          } else if (condition.includes('fair')) {
-            suggestedCondition = 'fair';
-          } else if (condition.includes('poor') || condition.includes('bad')) {
-            suggestedCondition = 'poor';
-          }
-        }
+        // Debug: Log what OpenAI returned
+        console.log('[analyze-images] OpenAI response:', JSON.stringify(analysisData));
 
         return {
           imageUrl,
           imageId,
-          detectedObjects: Array.isArray(analysisData.detectedObjects)
-            ? analysisData.detectedObjects
-            : [],
-          suggestedCategory: null, // Category removed - user will select
-          suggestedTitle: analysisData.suggestedTitle || '',
-          suggestedDescription: analysisData.suggestedDescription || '',
-          suggestedCondition,
-          confidence: analysisData.confidence || 0.5,
+          ...analysisData
         };
       } catch (error) {
         console.error(`Error analyzing image ${imageUrl}:`, error);
@@ -163,102 +157,8 @@ Be specific about condition and details.`
 
     // Wait for all images to be analyzed in parallel
     const results = await Promise.all(analysisPromises);
-    const analysisResults = results.filter((r): r is ImageAnalysisResult => r !== null);
 
-    if (analysisResults.length === 0) {
-      return new Response(
-        JSON.stringify({
-          error: 'Failed to analyze any images',
-        }),
-        {
-          headers: { 'Content-Type': 'application/json' },
-          status: 500,
-        }
-      );
-    }
-
-    // Aggregate results
-    const allDetectedObjects = new Set<string>();
-    analysisResults.forEach((result) => {
-      result.detectedObjects.forEach((obj) => allDetectedObjects.add(obj));
-    });
-
-    // Aggregate title, description, and condition (use the one with highest confidence)
-    const bestResult = analysisResults.reduce((best, current) =>
-      current.confidence > best.confidence ? current : best
-    );
-
-    // Aggregate condition (use most common, or best result if no consensus)
-    const conditionCounts = new Map<string, number>();
-    analysisResults.forEach((result) => {
-      if (result.suggestedCondition) {
-        conditionCounts.set(
-          result.suggestedCondition,
-          (conditionCounts.get(result.suggestedCondition) || 0) + 1
-        );
-      }
-    });
-    let aggregatedCondition: 'new' | 'like_new' | 'good' | 'fair' | 'poor' | null = null;
-    if (conditionCounts.size > 0) {
-      const sortedConditions = Array.from(conditionCounts.entries()).sort((a, b) => b[1] - a[1]);
-      aggregatedCondition = sortedConditions[0][0] as 'new' | 'like_new' | 'good' | 'fair' | 'poor';
-    } else if (bestResult.suggestedCondition) {
-      aggregatedCondition = bestResult.suggestedCondition;
-    }
-
-    const aggregated: ImageAnalysisResponse['aggregated'] = {
-      detectedObjects: Array.from(allDetectedObjects),
-      suggestedCategory: null, // Category removed - user will select
-      suggestedTitle: bestResult.suggestedTitle,
-      suggestedDescription: bestResult.suggestedDescription,
-      suggestedCondition: aggregatedCondition,
-    };
-
-    // Debug logging
-    console.log('[analyze-images] Aggregated result:', JSON.stringify({
-      detectedObjects: aggregated.detectedObjects,
-      suggestedTitle: aggregated.suggestedTitle,
-      suggestedDescription: aggregated.suggestedDescription,
-      suggestedCondition: aggregated.suggestedCondition,
-    }));
-    console.log('[analyze-images] Analysis results count:', analysisResults.length);
-
-    // If itemId and imageIds are provided, store results in item_images.meta
-    if (itemId && imageIds && imageIds.length === analysisResults.length) {
-      for (let i = 0; i < analysisResults.length; i++) {
-        const result = analysisResults[i];
-        const imageId = imageIds[i];
-
-        if (imageId) {
-          const { error: updateError } = await supabaseClient
-            .from('item_images')
-            .update({
-              meta: {
-                detectedObjects: result.detectedObjects,
-                suggestedCategory: result.suggestedCategory,
-                suggestedTitle: result.suggestedTitle,
-                suggestedDescription: result.suggestedDescription,
-                suggestedCondition: result.suggestedCondition,
-                confidence: result.confidence,
-                analyzedAt: new Date().toISOString(),
-              },
-            })
-            .eq('id', imageId)
-            .eq('item_id', itemId);
-
-          if (updateError) {
-            console.error(`Error updating item_images.meta for ${imageId}:`, updateError);
-          }
-        }
-      }
-    }
-
-    const response: ImageAnalysisResponse = {
-      results: analysisResults,
-      aggregated,
-    };
-
-    return new Response(JSON.stringify(response), {
+    return new Response(JSON.stringify(results), {
       headers: { 'Content-Type': 'application/json' },
       status: 200,
     });

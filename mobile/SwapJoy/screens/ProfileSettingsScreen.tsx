@@ -36,8 +36,6 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigatio
   const [favoriteCategories, setFavoriteCategories] = useState<string[]>([]);
   const [categoryOptions, setCategoryOptions] = useState<CategoryOption[]>([]);
   const [categoriesLoading, setCategoriesLoading] = useState(false);
-  const [savingCategoryId, setSavingCategoryId] = useState<string | null>(null);
-  const [isCategoryModalVisible, setCategoryModalVisible] = useState(false);
   const [preferredCurrency, setPreferredCurrency] = useState<string>('USD');
   const [isCurrencyModalVisible, setCurrencyModalVisible] = useState(false);
   const [savingCurrency, setSavingCurrency] = useState(false);
@@ -122,49 +120,13 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigatio
     [preferredRadius, savingRadius, t]
   );
 
-  const toggleCategorySelection = useCallback(
-    async (categoryId: string) => {
-      let previousSelections: string[] = [];
-      let nextSelections: string[] = [];
-
-      setFavoriteCategories((current) => {
-        previousSelections = [...current];
-        if (current.includes(categoryId)) {
-          nextSelections = current.filter((id) => id !== categoryId);
-        } else {
-          nextSelections = [...current, categoryId];
-        }
-        return nextSelections;
-      });
-
-      setSavingCategoryId(categoryId);
-      try {
-        const payload = nextSelections.length > 0 ? nextSelections : null;
-        const { error } = await UserService.updateProfile({
-          favorite_categories: payload,
-        });
-        if (error) {
-          throw new Error(error.message || 'Failed to update categories');
-        }
-        setProfile((prev) =>
-          prev ? { ...prev, favorite_categories: nextSelections } : prev
-        );
-      } catch (error: any) {
-        console.error('[ProfileSettings] Favorite categories update error:', error);
-        setFavoriteCategories(previousSelections);
-        Alert.alert(
-          t('common.error', { defaultValue: 'Error' }),
-          error?.message ||
-            t('settings.profile.favoriteCategoriesErrorMessage', {
-              defaultValue: 'Could not update favorite categories. Please try again.',
-            })
-        );
-      } finally {
-        setSavingCategoryId(null);
-      }
-    },
-    [t]
-  );
+  const handleNavigateToCategorySelector = useCallback(() => {
+    navigation.navigate('CategorySelector', {
+      multiselect: true,
+      selectedCategories: favoriteCategories,
+      updateProfile: true,
+    });
+  }, [navigation, favoriteCategories]);
 
   const handleCurrencySelect = useCallback(
     async (currencyCode: string) => {
@@ -411,7 +373,7 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigatio
         <View style={styles.categoryHeaderRow}>
           <Text style={styles.sectionTitle}>{t('settings.profile.favoriteCategoriesTitle')}</Text>
           <TouchableOpacity
-            onPress={() => setCategoryModalVisible(true)}
+            onPress={handleNavigateToCategorySelector}
             disabled={categoriesLoading}
             style={styles.manageCategoriesButton}
             activeOpacity={0.8}
@@ -558,77 +520,6 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigatio
         </View>
       </Modal>
 
-      <Modal
-        visible={isCategoryModalVisible}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setCategoryModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.choiceModalCard}>
-            <Text style={styles.choiceModalTitle}>{t('settings.profile.favoriteCategoriesModalTitle')}</Text>
-            <Text style={styles.choiceModalSubtitle}>{t('settings.profile.favoriteCategoriesModalSubtitle')}</Text>
-            {categoriesLoading ? (
-              <View style={styles.categoriesLoading}>
-                <ActivityIndicator size="small" color="#1f7ae0" />
-              </View>
-            ) : sortedCategories.length === 0 ? (
-              <Text style={styles.categoriesEmptyText}>
-                {t('settings.profile.favoriteCategoriesEmpty')}
-              </Text>
-            ) : (
-              <ScrollView contentContainerStyle={styles.categoryModalList}>
-                <View style={styles.categoryBubbleWrap}>
-                  {sortedCategories.map((category) => {
-                    const selected = favoriteCategories.includes(category.id);
-                    const isSaving = savingCategoryId === category.id;
-                    return (
-                      <TouchableOpacity
-                        key={category.id}
-                        style={[
-                          styles.categoryBubble,
-                          selected && styles.categoryBubbleSelected,
-                        ]}
-                        onPress={() => toggleCategorySelection(category.id)}
-                        disabled={isSaving}
-                        activeOpacity={0.85}
-                      >
-                        <View style={styles.categoryBubbleLeft}>
-                          {isSaving ? (
-                            <ActivityIndicator
-                              size="small"
-                              color={selected ? '#ffffff' : '#0f172a'}
-                            />
-                          ) : !selected ? (
-                            <Text style={styles.categoryBubblePlus}>+</Text>
-                          ) : null}
-                        </View>
-                        <Text
-                          style={[
-                            styles.categoryBubbleLabel,
-                            selected && styles.categoryBubbleLabelSelected,
-                          ]}
-                        >
-                          {category.name}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </ScrollView>
-            )}
-            <TouchableOpacity
-              style={styles.choiceModalCancel}
-              onPress={() => setCategoryModalVisible(false)}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.choiceModalCancelText}>
-                {t('settings.profile.favoriteCategoriesModalClose')}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
 
       <Modal
         visible={isCurrencyModalVisible}

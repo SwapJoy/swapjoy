@@ -1,49 +1,26 @@
 import { ApiService } from './api';
 
-export interface ImageAnalysisResult {
-  imageUrl: string;
-  imageId?: string;
-  detectedObjects: string[];
-  suggestedCategory: {
-    id: string;
-    name: string;
-    confidence: number;
-  } | null;
-  suggestedTitle: string;
-  suggestedDescription: string;
-  suggestedCondition: 'new' | 'like_new' | 'good' | 'fair' | 'poor' | null;
-  confidence: number;
-}
-
 export interface ImageAnalysisResponse {
-  results: ImageAnalysisResult[];
-  aggregated: {
-    detectedObjects: string[];
-    suggestedCategory: {
-      id: string;
-      name: string;
-      confidence: number;
-    } | null;
-    suggestedTitle: string;
-    suggestedDescription: string;
-    suggestedCondition: 'new' | 'like_new' | 'good' | 'fair' | 'poor' | null;
-  };
+    imageUrl: string;
+    imageId: string;
+    title: string;
+    categoryId: string | null;
+    description: string;
+    error: string | null;
 }
 
 export class ImageAnalysisService {
-  private static readonly MAX_RETRIES = 3;
-  private static readonly RETRY_DELAY = 1000; // ms
+  private static readonly MAX_RETRIES = 1;
+  private static readonly RETRY_DELAY = 500; // ms
 
   /**
    * Analyze images using OpenAI Vision API via Edge Function
    * @param imageUrls Array of Supabase Storage URLs
+   * @param language Language code ('en' or 'ka')
    * @param itemId Optional item ID for storing results in item_images.meta
-   * @param imageIds Optional array of image IDs for mapping results
    */
   static async analyzeImages(
-    imageUrls: string[],
-    itemId?: string,
-    imageIds?: string[]
+    imageUrls: string[]    
   ): Promise<ImageAnalysisResponse> {
     if (!imageUrls || imageUrls.length === 0) {
       throw new Error('At least one image URL is required');
@@ -54,25 +31,64 @@ export class ImageAnalysisService {
 
     while (attempt < this.MAX_RETRIES) {
       try {
-        const client = await ApiService.getAuthenticatedClient();
+        const result = await ApiService.authenticatedCall(async (client) => {
+          const { data, error } = await client.functions.invoke('analyze-images', {
+            body: {
+              imageUrls,
+            },
+          });
 
-        const { data, error } = await client.functions.invoke('analyze-images', {
-          body: {
-            imageUrls,
-            itemId,
-            imageIds,
-          },
+          if (error) {
+            return { data: null, error };
+          }
+
+          return { data, error: null };
         });
 
-        if (error) {
-          throw new Error(error.message || 'Failed to analyze images');
+        if (result.error) {
+          throw new Error(result.error.message || 'Failed to analyze images');
         }
 
-        if (!data) {
+        if (!result.data) {
           throw new Error('No data returned from analysis function');
         }
 
-        return data as ImageAnalysisResponse;
+        // Edge function returns an array of results, aggregate into single object
+        const results: ImageAnalysisResponse[] = Array.isArray(result.data) ? result.data : [result.data];
+        
+        // Filter out null/undefined results (failed analyses)
+        const validResults = results.filter((r): r is ImageAnalysisResponse => 
+          r !== null && r !== undefined && typeof r === 'object' && 'imageUrl' in r && !!r.imageUrl
+        );
+
+        if (validResults.length === 0) {
+          throw new Error('No valid analysis results returned');
+        }
+
+        // Aggregate results: use first valid result, prefer non-null values
+        const firstResult = validResults[0];
+        
+        // Find best title (first non-empty)
+        const bestTitle = validResults.find(r => r.title && r.title.trim())?.title || firstResult.title || '';
+        
+        // Find best description (first non-empty)
+        const bestDescription = validResults.find(r => r.description && r.description.trim())?.description || firstResult.description || '';
+        
+        // Find best categoryId (first non-null)
+        const bestCategoryId = validResults.find(r => r.categoryId)?.categoryId || firstResult.categoryId || null;
+        
+        // Check for errors
+        const errorMessage = validResults.find(r => r.error)?.error || null;
+
+        // Use first image's URL and ID for the aggregated response
+        return {
+          imageUrl: firstResult.imageUrl,
+          imageId: firstResult.imageId || '',
+          title: bestTitle,
+          categoryId: bestCategoryId,
+          description: bestDescription,
+          error: errorMessage,
+        };
       } catch (error: any) {
         lastError = error;
         attempt++;

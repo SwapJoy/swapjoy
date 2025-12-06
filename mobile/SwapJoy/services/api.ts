@@ -3018,17 +3018,24 @@ export class ApiService {
       }
 
       // Calculate similarity scores for recent items
+      // Limit to first 20 items to avoid excessive RPC calls
+      const itemsToScore = recentItemsFiltered.slice(0, 20);
+      const remainingItems = recentItemsFiltered.slice(20);
+      
+      // Limit user items to first 3 to reduce RPC calls
+      const userItemsToUse = userItems.slice(0, 3);
+      
       const itemsWithScores = await Promise.all(
-        recentItemsFiltered.map(async (item) => {
+        itemsToScore.map(async (item) => {
           if (!item.embedding) {
             return { ...item, similarity_score: 0.5, overall_score: 0.5 };
           }
 
-          // Calculate average similarity to user's items
+          // Calculate average similarity to user's items (limited to 3 user items)
           let totalSimilarity = 0;
           let count = 0;
 
-          for (const userItem of userItems) {
+          for (const userItem of userItemsToUse) {
             if (!userItem.embedding) continue;
 
             try {
@@ -3070,9 +3077,23 @@ export class ApiService {
           };
         })
       );
+      
+      // Add remaining items without similarity scores (just use recency boost)
+      const remainingItemsWithScores = remainingItems.map((item) => {
+        const daysSinceCreated = (Date.now() - new Date(item.created_at).getTime()) / (1000 * 60 * 60 * 24);
+        const recencyBoost = Math.max(0, (30 - daysSinceCreated) / 30) * 0.2;
+        return {
+          ...item,
+          similarity_score: 0.5,
+          overall_score: Math.min(1, 0.5 + recencyBoost)
+        };
+      });
+      
+      // Combine scored items with remaining items
+      const allItemsWithScores = [...itemsWithScores, ...remainingItemsWithScores];
 
       // Sort by overall score and limit
-      const sortedItems = itemsWithScores
+      const sortedItems = allItemsWithScores
         .sort((a, b) => (b.overall_score || 0) - (a.overall_score || 0));
 
       const paginatedItems = sortedItems.slice(offset, offset + limit);
@@ -3386,30 +3407,43 @@ export class ApiService {
     const fallbackColumn = lang === 'ka' ? 'title_en' : 'title_ka';
 
     // Cached categories for performance (used for favorite category chips and filters)
+    console.log('[ApiService.getCategories] Starting fetch, bypassCache=true');
     return RedisCache.cache(
       'all-categories',
       ['active', lang],
-      () => this.authenticatedCall(async (client) => {
-        const { data, error } = await client
-          .from('categories')
-          .select('id, title_en, title_ka, description, slug, icon, color, is_active, created_at')
-          .eq('is_active', true)
-          .order(localizedColumn, { ascending: true });
+      () => {
+        console.log('[ApiService.getCategories] Fetch function called');
+        return this.authenticatedCall(async (client) => {
+          console.log('[ApiService.getCategories] Calling RPC function');
+          // Use RPC function to fetch all categories at once (bypasses 1000 row limit)
+          const { data, error } = await client.rpc('get_all_active_categories');
+          console.log('[ApiService.getCategories] RPC response received, error:', !!error, 'data:', data ? data.length : 'null');
 
-        if (error || !data) {
-          return { data: null, error };
-        }
+          if (error || !data) {
+            console.error('[ApiService.getCategories] Error:', error);
+            return { data: null, error };
+          }
 
-        const dataWithLocalizedName = data.map((category: any) => ({
-          ...category,
-          name: category?.[localizedColumn] || category?.[fallbackColumn] || '',
-        }));
+          console.log('[ApiService.getCategories] getCategories.count', data.length);
 
-        return {
-          data: dataWithLocalizedName,
-          error: null,
-        };
-      }),
+          // Sort by localized column
+          const sortedData = [...data].sort((a: any, b: any) => {
+            const aName = a[localizedColumn] || a[fallbackColumn] || '';
+            const bName = b[localizedColumn] || b[fallbackColumn] || '';
+            return aName.localeCompare(bName);
+          });
+
+          const dataWithLocalizedName = sortedData.map((category: any) => ({
+            ...category,
+            name: category?.[localizedColumn] || category?.[fallbackColumn] || '',
+          }));
+
+          return {
+            data: dataWithLocalizedName,
+            error: null,
+          };
+        });
+      },
       true
     );
   }

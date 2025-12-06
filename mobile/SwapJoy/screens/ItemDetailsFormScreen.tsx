@@ -336,68 +336,26 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
           const imageUrls = allUploaded.map((img) => img.supabaseUrl!);
           const analysisResult = await ImageAnalysisService.analyzeImages(imageUrls);
 
-          // Store analysis in draft
-          await DraftManager.updateDraft(draftId, {
-            imageAnalysis: analysisResult,
-          });
-
           // Prefill fields with AI suggestions
           const updates: Partial<ItemDraft> = {};
 
-          if (analysisResult.aggregated.suggestedTitle) {
-            setTitle(analysisResult.aggregated.suggestedTitle);
-            updates.title = analysisResult.aggregated.suggestedTitle;
+          if (analysisResult.title) {
+            setTitle(analysisResult.title);
+            updates.title = analysisResult.title
           }
 
-          if (analysisResult.aggregated.suggestedDescription) {
-            setDescription(analysisResult.aggregated.suggestedDescription);
-            updates.description = analysisResult.aggregated.suggestedDescription;
-          }
-
-          if (analysisResult.aggregated.suggestedCategory) {
-            const categoryId = analysisResult.aggregated.suggestedCategory.id;
-            const categoryName = analysisResult.aggregated.suggestedCategory.name;
-            console.log('[ItemDetailsForm] Auto-analysis: Setting category_id:', categoryId, 'category name:', categoryName);
-            console.log('[ItemDetailsForm] Auto-analysis: Categories loaded:', categories.length, 'categories available');
-            
+          if (analysisResult.categoryId) {
             // Always set the category_id - even if categories list isn't loaded yet, it will be validated later
-            setCategory(categoryId);
-            updates.category_id = categoryId;
+            setCategory(analysisResult.categoryId);
+            updates.category_id = analysisResult.categoryId;
             
             // Verify category exists in our categories list (for logging)
-            const categoryExists = categories.find(cat => cat.id === categoryId);
-            if (categoryExists) {
-              console.log('[ItemDetailsForm] Auto-analysis: Category verified:', categoryId, 'name:', categoryExists.name);
-            } else {
-              console.warn('[ItemDetailsForm] Auto-analysis: Category ID not found in categories list yet (may be timing issue):', categoryId);
-              console.warn('[ItemDetailsForm] Auto-analysis: Available category IDs:', categories.slice(0, 5).map(c => c.id));
-            }
-          } else {
-            console.warn('[ItemDetailsForm] Auto-analysis: No suggested category in result');
-            console.warn('[ItemDetailsForm] Auto-analysis: Full aggregated result:', JSON.stringify(analysisResult.aggregated));
-          }
-
-          if (analysisResult.aggregated.suggestedCondition) {
-            setCondition(analysisResult.aggregated.suggestedCondition);
-            updates.condition = analysisResult.aggregated.suggestedCondition;
-            console.log('[ItemDetailsForm] Auto-analysis: Condition set to:', analysisResult.aggregated.suggestedCondition);
-          }
-
-          if (Object.keys(updates).length > 0) {
-            console.log('[ItemDetailsForm] Auto-analysis: Updating draft with:', JSON.stringify(updates));
-            await DraftManager.updateDraft(draftId, updates);
-            
-            // Reload draft and update state
-            const finalDraft = await DraftManager.getDraft(draftId);
-            if (finalDraft) {
-              setDraft(finalDraft);
-              if (finalDraft.category_id) {
-                setCategory(finalDraft.category_id);
-                console.log('[ItemDetailsForm] Auto-analysis: Final category state:', finalDraft.category_id);
-              }
+            const categoryExists = categories.find(cat => cat.id === analysisResult.categoryId);
+            if (!categoryExists) {
+              console.warn('[ItemDetailsForm] Auto-analysis: Category ID not found in categories list yet (may be timing issue):', analysisResult.categoryId);
             }
           }
-          
+
           setAiEnabled(true);
         } catch (error) {
           console.error('[ItemDetailsForm] Auto-analysis failed:', error);
@@ -504,38 +462,31 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
         const imageUrls = uploadedImages.map((img) => img.supabaseUrl!);
         const analysisResult = await ImageAnalysisService.analyzeImages(imageUrls);
 
-        // Store analysis in draft
-        await DraftManager.updateDraft(draftId, {
-          imageAnalysis: analysisResult,
-        });
+        if (analysisResult.error) {
+          Alert.alert('AI Analysis Failed', 'Image violates our content guidelines. Please remove the image and try again.');
+          setAiEnabled(false);
+          return;
+        }
 
         // Prefill fields with AI suggestions
         const updates: Partial<ItemDraft> = {};
 
-        if (analysisResult.aggregated.suggestedTitle) {
-          setTitle(analysisResult.aggregated.suggestedTitle);
-          updates.title = analysisResult.aggregated.suggestedTitle;
+        if (analysisResult.title) {
+          setTitle(analysisResult.title);
+          updates.title = analysisResult.title
         }
 
-        if (analysisResult.aggregated.suggestedDescription) {
-          setDescription(analysisResult.aggregated.suggestedDescription);
-          updates.description = analysisResult.aggregated.suggestedDescription;
-        }
-
-        if (analysisResult.aggregated.suggestedCategory) {
-          const categoryId = analysisResult.aggregated.suggestedCategory.id;
-          const categoryName = analysisResult.aggregated.suggestedCategory.name;
-          console.log('[ItemDetailsForm] AI setting category_id:', categoryId, 'category name:', categoryName);
+        if (analysisResult.categoryId) {
+          const categoryId = analysisResult.categoryId
           
           // Verify category exists in our categories list
           const categoryExists = categories.find(cat => cat.id === categoryId);
           if (categoryExists) {
             setCategory(categoryId);
             updates.category_id = categoryId;
-            console.log('[ItemDetailsForm] Category verified and set to:', categoryId, 'name:', categoryExists.name);
+            console.log('[ItemDetailsForm] Category verified and set to:', categoryId);
           } else {
-            console.warn('[ItemDetailsForm] Category ID not found in categories list:', categoryId, 'name:', categoryName);
-            console.warn('[ItemDetailsForm] Available category IDs:', categories.slice(0, 5).map(c => c.id));
+            console.warn('[ItemDetailsForm] Category ID not found in categories list:', categoryId);
             // Still try to set it - might be a timing issue
             setCategory(categoryId);
             updates.category_id = categoryId;
@@ -544,69 +495,15 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
           console.warn('[ItemDetailsForm] No suggested category in analysis result. Full result:', JSON.stringify(analysisResult.aggregated));
         }
 
-        if (analysisResult.aggregated.suggestedCondition) {
-          setCondition(analysisResult.aggregated.suggestedCondition);
-          updates.condition = analysisResult.aggregated.suggestedCondition;
-          console.log('[ItemDetailsForm] AI set condition:', analysisResult.aggregated.suggestedCondition);
-        }
-
-        console.log('[ItemDetailsForm] Updating draft with:', JSON.stringify(updates));
-        await DraftManager.updateDraft(draftId, updates);
-        
-        // Reload draft to ensure state is in sync
-        const updatedDraft = await DraftManager.getDraft(draftId);
-        if (updatedDraft) {
-          setDraft(updatedDraft);
-          console.log('[ItemDetailsForm] Draft reloaded, category_id:', updatedDraft.category_id);
-          // Ensure category is set in state
-          if (updatedDraft.category_id) {
-            setCategory(updatedDraft.category_id);
-            console.log('[ItemDetailsForm] Category state updated to:', updatedDraft.category_id);
-          }
-        }
-        
         setAiEnabled(true);
       } catch (error) {
         console.error('AI analysis failed:', error);
-        Alert.alert('Analysis Failed', 'Could not analyze images. Please try again or fill in the details manually.');
         setAiEnabled(false);
       } finally {
         setAnalyzing(false);
       }
     } else {
-      // Revert to original values
-      if (originalValues) {
-        setTitle(originalValues.title);
-        setDescription(originalValues.description);
-        setCategory(originalValues.category_id);
-        setCondition(originalValues.condition);
-
-        await DraftManager.updateDraft(draftId, {
-          title: originalValues.title,
-          description: originalValues.description,
-          category_id: originalValues.category_id,
-          condition: originalValues.condition,
-        });
-        
-        // Reload draft to ensure state is in sync
-        const updatedDraft = await DraftManager.getDraft(draftId);
-        if (updatedDraft) {
-          setDraft(updatedDraft);
-        }
-      } else {
-        // If no original values, clear AI-filled fields
-        setTitle('');
-        setDescription('');
-        setCategory(null);
-        setCondition(null);
-
-        await DraftManager.updateDraft(draftId, {
-          title: '',
-          description: '',
-          category_id: null,
-          condition: null,
-        });
-      }
+      
       setAiEnabled(false);
     }
   };
@@ -868,7 +765,7 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
               <View style={styles.aiToggleContent}>
                 <View style={styles.aiToggleTextContainer}>
                   <Ionicons name="sparkles" size={20} color="#007AFF" style={styles.aiToggleIcon} />
-                  <Text style={styles.aiToggleLabel}>Fill the information with SwapJoy AI</Text>
+                  <Text style={styles.aiToggleLabel}>Fill the details with SwapJoy AI</Text>
                 </View>
                 {analyzing ? (
                   <ActivityIndicator size="small" color="#007AFF" />

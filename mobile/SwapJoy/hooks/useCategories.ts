@@ -18,6 +18,7 @@ export interface Category {
   icon?: string | null;
   color?: string | null;
   is_active: boolean;
+  parent_id?: string | null;
   created_at: string;
 }
 
@@ -28,6 +29,13 @@ interface UseCategoriesReturn {
   refresh: () => Promise<void>;
   getCategoryById: (id: string) => Category | undefined;
   getCategoryByName: (name: string) => Category | undefined;
+  getCategoryTree: () => CategoryTreeNode[];
+  getChildren: (parentId: string) => Category[];
+  isLeafNode: (categoryId: string) => boolean;
+}
+
+export interface CategoryTreeNode extends Category {
+  children: CategoryTreeNode[];
 }
 
 /**
@@ -52,7 +60,7 @@ export const useCategories = (): UseCategoriesReturn => {
         AsyncStorage.getItem(CATEGORIES_STORAGE_KEY),
         AsyncStorage.getItem(CATEGORIES_TIMESTAMP_KEY),
       ]);
-
+    
       if (!cachedData || !timestampStr) {
         return null;
       }
@@ -105,19 +113,23 @@ export const useCategories = (): UseCategoriesReturn => {
       setError(null);
 
       // Try to load from cache first (unless forcing refresh)
+      let cacheLoaded = false;
       if (!forceRefresh) {
         const cached = await loadCachedCategories();
         if (cached && cached.length > 0) {
+          cacheLoaded = true;
           if (isMountedRef.current) {
             setCategories(cached);
             setLoading(false);
           }
-          // Still fetch in background to update cache
-          // (but don't block UI)
+          // Skip API call if we have valid cache - categories are cached on app launch
+          // Only fetch if explicitly refreshing or if cache is invalid
+          refreshInProgressRef.current = false;
+          return;
         }
       }
 
-      // Fetch from API
+      // Fetch from API only if no valid cache or forcing refresh
       const { data, error: fetchError } = await ApiService.getCategories(language);
 
       if (fetchError) {
@@ -207,8 +219,82 @@ export const useCategories = (): UseCategoriesReturn => {
     [categories]
   );
 
+  /**
+   * Get children of a parent category
+   */
+  const getChildren = useCallback(
+    (parentId: string): Category[] => {
+      return categories.filter((cat) => cat.parent_id === parentId);
+    },
+    [categories]
+  );
+
+  /**
+   * Check if a category is a leaf node (has no children)
+   */
+  const isLeafNode = useCallback(
+    (categoryId: string): boolean => {
+      return !categories.some((cat) => cat.parent_id === categoryId);
+    },
+    [categories]
+  );
+
+  /**
+   * Build category tree structure
+   */
+  const getCategoryTree = useCallback((): CategoryTreeNode[] => {
+    const categoryMap = new Map<string, CategoryTreeNode>();
+    const rootCategories: CategoryTreeNode[] = [];
+
+    // First pass: create all nodes
+    categories.forEach((cat) => {
+      categoryMap.set(cat.id, {
+        ...cat,
+        children: [],
+      });
+    });
+
+    // Second pass: build tree structure
+    categories.forEach((cat) => {
+      const node = categoryMap.get(cat.id);
+      if (!node) return;
+
+      if (cat.parent_id && categoryMap.has(cat.parent_id)) {
+        const parent = categoryMap.get(cat.parent_id);
+        if (parent) {
+          parent.children.push(node);
+        }
+      } else {
+        rootCategories.push(node);
+      }
+    });
+
+    // Sort children recursively
+    const sortTree = (nodes: CategoryTreeNode[]): CategoryTreeNode[] => {
+      return nodes
+        .map((node) => ({
+          ...node,
+          children: sortTree(node.children),
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+    };
+
+    return sortTree(rootCategories);
+  }, [categories]);
+
   // Load categories on mount and when language changes
   useEffect(() => {
+    // // TEMPORARY: Clear cache for testing
+    // (async () => {
+    //   try {
+    //     await AsyncStorage.removeItem(CATEGORIES_STORAGE_KEY);
+    //     await AsyncStorage.removeItem(CATEGORIES_TIMESTAMP_KEY);
+    //     console.log('[useCategories] TEMPORARY: Cache cleared for testing');
+    //   } catch (err) {
+    //     console.error('[useCategories] Error clearing cache:', err);
+    //   }
+    // })();
+    
     fetchCategories(false);
   }, [fetchCategories]);
 
@@ -226,6 +312,9 @@ export const useCategories = (): UseCategoriesReturn => {
     refresh,
     getCategoryById,
     getCategoryByName,
+    getCategoryTree,
+    getChildren,
+    isLeafNode,
   };
 };
 

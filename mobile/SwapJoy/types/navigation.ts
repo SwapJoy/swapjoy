@@ -66,6 +66,11 @@ export type RootStackParamList = {
     offer: any;
   };
   ProfileSettings: undefined;
+  CategorySelector: {
+    multiselect?: boolean;
+    selectedCategories?: string[];
+    updateProfile?: boolean;
+  };
   DevRecommendationSettings: undefined;
   // Offer flow
   OfferCreate: {
@@ -184,6 +189,11 @@ export type OfferPreviewScreenProps = {
 
 export type ProfileSettingsScreenProps = {
   navigation: NavigationProp<RootStackParamList, 'ProfileSettings'>;
+};
+
+export type CategorySelectorScreenProps = {
+  navigation: NavigationProp<RootStackParamList, 'CategorySelector'>;
+  route: RouteProp<RootStackParamList, 'CategorySelector'>;
 };
 
 export type ProfileEditScreenProps = {

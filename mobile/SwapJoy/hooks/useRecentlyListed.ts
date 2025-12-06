@@ -125,7 +125,7 @@ export const useRecentlyListed = (limit: number = 10, options?: UseRecentlyListe
       }
       isFetchingRef.current = false;
     }
-  }, [language, limit, user?.id]);
+  }, [user?.id, limit]); // Removed language from dependencies to prevent unnecessary re-fetches
 
   // Fetch data whenever user or limit changes
   useEffect(() => {
@@ -133,10 +133,11 @@ export const useRecentlyListed = (limit: number = 10, options?: UseRecentlyListe
       return;
     }
 
-    if (user && !hasFetchedRef.current) {
+    // Only fetch if user exists and we haven't fetched yet
+    if (user?.id && !hasFetchedRef.current && !isFetchingRef.current) {
       fetchRecentItems();
     }
-  }, [autoFetch, fetchRecentItems, user?.id]);
+  }, [autoFetch, user?.id, limit]); // Removed fetchRecentItems to prevent loop
 
   useEffect(() => {
     return () => {
