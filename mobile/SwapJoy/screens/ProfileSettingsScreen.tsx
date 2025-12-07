@@ -8,7 +8,7 @@ import { ApiService } from '../services/api';
 import { UserService } from '../services/userService';
 import { useLocalization } from '../localization';
 import { LanguageSelector } from '../components/LanguageSelector';
-import { CategoryService } from '../services/categoryService';
+import { useCategories } from '../hooks/useCategories';
 
 const RADIUS_OPTIONS = [1, 2, 3, 5, 10, 15, 20, 30, 40, 50] as const;
 const DEFAULT_RADIUS_KM = 50;
@@ -28,14 +28,13 @@ type CategoryOption = {
 const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigation }) => {
   const { signOut } = useAuth();
   const { t, language, setLanguage } = useLocalization();
+  const { categories, loading: categoriesLoading } = useCategories();
   const [profile, setProfile] = useState<any | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
   const [preferredRadius, setPreferredRadius] = useState<number>(DEFAULT_RADIUS_KM);
   const [isRadiusModalVisible, setRadiusModalVisible] = useState(false);
   const [savingRadius, setSavingRadius] = useState(false);
   const [favoriteCategories, setFavoriteCategories] = useState<string[]>([]);
-  const [categoryOptions, setCategoryOptions] = useState<CategoryOption[]>([]);
-  const [categoriesLoading, setCategoriesLoading] = useState(false);
   const [preferredCurrency, setPreferredCurrency] = useState<string>('USD');
   const [isCurrencyModalVisible, setCurrencyModalVisible] = useState(false);
   const [savingCurrency, setSavingCurrency] = useState(false);
@@ -47,6 +46,14 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigatio
       }),
     [preferredRadius, t]
   );
+
+  const categoryOptions = useMemo(() => {
+    return categories.map((category) => ({
+      id: String(category.id),
+      name: category.name || category.title_en || category.title_ka || t('settings.profile.unknownCategory', { defaultValue: 'Other' }),
+      icon: category.icon ?? null,
+    }));
+  }, [categories, t]);
 
   const categoryMap = useMemo(() => {
     const map: Record<string, CategoryOption> = {};
@@ -253,45 +260,6 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigatio
       void fetchProfile();
     }, [fetchProfile])
   );
-
-  useEffect(() => {
-    let isMounted = true;
-    (async () => {
-      try {
-        setCategoriesLoading(true);
-        const { data, error } = await CategoryService.getCategories(language);
-        if (error) {
-          console.warn('[ProfileSettings] Failed to load categories:', error);
-        }
-        if (!isMounted) {
-          return;
-        }
-        const rows = Array.isArray(data)
-          ? (data as any[]).map((entry) => ({
-              id: String(entry.id),
-              name:
-                entry.name ||
-                entry.title ||
-                entry.title_en ||
-                entry.title_ka ||
-                t('settings.profile.unknownCategory', { defaultValue: 'Other' }),
-              icon: entry.icon ?? null,
-            }))
-          : [];
-        setCategoryOptions(rows);
-      } catch (error) {
-        console.error('[ProfileSettings] Category load error:', error);
-      } finally {
-        if (isMounted) {
-          setCategoriesLoading(false);
-        }
-      }
-    })();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [language, t]);
 
   const Item = ({
     icon,

@@ -125,10 +125,43 @@ export class ApiService {
       }
       // If unauthorized or JWT error, attempt one refresh + retry
       const errMsg = String(result?.error?.message || '').toLowerCase();
+      const errCode = String(result?.error?.code || '').toLowerCase();
+      const errorStatus = result?.error?.status;
+      
+      // Parse error body if it's a JSON string (Supabase sometimes returns errors this way)
+      let errBody = '';
+      if (typeof result?.error?.body === 'string') {
+        try {
+          const parsedBody = JSON.parse(result.error.body);
+          errBody = JSON.stringify(parsedBody).toLowerCase();
+        } catch {
+          errBody = result.error.body.toLowerCase();
+        }
+      }
+      
+      // Check for auth errors: 401, 403, or error messages/codes indicating auth issues
       const isAuthError = !!result?.error && (
-        errMsg.includes('jwt') || errMsg.includes('token') || errMsg.includes('unauthorized') || errMsg.includes('auth') || result?.error?.status === 401
+        errorStatus === 401 || 
+        errorStatus === 403 ||
+        errMsg.includes('jwt') || 
+        errMsg.includes('token') || 
+        errMsg.includes('unauthorized') || 
+        errMsg.includes('auth') ||
+        errMsg.includes('session') ||
+        errCode.includes('session_not_found') ||
+        errCode.includes('jwt') ||
+        errCode.includes('token') ||
+        errBody.includes('session_not_found') ||
+        errBody.includes('jwt') ||
+        errBody.includes('token')
       );
+      
       if (isAuthError) {
+        console.log('[ApiService] Detected auth error - attempting token refresh', {
+          status: errorStatus,
+          code: errCode,
+          message: errMsg.substring(0, 100)
+        });
         try {
           // Force reload current session; AuthService.getCurrentSession will refresh if expired
           const refreshedSession = await AuthService.getCurrentSession();
@@ -2174,6 +2207,39 @@ export class ApiService {
 
     // Return success immediately for UI (optimistic update)
     return { data: { id: notificationId, is_read: true }, error: null };
+  }
+
+  /**
+   * Mark all notifications as read for the current user
+   */
+  static async markAllNotificationsAsRead() {
+    return this.authenticatedCall(async (client) => {
+      try {
+        const currentUser = await AuthService.getCurrentUser();
+        if (!currentUser?.id) {
+          console.warn('[ApiService.markAllNotificationsAsRead] No current user');
+          return { data: null, error: { message: 'Not authenticated' } };
+        }
+
+        // Update all unread notifications for the current user
+        const updateResult = await client
+          .from('notifications')
+          .update({ is_read: true })
+          .eq('user_id', currentUser.id)
+          .eq('is_read', false);
+
+        if (updateResult.error) {
+          console.error('[ApiService.markAllNotificationsAsRead] Error:', updateResult.error);
+          return { data: null, error: updateResult.error };
+        }
+
+        console.log('[ApiService.markAllNotificationsAsRead] All notifications marked as read');
+        return { data: { success: true }, error: null };
+      } catch (err: any) {
+        console.error('[ApiService.markAllNotificationsAsRead] Exception:', err?.message);
+        return { data: null, error: { message: err?.message || 'Update failed' } };
+      }
+    });
   }
 
   static async getFavorites() {

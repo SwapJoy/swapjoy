@@ -110,6 +110,32 @@ export const useNotificationsData = () => {
     }
   }, []);
 
+  const markAllAsRead = useCallback(async () => {
+    // Optimistically update UI first - mark all as read
+    const previousUnreadCount = unreadCount;
+    setNotifications(prev => 
+      prev.map(notification => ({ ...notification, is_read: true }))
+    );
+    setUnreadCount(0);
+    
+    // Then update in background
+    try {
+      const { error } = await ApiService.markAllNotificationsAsRead();
+      if (error) {
+        console.warn('[useNotificationsData] Error marking all notifications as read:', error);
+        // Revert optimistic update on error - restore previous state
+        await fetchNotifications();
+      } else {
+        // Refresh to ensure sync with server
+        await fetchNotifications();
+      }
+    } catch (error) {
+      console.warn('[useNotificationsData] Exception marking all notifications as read:', error);
+      // Revert optimistic update on error
+      await fetchNotifications();
+    }
+  }, [unreadCount, fetchNotifications]);
+
   const getNotificationIcon = useCallback((type: string) => {
     switch (type) {
       case 'new_offer':
@@ -184,6 +210,7 @@ export const useNotificationsData = () => {
     unreadCount,
     onRefresh,
     markAsRead,
+    markAllAsRead,
     getNotificationIcon,
     getNotificationColor,
     formatTimeAgo,

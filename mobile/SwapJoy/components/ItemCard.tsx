@@ -246,7 +246,6 @@ ItemCard.displayName = 'ItemCard';
 const styles = StyleSheet.create({
   container: {
     backgroundColor: '#ffffff',
-    borderRadius: 4,
     overflow: 'hidden',
     shadowColor: '#0f172a',
     shadowOffset: { width: 0, height: 4 },

@@ -141,41 +141,33 @@ const SkeletonLoader: React.FC<{ width?: number | string; height?: number; style
 // Profile Header Skeleton
 const ProfileHeaderSkeleton = memo(() => (
   <View style={styles.profileSection}>
-    <View style={styles.avatarSection}>
-      <SkeletonLoader width={100} height={100} borderRadius={50} />
-    </View>
-    <View style={styles.statsInfoRow}>
-      <View style={styles.socialGrid}>
-        <View style={styles.socialStatItem}>
-          <SkeletonLoader width={40} height={20} style={{ marginBottom: 4 }} />
-          <SkeletonLoader width={50} height={12} />
-        </View>
-        <View style={styles.socialStatItem}>
-          <SkeletonLoader width={40} height={20} style={{ marginBottom: 4 }} />
-          <SkeletonLoader width={50} height={12} />
+    <View style={styles.profileContentRow}>
+      <View style={styles.avatarSection}>
+        <SkeletonLoader width={100} height={100} borderRadius={50} />
+      </View>
+      <View style={styles.profileRightContent}>
+        <SkeletonLoader width="60%" height={15} style={{ marginBottom: 8 }} />
+        <View style={styles.statsInfoRow}>
+          <View style={styles.socialGrid}>
+            <View style={styles.socialStatItem}>
+              <SkeletonLoader width={40} height={20} style={{ marginBottom: 4 }} />
+              <SkeletonLoader width={50} height={12} />
+            </View>
+            <View style={styles.socialStatItem}>
+              <SkeletonLoader width={40} height={20} style={{ marginBottom: 4 }} />
+              <SkeletonLoader width={50} height={12} />
+            </View>
+          </View>
         </View>
       </View>
     </View>
-    <View style={styles.userInfoSection}>
-      <SkeletonLoader width="60%" height={22} style={{ marginBottom: 8, alignSelf: 'center' }} />
-      <SkeletonLoader width="40%" height={15} style={{ marginBottom: 8, alignSelf: 'center' }} />
-      <SkeletonLoader width="80%" height={14} style={{ alignSelf: 'center' }} />
+    <View style={styles.userNameSection}>
+      <SkeletonLoader width="50%" height={22} />
+    </View>
+    <View style={styles.bioSection}>
+      <SkeletonLoader width="80%" height={14} />
     </View>
   </View>
-));
-
-// Stats Skeleton
-const StatsSkeleton = memo(() => (
-  <>
-    <View style={styles.statItem}>
-      <SkeletonLoader width={40} height={20} style={{ marginBottom: 4 }} />
-      <SkeletonLoader width={50} height={12} />
-    </View>
-    <View style={styles.statItem}>
-      <SkeletonLoader width={40} height={20} style={{ marginBottom: 4 }} />
-      <SkeletonLoader width={50} height={12} />
-    </View>
-  </>
 ));
 
 // Grid Items Skeleton
@@ -299,18 +291,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
     return loadingDraftItems;
   }, [activeTab, isViewingOtherUser, loadingPublishedItems, loadingSavedItems, loadingDraftItems]);
 
-
-
-  const renderStatItem = useCallback((title: string, value: string | number, subtitle?: string) => (
-    <View style={styles.statItem}>
-      <Text style={styles.statValue}>{value}</Text>
-      <Text style={styles.statTitle}>{title}</Text>
-      {subtitle && <Text style={styles.statSubtitle}>{subtitle}</Text>}
-    </View>
-  ), []);
-
   // removed unused renderProfileItem helper
-
   const handleItemPress = useCallback(
     (item: any) => navigation.navigate('ItemDetails', { itemId: item.id }),
     [navigation]
@@ -353,98 +334,93 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
         <ProfileHeaderSkeleton />
       ) : (
         <View style={styles.profileSection}>
-          {/* Avatar */}
-          <View style={styles.avatarSection}>
-            <View style={styles.avatarWrapper}>
-              <CachedImage
-                uri={
-                  (profile as any)?.profile_image_url ||
-                  (user as any)?.profile_image_url ||
-                  (user as any)?.user_metadata?.avatar_url ||
-                  'https://via.placeholder.com/100?text=Avatar'
-                }
-                style={styles.avatar}
-                resizeMode="cover"
-              />
+          <View style={styles.profileContentRow}>
+            {/* Avatar - Left Edge */}
+            <View style={styles.avatarSection}>
+              <View style={styles.avatarWrapper}>
+                <CachedImage
+                  uri={
+                    (profile as any)?.profile_image_url ||
+                    (user as any)?.profile_image_url ||
+                    (user as any)?.user_metadata?.avatar_url ||
+                    'https://via.placeholder.com/100?text=Avatar'
+                  }
+                  style={styles.avatar}
+                  resizeMode="cover"
+                />
+              </View>
+            </View>
+
+            {/* Right Content */}
+            <View style={styles.profileRightContent}>
+              {/* Username - Top */}
+              {(
+                profile?.username ||
+                (user as any)?.user_metadata?.username ||
+                (user as any)?.email?.split?.('@')?.[0]
+              ) && (
+                <Text style={styles.username}>@
+                  {profile?.username ||
+                    (user as any)?.user_metadata?.username ||
+                    (user as any)?.email?.split?.('@')?.[0]}
+                </Text>
+              )}
+
+              {/* Followers & Following - Under Username */}
+              {!loadingFollowCounts && (
+                <View style={styles.statsInfoRow}>
+                  <View style={styles.socialGrid}>
+                    <TouchableOpacity
+                      style={styles.socialStatItem}
+                      onPress={() =>
+                        navigation.navigate('FollowersFollowing', {
+                          userId: viewedUserId || user?.id,
+                          initialTab: 'followers',
+                        })
+                      }
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.socialStatValue}>{followCounts.followers}</Text>
+                      <Text style={styles.socialStatLabel}>{strings.stats.followers}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.socialStatItem}
+                      onPress={() =>
+                        navigation.navigate('FollowersFollowing', {
+                          userId: viewedUserId || user?.id,
+                          initialTab: 'following',
+                        })
+                      }
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.socialStatValue}>{followCounts.following}</Text>
+                      <Text style={styles.socialStatLabel}>{strings.stats.following}</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
             </View>
           </View>
 
-          {/* Followers & Following */}
-          {!loadingFollowCounts && (
-            <View style={styles.statsInfoRow}>
-              <View style={styles.socialGrid}>
-                <TouchableOpacity
-                  style={styles.socialStatItem}
-                  onPress={() =>
-                    navigation.navigate('FollowersFollowing', {
-                      userId: viewedUserId || user?.id,
-                      initialTab: 'followers',
-                    })
-                  }
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.socialStatValue}>{followCounts.followers}</Text>
-                  <Text style={styles.socialStatLabel}>{strings.stats.followers}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.socialStatItem}
-                  onPress={() =>
-                    navigation.navigate('FollowersFollowing', {
-                      userId: viewedUserId || user?.id,
-                      initialTab: 'following',
-                    })
-                  }
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.socialStatValue}>{followCounts.following}</Text>
-                  <Text style={styles.socialStatLabel}>{strings.stats.following}</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-
-          {/* User Info */}
-          <View style={styles.userInfoSection}>
+          {/* Full Name - Under Avatar */}
+          <View style={styles.userNameSection}>
             <Text style={styles.userName}>
               {profile?.first_name || (user as any)?.user_metadata?.first_name || ''}{' '}
               {profile?.last_name || (user as any)?.user_metadata?.last_name || ''}
             </Text>
-            {(
-              profile?.username ||
-              (user as any)?.user_metadata?.username ||
-              (user as any)?.email?.split?.('@')?.[0]
-            ) && (
-              <Text style={styles.username}>@
-                {profile?.username ||
-                  (user as any)?.user_metadata?.username ||
-                  (user as any)?.email?.split?.('@')?.[0]}
-              </Text>
-            )}
-            {(profile?.email || (user as any)?.email) && (
-              <Text style={styles.emailText}>
-                {profile?.email || (user as any)?.email}
-              </Text>
-            )}
-            {profile?.bio && <Text style={styles.bio}>{profile.bio}</Text>}
           </View>
+
+          {/* Bio - Under Full Name */}
+          {profile?.bio && (
+            <View style={styles.bioSection}>
+              <Text style={styles.bio}>{profile.bio}</Text>
+            </View>
+          )}
 
           {/* Follow button (other users only) */}
           {isViewingOtherUser && (
             <View style={styles.followButtonContainer}>
               <FollowButton targetUserId={viewedUserId!} />
-            </View>
-          )}
-
-          {/* Favorite Categories */}
-          {Array.isArray(favoriteCategoryNames) && favoriteCategoryNames.length > 0 && (
-            <View style={styles.favSection}>
-              <View style={styles.favChipsContainerCentered}>
-                {favoriteCategoryNames.slice(0, 10).map((name) => (
-                  <View key={name} style={styles.favChip}>
-                    <Text style={styles.favChipText}>{name}</Text>
-                  </View>
-                ))}
-              </View>
             </View>
           )}
         </View>
@@ -464,8 +440,8 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
 
       {/* Tabs (hide for other users) */}
       {!isViewingOtherUser && (
-        <View style={styles.section}>
-          <View style={styles.tabsWrapper}>
+        <View>
+          <View>
             <View style={styles.tabsContainer}>
               <TouchableOpacity
                 onPress={() => setActiveTab('published')}
@@ -520,9 +496,9 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
         emptyComponent={isLoadingCurrentTab ? <GridItemsSkeleton /> : null}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.gridListContent}
-        horizontalPadding={20}
-        columnSpacing={20}
-        rowSpacing={18}
+        horizontalPadding={0}
+        columnSpacing={1}
+        rowSpacing={2}
       />
     </View>
   );
@@ -549,11 +525,18 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     paddingTop: 16,
     paddingBottom: 20,
-    marginBottom: 10,
+    paddingHorizontal: 20,
+    marginBottom: 8,
+  },
+  profileContentRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 0,
+    marginBottom: 12,
   },
   avatarSection: {
-    alignItems: 'center',
-    marginBottom: 16,
+    alignItems: 'flex-start',
+    marginLeft: 0,
+    marginRight: 12,
   },
   avatarWrapper: {
     width: 100,
@@ -572,11 +555,16 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: 50,
   },
+  profileRightContent: {
+    flex: 1,
+    justifyContent: 'flex-start',
+  },
   statsInfoRow: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
-    marginBottom: 16,
-    gap: 24,
+    paddingHorizontal: 0,
+    marginTop: 8,
+    marginBottom: 0,
+    gap: 8,
   },
   statsGrid: {
     flex: 1,
@@ -587,6 +575,11 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     gap: 16,
+  },
+  userNameSection: {
+    paddingHorizontal: 0,
+    marginTop: 8,
+    marginBottom: 8,
   },
   userInfoSection: {
     paddingHorizontal: 20,
@@ -599,14 +592,14 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '700',
     color: '#000',
-    marginBottom: 4,
-    textAlign: 'center',
+    marginBottom: 0,
+    textAlign: 'left',
   },
   username: {
     fontSize: 15,
     color: '#737373',
-    marginBottom: 8,
-    textAlign: 'center',
+    marginBottom: 0,
+    textAlign: 'left',
   },
   emailText: {
     fontSize: 14,
@@ -614,18 +607,22 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     textAlign: 'center',
   },
+  bioSection: {
+    paddingHorizontal: 0,
+    marginTop: 4,
+    marginBottom: 8,
+  },
   bio: {
     fontSize: 14,
     color: '#262626',
     lineHeight: 20,
-    textAlign: 'center',
+    textAlign: 'left',
   },
   statItem: {
     flex: 1,
     alignItems: 'center',
     backgroundColor: '#FAFAFA',
     borderRadius: 10,
-    paddingVertical: 12,
     paddingHorizontal: 8,
   },
   statValue: {
@@ -649,8 +646,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#FAFAFA',
     borderRadius: 10,
-    paddingVertical: 12,
+    paddingVertical: 8,
     paddingHorizontal: 8,
+    minWidth: 70,
   },
   socialStatValue: {
     fontSize: 20,
@@ -711,7 +709,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 15,
     paddingHorizontal: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
@@ -743,23 +740,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: '#ccc',
     marginLeft: 10,
-  },
-  signOutContainer: {
-    padding: 20,
-  },
-  signOutButton: {
-    backgroundColor: '#FF3B30',
-    paddingVertical: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  signOutText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  itemsContainer: {
-    marginTop: 10,
   },
   itemCard: {
     flexDirection: 'row',
@@ -841,24 +821,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
-  section: {
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 10,
   },
-  tabsWrapper: {
-    marginHorizontal: -20, // cancel section horizontal padding to stretch full width
-  },
   tabsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderBottomWidth: 1,
+    borderBottomWidth: 0,
     borderBottomColor: '#E5E5EA',
   },
   tabButton: {
@@ -889,15 +862,15 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   gridCardLeft: {
-    marginLeft: 20,
+    marginLeft: 0,
     marginRight: 10,
   },
   gridCardRight: {
     marginLeft: 10,
-    marginRight: 20,
+    marginRight: 0,
   },
   followButtonContainer: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 0,
     marginTop: 8,
     marginBottom: 8,
   },

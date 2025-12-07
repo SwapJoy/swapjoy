@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import React, { memo, useState } from 'react';
 import {
   View,
   Text,
@@ -6,10 +6,13 @@ import {
   FlatList,
   TouchableOpacity,
   RefreshControl,
+  Modal,
+  Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { CommonActions } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import { NotificationsScreenProps, RootStackParamList } from '../types/navigation';
 import { Notification } from '../hooks/useNotificationsData';
 import { useNotifications } from '../contexts/NotificationsContext';
@@ -24,10 +27,12 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = memo(() => {
     refreshing,
     onRefresh,
     markAsRead,
+    markAllAsRead,
     getNotificationIcon,
     getNotificationColor,
     formatTimeAgo,
   } = useNotifications();
+  const [popoverVisible, setPopoverVisible] = useState(false);
 
   // Always refresh notifications (and thus unread counts/badges) when this screen gains focus
   useFocusEffect(
@@ -35,6 +40,29 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = memo(() => {
       onRefresh();
     }, [onRefresh])
   );
+
+  // Set up header button
+  React.useEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <TouchableOpacity
+          style={styles.headerButton}
+          onPress={() => setPopoverVisible(true)}
+        >
+          <Ionicons name="ellipsis-vertical" size={24} color="#007AFF" />
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation]);
+
+  const handleMarkAllAsRead = async () => {
+    setPopoverVisible(false);
+    try {
+      await markAllAsRead();
+    } catch (error) {
+      console.error('[NotificationsScreen] Error marking all as read:', error);
+    }
+  };
 
   const handleNotificationPress = (item: Notification) => {
     console.log('[NotificationsScreen] Notification pressed:', { 
@@ -208,7 +236,27 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = memo(() => {
 
   return (
     <View style={styles.container}>
-     
+      <Modal
+        visible={popoverVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setPopoverVisible(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setPopoverVisible(false)}
+        >
+          <View style={styles.popoverContainer}>
+            <Pressable
+              style={styles.popoverItem}
+              onPress={handleMarkAllAsRead}
+            >
+              <Ionicons name="checkmark-done" size={20} color="#007AFF" style={styles.popoverIcon} />
+              <Text style={styles.popoverText}>Mark all as read</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
       <FlatList
         data={notifications}
         renderItem={renderNotification}
@@ -368,6 +416,42 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     textAlign: 'center',
+  },
+  headerButton: {
+    padding: 8,
+    marginRight: 8,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: 'flex-start',
+    alignItems: 'flex-end',
+    paddingTop: 60,
+    paddingRight: 16,
+  },
+  popoverContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    minWidth: 200,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 5,
+    overflow: 'hidden',
+  },
+  popoverItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+  },
+  popoverIcon: {
+    marginRight: 12,
+  },
+  popoverText: {
+    fontSize: 16,
+    color: '#333',
   },
 });
 
