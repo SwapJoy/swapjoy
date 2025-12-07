@@ -257,8 +257,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
     },
     tabs: {
       published: t('profileScreen.tabs.published'),
-      saved: t('profileScreen.tabs.saved'),
-      drafts: t('profileScreen.tabs.drafts'),
+      saved: t('profileScreen.tabs.saved')
     },
     loading: {
       items: t('profileScreen.loading.items'),
@@ -482,14 +481,6 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
               >
                 <Text style={[styles.tabText, activeTab === 'saved' && styles.tabTextActive]}>
                   {strings.tabs.saved}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => setActiveTab('drafts')}
-                style={[styles.tabButton, activeTab === 'drafts' && styles.tabButtonActive]}
-              >
-                <Text style={[styles.tabText, activeTab === 'drafts' && styles.tabTextActive]}>
-                  {strings.tabs.drafts}
                 </Text>
               </TouchableOpacity>
             </View>

@@ -46,6 +46,10 @@ export class ApiService {
 
       if (!session?.access_token) {
         console.warn('[ApiService] No stored session found - user needs to sign in');
+        // Notify AuthContext that session has expired so user gets redirected to sign in
+        AuthService.notifySessionExpired().catch((err) => {
+          console.error('[ApiService] Error notifying session expired:', err);
+        });
         throw new Error('No access token available. Please sign in.');
       }
 
@@ -127,7 +131,20 @@ export class ApiService {
       if (isAuthError) {
         try {
           // Force reload current session; AuthService.getCurrentSession will refresh if expired
-          await AuthService.getCurrentSession();
+          const refreshedSession = await AuthService.getCurrentSession();
+          
+          // Check if we have a valid session with access token before proceeding
+          if (!refreshedSession?.access_token) {
+            console.warn('[ApiService] No valid session available after refresh attempt - notifying AuthContext');
+            // Notify AuthService that session has expired - this will trigger AuthContext to update
+            // and redirect user to sign in screen
+            AuthService.notifySessionExpired().catch((err) => {
+              console.error('[ApiService] Error notifying session expired:', err);
+            });
+            // Return the original error since we can't refresh without a valid session
+            return result;
+          }
+          
           // Reset auth state so we reapply the refreshed session to the Supabase client
           this.resetAuthState();
           await this.getAuthenticatedClient();
@@ -136,6 +153,16 @@ export class ApiService {
         } catch (refreshError: any) {
           // FIXED: Log refresh error instead of swallowing it
           console.error('[ApiService] Session refresh failed:', refreshError?.message || refreshError);
+          
+          // If the error indicates no access token, notify AuthContext
+          const errorMsg = String(refreshError?.message || '').toLowerCase();
+          if (errorMsg.includes('no access token') || errorMsg.includes('please sign in')) {
+            console.warn('[ApiService] No access token detected in refresh error - notifying AuthContext');
+            AuthService.notifySessionExpired().catch((err) => {
+              console.error('[ApiService] Error notifying session expired:', err);
+            });
+          }
+          
           // Return the original error, not the refresh error
           return result;
         }
@@ -144,11 +171,40 @@ export class ApiService {
     } catch (error: any) {
       const errorMsg = error?.message || String(error);
       const isNetworkError = errorMsg.includes('Network request failed') || errorMsg.includes('network') || errorMsg.includes('fetch');
-      console.error('[ApiService] API call failed:', {
-        message: errorMsg,
-        isNetworkError,
-        stack: error?.stack?.substring(0, 200)
-      });
+      const isAuthError = errorMsg.includes('No access token') || errorMsg.includes('Please sign in');
+      
+      // Log the actual error message for better debugging
+      if (isAuthError) {
+        console.error('[ApiService] API call failed - authentication required:', errorMsg || error);
+        // Ensure AuthContext is notified
+        AuthService.notifySessionExpired().catch((err) => {
+          console.error('[ApiService] Error notifying session expired:', err);
+        });
+        // Return an error response so the caller knows authentication is required
+        return {
+          data: null,
+          error: {
+            message: errorMsg || 'Authentication required. Please sign in.',
+            code: 'AUTH_REQUIRED',
+            originalError: error
+          }
+        };
+      } else {
+        console.error('[ApiService] API call failed:', {
+          message: errorMsg || error,
+          isNetworkError,
+          stack: error?.stack?.substring(0, 200)
+        });
+        // Return error response for non-auth errors too
+        return {
+          data: null,
+          error: {
+            message: errorMsg || 'An unexpected error occurred',
+            code: isNetworkError ? 'NETWORK_ERROR' : 'UNKNOWN_ERROR',
+            originalError: error
+          }
+        };
+      }
       return {
         data: null,
         error: {
@@ -3034,33 +3090,6 @@ export class ApiService {
           // Calculate average similarity to user's items (limited to 3 user items)
           let totalSimilarity = 0;
           let count = 0;
-
-          for (const userItem of userItemsToUse) {
-            if (!userItem.embedding) continue;
-
-            try {
-              const { data: simResult, error: rpcError } = await client.rpc('match_items_cosine', {
-                query_embedding: userItem.embedding,
-                target_item_id: item.id,
-                match_threshold: 0.1,
-                match_count: 1
-              });
-
-              if (rpcError) {
-                console.warn('Error calling match_items_cosine:', rpcError);
-                continue;
-              }
-
-              if (simResult && simResult.length > 0 && simResult[0].similarity) {
-                totalSimilarity += simResult[0].similarity;
-                count++;
-              }
-            } catch (error) {
-              console.warn('Exception calling match_items_cosine:', error);
-              // Continue with next user item
-              continue;
-            }
-          }
 
           const avgSimilarity = count > 0 ? totalSimilarity / count : 0.5;
 

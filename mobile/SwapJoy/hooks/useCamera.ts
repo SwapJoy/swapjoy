@@ -12,7 +12,6 @@ import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useNavigation, NavigationProp, useIsFocused } from '@react-navigation/native';
 import { RootStackParamList } from '../types/navigation';
-import { DraftManager } from '../services/draftManager';
 
 export const MAX_PHOTOS = 10;
 
@@ -278,17 +277,9 @@ export const useCamera = (onNavigateToMain?: () => void, isVisible?: boolean) =>
       return;
     }
 
-    try {
-      // Create draft and navigate to form
-      const draft = await DraftManager.createDraft(capturedPhotos);
       navigation.navigate('ItemDetailsForm', {
-        draftId: draft.id,
         imageUris: capturedPhotos,
       });
-    } catch (error) {
-      console.error('Error creating draft:', error);
-      Alert.alert('Error', 'Failed to create draft. Please try again.');
-    }
   };
 
   const toggleFlash = () => {

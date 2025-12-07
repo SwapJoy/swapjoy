@@ -9,6 +9,7 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { CommonActions } from '@react-navigation/native';
 import { CategoryTreeNode } from '../hooks/useCategories';
 import { useCategorySelector } from '../hooks/useCategorySelector';
 import { useLocalization } from '../localization';
@@ -19,6 +20,7 @@ interface CategorySelectorScreenParams {
   multiselect?: boolean;
   selectedCategories?: string[];
   updateProfile?: boolean;
+  onCategorySelected?: (categoryId: string) => void;
 }
 
 const CategorySelectorScreen: React.FC<CategorySelectorScreenProps> = ({ route, navigation }) => {
@@ -27,6 +29,7 @@ const CategorySelectorScreen: React.FC<CategorySelectorScreenProps> = ({ route, 
   const multiselect = params.multiselect ?? true;
   const initialSelected = params.selectedCategories || [];
   const updateProfile = params.updateProfile ?? true;
+  const onCategorySelected = params.onCategorySelected;
 
   const {
     rootCategories,
@@ -67,8 +70,39 @@ const CategorySelectorScreen: React.FC<CategorySelectorScreenProps> = ({ route, 
         return;
       }
     }
-    navigation.goBack();
-  }, [selectedCategoryIds, updateProfile, navigation, t]);
+    
+    // If single select mode and not updating profile, use callback if provided
+    if (!multiselect && !updateProfile) {
+      const selectedId = selectedCategoryIds.length > 0 ? selectedCategoryIds[0] : null;
+      if (selectedId && onCategorySelected) {
+        // Call the callback with the selected category
+        onCategorySelected(selectedId);
+      }
+      // Go back (no animation since animationEnabled is false)
+      navigation.goBack();
+    } else {
+      navigation.goBack();
+    }
+  }, [selectedCategoryIds, updateProfile, multiselect, navigation, t, onCategorySelected]);
+
+  const handleCategoryPress = useCallback((category: CategoryTreeNode, isLeaf: boolean) => {
+    // In single-select mode, if a leaf category is selected, auto-navigate back immediately
+    if (!multiselect && isLeaf && !updateProfile) {
+      toggleCategory(category);
+      // Small delay to allow state to update, then call callback and go back
+      setTimeout(() => {
+        const selectedId = category.id;
+        if (onCategorySelected) {
+          // Call the callback with the selected category
+          onCategorySelected(selectedId);
+        }
+        // Go back (no animation since animationEnabled is false)
+        navigation.goBack();
+      }, 50);
+    } else {
+      toggleCategory(category);
+    }
+  }, [multiselect, updateProfile, toggleCategory, navigation, onCategorySelected]);
 
   const renderCategoryItem = useCallback(
     (category: CategoryTreeNode, level: number = 0): React.ReactNode => {
@@ -88,7 +122,7 @@ const CategorySelectorScreen: React.FC<CategorySelectorScreenProps> = ({ route, 
               isSelected && styles.categoryItemSelected,
               isRoot && hasSelectedChildren && !isSelected && styles.categoryItemHasSelectedChildren,
             ]}
-            onPress={() => toggleCategory(category)}
+            onPress={() => handleCategoryPress(category, isLeaf)}
             activeOpacity={0.7}
           >
             <View style={styles.categoryItemLeft}>
@@ -112,27 +146,39 @@ const CategorySelectorScreen: React.FC<CategorySelectorScreenProps> = ({ route, 
                 {category.name}
               </Text>
             </View>
-            {isLeaf && (
-              <View style={styles.checkboxWrapper}>
-                {isSelected ? (
-                  <View style={styles.checkboxChecked}>
-                    <Ionicons name="checkmark" size={16} color="#fff" />
-                  </View>
-                ) : (
-                  <View style={styles.checkboxUnchecked} />
-                )}
-              </View>
-            )}
-            {!isLeaf && (
-              <View style={styles.categoryItemRight}>
-                {hasSelectedChildren && !isSelected && (
-                  <View style={styles.selectionBadge}>
-                    <Text style={styles.selectionBadgeText}>
-                      {getSelectedDescendantsCount(category.id)}
-                    </Text>
+            {multiselect ? (
+              // Multi-select mode: show checkboxes
+              <>
+                {isLeaf && (
+                  <View style={styles.checkboxWrapper}>
+                    {isSelected ? (
+                      <View style={styles.checkboxChecked}>
+                        <Ionicons name="checkmark" size={16} color="#fff" />
+                      </View>
+                    ) : (
+                      <View style={styles.checkboxUnchecked} />
+                    )}
                   </View>
                 )}
-              </View>
+                {!isLeaf && (
+                  <View style={styles.categoryItemRight}>
+                    {hasSelectedChildren && !isSelected && (
+                      <View style={styles.selectionBadge}>
+                        <Text style={styles.selectionBadgeText}>
+                          {getSelectedDescendantsCount(category.id)}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                )}
+              </>
+            ) : (
+              // Single-select mode: show selection indicator (checkmark icon)
+              isLeaf && isSelected && (
+                <View style={styles.selectionIndicator}>
+                  <Ionicons name="checkmark-circle" size={24} color="#2563eb" />
+                </View>
+              )
             )}
           </TouchableOpacity>
           {!isLeaf && isExpanded && children.length > 0 && (
@@ -150,7 +196,8 @@ const CategorySelectorScreen: React.FC<CategorySelectorScreenProps> = ({ route, 
       hasSelectedDescendants,
       getSelectedDescendantsCount,
       getCategoryChildren,
-      toggleCategory,
+      multiselect,
+      handleCategoryPress,
     ]
   );
 
@@ -179,36 +226,38 @@ const CategorySelectorScreen: React.FC<CategorySelectorScreenProps> = ({ route, 
         </ScrollView>
       )}
 
-      {/* Footer */}
-      <View style={styles.footer}>
-        {multiselect && selectedCount > 0 && (
-          <Text style={styles.footerText}>
-            {selectedCount}{' '}
-            {selectedCount === 1
-              ? t('common.selected', { defaultValue: 'selected' })
-              : t('common.selectedPlural', { defaultValue: 'selected' })}
-          </Text>
-        )}
-        <TouchableOpacity
-          style={[
-            styles.doneButton,
-            selectedCount > 0 && styles.doneButtonActive,
-            selectedCount === 0 && styles.doneButtonDisabled,
-          ]}
-          onPress={handleDone}
-          activeOpacity={0.8}
-          disabled={selectedCount === 0 && !multiselect}
-        >
-          <Text
+      {/* Footer - Only show in multiselect mode or when updating profile */}
+      {(multiselect || updateProfile) && (
+        <View style={styles.footer}>
+          {multiselect && selectedCount > 0 && (
+            <Text style={styles.footerText}>
+              {selectedCount}{' '}
+              {selectedCount === 1
+                ? t('common.selected', { defaultValue: 'selected' })
+                : t('common.selectedPlural', { defaultValue: 'selected' })}
+            </Text>
+          )}
+          <TouchableOpacity
             style={[
-              styles.doneButtonText,
-              selectedCount === 0 && styles.doneButtonTextDisabled,
+              styles.doneButton,
+              selectedCount > 0 && styles.doneButtonActive,
+              selectedCount === 0 && styles.doneButtonDisabled,
             ]}
+            onPress={handleDone}
+            activeOpacity={0.8}
+            disabled={selectedCount === 0 && !multiselect}
           >
-            {t('common.done', { defaultValue: 'Done' })}
-          </Text>
-        </TouchableOpacity>
-      </View>
+            <Text
+              style={[
+                styles.doneButtonText,
+                selectedCount === 0 && styles.doneButtonTextDisabled,
+              ]}
+            >
+              {t('common.done', { defaultValue: 'Done' })}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 };
@@ -324,6 +373,11 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 6,
     backgroundColor: '#2563eb',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  selectionIndicator: {
+    marginLeft: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },

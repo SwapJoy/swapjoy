@@ -64,12 +64,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const { data: { subscription } } = AuthService.onAuthStateChange(async (user, session) => {
       console.log('[AuthState] onAuthStateChange user:', !!user, 'session:', !!session);
       
-      // If we have a stored session but Supabase reports no session, ignore it
-      // This prevents Supabase from clearing our stored session on startup
+      // Check if we actually have a stored session before ignoring the sign-out event
+      // This allows session expiration to work properly
       if (!user && !session && hasStoredSessionRef.current) {
-        console.log('[AuthState] Ignoring sign-out event - we have a stored session');
-        // Don't update state - keep the stored session
-        return;
+        // Verify that we actually still have a stored session
+        // If not, this is a legitimate sign-out (e.g., session expired)
+        try {
+          const currentSession = await AuthService.getCurrentSession();
+          if (currentSession) {
+            console.log('[AuthState] Ignoring sign-out event - we have a stored session');
+            // Don't update state - keep the stored session
+            return;
+          } else {
+            console.log('[AuthState] No stored session found - accepting sign-out event (session expired)');
+            // Clear the flag since we don't actually have a session
+            hasStoredSessionRef.current = false;
+          }
+        } catch (error) {
+          console.warn('[AuthState] Error checking stored session, accepting sign-out:', error);
+          hasStoredSessionRef.current = false;
+        }
       }
       
       setUser(user);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,675 +6,72 @@ import {
   TextInput,
   TouchableOpacity,
   ScrollView,
-  Alert,
   Platform,
   ActivityIndicator,
   Image,
   Modal,
-  Dimensions,
   KeyboardAvoidingView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { ItemDetailsFormScreenProps } from '../types/navigation';
-import { DraftManager } from '../services/draftManager';
-import { ImageUploadService } from '../services/imageUpload';
-import { ImageAnalysisService } from '../services/imageAnalysis';
-import { ApiService } from '../services/api';
-import { UserService } from '../services/userService';
-import { ItemDraft, ItemCondition, Category } from '../types/item';
 import { getCurrencySymbol } from '../utils';
-import { useLocalization } from '../localization';
 import LocationSelector from '../components/LocationSelector';
-import type { LocationSelection } from '../types/location';
-import { Switch } from 'react-native';
-import { useCategories } from '../hooks/useCategories';
-
-const { width } = Dimensions.get('window');
-
-type NearestCityData = {
-  name?: string | null;
-  country?: string | null;
-};
-
-const CONDITION_DEFS: { value: ItemCondition; icon: string }[] = [
-  { value: 'new', icon: 'sparkles' },
-  { value: 'like_new', icon: 'star' },
-  { value: 'good', icon: 'thumbs-up' },
-  { value: 'fair', icon: 'hand-left' },
-  { value: 'poor', icon: 'hand-right' },
-];
-
-const CURRENCY_DEFS: { code: string; symbol: string }[] = [
-  { code: 'USD', symbol: '$' },
-  { code: 'EUR', symbol: '€' },
-  { code: 'GEL', symbol: '₾' },
-];
+import SWInputField from '../components/SWInputField';
+import SWCategorySelector from '../components/SWCategorySelector';
+import { useItemDetails } from '../hooks/useItemDetails';
 
 const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
   navigation,
   route,
 }) => {
-  const { draftId, imageUris } = route.params;
-  const { language, t } = useLocalization();
-  const strings = useMemo(() => ({
-    headerTitle: t('addItem.details.title'),
-    saving: t('addItem.details.saving'),
-    uploading: t('addItem.details.uploading'),
-    loading: t('addItem.details.loading'),
-    labels: {
-      title: t('addItem.details.labels.title'),
-      description: t('addItem.details.labels.description'),
-      category: t('addItem.details.labels.category'),
-      condition: t('addItem.details.labels.condition'),
-      currency: t('addItem.details.labels.currency'),
-      price: t('addItem.details.labels.price'),
-      location: t('addItem.details.labels.location', { defaultValue: 'Location' }),
-    },
-    placeholders: {
-      title: t('addItem.details.placeholders.title'),
-      description: t('addItem.details.placeholders.description'),
-      category: t('addItem.details.placeholders.category'),
-      condition: t('addItem.details.placeholders.condition'),
-      currency: t('addItem.details.placeholders.currency'),
-      value: t('addItem.details.placeholders.value'),
-      location: t('addItem.details.placeholders.location', { defaultValue: 'Select location' }),
-    },
-    buttons: {
-      next: t('addItem.details.buttons.next'),
-    },
-    modals: {
-      selectCategory: t('addItem.details.modals.selectCategory'),
-      selectCondition: t('addItem.details.modals.selectCondition'),
-      selectCurrency: t('addItem.details.modals.selectCurrency'),
-    },
-    alerts: {
-      missingInfoTitle: t('addItem.alerts.missingInfoTitle'),
-      missingTitle: t('addItem.alerts.missingTitle'),
-      missingDescription: t('addItem.alerts.missingDescription'),
-      missingCategory: t('addItem.alerts.missingCategory'),
-      missingCondition: t('addItem.alerts.missingCondition'),
-      missingPrice: t('addItem.alerts.missingPrice'),
-      uploadingImagesTitle: t('addItem.alerts.uploadingImagesTitle'),
-      uploadingImagesMessage: t('addItem.alerts.uploadingImagesMessage'),
-      missingLocation: t('addItem.alerts.missingLocation', { defaultValue: 'Please choose a location for your item.' }),
-    },
-    location: {
-      resolving: t('addItem.details.locationResolving', { defaultValue: 'Resolving nearest city…' }),
-    },
-  }), [t]);
-  const uploadingText = useCallback(
-    (progress: number) => strings.uploading.replace('{progress}', String(progress)),
-    [strings.uploading]
-  );
-  const conditionOptions = useMemo(
-    () =>
-      CONDITION_DEFS.map((def) => ({
-        ...def,
-        label: t(`addItem.conditions.${def.value}` as const),
-      })),
-    [t]
-  );
-  const currencyOptions = useMemo(
-    () =>
-      CURRENCY_DEFS.map((curr) => ({
-        ...curr,
-        label: t(`addItem.currencies.${curr.code}` as const),
-      })),
-    [t]
-  );
-  
-  const [draft, setDraft] = useState<ItemDraft | null>(null);
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [category, setCategory] = useState<string | null>(null);
-  const [condition, setCondition] = useState<ItemCondition | null>(null);
-  const [price, setPrice] = useState('');
-  const [currency, setCurrency] = useState<string>('USD');
-  const [showLocationSelector, setShowLocationSelector] = useState(false);
-  const [locationLabel, setLocationLabel] = useState<string | null>(null);
-  const [locationCoords, setLocationCoords] = useState<{ lat: number | null; lng: number | null }>({
-    lat: null,
-    lng: null,
-  });
-  const [resolvingLocation, setResolvingLocation] = useState(false);
-  
-  // Use categories hook for centralized category management
-  const { categories, loading: loadingCategories } = useCategories();
-  const [showCategoryPicker, setShowCategoryPicker] = useState(false);
-  const [showConditionPicker, setShowConditionPicker] = useState(false);
-  const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
-  
-  const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
-  
-  const [isSaving, setIsSaving] = useState(false);
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
-  // AI Analysis state
-  const [aiEnabled, setAiEnabled] = useState(false);
-  const [analyzing, setAnalyzing] = useState(false);
-  const [originalValues, setOriginalValues] = useState<{
-    title: string;
-    description: string;
-    category_id: string | null;
-    condition: ItemCondition | null;
-  } | null>(null);
+  const { imageUris } = route.params;
 
-  const loadDraftAndCategories = useCallback(async () => {
-    try {
-      // Categories are now loaded via useCategories hook, no need to manage loading state here
-      
-      // Load user profile to get preferred currency FIRST
-      let userPreferredCurrency = 'USD';
-      try {
-        const profileResult = await UserService.getProfile();
-        if (profileResult?.data && typeof profileResult.data === 'object') {
-          const profileData = profileResult.data as any;
-          if (typeof profileData.preferred_currency === 'string' && profileData.preferred_currency) {
-            userPreferredCurrency = profileData.preferred_currency;
-            console.log('[ItemDetailsForm] Loaded preferred currency from profile:', userPreferredCurrency);
-          } else {
-            console.log('[ItemDetailsForm] No preferred_currency in profile, using default USD');
-          }
-        } else {
-          console.warn('[ItemDetailsForm] Profile data is not an object:', profileResult);
-        }
-      } catch (error) {
-        console.warn('[ItemDetailsForm] Failed to load user profile for preferred currency:', error);
-      }
-      
-      // Load draft
-      const loadedDraft = await DraftManager.getDraft(draftId);
-      if (loadedDraft) {
-        setDraft(loadedDraft);
-        setTitle(loadedDraft.title || '');
-        setDescription(loadedDraft.description || '');
-        console.log('[ItemDetailsForm] Loading draft - category_id:', loadedDraft.category_id, 'condition:', loadedDraft.condition, 'title:', loadedDraft.title);
-        
-        // Set category - ensure it's a valid string or null
-        const categoryId = loadedDraft.category_id && typeof loadedDraft.category_id === 'string' ? loadedDraft.category_id : null;
-        setCategory(categoryId);
-        if (categoryId) {
-          console.log('[ItemDetailsForm] Category set to:', categoryId);
-        }
-        
-        setCondition(loadedDraft.condition);
-        setPrice(loadedDraft.price || '');
-        // Use draft currency only if it exists, is valid, AND is not the default USD
-        // Otherwise, always use preferred currency to ensure user's preference is respected
-        const draftCurrency = loadedDraft.currency;
-        const hasValidDraftCurrency = draftCurrency && typeof draftCurrency === 'string' && draftCurrency.trim() && draftCurrency !== 'USD';
-        const currencyToUse = hasValidDraftCurrency ? draftCurrency : userPreferredCurrency;
-        
-        console.log('[ItemDetailsForm] Draft currency:', draftCurrency, 'Preferred:', userPreferredCurrency, 'Using:', currencyToUse);
-        
-        setCurrency(currencyToUse);
-        // If we're using preferred currency (either because draft doesn't have one or it's the default USD), save it to the draft
-        if (currencyToUse === userPreferredCurrency && (!draftCurrency || draftCurrency === 'USD' || draftCurrency !== userPreferredCurrency)) {
-          console.log('[ItemDetailsForm] Updating draft with preferred currency:', currencyToUse);
-          await DraftManager.updateDraft(draftId, { currency: currencyToUse });
-        }
-        setLocationCoords({
-          lat: loadedDraft.location_lat,
-          lng: loadedDraft.location_lng,
-        });
-        if (loadedDraft.location_label) {
-          setLocationLabel(loadedDraft.location_label);
-        } else if (loadedDraft.location_lat !== null && loadedDraft.location_lng !== null) {
-          try {
-            setResolvingLocation(true);
-            const { data } = await ApiService.findNearestCity(
-              loadedDraft.location_lat,
-              loadedDraft.location_lng
-            );
-            if (data) {
-              const cityData = data as NearestCityData;
-              const label =
-                [cityData.name, cityData.country].filter(Boolean).join(', ') || null;
-              setLocationLabel(label);
-              if (label) {
-                await DraftManager.updateDraft(draftId, { location_label: label });
-              }
-            } else {
-              setLocationLabel(null);
-            }
-          } catch (error) {
-            console.warn('Error resolving draft location:', error);
-            setLocationLabel(null);
-          } finally {
-            setResolvingLocation(false);
-          }
-        } else {
-          setLocationLabel(null);
-        }
-      }
-      if (!loadedDraft) {
-        setLocationCoords({ lat: null, lng: null });
-        setLocationLabel(null);
-        // If no draft exists, use user's preferred currency
-        setCurrency(userPreferredCurrency);
-        // Also save it to the draft so it persists
-        await DraftManager.updateDraft(draftId, { currency: userPreferredCurrency });
-      }
-
-      // Categories are now loaded via useCategories hook, no need to fetch here
-      // The hook will provide categories automatically
-    } catch (error) {
-      console.error('Error loading data:', error);
-      // Don't block the UI - categories are handled by useCategories hook
-    }
-  }, [draftId, language]);
-
-  const startImageUploads = useCallback(async () => {
-    if (!imageUris || imageUris.length === 0) return;
-
-    setUploading(true);
-    const loadedDraft = await DraftManager.getDraft(draftId);
-    if (!loadedDraft) return;
-
-    const imagesToUpload = loadedDraft.images
-      .filter((img) => !img.uploaded || !img.supabaseUrl)
-      .map((img) => ({
-        uri: img.uri,
-        id: img.id,
-      }));
-
-    if (imagesToUpload.length === 0) {
-      setUploading(false);
-      return;
-    }
-
-    const uploadedImageIds: string[] = [];
-    
-    await ImageUploadService.uploadMultipleImages(
-      imagesToUpload,
-      draftId,
-      // On progress
-      (imageId, progress) => {
-        setUploadProgress((prev) => ({ ...prev, [imageId]: progress }));
-      },
-      // On complete
-      async (imageId, url) => {
-        await DraftManager.updateDraftImage(draftId, imageId, {
-          uploaded: true,
-          supabaseUrl: url,
-          uploadProgress: 100,
-        });
-        uploadedImageIds.push(imageId);
-        // Reload draft to update UI
-        const updatedDraft = await DraftManager.getDraft(draftId);
-        if (updatedDraft) {
-          setDraft(updatedDraft);
-        }
-      },
-      // On error
-      async (imageId, error) => {
-        console.error(`Upload failed for image ${imageId}:`, error);
-        await DraftManager.updateDraftImage(draftId, imageId, {
-          uploaded: false,
-          uploadError: error,
-        });
-        // Reload draft to update UI
-        const updatedDraft = await DraftManager.getDraft(draftId);
-        if (updatedDraft) {
-          setDraft(updatedDraft);
-        }
-      }
-    );
-
-    const latestDraft = await DraftManager.getDraft(draftId);
-    if (latestDraft) {
-      setDraft(latestDraft);
-      
-      // Auto-trigger AI analysis after all images are uploaded
-      const allUploaded = latestDraft.images.filter((img) => img.uploaded && img.supabaseUrl);
-      if (allUploaded.length > 0 && !latestDraft.imageAnalysis) {
-        console.log('[ItemDetailsForm] Auto-triggering AI analysis for', allUploaded.length, 'uploaded images');
-        // Trigger analysis automatically
-        try {
-          const imageUrls = allUploaded.map((img) => img.supabaseUrl!);
-          const analysisResult = await ImageAnalysisService.analyzeImages(imageUrls);
-
-          // Prefill fields with AI suggestions
-          const updates: Partial<ItemDraft> = {};
-
-          if (analysisResult.title) {
-            setTitle(analysisResult.title);
-            updates.title = analysisResult.title
-          }
-
-          if (analysisResult.categoryId) {
-            // Always set the category_id - even if categories list isn't loaded yet, it will be validated later
-            setCategory(analysisResult.categoryId);
-            updates.category_id = analysisResult.categoryId;
-            
-            // Verify category exists in our categories list (for logging)
-            const categoryExists = categories.find(cat => cat.id === analysisResult.categoryId);
-            if (!categoryExists) {
-              console.warn('[ItemDetailsForm] Auto-analysis: Category ID not found in categories list yet (may be timing issue):', analysisResult.categoryId);
-            }
-          }
-
-          setAiEnabled(true);
-        } catch (error) {
-          console.error('[ItemDetailsForm] Auto-analysis failed:', error);
-          // Don't show error to user - they can still use manual toggle
-        }
-      }
-    }
-    setUploading(false);
-  }, [draftId, imageUris]);
-
-  useEffect(() => {
-    loadDraftAndCategories();
-  }, [loadDraftAndCategories]);
-
-  useEffect(() => {
-    startImageUploads();
-  }, [startImageUploads]);
-
-  // Re-validate category when categories are loaded (in case category was set before categories loaded)
-  useEffect(() => {
-    if (category && categories.length > 0) {
-      const categoryExists = categories.find(cat => cat.id === category);
-      if (!categoryExists) {
-        console.warn('[ItemDetailsForm] Category ID not found after categories loaded:', category);
-        console.warn('[ItemDetailsForm] Available category IDs:', categories.slice(0, 5).map(c => c.id));
-      } else {
-        console.log('[ItemDetailsForm] Category validated after categories loaded:', categoryExists.name);
-      }
-    }
-  }, [category, categories]);
-
-  // Auto-save draft with debounce
-  const saveDraft = async (updates: Partial<ItemDraft>) => {
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
-
-    saveTimeoutRef.current = setTimeout(async () => {
-      setIsSaving(true);
-      await DraftManager.updateDraft(draftId, updates);
-      setIsSaving(false);
-    }, 500);
-  };
-
-  const handleTitleChange = (text: string) => {
-    setTitle(text);
-    saveDraft({ title: text });
-  };
-
-  const handleDescriptionChange = (text: string) => {
-    setDescription(text);
-    saveDraft({ description: text });
-  };
-
-  const handleCategorySelect = (categoryId: string) => {
-    setCategory(categoryId);
-    setShowCategoryPicker(false);
-    saveDraft({ category_id: categoryId });
-  };
-
-  const handleConditionSelect = (cond: ItemCondition) => {
-    setCondition(cond);
-    setShowConditionPicker(false);
-    saveDraft({ condition: cond });
-  };
-
-  const handleCurrencySelect = (curr: string) => {
-    setCurrency(curr);
-    setShowCurrencyPicker(false);
-    saveDraft({ currency: curr });
-  };
-
-  const handleValueChange = (text: string) => {
-    // Allow only numbers and decimal point
-    const filtered = text.replace(/[^0-9.]/g, '');
-    setPrice(filtered);
-    saveDraft({ price: filtered });
-  };
-
-  const handleAiToggle = async (enabled: boolean) => {
-    if (!draft) return;
-
-    if (enabled) {
-      // Save original values before AI fills (only if not already saved)
-      if (!originalValues) {
-        setOriginalValues({
+  const {
+    // State
+    images,
           title,
           description,
-          category_id: category,
+    category,
           condition,
-        });
-      }
+    price,
+    currency,
+    showLocationSelector,
+    locationLabel,
+    locationCoords,
+    resolvingLocation,
+    showCategoryPicker,
+    uploading,
+    uploadProgress,
+    analyzing,
+    loadingCategories,
+    categories,
+    // Computed values
+    strings,
+    uploadingText,
+    conditionOptions,
+    currencyOptions,
+    // Handlers
+    setTitle,
+    setDescription,
+    setCategory,
+    setCondition,
+    setCurrency,
+    setPrice,
+    setShowLocationSelector,
+    setShowCategoryPicker,
+    handleLocationSelected,
+    handleRemoveImage,
+    handleNext,
+    handleBack,
+    handleCategorySelected,
+    // Helpers
+    getCategoryName,
+    getConditionLabel,
+    getOverallProgress,
+  } = useItemDetails({ imageUris, navigation, route });
 
-      // Check if images are uploaded
-      const uploadedImages = draft.images.filter((img) => img.uploaded && img.supabaseUrl);
-      if (uploadedImages.length === 0) {
-        Alert.alert('No Images', 'Please wait for images to upload before using AI analysis.');
-        setAiEnabled(false);
-        return;
-      }
-
-      setAnalyzing(true);
-      try {
-        const imageUrls = uploadedImages.map((img) => img.supabaseUrl!);
-        const analysisResult = await ImageAnalysisService.analyzeImages(imageUrls);
-
-        if (analysisResult.error) {
-          Alert.alert('AI Analysis Failed', 'Image violates our content guidelines. Please remove the image and try again.');
-          setAiEnabled(false);
-          return;
-        }
-
-        // Prefill fields with AI suggestions
-        const updates: Partial<ItemDraft> = {};
-
-        if (analysisResult.title) {
-          setTitle(analysisResult.title);
-          updates.title = analysisResult.title
-        }
-
-        if (analysisResult.categoryId) {
-          const categoryId = analysisResult.categoryId
-          
-          // Verify category exists in our categories list
-          const categoryExists = categories.find(cat => cat.id === categoryId);
-          if (categoryExists) {
-            setCategory(categoryId);
-            updates.category_id = categoryId;
-            console.log('[ItemDetailsForm] Category verified and set to:', categoryId);
-          } else {
-            console.warn('[ItemDetailsForm] Category ID not found in categories list:', categoryId);
-            // Still try to set it - might be a timing issue
-            setCategory(categoryId);
-            updates.category_id = categoryId;
-          }
-        } else {
-          console.warn('[ItemDetailsForm] No suggested category in analysis result. Full result:', JSON.stringify(analysisResult.aggregated));
-        }
-
-        setAiEnabled(true);
-      } catch (error) {
-        console.error('AI analysis failed:', error);
-        setAiEnabled(false);
-      } finally {
-        setAnalyzing(false);
-      }
-    } else {
-      
-      setAiEnabled(false);
-    }
-  };
-
-  const handleLocationSelected = useCallback(
-    async (selection: LocationSelection) => {
-      const labelParts = [selection.cityName, selection.country].filter(Boolean);
-      const fallbackLabel = t('locationSelector.coordinatesFallback', {
-        defaultValue: 'Exact location',
-      });
-      const label = labelParts.length > 0 ? labelParts.join(', ') : fallbackLabel;
-
-      setLocationCoords({ lat: selection.lat, lng: selection.lng });
-      setLocationLabel(label);
-      setDraft((prev) =>
-        prev
-          ? {
-              ...prev,
-              location_lat: selection.lat,
-              location_lng: selection.lng,
-              location_label: label,
-            }
-          : prev
-      );
-      saveDraft({
-        location_lat: selection.lat,
-        location_lng: selection.lng,
-        location_label: label,
-      });
-    },
-    [saveDraft, t]
-  );
-
-  const handleRemoveImage = useCallback(
-    async (imageId: string) => {
-      const currentDraft = draft;
-      const imageToRemove = currentDraft?.images.find((img) => img.id === imageId);
-      if (!imageToRemove) {
-        return;
-      }
-
-      if (imageToRemove.uploaded && imageToRemove.supabaseUrl) {
-        const deleted = await ImageUploadService.deleteImage(imageToRemove.supabaseUrl);
-        if (!deleted) {
-          Alert.alert(
-            t('addItem.alerts.removeImageErrorTitle', { defaultValue: 'Could not remove image' }),
-            t('addItem.alerts.removeImageErrorMessage', {
-              defaultValue: 'We were unable to delete this image from storage. Please try again.',
-            })
-          );
-          return;
-        }
-      }
-
-      try {
-        const updatedDraft = await DraftManager.removeDraftImage(draftId, imageId);
-        if (updatedDraft) {
-          setDraft(updatedDraft);
-          setUploadProgress((prev) => {
-            const { [imageId]: _removed, ...rest } = prev;
-            return rest;
-          });
-        }
-      } catch (error) {
-        console.error('Error removing draft image:', error);
-        Alert.alert(
-          t('addItem.alerts.removeImageErrorTitle', { defaultValue: 'Could not remove image' }),
-          t('addItem.alerts.removeImageErrorMessage', {
-            defaultValue: 'We were unable to remove this image. Please try again.',
-          })
-        );
-      }
-    },
-    [draft, draftId, t]
-  );
-
-  const handleNext = async () => {
-    // Validate form
-    if (!title.trim()) {
-      Alert.alert(strings.alerts.missingInfoTitle, strings.alerts.missingTitle);
-      return;
-    }
-    if (!description.trim()) {
-      Alert.alert(strings.alerts.missingInfoTitle, strings.alerts.missingDescription);
-      return;
-    }
-    if (!category) {
-      Alert.alert(strings.alerts.missingInfoTitle, strings.alerts.missingCategory);
-      return;
-    }
-    if (!condition) {
-      Alert.alert(strings.alerts.missingInfoTitle, strings.alerts.missingCondition);
-      return;
-    }
-    if (!price.trim()) {
-      Alert.alert(strings.alerts.missingInfoTitle, strings.alerts.missingPrice);
-      return;
-    }
-    if (locationCoords.lat === null || locationCoords.lng === null) {
-      Alert.alert(strings.alerts.missingInfoTitle, strings.alerts.missingLocation);
-      return;
-    }
-    const hasImages =
-      draft?.images && draft.images.length > 0;
-    const pendingUploads =
-      draft?.images?.some((img) => !img.uploaded || !img.supabaseUrl) ?? true;
-
-    if (!hasImages || pendingUploads) {
-      Alert.alert(strings.alerts.uploadingImagesTitle, strings.alerts.uploadingImagesMessage);
-      return;
-    }
-
-    // Final save
-    await DraftManager.updateDraft(draftId, {
-      title,
-      description,
-      category_id: category,
-      condition,
-      price: price,
-      currency: currency,
-      location_lat: locationCoords.lat,
-      location_lng: locationCoords.lng,
-      location_label: locationLabel,
-    });
-
-    // Navigate to preview
-    navigation.navigate('ItemPreview', { draftId });
-  };
-
-  const handleBack = async () => {
-    // Save before going back
-    await DraftManager.updateDraft(draftId, {
-      title,
-      description,
-      category_id: category,
-      condition,
-      price: price,
-      currency: currency,
-      location_lat: locationCoords.lat,
-      location_lng: locationCoords.lng,
-      location_label: locationLabel,
-    });
-    navigation.goBack();
-  };
-
-  const getCategoryName = () => {
-    if (!category) {
-      return strings.placeholders.category;
-    }
-    const cat = categories.find((c) => c.id === category);
-    if (cat) {
-      return cat.name;
-    } else {
-      console.warn('[ItemDetailsForm] getCategoryName: Category not found. ID:', category, 'Categories loaded:', categories.length);
-      return strings.placeholders.category;
-    }
-  };
-
-  const getConditionLabel = () => {
-    if (!condition) return strings.placeholders.condition;
-    const cond = conditionOptions.find((c) => c.value === condition);
-    return cond ? cond.label : strings.placeholders.condition;
-  };
-
-  const getOverallProgress = () => {
-    if (!draft || draft.images.length === 0) return 0;
-    const total = Object.values(uploadProgress).reduce((sum, val) => sum + val, 0);
-    return Math.round(total / draft.images.length);
-  };
-
-  if (!draft || loadingCategories) {
+  if (loadingCategories) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
@@ -697,14 +94,6 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
             <Ionicons name="arrow-back" size={24} color="#007AFF" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>{strings.headerTitle}</Text>
-          <View style={styles.savingIndicator}>
-            {isSaving && (
-              <>
-                <ActivityIndicator size="small" color="#007AFF" />
-                <Text style={styles.savingText}>{strings.saving}</Text>
-              </>
-            )}
-          </View>
         </View>
 
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
@@ -732,7 +121,7 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.imagePreviewList}
             >
-              {draft.images.map((img, index) => (
+              {images.map((img, index) => (
                 <View key={img.id} style={styles.imagePreview}>
                   <Image source={{ uri: img.uri }} style={styles.imagePreviewImage} />
                   <TouchableOpacity
@@ -759,162 +148,148 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
             </ScrollView>
           </View>
 
-          {/* AI Analysis Toggle */}
-          {draft.images.some((img) => img.uploaded && img.supabaseUrl) && (
-            <View style={styles.aiToggleContainer}>
-              <View style={styles.aiToggleContent}>
-                <View style={styles.aiToggleTextContainer}>
-                  <Ionicons name="sparkles" size={20} color="#007AFF" style={styles.aiToggleIcon} />
-                  <Text style={styles.aiToggleLabel}>Fill the details with SwapJoy AI</Text>
-                </View>
-                {analyzing ? (
-                  <ActivityIndicator size="small" color="#007AFF" />
-                ) : (
-                  <Switch
-                    value={aiEnabled}
-                    onValueChange={handleAiToggle}
-                    trackColor={{ false: '#E5E5E5', true: '#007AFF' }}
-                    thumbColor="#fff"
-                  />
-                )}
-              </View>
-            </View>
-          )}
-
           {/* Form Fields */}
           <View style={styles.formContainer}>
             {/* Title */}
-            <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>
-                {strings.labels.title} <Text style={styles.required}>*</Text>
-              </Text>
-              <TextInput
-                style={styles.textInput}
-                placeholder={strings.placeholders.title}
+            <SWInputField
+              placeholder="Title: i.e. iPhone 16 Pro max black"
                 value={title}
-                onChangeText={handleTitleChange}
+              onChangeText={setTitle}
                 maxLength={100}
-              />
-              <Text style={styles.charCount}>{title.length}/100</Text>
-            </View>
-
-            {/* Description */}
-            <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>
-                {strings.labels.description} <Text style={styles.required}>*</Text>
-              </Text>
-              <TextInput
-                style={[styles.textInput, styles.textArea]}
-                placeholder={strings.placeholders.description}
-                value={description}
-                onChangeText={handleDescriptionChange}
-                multiline
-                numberOfLines={6}
-                maxLength={1000}
-                textAlignVertical="top"
-              />
-              <Text style={styles.charCount}>{description.length}/1000</Text>
-            </View>
+              disabled={analyzing}
+              showLoading={analyzing}
+              required
+            />
 
             {/* Category */}
-            <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>
-                {strings.labels.category} <Text style={styles.required}>*</Text>
-              </Text>
-              <TouchableOpacity
-                style={styles.pickerButton}
-                onPress={() => setShowCategoryPicker(true)}
-              >
-                <Text style={[styles.pickerButtonText, !category && styles.placeholder]}>
-                  {getCategoryName()}
-                </Text>
-                <Ionicons name="chevron-down" size={20} color="#666" />
-              </TouchableOpacity>
-            </View>
+            <SWCategorySelector
+              placeholder="Category"
+              value={category}
+              displayValue={getCategoryName()}
+              onPress={() => {
+                if (!analyzing) {
+                  navigation.navigate('CategorySelector', {
+                    multiselect: false,
+                    selectedCategories: category ? [category] : [],
+                    updateProfile: false,
+                    onCategorySelected: handleCategorySelected,
+                  });
+                }
+              }}
+              disabled={analyzing}
+              showLoading={analyzing}
+              required
+            />
+
+            {/* Description */}
+            <SWInputField
+              placeholder="Description: Describe your item in detail"
+                value={description}
+              onChangeText={setDescription}
+                maxLength={1000}
+              multiline
+              required
+            />
 
             {/* Condition */}
-            <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>
+            <View style={styles.fieldContainerWithLabel}>
+              {strings.labels.condition && (
+                <View style={styles.floatingLabelContainer}>
+                  <Text style={styles.floatingLabelText}>
                 {strings.labels.condition} <Text style={styles.required}>*</Text>
               </Text>
-              <TouchableOpacity
-                style={styles.pickerButton}
-                onPress={() => setShowConditionPicker(true)}
-              >
-                <Text style={[styles.pickerButtonText, !condition && styles.placeholder]}>
-                  {getConditionLabel()}
-                </Text>
-                <Ionicons name="chevron-down" size={20} color="#666" />
-              </TouchableOpacity>
             </View>
-
-            {/* Currency */}
-            <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>
-                {strings.labels.currency} <Text style={styles.required}>*</Text>
-              </Text>
+              )}
+              <View style={styles.inlineSelectionContainer}>
+                {conditionOptions.map((cond) => (
               <TouchableOpacity
-                style={styles.pickerButton}
-                onPress={() => setShowCurrencyPicker(true)}
-              >
-                <Text style={styles.pickerButtonText}>
-                  {currencyOptions.find(c => c.code === currency)?.label || strings.placeholders.currency}
+                    key={cond.value}
+                    style={[
+                      styles.inlineSelectionButton,
+                      condition === cond.value && styles.inlineSelectionButtonSelected,
+                    ]}
+                    onPress={() => setCondition(cond.value)}
+                  >
+                    <Ionicons
+                      name={cond.icon as any}
+                      size={16}
+                      color={condition === cond.value ? '#fff' : '#666'}
+                      style={styles.inlineSelectionIcon}
+                    />
+                    <Text
+                      style={[
+                        styles.inlineSelectionText,
+                        condition === cond.value && styles.inlineSelectionTextSelected,
+                      ]}
+                    >
+                      {cond.label}
                 </Text>
-                <Ionicons name="chevron-down" size={20} color="#666" />
               </TouchableOpacity>
+                ))}
+              </View>
+              <View style={styles.bottomBorderInline} />
             </View>
 
             {/* Price */}
-            <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>
-                {strings.labels.price} <Text style={styles.required}>*</Text>
-              </Text>
-              <View style={styles.valueInputContainer}>
-                <Text style={styles.currencySymbol}>{getCurrencySymbol(currency)}</Text>
-                <TextInput
-                  style={[styles.textInput, styles.valueInput]}
-                  placeholder={strings.placeholders.value}
+            <SWInputField
+              placeholder="Price"
                   value={price}
-                  onChangeText={handleValueChange}
+              onChangeText={setPrice}
                   keyboardType="decimal-pad"
-                />
-              </View>
-            </View>
+              required
+              rightButton={
+              <TouchableOpacity
+                  style={styles.currencySwitcher}
+                  onPress={() => {
+                    const currencyOrder = ['GEL', 'USD', 'EUR'];
+                    const currentIndex = currencyOrder.indexOf(currency);
+                    const nextIndex = (currentIndex + 1) % currencyOrder.length;
+                    setCurrency(currencyOrder[nextIndex]);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.currencySwitcherText}>
+                    {currency === 'GEL' ? '🇬🇪' : currency === 'USD' ? '🇺🇸' : '🇪🇺'} {getCurrencySymbol(currency)}
+                </Text>
+              </TouchableOpacity>
+              }
+            />
 
             {/* Location */}
-            <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>
-                {strings.labels.location} <Text style={styles.required}>*</Text>
-              </Text>
-              <TouchableOpacity
-                style={styles.pickerButton}
-                onPress={() => setShowLocationSelector(true)}
-              >
-                <Text style={[styles.pickerButtonText, !locationLabel && styles.placeholder]}>
-                  {locationLabel || strings.placeholders.location}
-                </Text>
-                <Ionicons name="chevron-down" size={20} color="#666" />
-              </TouchableOpacity>
-              {resolvingLocation ? (
+            <SWCategorySelector
+              placeholder={strings.labels.location}
+              value={locationLabel}
+              displayValue={locationLabel || undefined}
+              onPress={() => setShowLocationSelector(true)}
+              required
+            />
+            {resolvingLocation ?? (
                 <Text style={styles.locationStatus}>{strings.location.resolving}</Text>
-              ) : locationCoords.lat !== null && locationCoords.lng !== null ? (
-                <Text style={styles.locationCoordinates}>
-                  {locationCoords.lat.toFixed(4)}, {locationCoords.lng.toFixed(4)}
-                </Text>
-              ) : null}
-            </View>
+            )}
           </View>
         </ScrollView>
 
         {/* Next Button */}
         <View style={styles.footer}>
           <TouchableOpacity
-            style={[styles.nextButton, uploading && styles.nextButtonDisabled]}
+            style={[
+              styles.nextButton,
+              (uploading || images.length === 0) && styles.nextButtonDisabled
+            ]}
             onPress={handleNext}
-            disabled={uploading}
+            disabled={uploading || images.length === 0}
           >
-            <Text style={styles.nextButtonText}>{strings.buttons.next}</Text>
-            <Ionicons name="arrow-forward" size={20} color="#fff" />
+            <Text style={[
+              styles.nextButtonText,
+              (uploading || images.length === 0) && styles.nextButtonTextDisabled
+            ]}>
+              {strings.buttons.next}
+            </Text>
+            <Ionicons 
+              name="arrow-forward" 
+              size={20} 
+              color={(uploading || images.length === 0) ? '#999' : '#fff'} 
+            />
           </TouchableOpacity>
         </View>
 
@@ -948,7 +323,7 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
                       styles.modalItem,
                       category === cat.id && styles.modalItemSelected,
                     ]}
-                    onPress={() => handleCategorySelect(cat.id)}
+                    onPress={() => setCategory(cat.id)}
                   >
                     <Text style={styles.modalItemText}>{cat.name}</Text>
                     {category === cat.id && (
@@ -961,83 +336,6 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
           </View>
         </Modal>
 
-        {/* Condition Picker Modal */}
-        <Modal
-          visible={showConditionPicker}
-          transparent
-          animationType="slide"
-          onRequestClose={() => setShowConditionPicker(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>{strings.modals.selectCondition}</Text>
-                <TouchableOpacity onPress={() => setShowConditionPicker(false)}>
-                  <Ionicons name="close" size={24} color="#666" />
-                </TouchableOpacity>
-              </View>
-              <ScrollView>
-                {conditionOptions.map((cond) => (
-                  <TouchableOpacity
-                    key={cond.value}
-                    style={[
-                      styles.modalItem,
-                      condition === cond.value && styles.modalItemSelected,
-                    ]}
-                    onPress={() => handleConditionSelect(cond.value)}
-                  >
-                    <View style={styles.conditionItem}>
-                      <Ionicons name={cond.icon as any} size={20} color="#666" />
-                      <Text style={styles.modalItemText}>{cond.label}</Text>
-                    </View>
-                    {condition === cond.value && (
-                      <Ionicons name="checkmark" size={24} color="#007AFF" />
-                    )}
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-          </View>
-        </Modal>
-
-        {/* Currency Picker Modal */}
-        <Modal
-          visible={showCurrencyPicker}
-          transparent
-          animationType="slide"
-          onRequestClose={() => setShowCurrencyPicker(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>{strings.modals.selectCurrency}</Text>
-                <TouchableOpacity onPress={() => setShowCurrencyPicker(false)}>
-                  <Ionicons name="close" size={24} color="#666" />
-                </TouchableOpacity>
-              </View>
-              <ScrollView>
-                {currencyOptions.map((curr) => (
-                  <TouchableOpacity
-                    key={curr.code}
-                    style={[
-                      styles.modalItem,
-                      currency === curr.code && styles.modalItemSelected,
-                    ]}
-                    onPress={() => handleCurrencySelect(curr.code)}
-                  >
-                    <View style={styles.conditionItem}>
-                      <Text style={styles.modalItemText}>{curr.symbol}</Text>
-                      <Text style={styles.modalItemText}>{curr.label}</Text>
-                    </View>
-                    {currency === curr.code && (
-                      <Ionicons name="checkmark" size={24} color="#007AFF" />
-                    )}
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-          </View>
-        </Modal>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -1163,32 +461,6 @@ const styles = StyleSheet.create({
     bottom: 4,
     right: 4,
   },
-  aiToggleContainer: {
-    backgroundColor: '#fff',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginBottom: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-  },
-  aiToggleContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  aiToggleTextContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  aiToggleIcon: {
-    marginRight: 8,
-  },
-  aiToggleLabel: {
-    fontSize: 16,
-    color: '#1a1a1a',
-    fontWeight: '500',
-  },
   formContainer: {
     backgroundColor: '#fff',
     padding: 16,
@@ -1196,11 +468,19 @@ const styles = StyleSheet.create({
   fieldContainer: {
     marginBottom: 24,
   },
+  fieldLabelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
   fieldLabel: {
     fontSize: 16,
     fontWeight: '600',
     color: '#1a1a1a',
-    marginBottom: 8,
+  },
+  fieldLoadingIndicator: {
+    marginLeft: 8,
   },
   required: {
     color: '#FF3B30',
@@ -1213,6 +493,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#1a1a1a',
     backgroundColor: '#fff',
+  },
+  textInputDisabled: {
+    backgroundColor: '#f5f5f5',
+    opacity: 0.6,
   },
   textArea: {
     height: 120,
@@ -1233,6 +517,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     backgroundColor: '#fff',
+  },
+  pickerButtonDisabled: {
+    backgroundColor: '#f5f5f5',
+    opacity: 0.6,
   },
   pickerButtonText: {
     fontSize: 16,
@@ -1287,6 +575,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#fff',
   },
+  nextButtonTextDisabled: {
+    color: '#999',
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -1330,6 +621,80 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+  },
+  inlineSelectionContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 0,
+    paddingTop: 8,
+  },
+  inlineSelectionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#d1d1d6',
+    backgroundColor: '#fff',
+  },
+  inlineSelectionButtonSelected: {
+    backgroundColor: '#007AFF',
+    borderColor: '#007AFF',
+  },
+  inlineSelectionIcon: {
+    marginRight: 6,
+  },
+  inlineSelectionText: {
+    fontSize: 14,
+    color: '#1a1a1a',
+    fontWeight: '500',
+  },
+  inlineSelectionTextSelected: {
+    color: '#fff',
+  },
+  fieldContainerWithLabel: {
+    marginBottom: 24,
+    position: 'relative',
+    paddingTop: 20,
+    paddingBottom: 8,
+  },
+  floatingLabelContainer: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    zIndex: 1,
+  },
+  floatingLabelText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#8e8e93',
+  },
+  bottomBorderInline: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: '#d1d1d6',
+  },
+  currencySwitcher: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#d1d1d6',
+    flexDirection: 'row',
+    gap: 4,
+  },
+  currencySwitcherText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1a1a1a',
   },
 });
 

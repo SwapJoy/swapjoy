@@ -238,9 +238,22 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
             <Stack.Screen 
               name="ItemDetailsForm" 
               component={ItemDetailsFormScreen}
-              options={{ 
+              options={({ route }) => {
+                const params = route.params as any;
+                // Disable animation when navigating back from CategorySelector
+                const shouldDisableAnimation = params?.selectedCategoryId !== undefined;
+                return {
                 title: 'Item Details',
                 headerShown: false,
+                  ...(shouldDisableAnimation ? {
+                    animationEnabled: false,
+                    animation: 'none' as const,
+                    transitionSpec: {
+                      open: { animation: 'timing', config: { duration: 0 } },
+                      close: { animation: 'timing', config: { duration: 0 } },
+                    },
+                  } : {}),
+                };
               }}
             />
             <Stack.Screen 
@@ -298,7 +311,24 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
             <Stack.Screen
               name="CategorySelector"
               component={CategorySelectorScreen}
-              options={{ title: 'Select Categories', headerBackTitleVisible: false }}
+              options={({ route }) => {
+                const params = route.params as any;
+                // Disable animation when opened from ItemDetailsForm (multiselect=false, updateProfile=false)
+                const shouldDisableAnimation = params?.multiselect === false && params?.updateProfile === false;
+                return {
+                  title: 'Select Categories',
+                  headerBackTitleVisible: false,
+                  headerShown: true,
+                  ...(shouldDisableAnimation ? {
+                    animationEnabled: false,
+                    animation: 'none' as const,
+                    transitionSpec: {
+                      open: { animation: 'timing', config: { duration: 0 } },
+                      close: { animation: 'timing', config: { duration: 0 } },
+                    },
+                  } : {}),
+                };
+              }}
             />
             <Stack.Screen
               name="ProfileEdit"

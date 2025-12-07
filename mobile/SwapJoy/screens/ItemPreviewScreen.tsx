@@ -13,10 +13,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { ItemPreviewScreenProps } from '../types/navigation';
-import { DraftManager } from '../services/draftManager';
 import { ApiService } from '../services/api';
-import { ImageAnalysisService } from '../services/imageAnalysis';
-import { ItemDraft, Category, ItemCondition } from '../types/item';
+import { Category, ItemCondition } from '../types/item';
 import { formatCurrency } from '../utils';
 import { useLocalization } from '../localization';
 
@@ -26,7 +24,7 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
   navigation,
   route,
 }) => {
-  const { draftId } = route.params;
+  const { itemData } = route.params;
   const { language, t } = useLocalization();
   const strings = useMemo(() => ({
     loading: t('addItem.preview.loading'),
@@ -65,52 +63,30 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
     [t]
   );
 
-  const [draft, setDraft] = useState<ItemDraft | null>(null);
   const [category, setCategory] = useState<Category | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
-  const loadDraft = useCallback(async () => {
-    try {
-      const loadedDraft = await DraftManager.getDraft(draftId);
-      if (!loadedDraft) {
-        Alert.alert(strings.alerts.draftNotFoundTitle, strings.alerts.draftNotFoundMessage);
-        navigation.goBack();
-        return;
-      }
-
-      setDraft(loadedDraft);
-
-      // Load category details
-      if (loadedDraft.category_id) {
+  useEffect(() => {
+    const loadCategory = async () => {
+      if (itemData.category_id) {
+        try {
         const { data: categories } = await ApiService.getCategories(language);
         if (categories) {
-          const cat = categories.find((c) => c.id === loadedDraft.category_id);
+            const cat = categories.find((c) => c.id === itemData.category_id);
           setCategory(cat || null);
+          }
+        } catch (error) {
+          console.error('Error loading category:', error);
         }
       }
-    } catch (error) {
-      console.error('Error loading draft:', error);
-      Alert.alert(strings.alerts.draftNotFoundTitle, strings.alerts.loadFailed);
-    } finally {
       setLoading(false);
-    }
-  }, [draftId, language, navigation, strings.alerts.draftNotFoundTitle, strings.alerts.draftNotFoundMessage, strings.alerts.loadFailed]);
-
-  useEffect(() => {
-    loadDraft();
-  }, [loadDraft]);
+    };
+    loadCategory();
+  }, [itemData.category_id, language]);
 
   const handleSubmit = async () => {
-    if (!draft) return;
-
-    // Final validation
-    if (!DraftManager.isDraftComplete(draft)) {
-      Alert.alert(strings.alerts.incompleteTitle, strings.alerts.incompleteMessage);
-      return;
-    }
-
     Alert.alert(
       strings.alerts.submitTitle,
       strings.alerts.submitMessage,
@@ -129,22 +105,42 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
   };
 
   const submitItem = async () => {
-    if (!draft) return;
-
     setSubmitting(true);
 
     try {
       // Create item
       const { data: item, error: itemError } = await ApiService.createItem({
-        title: draft.title,
-        description: draft.description,
-        category_id: draft.category_id,
-        condition: draft.condition!,
-        price: parseFloat(draft.price),
-        currency: draft.currency,
-        location_lat: draft.location_lat,
-        location_lng: draft.location_lng,
+        title: itemData.title,
+        description: itemData.description,
+        category_id: itemData.category_id,
+        condition: itemData.condition,
+        price: itemData.price,
+        currency: itemData.currency,
+        location_lat: itemData.location_lat ?? undefined,
+        location_lng: itemData.location_lng ?? undefined,
       });
+
+      if (itemError || !item) {
+        throw new Error(itemError?.message || 'Failed to create item');
+      }
+
+      const itemId = (item as any).id;
+
+      // Upload images
+      if (itemData.images && itemData.images.length > 0) {
+        const imageData = itemData.images.map((img, index) => ({
+          item_id: itemId,
+          image_url: img.supabaseUrl,
+          sort_order: index,
+          is_primary: index === 0,
+        }));
+
+        const { error: imagesError } = await ApiService.createItemImages(imageData);
+        if (imagesError) {
+          console.error('Error creating item images:', imagesError);
+          // Don't fail the whole operation, but log the error
+        }
+      }
 
       // Show success and navigate
       Alert.alert(
@@ -159,7 +155,7 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
                 index: 1,
                 routes: [
                   { name: 'MainTabs' },
-                  { name: 'ItemDetails', params: { itemId: item.id } },
+                  { name: 'ItemDetails', params: { itemId } },
                 ],
               });
             },
@@ -178,7 +174,7 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
     navigation.goBack();
   };
 
-  if (loading || !draft) {
+  if (loading || !itemData) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
@@ -212,17 +208,17 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
               setCurrentImageIndex(index);
             }}
           >
-            {draft.images.map((img, index) => (
+            {itemData.images.map((img, index) => (
               <Image
                 key={img.id}
-                source={{ uri: img.uri }}
+                source={{ uri: img.supabaseUrl }}
                 style={styles.carouselImage}
               />
             ))}
           </ScrollView>
-          {draft.images.length > 1 && (
+          {itemData.images.length > 1 && (
             <View style={styles.imageIndicatorContainer}>
-              {draft.images.map((_, index) => (
+              {itemData.images.map((_, index) => (
                 <View
                   key={index}
                   style={[
@@ -239,9 +235,9 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
         <View style={styles.detailsContainer}>
           {/* Title and Price */}
           <View style={styles.titleSection}>
-            <Text style={styles.title}>{draft.title}</Text>
+            <Text style={styles.title}>{itemData.title}</Text>
             <Text style={styles.price}>
-              {formatCurrency(parseFloat(draft.price), draft.currency)}
+              {formatCurrency(itemData.price, itemData.currency)}
             </Text>
           </View>
 
@@ -253,11 +249,11 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
                 <Text style={styles.tagText}>{category.name}</Text>
               </View>
             )}
-            {draft.condition && (
+            {itemData.condition && (
               <View style={styles.tag}>
                 <Ionicons name="checkmark-circle" size={14} color="#34C759" />
                 <Text style={styles.tagText}>
-                  {getConditionLabel(draft.condition)}
+                  {getConditionLabel(itemData.condition)}
                 </Text>
               </View>
             )}
@@ -269,7 +265,7 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
           {/* Description */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>{strings.descriptionTitle}</Text>
-            <Text style={styles.description}>{draft.description}</Text>
+            <Text style={styles.description}>{itemData.description}</Text>
           </View>
 
           {/* Item Info */}
@@ -281,20 +277,20 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>{strings.info.condition}</Text>
-              <Text style={styles.infoValue}>{getConditionLabel(draft.condition)}</Text>
+              <Text style={styles.infoValue}>{getConditionLabel(itemData.condition)}</Text>
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>{strings.info.price}</Text>
               <Text style={styles.infoValue}>
-                {formatCurrency(parseFloat(draft.price), draft.currency)}
+                {formatCurrency(itemData.price, itemData.currency)}
               </Text>
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>{strings.info.location}</Text>
               <Text style={styles.infoValue}>
-                {draft.location_label ??
-                  (draft.location_lat !== null && draft.location_lng !== null
-                    ? `${draft.location_lat.toFixed(4)}, ${draft.location_lng.toFixed(4)}`
+                {itemData.location_label ??
+                  (itemData.location_lat !== null && itemData.location_lng !== null
+                    ? `${itemData.location_lat.toFixed(4)}, ${itemData.location_lng.toFixed(4)}`
                     : t('common.notAvailable'))}
               </Text>
             </View>

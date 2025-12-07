@@ -23,7 +23,7 @@ export class ImageUploadService {
   static async uploadImage(
     imageUri: string,
     imageId: string,
-    draftId: string,
+    userId: string,
     onProgress?: (progress: number) => void
   ): Promise<{ url: string; error?: string }> {
     try {
@@ -45,7 +45,7 @@ export class ImageUploadService {
       // Determine file extension
       const extension = this.getFileExtension(imageUri);
       const fileName = `${imageId}.${extension}`;
-      const filePath = `${userId}/${draftId}/${fileName}`;
+      const filePath = `${userId}/${fileName}`;
 
       // Convert base64 to ArrayBuffer
       const arrayBuffer = decode(base64);
@@ -91,7 +91,7 @@ export class ImageUploadService {
    */
   static async uploadMultipleImages(
     images: Array<{ uri: string; id: string }>,
-    draftId: string,
+    userId: string,
     onProgress?: (imageId: string, progress: number) => void,
     onComplete?: (imageId: string, url: string) => void,
     onError?: (imageId: string, error: string) => void
@@ -108,7 +108,7 @@ export class ImageUploadService {
         uploadResult = await this.uploadImage(
           image.uri,
           image.id,
-          draftId,
+          userId,
           (progress) => {
             onProgress?.(image.id, progress);
           }

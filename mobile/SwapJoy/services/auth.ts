@@ -715,9 +715,28 @@ export class AuthService {
         return session;
       }
 
-      // If no stored session, ONLY THEN try to get from Supabase (but this will also fail if network is down)
-      // Skip this to avoid network errors on app startup
-      console.log('[AuthService] No stored session found - skipping Supabase getSession to avoid network errors');
+      // If no stored session, check if we have a refresh_token stored separately
+      // This can happen if the session was cleared but refresh_token still exists
+      console.log('[AuthService] No stored session found - checking for refresh token');
+      const refreshToken = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
+      
+      if (refreshToken) {
+        console.log('[AuthService] Found refresh token - attempting to refresh session');
+        // Try to refresh the session using the stored refresh_token
+        const refreshedSession = await this.refreshSessionWithGate(refreshToken);
+        if (refreshedSession) {
+          console.log('[AuthService] Successfully refreshed session using stored refresh token');
+          return refreshedSession;
+        } else {
+          console.warn('[AuthService] Failed to refresh session using stored refresh token - token may be invalid');
+          // Clear the invalid refresh token
+          await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
+        }
+      } else {
+        console.log('[AuthService] No refresh token found either - user needs to sign in');
+      }
+
+      // No session and no valid refresh token - user needs to sign in
       return null;
       
       // REMOVED: supabase.auth.getSession() call - it triggers refresh attempts even with autoRefreshToken: false
@@ -733,6 +752,46 @@ export class AuthService {
   static async getCurrentUser(): Promise<User | null> {
     const session = await this.getCurrentSession();
     return session?.user || null;
+  }
+
+  // Notify that session has expired (called when API detects no valid session)
+  // This will trigger auth state change listeners to update UI
+  static async notifySessionExpired(): Promise<void> {
+    try {
+      console.log('[AuthService] Notifying session expired - clearing session and triggering sign out');
+      // Clear stored session first
+      await this.clearStoredSession();
+      
+      // Reset ApiService auth state
+      const { ApiService } = await import('./api');
+      ApiService.resetAuthState();
+      
+      // CRITICAL: Clear Supabase client session to ensure auth state change fires
+      // First, manually clear the session from the client
+      try {
+        // Clear any cached session in the Supabase client
+        const { data: { session: currentSession } } = await supabase.auth.getSession();
+        if (currentSession) {
+          console.log('[AuthService] Clearing existing Supabase client session');
+        }
+      } catch (e) {
+        // Ignore errors when checking session
+      }
+      
+      // Trigger Supabase sign out to emit SIGNED_OUT event
+      // This will notify AuthContext listeners to update state
+      try {
+        await supabase.auth.signOut();
+        console.log('[AuthService] Supabase signOut completed - SIGNED_OUT event should fire');
+      } catch (signOutError) {
+        // If signOut fails, manually trigger the auth state change
+        console.warn('[AuthService] Error during signOut, manually triggering auth state change:', signOutError);
+        // The auth state change listener should still fire, but if it doesn't,
+        // we rely on the check in AuthContext to detect the cleared session
+      }
+    } catch (error) {
+      console.error('[AuthService] Error notifying session expired:', error);
+    }
   }
 
   // Sign out

@@ -16,14 +16,18 @@ export class ImageAnalysisService {
   /**
    * Analyze images using OpenAI Vision API via Edge Function
    * @param imageUrls Array of Supabase Storage URLs
-   * @param language Language code ('en' or 'ka')
-   * @param itemId Optional item ID for storing results in item_images.meta
+   * @param categories Array of categories with id, title_en, and is_active fields
    */
   static async analyzeImages(
-    imageUrls: string[]    
+    imageUrls: string[],
+    categories: Array<{ id: string; title_en: string; is_active?: boolean }>
   ): Promise<ImageAnalysisResponse> {
     if (!imageUrls || imageUrls.length === 0) {
       throw new Error('At least one image URL is required');
+    }
+
+    if (!categories || !Array.isArray(categories) || categories.length === 0) {
+      throw new Error('Categories array is required');
     }
 
     let attempt = 0;
@@ -35,6 +39,7 @@ export class ImageAnalysisService {
           const { data, error } = await client.functions.invoke('analyze-images', {
             body: {
               imageUrls,
+              categories,
             },
           });
 

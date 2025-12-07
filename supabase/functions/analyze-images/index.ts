@@ -1,18 +1,12 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 serve(async (req) => {
   if (req.method !== 'POST') {
     return new Response('Method Not Allowed', { status: 405 });
   }
 
-  const supabaseClient = createClient(
-    Deno.env.get('SUPABASE_URL') ?? '',
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-  );
-
   try {
-    const { imageUrls, imageIds } = await req.json();
+    const { imageUrls, imageIds, categories } = await req.json();
 
     if (!imageUrls || !Array.isArray(imageUrls) || imageUrls.length === 0) {
       return new Response(
@@ -24,44 +18,35 @@ serve(async (req) => {
       );
     }
 
-    // Fetch categories from database
-    const { data: categories, error: categoriesError } = await supabaseClient
-      .from('categories')
-      .select('id, title_en')
-      .eq('is_active', true)
-
-    if (categoriesError) {
-      console.error('[analyze-images] Error fetching categories:', JSON.stringify(categoriesError));
-      console.error('[analyze-images] Error details:', {
-        message: categoriesError.message,
-        details: categoriesError.details,
-        hint: categoriesError.hint,
-        code: categoriesError.code,
-      });
+    // Validate categories from client
+    if (!categories || !Array.isArray(categories) || categories.length === 0) {
+      console.warn('[analyze-images] Warning: No categories provided by client.');
       return new Response(
-        JSON.stringify({ 
-          error: 'Failed to fetch categories from database',
-          details: categoriesError.message 
-        }),
+        JSON.stringify({ error: 'Categories array is required' }),
         {
           headers: { 'Content-Type': 'application/json' },
-          status: 500,
+          status: 400,
         }
       );
     }
 
-    if (!categories || categories.length === 0) {
-      console.warn('[analyze-images] Warning: No active categories found in database.');
+    // Filter to only active categories and ensure they have required fields
+    const activeCategories = categories.filter((cat: any) => 
+      cat && cat.id && cat.title_en && cat.is_active !== false
+    );
+
+    if (activeCategories.length === 0) {
+      console.warn('[analyze-images] Warning: No active categories found in provided categories.');
       return new Response(
-        JSON.stringify({ error: 'No categories available' }),
+        JSON.stringify({ error: 'No active categories available' }),
         {
           headers: { 'Content-Type': 'application/json' },
-          status: 500,
+          status: 400,
         }
       );
     }
 
-    console.log(`[analyze-images] Loaded ${categories.length} categories from database`);
+    console.log(`[analyze-images] Using ${activeCategories.length} categories from client`);
 
     // Analyze images in parallel for better performance
     const analysisPromises = imageUrls.map(async (imageUrl: string, i: number) => {
@@ -78,6 +63,8 @@ serve(async (req) => {
           },
           body: JSON.stringify({
             model: 'gpt-4o-mini',
+            temperature: 0,
+            max_tokens: 120,
             messages: [
               {
                 role: 'user',
@@ -85,7 +72,7 @@ serve(async (req) => {
                   {
                     type: 'text',
                     text: `You are a product listing extractor. Extract ONLY inherent product information — ignore actions or context from the photo (e.g., ignore charging, being held, background, lighting, reflections).  AVAILABLE CATEGORIES (you MUST select the best matching one):
-${categories.map((cat: any, idx: number) => {
+${activeCategories.map((cat: any, idx: number) => {
   return `${idx + 1}. ${cat.title_en} (ID: ${cat.id})`;
 }).join('\n')}
 
@@ -115,7 +102,6 @@ Rules:
               },
             ],
             response_format: { type: 'json_object' },
-            max_tokens: 200, // Reduced from 500 for faster response
           }),
         });
 

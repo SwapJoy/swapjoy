@@ -1,4 +1,5 @@
 import { User } from './auth';
+import { ItemCondition } from './item';
 import { NavigationProp } from '@react-navigation/native';
 import { RouteProp } from '@react-navigation/native';
 
@@ -24,11 +25,31 @@ export type RootStackParamList = {
   AddItem: undefined;
   Camera: undefined;
   ItemDetailsForm: {
-    draftId: string;
     imageUris: string[];
   };
+  CategorySelector: {
+    multiselect?: boolean;
+    selectedCategories?: string[];
+    updateProfile?: boolean;
+    onCategorySelected?: (categoryId: string) => void;
+  };
   ItemPreview: {
-    draftId: string;
+    itemData: {
+      title: string;
+      description: string;
+      category_id: string | null;
+      condition: ItemCondition;
+      price: number;
+      currency: string;
+      location_lat: number | null;
+      location_lng: number | null;
+      location_label: string | null;
+      images: Array<{
+        id: string;
+        uri: string;
+        supabaseUrl: string;
+      }>;
+    };
   };
   RecentlyListed: undefined;
   ItemDetails: {

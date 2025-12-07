@@ -10,6 +10,7 @@ import AppNavigator from './navigation/AppNavigator';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { FavoritesProvider } from './contexts/FavoritesContext';
 import { NotificationsProvider } from './contexts/NotificationsContext';
+import { CategoriesProvider } from './contexts/CategoriesContext';
 import { PushNotificationService } from './services/pushNotificationService';
 import { NotificationNavigation } from './utils/notificationNavigation';
 import { RootStackParamList } from './types/navigation';
@@ -125,6 +126,7 @@ export default function App() {
   return (
     <LocalizationProvider>
       <AuthProvider>
+        <CategoriesProvider>
         <NotificationsProvider>
           <FavoritesProvider>
             <MatchInventoryProvider>
@@ -132,6 +134,7 @@ export default function App() {
             </MatchInventoryProvider>
           </FavoritesProvider>
         </NotificationsProvider>
+        </CategoriesProvider>
       </AuthProvider>
     </LocalizationProvider>
   );
