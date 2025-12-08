@@ -177,14 +177,14 @@ export class AuthService {
               return finalSession;
             }
 
-            // Still needs refresh - proceed with refresh using final session's refresh token
-            const refreshedSession = await this.refreshSessionWithGate(finalSession.refresh_token);
+            // Still needs refresh - proceed with refresh (token will be read inside)
+            const refreshedSession = await this.refreshSessionWithGate();
             if (refreshedSession) {
               return refreshedSession;
             }
           } else {
-            // No session found, try with original session's refresh token
-            const refreshedSession = await this.refreshSessionWithGate(session.refresh_token);
+            // No session found, try to refresh (will read from REFRESH_TOKEN_KEY if available)
+            const refreshedSession = await this.refreshSessionWithGate();
             if (refreshedSession) {
               return refreshedSession;
             }
@@ -220,17 +220,86 @@ export class AuthService {
   }
 
   // Refresh session with gate mechanism to prevent parallel refreshes
-  private static async refreshSessionWithGate(refreshToken: string): Promise<AuthSession | null> {
+  // CRITICAL: Reads refresh token from storage INSIDE the refresh function
+  // This ensures that if a refresh is already in progress, waiting calls will
+  // read the NEW token after the refresh completes, preventing "refresh_token_already_used" errors
+  private static async refreshSessionWithGate(): Promise<AuthSession | null> {
     // Use the gate to ensure only one refresh happens at a time
     // startRefresh() will either start a new refresh or return the existing refresh promise
     const refreshPromise = this.refreshGate.startRefresh(async () => {
       console.log('[AuthService] Starting token refresh');
+      
+      // CRITICAL: Read refresh token from storage INSIDE the refresh function
+      // If a refresh is already in progress, we'll read the NEW token after it completes
+      const sessionData = await SecureStore.getItemAsync(SESSION_KEY);
+      let refreshToken: string | null = null;
+      
+      if (sessionData) {
+        const session = JSON.parse(sessionData) as AuthSession;
+        refreshToken = session.refresh_token;
+      }
+      
+      // Fallback: Check for refresh token stored separately
+      if (!refreshToken) {
+        refreshToken = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
+      }
+      
+      if (!refreshToken) {
+        console.error('[AuthService] No refresh token found in storage');
+        throw new Error('No refresh token available');
+      }
+      
       const session = await this.refreshSession(refreshToken);
       console.log('[AuthService] Token refresh completed');
+      
+      if (!session) {
+        throw new Error('Token refresh failed');
+      }
     });
 
     // Wait for refresh to complete (whether we started it or waited for existing one)
-    await refreshPromise;
+    try {
+      await refreshPromise;
+    } catch (error: any) {
+      const errorMsg = error?.message || String(error);
+      const errorCode = error?.code || '';
+      const isNetworkError = error?.isNetworkError || 
+                            errorMsg.includes('Network request failed') || 
+                            errorMsg.includes('network') || 
+                            errorMsg.includes('fetch');
+      
+      // Handle "refresh_token_already_used" error - this can happen if token was used
+      // by another refresh that completed between our check and execution
+      if (errorCode === 'refresh_token_already_used' || 
+          errorMsg.includes('refresh_token_already_used') ||
+          errorMsg.includes('Invalid Refresh Token: Already Used')) {
+        console.warn('[AuthService] Refresh token already used - another refresh may have completed');
+        // Try to read the new session - another refresh might have succeeded
+        const sessionData = await SecureStore.getItemAsync(SESSION_KEY);
+        if (sessionData) {
+          const session = JSON.parse(sessionData) as AuthSession;
+          const now = Date.now();
+          const expiresAtMs = session.expires_at ? session.expires_at * 1000 : 0;
+          // If session is valid (not expired), return it
+          if (expiresAtMs > now) {
+            console.log('[AuthService] Found valid session after refresh_token_already_used error');
+            return session;
+          }
+        }
+        // If no valid session found, return null (will trigger sign out)
+        console.warn('[AuthService] No valid session found after refresh_token_already_used error');
+        return null;
+      }
+      
+      // Handle network errors - don't clear session, return null to keep existing session
+      if (isNetworkError) {
+        console.warn('[AuthService] Network error during refresh - keeping existing session');
+        return null;
+      }
+      
+      // Re-throw other errors
+      throw error;
+    }
 
     // After refresh completes, get the refreshed session
     const sessionData = await SecureStore.getItemAsync(SESSION_KEY);
@@ -250,24 +319,36 @@ export class AuthService {
 
       if (error) {
         const errorMsg = error?.message || String(error);
+        const errorCode = error?.code || '';
         const isNetworkError = errorMsg.includes('Network request failed') || errorMsg.includes('network') || errorMsg.includes('fetch');
         console.error('[AuthService] Error refreshing session:', {
           message: errorMsg,
-          code: error?.code,
+          code: errorCode,
           status: error?.status,
           isNetworkError
         });
+        
+        // Create error object with code for proper handling upstream
+        const refreshError: any = new Error(errorMsg);
+        refreshError.code = errorCode;
+        refreshError.status = error?.status;
+        refreshError.isNetworkError = isNetworkError;
+        
         if (isNetworkError) {
           // Don't clear session on network error - keep existing session
           console.warn('[AuthService] Network error during refresh - keeping existing session');
-          return null;
+          throw refreshError; // Throw so caller can handle it
         }
-        return null;
+        
+        // Throw error so it can be caught and handled (especially refresh_token_already_used)
+        throw refreshError;
       }
 
       if (!data.session) {
         console.error('[AuthService] No session in refresh response');
-        return null;
+        const noSessionError: any = new Error('No session in refresh response');
+        noSessionError.code = 'NO_SESSION';
+        throw noSessionError;
       }
 
       const session: AuthSession = {
@@ -284,17 +365,27 @@ export class AuthService {
       return session;
     } catch (error: any) {
       const errorMsg = error?.message || String(error);
+      const errorCode = error?.code || '';
       const isNetworkError = errorMsg.includes('Network request failed') || errorMsg.includes('network') || errorMsg.includes('fetch');
       console.error('[AuthService] Exception refreshing session:', {
         message: errorMsg,
+        code: errorCode,
         isNetworkError,
         stack: error?.stack?.substring(0, 200)
       });
+      
+      // Preserve error code if it exists
+      if (error?.code) {
+        error.code = errorCode;
+      }
+      
       if (isNetworkError) {
         // Don't clear session on network error - keep existing session
         console.warn('[AuthService] Network exception during refresh - keeping existing session');
       }
-      return null;
+      
+      // Re-throw so caller can handle it (especially refresh_token_already_used)
+      throw error;
     }
   }
 
@@ -722,8 +813,8 @@ export class AuthService {
       
       if (refreshToken) {
         console.log('[AuthService] Found refresh token - attempting to refresh session');
-        // Try to refresh the session using the stored refresh_token
-        const refreshedSession = await this.refreshSessionWithGate(refreshToken);
+        // Try to refresh the session (token will be read from REFRESH_TOKEN_KEY inside)
+        const refreshedSession = await this.refreshSessionWithGate();
         if (refreshedSession) {
           console.log('[AuthService] Successfully refreshed session using stored refresh token');
           return refreshedSession;
@@ -797,6 +888,27 @@ export class AuthService {
   // Sign out
   static async signOut(): Promise<{ error: string | null }> {
     try {
+      // Sign out from Google if user was signed in with Google
+      try {
+        // Try to get current user - if it succeeds, user is signed in
+        const currentUser = await GoogleSignin.getCurrentUser();
+        if (currentUser) {
+          console.log('[AuthService] Signing out from Google');
+          await GoogleSignin.signOut();
+          console.log('[AuthService] Google sign-out completed');
+        }
+      } catch (googleError: any) {
+        // If getCurrentUser fails, user might not be signed in, or there's an error
+        // Try to sign out anyway to ensure clean state
+        try {
+          await GoogleSignin.signOut();
+          console.log('[AuthService] Google sign-out completed (attempted cleanup)');
+        } catch (signOutError: any) {
+          // Don't fail sign-out if Google sign-out fails
+          console.warn('[AuthService] Error signing out from Google (non-fatal):', signOutError?.message);
+        }
+      }
+      
       // Clear Supabase client session first
       await supabase.auth.signOut();
       
@@ -1122,7 +1234,18 @@ export class AuthService {
 
       // Sign in with Google
       console.log('[GoogleAuth] Calling GoogleSignin.signIn()');
-      const userInfo = await GoogleSignin.signIn();
+      let userInfo;
+      try {
+        userInfo = await GoogleSignin.signIn();
+      } catch (signInError: any) {
+        // Handle cancellation and other errors early
+        if (signInError.code === 'SIGN_IN_CANCELLED') {
+          console.log('[GoogleAuth] User cancelled sign-in');
+          return { user: null, session: null, error: 'Sign in was cancelled' };
+        }
+        // Re-throw to be handled by outer catch
+        throw signInError;
+      }
       console.log(
         '[GoogleAuth] Google sign-in completed, got userInfo:',
         !!userInfo,
@@ -1192,14 +1315,34 @@ export class AuthService {
       // Exchange Google ID token with Supabase
       const possibleNonce = (userInfo as any)?.data?.nonce || (userInfo as any)?.nonce;
       console.log('[GoogleAuth] Exchanging Google idToken with Supabase, has nonce:', !!possibleNonce);
-      const { data, error } = await supabase.auth.signInWithIdToken({
-        provider: 'google',
-        token: resolvedIdToken!,
-        nonce: possibleNonce,
-      });
+      
+      let data, error;
+      try {
+        const result = await supabase.auth.signInWithIdToken({
+          provider: 'google',
+          token: resolvedIdToken!,
+          nonce: possibleNonce,
+        });
+        data = result.data;
+        error = result.error;
+      } catch (exchangeError: any) {
+        // Check if this is a cancellation error
+        const errorMsg = exchangeError?.message || String(exchangeError);
+        if (errorMsg.includes('cancelled') || errorMsg.includes('cancel') || exchangeError?.code === 'SIGN_IN_CANCELLED') {
+          console.log('[GoogleAuth] User cancelled during Supabase exchange');
+          return { user: null, session: null, error: 'Sign in was cancelled' };
+        }
+        // Re-throw other errors
+        throw exchangeError;
+      }
 
       if (error) {
         console.log('[GoogleAuth] Supabase signInWithIdToken error:', error?.message);
+        // Check if error indicates cancellation
+        const errorMsg = error?.message || String(error);
+        if (errorMsg.includes('cancelled') || errorMsg.includes('cancel')) {
+          return { user: null, session: null, error: 'Sign in was cancelled' };
+        }
         return { user: null, session: null, error: error.message };
       }
 

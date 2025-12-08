@@ -228,30 +228,88 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const signInWithGoogle = async () => {
+    // Track if user was signed in before starting Google sign-in
+    const wasSignedInBefore = !!user;
+    console.log('[AuthContext] Starting Google sign-in, wasSignedInBefore:', wasSignedInBefore);
+    
     try {
       setIsLoading(true);
-      const { user, session, error } = await AuthService.signInWithGoogle();
+      const { user: newUser, session: newSession, error } = await AuthService.signInWithGoogle();
       
       if (error) {
         console.log('[AuthContext] Google sign-in returned error:', error);
+        
+        // If sign-in was cancelled, verify current session state
+        if (error === 'Sign in was cancelled' || error.includes('cancelled')) {
+          console.log('[AuthContext] Sign-in cancelled - verifying current session state');
+          
+          // If user was NOT signed in before, ensure they remain signed out
+          if (!wasSignedInBefore) {
+            console.log('[AuthContext] User was not signed in before, ensuring signed out state after cancellation');
+            setUser(null);
+            setSession(null);
+            // Also clear any session that might have been stored during the cancelled sign-in
+            await AuthService.signOut();
+          } else {
+            // User was already signed in, verify their session is still valid
+            const currentSession = await AuthService.getCurrentSession();
+            if (currentSession) {
+              console.log('[AuthContext] User was already signed in, keeping existing session');
+              setUser(currentSession.user);
+              setSession(currentSession);
+            } else {
+              console.log('[AuthContext] Previous session no longer valid, signing out');
+              setUser(null);
+              setSession(null);
+            }
+          }
+        } else {
+          // For other errors, if user wasn't signed in before, ensure signed out state
+          if (!wasSignedInBefore) {
+            const currentSession = await AuthService.getCurrentSession();
+            if (!currentSession) {
+              setUser(null);
+              setSession(null);
+            }
+          }
+        }
+        
         return { success: false, error };
       }
 
-      if (user && session) {
+      if (newUser && newSession) {
         console.log('[AuthContext] Setting user and session after Google sign-in');
-        setUser(user);
-        setSession(session);
+        setUser(newUser);
+        setSession(newSession);
         console.log('[AuthContext] State set; registering device listeners');
         
         // Register device for push notifications
-        await registerDeviceAndSetupListeners(user.id);
+        await registerDeviceAndSetupListeners(newUser.id);
         console.log('[AuthContext] Device registration done');
         
         return { success: true };
       }
 
+      // If no user/session returned, ensure we're signed out (especially if user wasn't signed in before)
+      console.log('[AuthContext] No user/session returned, ensuring signed out state');
+      if (!wasSignedInBefore) {
+        setUser(null);
+        setSession(null);
+        // Clear any partial session that might have been stored
+        await AuthService.signOut();
+      }
       return { success: false, error: 'Authentication failed' };
     } catch (error: any) {
+      console.error('[AuthContext] Exception during Google sign-in:', error);
+      // On exception, if user wasn't signed in before, ensure signed out state
+      if (!wasSignedInBefore) {
+        const currentSession = await AuthService.getCurrentSession();
+        if (!currentSession) {
+          setUser(null);
+          setSession(null);
+          await AuthService.signOut();
+        }
+      }
       return { success: false, error: error.message || 'Authentication failed' };
     } finally {
       setIsLoading(false);

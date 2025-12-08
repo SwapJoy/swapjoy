@@ -41,7 +41,12 @@ export class ApiService {
     }
     // Start a single-flight auth init
     this.authInitInFlight = (async () => {
+      // CRITICAL: Wait for any in-progress refresh BEFORE getting session
+      // This ensures we get a fresh token and don't trigger duplicate refreshes
+      await refreshGateKeeper.waitIfNeeded();
+      
       // Get stored session from SecureStore
+      // This will automatically refresh if expired, but we've already waited for any in-progress refresh
       let session: any = await AuthService.getCurrentSession();
 
       if (!session?.access_token) {
@@ -53,9 +58,34 @@ export class ApiService {
         throw new Error('No access token available. Please sign in.');
       }
 
+      // CRITICAL: Verify token is NOT expired before setting session
+      // setSession() with expired token triggers automatic refresh in Supabase
+      const now = Date.now();
+      const expiresAtMs = session.expires_at ? session.expires_at * 1000 : 0;
+      const isExpired = !!expiresAtMs && now >= expiresAtMs;
+      
+      if (isExpired) {
+        console.warn('[ApiService] Session expired after getCurrentSession() - refreshing again');
+        // Wait for any refresh that might have been triggered
+        await refreshGateKeeper.waitIfNeeded();
+        // Get fresh session
+        session = await AuthService.getCurrentSession();
+        
+        if (!session?.access_token) {
+          throw new Error('Session expired and refresh failed');
+        }
+        
+        // Double-check it's not expired
+        const newExpiresAtMs = session.expires_at ? session.expires_at * 1000 : 0;
+        if (newExpiresAtMs && now >= newExpiresAtMs) {
+          throw new Error('Session still expired after refresh');
+        }
+      }
+
       // CRITICAL: Set session on Supabase client so RLS policies work
       // RLS uses auth.uid() which comes from the Supabase client's session
       // Without this, auth.uid() returns null and RLS blocks all queries
+      // We've ensured the token is NOT expired to prevent automatic refresh
       try {
         const { data: setSessionData, error: setSessionError } = await supabase.auth.setSession({
           access_token: session.access_token,
@@ -84,6 +114,35 @@ export class ApiService {
       this.authInitInFlight = null;
     }
     return supabase;
+  }
+
+  // Generic public (unauthenticated) API call wrapper
+  // Use this for endpoints that don't require authentication (e.g., categories, public items)
+  static async publicCall<T>(
+    apiCall: (client: typeof supabase) => Promise<{ data: T | null; error: any }>
+  ): Promise<{ data: T | null; error: any }> {
+    try {
+      // Use Supabase client directly without authentication
+      // The client will use the anon key which is sufficient for public endpoints
+      const result = await apiCall(supabase);
+      return result;
+    } catch (error: any) {
+      const errorMsg = error?.message || String(error);
+      const isNetworkError = errorMsg.includes('Network request failed') || errorMsg.includes('network') || errorMsg.includes('fetch');
+      console.error('[ApiService] Public API call failed:', {
+        message: errorMsg,
+        isNetworkError,
+        stack: error?.stack?.substring(0, 200)
+      });
+      return {
+        data: null,
+        error: {
+          message: errorMsg || 'An unexpected error occurred',
+          code: isNetworkError ? 'NETWORK_ERROR' : 'UNKNOWN_ERROR',
+          originalError: error
+        }
+      };
+    }
   }
 
   // Generic authenticated API call wrapper
@@ -3502,15 +3561,17 @@ export class ApiService {
     const fallbackColumn = lang === 'ka' ? 'title_en' : 'title_ka';
 
     // Cached categories for performance (used for favorite category chips and filters)
+    // NOTE: Categories are public and don't require authentication
     console.log('[ApiService.getCategories] Starting fetch, bypassCache=true');
     return RedisCache.cache(
       'all-categories',
       ['active', lang],
       () => {
         console.log('[ApiService.getCategories] Fetch function called');
-        return this.authenticatedCall(async (client) => {
-          console.log('[ApiService.getCategories] Calling RPC function');
+        return this.publicCall(async (client) => {
+          console.log('[ApiService.getCategories] Calling RPC function (public)');
           // Use RPC function to fetch all categories at once (bypasses 1000 row limit)
+          // This is a public endpoint - no authentication required
           const { data, error } = await client.rpc('get_all_active_categories');
           console.log('[ApiService.getCategories] RPC response received, error:', !!error, 'data:', data ? data.length : 'null');
 
