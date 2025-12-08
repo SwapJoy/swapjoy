@@ -179,6 +179,19 @@ const TopMatchCard: React.FC<TopMatchCardProps> = ({
 
         {(conditionPresentation || normalizedCategory || price) && (
           <View style={styles.metaSection}>
+            {normalizedCategory ? (
+              <View style={styles.metaRow}>
+                <Text style={styles.metaLabel}>Category</Text>
+                <View
+                  style={[styles.chip, { backgroundColor: '#e2e8f0' }]}
+                >
+                  <Text style={[styles.chipText, { color: '#0f172a' }]}>
+                    {normalizedCategory}
+                  </Text>
+                </View>
+              </View>
+            ) : null}
+
             {conditionPresentation ? (
               <View style={styles.metaRow}>
                 <Text style={styles.metaLabel}>Condition</Text>
@@ -195,19 +208,6 @@ const TopMatchCard: React.FC<TopMatchCardProps> = ({
                     ]}
                   >
                     {conditionPresentation.label}
-                  </Text>
-                </View>
-              </View>
-            ) : null}
-
-            {normalizedCategory ? (
-              <View style={styles.metaRow}>
-                <Text style={styles.metaLabel}>Category</Text>
-                <View
-                  style={[styles.chip, { backgroundColor: '#e2e8f0' }]}
-                >
-                  <Text style={[styles.chipText, { color: '#0f172a' }]}>
-                    {normalizedCategory}
                   </Text>
                 </View>
               </View>
@@ -241,7 +241,7 @@ const styles = StyleSheet.create({
   },
   mediaWrapper: {
     position: 'relative',
-    height: 170,
+    height: 200,
   },
   heroImage: {
     width: '100%',

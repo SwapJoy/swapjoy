@@ -28,6 +28,7 @@ export interface CategoryTreeNode extends Category {
 
 interface CategoriesContextType {
   categories: Category[];
+  categoryMap: Map<string, Category>; // Fast lookup by category_id
   loading: boolean;
   error: any;
   refresh: () => Promise<void>;
@@ -48,6 +49,7 @@ export const CategoriesProvider: React.FC<CategoriesProviderProps> = ({ children
   // Get language from localization context (CategoriesProvider is inside LocalizationProvider in App.tsx)
   const { language } = useLocalization();
   const [categories, setCategories] = useState<Category[]>([]);
+  const [categoryMap, setCategoryMap] = useState<Map<string, Category>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<any>(null);
   const isMountedRef = useRef(true);
@@ -59,6 +61,25 @@ export const CategoriesProvider: React.FC<CategoriesProviderProps> = ({ children
   useEffect(() => {
     languageRef.current = language;
   }, [language]);
+
+  /**
+   * Create a category map from an array of categories
+   */
+  const createCategoryMap = useCallback((cats: Category[]): Map<string, Category> => {
+    const map = new Map<string, Category>();
+    cats.forEach((cat) => {
+      map.set(cat.id, cat);
+    });
+    return map;
+  }, []);
+
+  /**
+   * Update both categories and category map
+   */
+  const updateCategories = useCallback((cats: Category[]): void => {
+    setCategories(cats);
+    setCategoryMap(createCategoryMap(cats));
+  }, [createCategoryMap]);
 
   /**
    * Load categories from AsyncStorage
@@ -126,7 +147,7 @@ export const CategoriesProvider: React.FC<CategoriesProviderProps> = ({ children
         const cached = await loadCachedCategories();
         if (cached && cached.length > 0) {
           if (isMountedRef.current) {
-            setCategories(cached);
+            updateCategories(cached);
             setLoading(false);
           }
           // Skip API call if we have valid cache
@@ -146,7 +167,7 @@ export const CategoriesProvider: React.FC<CategoriesProviderProps> = ({ children
           if (categories.length === 0) {
             const cached = await loadCachedCategories();
             if (cached && cached.length > 0) {
-              setCategories(cached);
+              updateCategories(cached);
             }
           }
         }
@@ -158,7 +179,7 @@ export const CategoriesProvider: React.FC<CategoriesProviderProps> = ({ children
         await saveCategories(data);
 
         if (isMountedRef.current) {
-          setCategories(data);
+          updateCategories(data);
         }
       } else {
         console.warn('[CategoriesContext] No categories returned from API');
@@ -167,7 +188,7 @@ export const CategoriesProvider: React.FC<CategoriesProviderProps> = ({ children
           const cached = await loadCachedCategories();
           if (cached && cached.length > 0) {
             if (isMountedRef.current) {
-              setCategories(cached);
+              updateCategories(cached);
             }
           }
         }
@@ -180,7 +201,7 @@ export const CategoriesProvider: React.FC<CategoriesProviderProps> = ({ children
         if (categories.length === 0) {
           const cached = await loadCachedCategories();
           if (cached && cached.length > 0) {
-            setCategories(cached);
+            updateCategories(cached);
           }
         }
       }
@@ -190,7 +211,7 @@ export const CategoriesProvider: React.FC<CategoriesProviderProps> = ({ children
       }
       refreshInProgressRef.current = false;
     }
-  }, [loadCachedCategories, saveCategories, categories.length]);
+  }, [loadCachedCategories, saveCategories, categories.length, updateCategories]);
 
   /**
    * Refresh categories (force fetch from API)
@@ -298,7 +319,7 @@ export const CategoriesProvider: React.FC<CategoriesProviderProps> = ({ children
       const cached = await loadCachedCategories();
       if (cached && cached.length > 0) {
         if (isMountedRef.current) {
-          setCategories(cached);
+          updateCategories(cached);
           setLoading(false);
           console.log('[CategoriesContext] Initialized with', cached.length, 'categories from cache');
         }
@@ -322,6 +343,7 @@ export const CategoriesProvider: React.FC<CategoriesProviderProps> = ({ children
 
   const value: CategoriesContextType = {
     categories,
+    categoryMap,
     loading,
     error,
     refresh,

@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useLocalization } from '../localization';
 import { resolveCategoryName } from '../utils/category';
 
-export interface AIOffer {
+export interface SJCardItem {
   id: string;
   title: string;
   description: string;
@@ -20,9 +20,6 @@ export interface AIOffer {
     first_name: string;
     last_name: string;
   };
-  match_score: number;
-  is_bundle?: boolean;
-  bundle_items?: any[];
 }
 
 interface UseExploreDataOptions {
@@ -33,7 +30,7 @@ export const useExploreData = (options?: UseExploreDataOptions) => {
   const { autoFetch = true } = options ?? {};
   const { user } = useAuth();
   const { language } = useLocalization();
-  const [aiOffers, setAiOffers] = useState<AIOffer[]>([]);
+  const [aiOffers, setAiOffers] = useState<SJCardItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [isFetching, setIsFetching] = useState(false);
   const [hasData, setHasData] = useState(false);
@@ -65,46 +62,6 @@ export const useExploreData = (options?: UseExploreDataOptions) => {
   }, []);
 
 
-  const calculateMatchScore = useCallback((item: any, currentUser: any) => {
-    // Use AI similarity score if available, otherwise fallback to manual calculation
-    if (item.similarity_score !== undefined) {
-      // Convert similarity score (0-1) to percentage (0-100)
-      const aiScore = Math.round(item.similarity_score * 100);
-      
-      // Add bonus for overall score if available
-      const bonus = item.overall_score ? Math.round((item.overall_score - item.similarity_score) * 100) : 0;
-      
-      return Math.min(100, Math.max(60, aiScore + bonus)); // Ensure minimum 60% for AI matches
-    }
-
-    // Fallback to manual calculation for non-AI items
-    let score = 70; // Base score for items from favorite categories
-
-    // Category matching (items are already from favorite categories, so high score)
-    score += 20; // Bonus for being in favorite categories
-
-    // Price range matching
-    const itemPrice = item.price || 0;
-    if (itemPrice > 0) {
-      if (itemPrice >= 50 && itemPrice <= 200) score += 15;
-      else if (itemPrice >= 100 && itemPrice <= 500) score += 10;
-      else if (itemPrice >= 200 && itemPrice <= 1000) score += 5;
-    }
-
-    // Condition matching
-    if (item.condition === 'excellent') score += 10;
-    else if (item.condition === 'good') score += 5;
-
-    // Recency bonus (newer items get higher scores)
-    const daysSinceCreated = item.created_at ? 
-      (Date.now() - new Date(item.created_at).getTime()) / (1000 * 60 * 60 * 24) : 30;
-    if (daysSinceCreated < 7) score += 10;
-    else if (daysSinceCreated < 30) score += 5;
-
-    // Ensure score is between 70-100
-    return Math.min(100, Math.max(70, score));
-  }, []);
-
   const fetchAIOffers = useCallback(async () => {
     console.log('[useExploreData] fetchAIOffers start. user?', !!user);
     if (!user) {
@@ -129,9 +86,19 @@ export const useExploreData = (options?: UseExploreDataOptions) => {
       // FIXED: Only bypass cache on explicit refresh, not after first fetch
       // This allows cache to work properly and reduces unnecessary API calls
       const bypassCache = forceBypassRef.current; // Only bypass if explicitly requested
-      console.log('[useExploreData] calling getTopPicksForUserSafe. bypassCache=', bypassCache, 'hasFetched=', hasFetchedRef.current);
+      console.log('[useExploreData] calling fetchSesion. bypassCache=', bypassCache, 'hasFetched=', hasFetchedRef.current);
       // Fetch items from "Top Picks" section (favorite categories)
-      const { data: topPicks, error: topPicksError } = await ApiService.getTopPicksForUserSafe(user.id, 10, { bypassCache });
+      const { data: topPicks, error: topPicksError } = await ApiService.fetchSection('fn_near_you', 
+        { 
+          functionParams: { 
+            p_limit: 10, 
+            p_radius_km: 20,
+            p_user_id: user.id,
+            p_user_lat: 0, //user.manual_location_lat,
+            p_user_lng: 0, //user.manual_location_lng
+          }, 
+          bypassCache 
+        });
       forceBypassRef.current = false;
       
       if (topPicksError) {
@@ -154,10 +121,8 @@ export const useExploreData = (options?: UseExploreDataOptions) => {
         setError(null);
       }
 
-      // Transform items to AIOffer format
-      const aiOffers: AIOffer[] = (Array.isArray(topPicks) ? topPicks : []).map((item: any, index: number) => {
-        const matchScore = calculateMatchScore(item, user);
-        
+      // Transform items to SJCardItem format
+      const aiOffers: SJCardItem[] = (Array.isArray(topPicks) ? topPicks : []).map((item: any, index: number) => {
         // Force a realistic value if database value is missing or 0
         let displayValue = item.price;
         if (!displayValue || displayValue === 0) {
@@ -195,17 +160,10 @@ export const useExploreData = (options?: UseExploreDataOptions) => {
             first_name: item.users?.first_name || item.user?.first_name || `User ${(item.user_id || '').slice(-4)}`,
             last_name: item.users?.last_name || item.user?.last_name || '',
           },
-          match_score: matchScore,
-          is_bundle: item.is_bundle || false, // Add bundle flag
-          bundle_items: item.bundle_items || null, // Add bundle items
         };
       });
 
-      // Exclude bundles from top picks
-      const filteredOffers = aiOffers.filter((offer) => !offer.is_bundle);
-
-      // Sort by match score (highest first)
-      filteredOffers.sort((a, b) => b.match_score - a.match_score);
+      const filteredOffers = aiOffers;
 
       if (isMountedRef.current) {
         console.log('[useExploreData] TRANSFORMED DATA:', {
@@ -214,8 +172,7 @@ export const useExploreData = (options?: UseExploreDataOptions) => {
           firstOffer: filteredOffers[0] ? {
             id: filteredOffers[0].id,
             title: filteredOffers[0].title,
-            hasImage: !!filteredOffers[0].image_url,
-            matchScore: filteredOffers[0].match_score
+            hasImage: !!filteredOffers[0].image_url
           } : null
         });
         console.log('[useExploreData] Setting state - aiOffers:', filteredOffers.length, 'hasData: true, isInitialized: true');
@@ -249,7 +206,7 @@ export const useExploreData = (options?: UseExploreDataOptions) => {
       }
       isFetchingRef.current = false;
     }
-  }, [calculateMatchScore, language, user?.id]);
+  }, [language, user?.id]);
 
   useEffect(() => {
     console.log('[useExploreData] useEffect triggered:', {

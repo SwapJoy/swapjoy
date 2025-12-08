@@ -30,8 +30,15 @@ export class ItemService {
   /**
    * Get top AI picks for user
    */
-  static async getTopPicks(userId: string, limit: number = 10) {
-    return ApiService.getTopPicksForUserSafe(userId, limit);
+  static async fetchSection(functionName: string,
+    options: {
+      functionParams: Record<string, any>;
+      bypassCache?: boolean;
+      cacheKey?: string;
+      userId?: string;
+      limit?: number;
+    }) {
+    return ApiService.fetchSection(functionName,options);
   }
 
   /**

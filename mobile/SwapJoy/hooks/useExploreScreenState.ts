@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocalization } from '../localization';
-import { useExploreData, AIOffer } from './useExploreData';
+import { useExploreData, SJCardItem } from './useExploreData';
 import { useRecentlyListed } from './useRecentlyListed';
 import { useOtherItems } from './useOtherItems';
 import { useFavorites } from '../contexts/FavoritesContext';
@@ -32,7 +32,7 @@ export interface ExploreScreenState {
   hasSearchQuery: boolean;
   refreshing: boolean;
   onRefresh: () => Promise<void>;
-  aiOffers: AIOffer[];
+  aiOffers: SJCardItem[];
   topPicksLoading: boolean;
   topPicksError: Error | null;
   isInitialized: boolean;

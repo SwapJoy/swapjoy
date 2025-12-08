@@ -65,21 +65,33 @@ export class ApiService {
       const isExpired = !!expiresAtMs && now >= expiresAtMs;
       
       if (isExpired) {
-        console.warn('[ApiService] Session expired after getCurrentSession() - refreshing again');
+        const expiredAgo = Math.abs(Math.floor((now - expiresAtMs) / 60000));
+        console.warn(`[Token Expiry] ⚠️ [ApiService] Session expired ${expiredAgo} minutes ago after getCurrentSession() - refreshing again`);
+        console.warn(`[Token Expiry] Expired at: ${new Date(expiresAtMs).toISOString()}, Current time: ${new Date(now).toISOString()}`);
         // Wait for any refresh that might have been triggered
         await refreshGateKeeper.waitIfNeeded();
         // Get fresh session
         session = await AuthService.getCurrentSession();
         
         if (!session?.access_token) {
+          console.error('[Token Expiry] ❌ [ApiService] Session expired and refresh failed');
           throw new Error('Session expired and refresh failed');
         }
         
         // Double-check it's not expired
         const newExpiresAtMs = session.expires_at ? session.expires_at * 1000 : 0;
         if (newExpiresAtMs && now >= newExpiresAtMs) {
+          console.error(`[Token Expiry] ❌ [ApiService] Session still expired after refresh`);
+          console.error(`[Token Expiry] Still expired at: ${new Date(newExpiresAtMs).toISOString()}, Current time: ${new Date(now).toISOString()}`);
           throw new Error('Session still expired after refresh');
         }
+        
+        const newExpiresIn = session.expires_in || 0;
+        console.log(`[Token Expiry] ✅ [ApiService] Session refreshed successfully, expires in ${Math.floor(newExpiresIn / 60)} minutes`);
+      } else {
+        const timeUntilExpiry = expiresAtMs - now;
+        const minutesUntilExpiry = Math.floor(timeUntilExpiry / 60000);
+        console.log(`[Token Expiry] ✅ [ApiService] Session valid, expires in ${minutesUntilExpiry} minutes (${Math.floor(timeUntilExpiry / 1000)}s)`);
       }
 
       // CRITICAL: Set session on Supabase client so RLS policies work
@@ -216,18 +228,16 @@ export class ApiService {
       );
       
       if (isAuthError) {
-        console.log('[ApiService] Detected auth error - attempting token refresh', {
-          status: errorStatus,
-          code: errCode,
-          message: errMsg.substring(0, 100)
-        });
+        console.warn(`[Token Expiry] ⚠️ [ApiService] Detected auth error (status: ${errorStatus}, code: ${errCode}) - attempting token refresh`);
+        console.warn(`[Token Expiry] Error message: ${errMsg.substring(0, 200)}`);
         try {
           // Force reload current session; AuthService.getCurrentSession will refresh if expired
+          console.log('[Token Refresh] 🔄 [ApiService] Attempting to refresh session due to auth error');
           const refreshedSession = await AuthService.getCurrentSession();
           
           // Check if we have a valid session with access token before proceeding
           if (!refreshedSession?.access_token) {
-            console.warn('[ApiService] No valid session available after refresh attempt - notifying AuthContext');
+            console.error('[Token Expiry] ❌ [ApiService] No valid session available after refresh attempt - notifying AuthContext');
             // Notify AuthService that session has expired - this will trigger AuthContext to update
             // and redirect user to sign in screen
             AuthService.notifySessionExpired().catch((err) => {
@@ -237,19 +247,28 @@ export class ApiService {
             return result;
           }
           
+          // Log refresh success
+          const newExpiresAtMs = refreshedSession.expires_at ? refreshedSession.expires_at * 1000 : 0;
+          const newExpiresIn = refreshedSession.expires_in || 0;
+          const now = Date.now();
+          const timeUntilExpiry = newExpiresAtMs ? newExpiresAtMs - now : 0;
+          console.log(`[Token Refresh] ✅ [ApiService] Session refreshed successfully after auth error`);
+          console.log(`[Token Expiry] New token expires in: ${Math.floor(timeUntilExpiry / 60000)} minutes (${Math.floor(timeUntilExpiry / 1000)}s)`);
+          
           // Reset auth state so we reapply the refreshed session to the Supabase client
           this.resetAuthState();
           await this.getAuthenticatedClient();
-          console.log('[ApiService] retrying API call after session refresh');
+          console.log('[Token Refresh] 🔄 [ApiService] Retrying API call after session refresh');
           result = await apiCall(client);
+          console.log('[Token Refresh] ✅ [ApiService] API call succeeded after refresh');
         } catch (refreshError: any) {
           // FIXED: Log refresh error instead of swallowing it
-          console.error('[ApiService] Session refresh failed:', refreshError?.message || refreshError);
+          console.error('[Token Refresh] ❌ [ApiService] Session refresh failed:', refreshError?.message || refreshError);
           
           // If the error indicates no access token, notify AuthContext
           const errorMsg = String(refreshError?.message || '').toLowerCase();
           if (errorMsg.includes('no access token') || errorMsg.includes('please sign in')) {
-            console.warn('[ApiService] No access token detected in refresh error - notifying AuthContext');
+            console.error('[Token Expiry] ❌ [ApiService] No access token detected in refresh error - notifying AuthContext');
             AuthService.notifySessionExpired().catch((err) => {
               console.error('[ApiService] Error notifying session expired:', err);
             });
@@ -644,137 +663,110 @@ export class ApiService {
 
   // AI-Powered Vector-Based Recommendations
   // Uses single database function that combines all queries
-  static async getTopPicksForUser(userId: string, limit: number = 10, options?: { bypassCache?: boolean }) {
+  static async fetchSection(
+    functionName: string,
+    options: {
+      functionParams: Record<string, any>;
+      bypassCache?: boolean;
+      cacheKey?: string;
+      userId?: string;
+      limit?: number;
+      categoryMap?: Map<string, any>; // Optional category map for faster lookups
+    }
+  ) {
+    const { functionParams, bypassCache = false, cacheKey, userId, limit, categoryMap } = options;
+    const cacheKeyValue = cacheKey || functionName;
+    const cacheParams = userId && limit ? [userId, limit] : Object.values(functionParams);
+
     const fetchFn = async () => {
       const startTime = Date.now();
       try {
         const result = await this.authenticatedCall(async (client) => {
           try {
-            // Get user preferences and weights
-            const [userData, weights] = await Promise.all([
-              client.from('users')
-                .select('favorite_categories, manual_location_lat, manual_location_lng, preferred_radius_km')
-                .eq('id', userId)
-                .maybeSingle(),
-              this.getRecommendationWeights(userId)
-            ]);
-
-            const user = userData.data;
-            const userLat = user?.manual_location_lat ?? null;
-            const userLng = user?.manual_location_lng ?? null;
-            const maxRadiusKm = user?.preferred_radius_km ?? 50.0;
-
-            // Call the comprehensive database function
-            const { data, error } = await client.rpc('get_top_picks_for_user', {
-              p_user_id: userId,
-              p_limit: limit,
-              p_user_lat: userLat,
-              p_user_lng: userLng,
-              p_radius_km: maxRadiusKm,
-              p_match_threshold: 0.7,
-              p_similarity_weight: weights.similarity_weight,
-              p_category_score_weight: weights.category_score,
-              p_price_score_weight: weights.price_score,
-              p_location_score_weight: (weights.location_lat + weights.location_lng) / 2
-            });
+            // Call the database function with provided parameters
+            const { data, error } = await client.rpc(functionName, functionParams);
 
             if (error) {
-              console.error('[TopPicks] RPC error:', error);
-              // Fallback to category-based recommendations
-              return await this.getFallbackRecommendations(client, userId, limit, {
-                userLat,
-                userLng,
-                radiusKm: maxRadiusKm,
-              });
+              console.error(`[fetchSection:${functionName}] RPC error:`, error);
+              return { data: [], error };
             }
 
             if (!data || data.length === 0) {
-              console.warn('[TopPicks] No matches found, using fallback recommendations');
-              return await this.getFallbackRecommendations(client, userId, limit, {
-                userLat,
-                userLng,
-                radiusKm: maxRadiusKm,
-              });
+              console.warn(`[fetchSection:${functionName}] No matches found`);
+              return { data: [], error: null };
             }
 
             // Transform database results to match expected format
-            const transformed = data.map((item: any) => ({
-              id: item.id,
-              title: item.title,
-              description: item.description,
-              price: item.price,
-              currency: item.currency,
-              condition: item.condition,
-              status: item.status,
-              location_lat: item.location_lat,
-              location_lng: item.location_lng,
-              created_at: item.created_at,
-              updated_at: item.updated_at,
-              category_id: item.category_id,
-              category: item.category_id ? {
-                id: item.category_id,
-                title_en: item.category_title_en,
-                title_ka: item.category_title_ka
-              } : null,
-              image_url: item.image_url,
-              item_images: item.image_url ? [{ image_url: item.image_url }] : [],
-              user: {
-                id: item.user_id,
-                username: item.username,
-                first_name: item.first_name,
-                last_name: item.last_name,
-                profile_image_url: item.profile_image_url
-              },
-              similarity_score: item.similarity_score,
-              overall_score: item.overall_score,
-              category_match_score: item.category_match_score,
-              price_match_score: item.price_match_score,
-              location_match_score: item.location_match_score,
-              distance_km: item.distance_km,
-              is_favorite_category: item.category_match_score === 1.0,
-              from_favorite_category: item.category_match_score === 1.0
-            }));
+            const transformed = data.map((item: any) => {
+              // Extract primary image from images array
+              const images = item.images || [];
+              const primaryImage = Array.isArray(images) && images.length > 0 
+                ? images.find((img: any) => img.is_primary) || images[0]
+                : null;
+              const imageUrl = primaryImage?.url || null;
+
+              // Get category data from provided map
+              const categoryData = item.category_id && categoryMap ? categoryMap.get(item.category_id) : null;
+
+              return {
+                id: item.id,
+                title: item.title,
+                description: item.description,
+                price: item.price,
+                currency: item.currency,
+                condition: item.condition,
+                status: item.status,
+                location_lat: item.location_lat,
+                location_lng: item.location_lng,
+                created_at: item.created_at,
+                updated_at: item.updated_at,
+                category_id: item.category_id,
+                category: categoryData || (item.category_id ? { id: item.category_id } : null),
+                category_name_en: categoryData?.title_en || null,
+                category_name_ka: categoryData?.title_ka || null,
+                category_name: categoryData?.title_en || categoryData?.title_ka || null,
+                image_url: imageUrl,
+                item_images: Array.isArray(images) ? images.map((img: any) => ({
+                  id: img.id,
+                  image_url: img.url,
+                  is_primary: img.is_primary,
+                  created_at: img.created_at
+                })) : [],
+                user: {
+                  id: item.user_id,
+                  username: item.username,
+                  first_name: item.first_name,
+                  last_name: item.last_name,
+                  profile_image_url: item.profile_image_url
+                },
+                distance_km: item.distance_km
+              };
+            });
 
             return { data: transformed, error: null };
           } catch (error: any) {
             const errorMsg = error?.message || String(error);
             const isNetworkError = errorMsg.includes('Network request failed') || errorMsg.includes('network') || errorMsg.includes('fetch');
-            console.error('[TopPicks] QUERY EXCEPTION:', {
+            console.error(`[fetchSection:${functionName}] QUERY EXCEPTION:`, {
               message: errorMsg,
               isNetworkError,
               stack: error?.stack?.substring(0, 300)
             });
-
-            // Fallback to category-based recommendations on any error
-            try {
-              return await this.getFallbackRecommendations(client, userId, limit, {
-                userLat: null,
-                userLng: null,
-                radiusKm: null,
-              });
-            } catch (fallbackError: any) {
-              const fallbackErrorMsg = fallbackError?.message || String(fallbackError);
-              console.error('[TopPicks] Fallback also FAILED:', {
-                message: fallbackErrorMsg,
-                originalError: errorMsg
-              });
-              return {
-                data: [],
-                error: {
-                  message: isNetworkError ? 'Network request failed. Please check your internet connection.' : errorMsg,
-                  code: isNetworkError ? 'NETWORK_ERROR' : 'QUERY_ERROR',
-                  originalError: error,
-                  fallbackError: fallbackError
-                }
-              };
-            }
+            return {
+              data: [],
+              error: {
+                message: isNetworkError ? 'Network request failed. Please check your internet connection.' : errorMsg,
+                code: isNetworkError ? 'NETWORK_ERROR' : 'QUERY_ERROR',
+                originalError: error
+              }
+            };
           }
         });
 
         const duration = Date.now() - startTime;
         const dataCount = Array.isArray(result?.data) ? result.data.length : 0;
         const hasError = !!result?.error;
-        console.log('[TopPicks] fetchFn COMPLETED:', {
+        console.log(`[fetchSection:${functionName}] fetchFn COMPLETED:`, {
           duration: `${duration}ms`,
           dataCount,
           hasError,
@@ -782,22 +774,22 @@ export class ApiService {
           errorCode: result?.error?.code || null
         });
         if (hasError) {
-          console.error('[TopPicks] Query ERROR:', {
+          console.error(`[fetchSection:${functionName}] Query ERROR:`, {
             message: result.error.message,
             code: result.error.code,
             status: result.error.status
           });
         } else if (dataCount === 0) {
-          console.warn('[TopPicks] Query SUCCEEDED but returned EMPTY data');
+          console.warn(`[fetchSection:${functionName}] Query SUCCEEDED but returned EMPTY data`);
         } else {
-          console.log('[TopPicks] Query SUCCEEDED with', dataCount, 'items');
+          console.log(`[fetchSection:${functionName}] Query SUCCEEDED with`, dataCount, 'items');
         }
         return result;
       } catch (fetchErr: any) {
         const duration = Date.now() - startTime;
         const errorMsg = fetchErr?.message || String(fetchErr);
         const isNetworkError = errorMsg.includes('Network request failed') || errorMsg.includes('network') || errorMsg.includes('fetch');
-        console.error('[TopPicks] fetchFn THREW EXCEPTION:', {
+        console.error(`[fetchSection:${functionName}] fetchFn THREW EXCEPTION:`, {
           duration: `${duration}ms`,
           message: errorMsg,
           isNetworkError,
@@ -816,285 +808,27 @@ export class ApiService {
     };
 
     // Use cache if bypassCache is false
-    const bypassCache = options?.bypassCache ?? false;
     if (bypassCache) {
-      console.log('[TopPicks] bypassing cache, calling fetchFn directly');
+      console.log(`[fetchSection:${functionName}] bypassing cache, calling fetchFn directly`);
       return fetchFn();
     }
 
     // Try cache first
-    const cached = await RedisCache.get('topPicks', userId, limit);
+    const cached = await RedisCache.get(cacheKeyValue, ...cacheParams);
     if (cached) {
-      console.log('[TopPicks] cache hit, returning cached data');
+      console.log(`[fetchSection:${functionName}] cache hit, returning cached data`);
       return { data: cached, error: null };
     }
 
-    console.log('[TopPicks] cache miss, calling fetchFn');
+    console.log(`[fetchSection:${functionName}] cache miss, calling fetchFn`);
     const result = await fetchFn();
 
     // Store in cache if successful
     if (result.data && !result.error) {
-      await RedisCache.set('topPicks', result.data, userId, limit);
+      await RedisCache.set(cacheKeyValue, result.data, ...cacheParams);
     }
 
     return result;
-  }
-
-  // Ensure we always return a valid response
-  static async getTopPicksForUserSafe(userId: string, limit: number = 10, options?: { bypassCache?: boolean }) {
-    try {
-      // FIXED: Default to false (use cache) instead of true (bypass cache)
-      // This allows cache to work properly after Expo ejection
-      const bypassCache = options?.bypassCache ?? false;
-      console.log('[TopPicksSafe] calling getTopPicksForUser with bypassCache=', bypassCache);
-      const result = await this.getTopPicksForUser(userId, limit, { bypassCache });
-      const count = Array.isArray(result?.data) ? result.data.length : 0;
-      console.log('[TopPicksSafe] data count:', count, 'error?', !!result?.error, 'errorMsg:', result?.error?.message || null);
-      return {
-        data: Array.isArray(result?.data) ? result.data : [],
-        error: result?.error || null
-      };
-    } catch (error) {
-      console.error('[TopPicksSafe] Error in getTopPicksForUserSafe:', error);
-      return {
-        data: [],
-        error: error
-      };
-    }
-  }
-
-  // Fallback method for when vector search fails
-  static async getFallbackRecommendations(
-    client: any,
-    userId: string,
-    limit: number,
-    options?: {
-      userLat?: number | null;
-      userLng?: number | null;
-      radiusKm?: number | null;
-    }
-  ) {
-    console.log('[TopPicks Fallback] start. user:', userId, 'limit:', limit);
-    const baseSelect =
-      '*, category:categories!items_category_id_fkey(title_en, title_ka), item_images(image_url), users!items_user_id_fkey(username, first_name, last_name)';
-    let userLat = options?.userLat ?? null;
-    let userLng = options?.userLng ?? null;
-    let radiusKm = options?.radiusKm ?? null;
-
-    let { data: user, error: userError } = await client
-      .from('users')
-      .select('favorite_categories, manual_location_lat, manual_location_lng, preferred_radius_km')
-      .eq('id', userId)
-      .maybeSingle();
-
-    if (!userError && !user) {
-      console.warn('[TopPicks Fallback] Missing user row, attempting ensureUserRecord');
-      await AuthService.ensureUserRecord();
-      const retry = await client
-        .from('users')
-        .select('favorite_categories, manual_location_lat, manual_location_lng, preferred_radius_km')
-        .eq('id', userId)
-        .maybeSingle();
-      if (!retry.error && retry.data) {
-        user = retry.data;
-      } else if (retry.error) {
-        userError = retry.error;
-      }
-    }
-
-    if (user && (userLat === null || userLng === null)) {
-      userLat = user.manual_location_lat ?? userLat;
-      userLng = user.manual_location_lng ?? userLng;
-    }
-
-    if (user && (radiusKm === null || radiusKm === undefined)) {
-      radiusKm = user.preferred_radius_km ?? radiusKm;
-    }
-
-    if (radiusKm === null || radiusKm === undefined) {
-      radiusKm = 50;
-    }
-
-    if (userError || !user) {
-      console.warn('[TopPicks Fallback] User not found; returning recent items');
-      const { data: recent, error: recentErr } = await client
-        .from('items')
-        .select(baseSelect)
-        .eq('status', 'available')
-        .neq('user_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(limit);
-      console.log('[TopPicks Fallback] recent count:', (recent || []).length, 'error?', !!recentErr);
-      const filteredRecent = await this.applyLocationRadiusFilter(client, recent || [], userLat, userLng, radiusKm);
-      return { data: filteredRecent, error: recentErr || null };
-    }
-
-    // If no favorite categories yet, fall back to recent items
-    const hasFavs = Array.isArray(user.favorite_categories) && user.favorite_categories.length > 0;
-    console.log('[TopPicks Fallback] hasFavs:', hasFavs, 'favCount:', hasFavs ? user.favorite_categories.length : 0);
-    const query = hasFavs
-      ? client
-        .from('items')
-        .select(baseSelect)
-        .in('category_id', user.favorite_categories)
-        .eq('status', 'available')
-        .neq('user_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(limit)
-      : client
-        .from('items')
-        .select(baseSelect)
-        .eq('status', 'available')
-        .neq('user_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(limit);
-
-    const { data, error } = await query;
-    console.log('[TopPicks Fallback] query result count:', (data || []).length, 'error?', !!error);
-
-    if (error) {
-      console.error('Fallback query error:', error);
-      return { data: null, error };
-    }
-
-
-    const filteredData = await this.applyLocationRadiusFilter(client, data || [], userLat, userLng, radiusKm);
-
-    return { data: filteredData, error: null };
-  }
-
-  // Helper: Get favorite category items (fixes N+1 problem)
-  private static async getFavoriteCategoryItems(
-    client: any,
-    userId: string,
-    favoriteCategories: string[],
-    limit: number,
-    userLat: number | null,
-    userLng: number | null,
-    maxRadiusKm: number,
-    avgUserItemValueGEL: number,
-    rateMap: { [key: string]: number },
-    weights: RecommendationWeights
-  ): Promise<any[]> {
-    const { data: favoriteCategoryItems, error: favError } = await client
-      .from('items')
-      .select('id, title, description, price, currency, category_id, embedding, user_id, category:categories!items_category_id_fkey(title_en, title_ka)')
-      .in('category_id', favoriteCategories)
-      .eq('status', 'available')
-      .neq('user_id', userId)
-      .limit(limit * 2);
-
-    if (favError || !favoriteCategoryItems || favoriteCategoryItems.length === 0) {
-      return [];
-    }
-
-    // Batch fetch all user locations at once (fixes N+1 problem)
-    const userIds = [...new Set(favoriteCategoryItems.map((item: any) => item.user_id))];
-    const { data: itemUsers } = await client
-      .from('users')
-      .select('id, manual_location_lat, manual_location_lng')
-      .in('id', userIds);
-
-    const locationMap = new Map<string, { lat: number; lng: number }>();
-    itemUsers?.forEach((user: any) => {
-      if (user.manual_location_lat && user.manual_location_lng) {
-        locationMap.set(user.id, { lat: user.manual_location_lat, lng: user.manual_location_lng });
-      }
-    });
-
-    // Score all items
-    return favoriteCategoryItems.map((item: any) => {
-      const similarityScore = 0.7;
-      const categoryMatchScore = calculateCategoryScore(item.category_id, favoriteCategories);
-      const itemPriceGEL = parseFloat(item.price || 0) * (rateMap[item.currency] || 1);
-      const priceMatchScore = calculatePriceScore(avgUserItemValueGEL, itemPriceGEL, 0.3);
-
-      let locationMatchScore = 0.5;
-      const itemLocation = locationMap.get(item.user_id);
-      if (userLat && userLng && itemLocation) {
-        locationMatchScore = calculateLocationScore(userLat, userLng, itemLocation.lat, itemLocation.lng, maxRadiusKm);
-      }
-
-      const overallScore = calculateWeightedScore(
-        similarityScore,
-        categoryMatchScore,
-        priceMatchScore,
-        locationMatchScore,
-        weights
-      );
-
-      return {
-        ...item,
-        similarity_score: similarityScore,
-        category_match_score: categoryMatchScore,
-        price_match_score: priceMatchScore,
-        location_match_score: locationMatchScore,
-        overall_score: overallScore,
-        is_favorite_category: true,
-        from_favorite_category: true
-      };
-    });
-  }
-
-  // Helper: Fetch item details with joins (single optimized query)
-  private static async fetchItemDetailsWithJoins(
-    client: any,
-    itemIds: string[],
-    uniqueItems: any[],
-    favoriteCategories: string[],
-    strictCategoryFilter: boolean
-  ): Promise<any[]> {
-    if (itemIds.length === 0) return [];
-
-    // Single query with all joins
-    const { data: items, error: itemsError } = await client
-      .from('items')
-      .select('*, category:categories!items_category_id_fkey(title_en, title_ka), item_images(image_url), users!items_user_id_fkey(id, username, first_name, last_name)')
-      .in('id', itemIds);
-
-    if (itemsError || !items) return [];
-
-    // Create lookup maps
-    const similarityMap = new Map(uniqueItems.map((item: any) => [item.id, item]));
-
-    // Combine data
-    const itemsWithScores = items.map((item: any) => {
-      const similarityData = similarityMap.get(item.id);
-      const itemImages = item.item_images || [];
-      const imageUrl = itemImages[0]?.image_url || null;
-      const itemUser = item.users;
-
-      const isFavoriteCategory =
-        similarityData?.from_favorite_category ||
-        similarityData?.is_favorite_category ||
-        (item.category_id && favoriteCategories.includes(item.category_id)) ||
-        false;
-
-      return {
-        ...item,
-        image_url: imageUrl,
-        item_images: itemImages,
-        user: itemUser ? {
-          id: itemUser.id,
-          username: itemUser.username,
-          first_name: itemUser.first_name,
-          last_name: itemUser.last_name,
-        } : { id: item.user_id },
-        similarity_score: similarityData?.similarity_score || similarityData?.similarity || 0,
-        overall_score: similarityData?.overall_score || 0,
-        is_favorite_category: isFavoriteCategory,
-        from_favorite_category: isFavoriteCategory
-      };
-    });
-
-    // Filter by category if strict mode
-    if (strictCategoryFilter) {
-      return itemsWithScores.filter((item: any) =>
-        item.category_id && favoriteCategories.includes(item.category_id)
-      );
-    }
-
-    return itemsWithScores;
   }
 
   private static async applyLocationRadiusFilter(

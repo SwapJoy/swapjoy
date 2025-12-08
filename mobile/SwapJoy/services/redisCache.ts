@@ -43,6 +43,8 @@ export class RedisCache {
 
   // Get cached data
   static async get<T>(prefix: string, ...params: any[]): Promise<T | null> {
+
+    return null;
     try {
       const key = this.getCacheKey(prefix, ...params);
       // Try to use Edge Function first (with timeout)
@@ -71,6 +73,7 @@ export class RedisCache {
     value: T, 
     ...params: any[]
   ): Promise<boolean> {
+    return false;
     try {
       const ttl: number = this.DEFAULT_TTL
       const key = this.getCacheKey(prefix, ...params);
@@ -95,6 +98,7 @@ export class RedisCache {
 
   // Delete cached data
   static async delete(prefix: string, ...params: any[]): Promise<boolean> {
+    return false;
     try {
       const key = this.getCacheKey(prefix, ...params);
       const res = await this.invokeWithTimeout(() => supabase.functions.invoke('redis-delete', { body: { key } }), this.INVOKE_TIMEOUT_MS);
@@ -123,6 +127,7 @@ export class RedisCache {
     fetchFn: () => Promise<T>,
     bypassCache: boolean = false
   ): Promise<T> {
+    return null as any;
     // Try to get from cache first (unless bypassed)
     if (!bypassCache) {
       const cached = await this.get<T>(prefix, ...keyParams);

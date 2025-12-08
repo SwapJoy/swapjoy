@@ -23,8 +23,11 @@ class RefreshGateKeeper {
   // Wait if refresh is in progress, otherwise proceed immediately
   async waitIfNeeded(): Promise<void> {
     if (this.refreshPromise) {
-      console.log('[RefreshGateKeeper] Waiting for refresh in progress...');
+      const waitStartTime = Date.now();
+      console.log(`[Token Refresh] 🔄 [RefreshGateKeeper] Waiting for refresh in progress at ${new Date(waitStartTime).toISOString()}...`);
       await this.refreshPromise;
+      const waitDuration = Date.now() - waitStartTime;
+      console.log(`[Token Refresh] ✅ [RefreshGateKeeper] Finished waiting for refresh after ${waitDuration}ms`);
     }
   }
 
@@ -36,7 +39,7 @@ class RefreshGateKeeper {
     
     // If promise exists, return it (another call is refreshing)
     if (currentPromise) {
-      console.log('[RefreshGateKeeper] Refresh already in progress, waiting for existing refresh...');
+      console.log(`[Token Refresh] ⏳ [RefreshGateKeeper] Refresh already in progress at ${new Date().toISOString()}, waiting for existing refresh...`);
       return currentPromise;
     }
 
@@ -46,14 +49,16 @@ class RefreshGateKeeper {
     const timeSinceLastRefresh = now - this.lastRefreshTime;
     if (this.lastRefreshTime > 0 && timeSinceLastRefresh < this.REFRESH_COOLDOWN_MS) {
       const remainingCooldown = this.REFRESH_COOLDOWN_MS - timeSinceLastRefresh;
-      console.log(`[RefreshGateKeeper] Refresh cooldown active (${Math.ceil(remainingCooldown / 1000)}s remaining) - skipping refresh`);
+      const lastRefreshTime = new Date(this.lastRefreshTime).toISOString();
+      console.log(`[Token Refresh] ⏸️ [RefreshGateKeeper] Refresh cooldown active (${Math.ceil(remainingCooldown / 1000)}s remaining) - skipping refresh`);
+      console.log(`[Token Refresh] Last refresh was at: ${lastRefreshTime} (${Math.floor(timeSinceLastRefresh / 1000)}s ago)`);
       // Return a resolved promise since refresh just happened - session is already fresh
       return Promise.resolve();
     }
 
     // CRITICAL: Create promise in local variable first, then assign to instance
     // This ensures the promise is created before assignment
-    console.log('[RefreshGateKeeper] Acquiring lock and starting refresh - closing gate');
+    console.log(`[Token Refresh] 🔒 [RefreshGateKeeper] Acquiring lock and starting refresh - closing gate at ${new Date(now).toISOString()}`);
     this.isRefreshing = true;
     
     const newPromise = new Promise<void>((resolve, reject) => {
@@ -63,7 +68,8 @@ class RefreshGateKeeper {
     
     // Assign to instance AFTER creation (atomic write)
     this.refreshPromise = newPromise;
-    console.log('[RefreshGateKeeper] Lock acquired, promise created');
+    const refreshStartTime = Date.now();
+    console.log(`[Token Refresh] 🔒 [RefreshGateKeeper] Lock acquired, promise created at ${new Date(refreshStartTime).toISOString()}`);
 
     // Execute refresh in background - when done, resolve the promise
     (async () => {
@@ -85,8 +91,10 @@ class RefreshGateKeeper {
         this.refreshPromise = null;
         this.refreshResolver = null;
         this.refreshRejector = null;
-        this.lastRefreshTime = Date.now(); // Update last refresh time
-        console.log('[RefreshGateKeeper] Refresh completed - opening gate');
+        const refreshEndTime = Date.now();
+        this.lastRefreshTime = refreshEndTime; // Update last refresh time
+        const totalRefreshDuration = refreshEndTime - refreshStartTime;
+        console.log(`[Token Refresh] ✅ [RefreshGateKeeper] Refresh completed in ${totalRefreshDuration}ms - opening gate at ${new Date(refreshEndTime).toISOString()}`);
       }
     })();
 
@@ -129,19 +137,33 @@ export class AuthService {
         const isExpired = !!expiresAtMs && now >= expiresAtMs;
         const timeUntilExpiry = expiresAtMs - now;
         const minutesUntilExpiry = Math.floor(timeUntilExpiry / (60 * 1000));
+        const secondsUntilExpiry = Math.floor(timeUntilExpiry / 1000);
         
-        console.log(`[AuthService] Token will expire in: ${minutesUntilExpiry} minutes (${Math.floor(timeUntilExpiry / 1000)}s)`);
+        // Log token expiry status
+        if (isExpired) {
+          console.log(`[Token Expiry] ⚠️ TOKEN EXPIRED: ${Math.abs(minutesUntilExpiry)} minutes ago (${Math.abs(secondsUntilExpiry)}s ago)`);
+          console.log(`[Token Expiry] Expires at: ${new Date(expiresAtMs).toISOString()}, Current time: ${new Date(now).toISOString()}`);
+        } else {
+          console.log(`[Token Expiry] ✅ Token valid, expires in: ${minutesUntilExpiry} minutes (${secondsUntilExpiry}s)`);
+          console.log(`[Token Expiry] Expires at: ${new Date(expiresAtMs).toISOString()}, Current time: ${new Date(now).toISOString()}`);
+        }
         
         const needsProactiveRefresh =
           !!expiresAtMs && !isExpired && timeUntilExpiry <= refreshThresholdMs;
+        
+        if (needsProactiveRefresh) {
+          console.log(`[Token Expiry] 🔄 Token approaching expiry (within ${refreshThresholdMs / 1000 / 60} minutes threshold) - proactive refresh will be triggered`);
+        }
 
         if (!hasRefreshToken) {
-          console.warn('[AuthService] Stored session missing refresh token');
+          console.warn('[Token Expiry] ⚠️ [AuthService] Stored session missing refresh token');
           if (isExpired) {
-            console.warn('[AuthService] Session expired without refresh token - signing out');
+            console.error('[Token Expiry] ❌ [AuthService] Session expired without refresh token - signing out');
+            console.error(`[Token Expiry] Session expired ${Math.abs(minutesUntilExpiry)} minutes ago`);
             await this.signOut();
             return null;
           }
+          console.warn('[Token Expiry] ⚠️ [AuthService] Session missing refresh token but still valid - returning session');
           return session;
         }
 
@@ -151,8 +173,8 @@ export class AuthService {
           const timeRemaining = Math.max(timeUntilExpiry, 0);
           const minutesRemaining = Math.floor(timeRemaining / (60 * 1000));
           console.log(
-            `[AuthService] Session ${
-              isExpired ? 'expired' : 'approaching expiry'
+            `[Token Refresh] 🔄 Session ${
+              isExpired ? 'EXPIRED' : 'approaching expiry'
             } (${minutesRemaining} minutes remaining) - checking if refresh needed`
           );
 
@@ -173,7 +195,9 @@ export class AuthService {
 
             // If session was refreshed by another call, use it
             if (!finalNeedsRefresh) {
-              console.log('[AuthService] Session was refreshed by another call, using refreshed session');
+              const finalTimeUntilExpiry = finalExpiresAtMs - finalNow;
+              console.log('[Token Refresh] ✅ [AuthService] Session was refreshed by another call, using refreshed session');
+              console.log(`[Token Expiry] Refreshed session expires in: ${Math.floor(finalTimeUntilExpiry / 60000)} minutes`);
               return finalSession;
             }
 
@@ -191,12 +215,14 @@ export class AuthService {
           }
 
           if (isExpired) {
-            console.warn('[AuthService] Refresh failed for expired session - signing out');
+            console.error('[Token Refresh] ❌ Refresh failed for expired session - signing out');
+            console.error(`[Token Expiry] Session expired ${Math.abs(Math.floor((Date.now() - expiresAtMs) / 60000))} minutes ago`);
             await this.signOut();
             return null;
           }
 
-          console.warn('[AuthService] Proactive refresh failed - keeping current session');
+          console.warn('[Token Refresh] ⚠️ Proactive refresh failed - keeping current session');
+          console.warn(`[Token Expiry] Session still valid for ${Math.floor((expiresAtMs - Date.now()) / 60000)} more minutes`);
           return session;
         }
 
@@ -227,7 +253,8 @@ export class AuthService {
     // Use the gate to ensure only one refresh happens at a time
     // startRefresh() will either start a new refresh or return the existing refresh promise
     const refreshPromise = this.refreshGate.startRefresh(async () => {
-      console.log('[AuthService] Starting token refresh');
+      const refreshStartTime = Date.now();
+      console.log(`[Token Refresh] 🔄 Starting token refresh at ${new Date(refreshStartTime).toISOString()}`);
       
       // CRITICAL: Read refresh token from storage INSIDE the refresh function
       // If a refresh is already in progress, we'll read the NEW token after it completes
@@ -250,9 +277,18 @@ export class AuthService {
       }
       
       const session = await this.refreshSession(refreshToken);
-      console.log('[AuthService] Token refresh completed');
+      const refreshDuration = Date.now() - refreshStartTime;
       
-      if (!session) {
+      if (session) {
+        const newExpiresAtMs = session.expires_at ? session.expires_at * 1000 : 0;
+        const newExpiresIn = session.expires_in || 3600;
+        const expiresAtDate = newExpiresAtMs ? new Date(newExpiresAtMs).toISOString() : 'unknown';
+        
+        console.log(`[Token Refresh] ✅ Token refresh completed successfully in ${refreshDuration}ms`);
+        console.log(`[Token Refresh] New token expires in: ${Math.floor(newExpiresIn / 60)} minutes (${newExpiresIn}s)`);
+        console.log(`[Token Refresh] New token expires at: ${expiresAtDate}`);
+      } else {
+        console.error(`[Token Refresh] ❌ Token refresh failed after ${refreshDuration}ms`);
         throw new Error('Token refresh failed');
       }
     });
@@ -273,7 +309,7 @@ export class AuthService {
       if (errorCode === 'refresh_token_already_used' || 
           errorMsg.includes('refresh_token_already_used') ||
           errorMsg.includes('Invalid Refresh Token: Already Used')) {
-        console.warn('[AuthService] Refresh token already used - another refresh may have completed');
+        console.warn('[Token Refresh] ⚠️ Refresh token already used - another refresh may have completed');
         // Try to read the new session - another refresh might have succeeded
         const sessionData = await SecureStore.getItemAsync(SESSION_KEY);
         if (sessionData) {
@@ -282,12 +318,16 @@ export class AuthService {
           const expiresAtMs = session.expires_at ? session.expires_at * 1000 : 0;
           // If session is valid (not expired), return it
           if (expiresAtMs > now) {
-            console.log('[AuthService] Found valid session after refresh_token_already_used error');
+            const timeUntilExpiry = expiresAtMs - now;
+            console.log(`[Token Refresh] ✅ Found valid session after refresh_token_already_used error`);
+            console.log(`[Token Refresh] Session expires in: ${Math.floor(timeUntilExpiry / 60000)} minutes`);
             return session;
+          } else {
+            console.warn(`[Token Refresh] ❌ Session found but is expired (expired ${Math.abs(Math.floor((now - expiresAtMs) / 60000))} minutes ago)`);
           }
         }
         // If no valid session found, return null (will trigger sign out)
-        console.warn('[AuthService] No valid session found after refresh_token_already_used error');
+        console.warn('[Token Refresh] ❌ No valid session found after refresh_token_already_used error');
         return null;
       }
       
@@ -312,7 +352,8 @@ export class AuthService {
   // Refresh session using refresh token
   private static async refreshSession(refreshToken: string): Promise<AuthSession | null> {
     try {
-      console.log('[AuthService] refreshSession called');
+      const refreshStartTime = Date.now();
+      console.log(`[Token Refresh] 📡 Calling Supabase refreshSession at ${new Date(refreshStartTime).toISOString()}`);
       const { data, error } = await supabase.auth.refreshSession({
         refresh_token: refreshToken,
       });
@@ -361,7 +402,14 @@ export class AuthService {
       };
 
       await this.storeSession(session);
-      console.log('[AuthService] Session refreshed successfully');
+      const refreshDuration = Date.now() - refreshStartTime;
+      const newExpiresAtMs = session.expires_at ? session.expires_at * 1000 : 0;
+      const newExpiresIn = session.expires_in || 3600;
+      const expiresAtDate = newExpiresAtMs ? new Date(newExpiresAtMs).toISOString() : 'unknown';
+      
+      console.log(`[Token Refresh] ✅ Session refreshed successfully in ${refreshDuration}ms`);
+      console.log(`[Token Refresh] New access token expires in: ${Math.floor(newExpiresIn / 60)} minutes (${newExpiresIn}s)`);
+      console.log(`[Token Refresh] New access token expires at: ${expiresAtDate}`);
       return session;
     } catch (error: any) {
       const errorMsg = error?.message || String(error);
@@ -958,7 +1006,13 @@ export class AuthService {
       // CRITICAL: Ignore TOKEN_REFRESHED events to prevent handling refresh attempts
       // These events are triggered by Supabase's internal refresh logic even with autoRefreshToken: false
       if (event === 'TOKEN_REFRESHED') {
-        console.log('[AuthService] Ignoring TOKEN_REFRESHED event to prevent network errors');
+        const expiresAtMs = session?.expires_at ? session.expires_at * 1000 : 0;
+        const expiresIn = session?.expires_in || 0;
+        const expiresAtDate = expiresAtMs ? new Date(expiresAtMs).toISOString() : 'unknown';
+        
+        console.log(`[Token Refresh] 🔄 TOKEN_REFRESHED event received (ignored to prevent network errors)`);
+        console.log(`[Token Refresh] New token expires in: ${Math.floor(expiresIn / 60)} minutes (${expiresIn}s)`);
+        console.log(`[Token Refresh] New token expires at: ${expiresAtDate}`);
         return;
       }
       
