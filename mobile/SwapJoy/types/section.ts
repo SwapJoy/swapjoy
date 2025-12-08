@@ -40,7 +40,7 @@ export namespace SectionType {
       case SectionType.FavouriteCategories:
         return 'Favourite Categories';
       case SectionType.BestDeals:
-        return 'Best Deals (Your Items Match)';
+        return 'Best Deals (Price)';
       case SectionType.TopPicksForYou:
         return 'Top Picks';
       case SectionType.TrendingCategories:

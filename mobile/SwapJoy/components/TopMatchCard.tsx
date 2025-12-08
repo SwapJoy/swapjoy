@@ -69,6 +69,7 @@ interface TopMatchCardOwner {
   username?: string;
   displayName?: string;
   profileImageUrl?: string;
+  userId?: string;
 }
 
 interface TopMatchCardProps {
@@ -81,6 +82,7 @@ interface TopMatchCardProps {
   imageUrl?: string;
   owner: TopMatchCardOwner;
   onPress: () => void;
+  onOwnerPress?: () => void;
   onLikePress?: (event: GestureResponderEvent) => void;
   containerStyle?: StyleProp<ViewStyle>;
   likeIconName?: keyof typeof Ionicons.glyphMap;
@@ -100,6 +102,7 @@ const TopMatchCard: React.FC<TopMatchCardProps> = ({
   imageUrl,
   owner,
   onPress,
+  onOwnerPress,
   onLikePress,
   containerStyle,
   likeIconName = 'heart-outline',
@@ -111,6 +114,13 @@ const TopMatchCard: React.FC<TopMatchCardProps> = ({
   const { language, t } = useLocalization();
   const displayTitle = (title ?? '').trim() || 'Untitled item';
   const ownerUsername = owner.username?.trim() || owner.displayName?.trim() || '';
+
+  const handleOwnerPress = (event: GestureResponderEvent) => {
+    event.stopPropagation();
+    if (onOwnerPress) {
+      onOwnerPress();
+    }
+  };
 
   const { conditionPresentation, normalizedCategory } = useMemo(() => {
     const conditionPresentationResult = getConditionPresentation({
@@ -130,7 +140,12 @@ const TopMatchCard: React.FC<TopMatchCardProps> = ({
   return (
     <View>
       {ownerUsername.length > 0 ? (
-        <View style={styles.ownerHeader}>
+        <TouchableOpacity
+          style={styles.ownerHeader}
+          onPress={handleOwnerPress}
+          activeOpacity={0.7}
+          disabled={!onOwnerPress}
+        >
           {owner.profileImageUrl ? (
             <CachedImage
               uri={owner.profileImageUrl}
@@ -147,7 +162,7 @@ const TopMatchCard: React.FC<TopMatchCardProps> = ({
           <Text style={styles.ownerUsername} numberOfLines={1}>
             {ownerUsername}
           </Text>
-        </View>
+        </TouchableOpacity>
       ) : null}
 
       <TouchableOpacity
@@ -493,7 +508,7 @@ const styles = StyleSheet.create({
 });
 
 export const TopMatchCardSkeleton = memo(({ style }: { style?: StyleProp<ViewStyle> }) => (
-  <View style={[styles.card, styles.skeletonCard, style]}>
+  <View style={[styles.card, styles.skeletonCard, style, { paddingLeft: 16, paddingTop: 8 }]}>
     <FadePlaceholder style={styles.skeletonMedia} borderRadius={16} />
     <View style={styles.infoSection}>
       <FadePlaceholder style={styles.skeletonLineLarge} />

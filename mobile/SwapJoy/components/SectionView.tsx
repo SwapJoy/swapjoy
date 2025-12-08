@@ -52,8 +52,14 @@ const SectionItemCard: React.FC<SectionItemCardProps> = memo(
           username: ownerUsername,
           displayName: ownerDisplayName,
           initials: ownerInitials,
+          userId: item.user?.id,
         }}
         onPress={() => (navigation as any).navigate('ItemDetails', { itemId: item.id })}
+        onOwnerPress={() => {
+          if (item.user?.id) {
+            (navigation as any).navigate('UserProfile', { userId: item.user.id });
+          }
+        }}
         onLikePress={(event) => {
           event?.stopPropagation?.();
           const favoriteData = {
@@ -252,8 +258,8 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 30,
-    fontWeight: '700',
-    color: '#707070',
+    fontWeight: '500',
+    color: '#A3A3A3',
   },
   horizontalScroller: {
     marginTop: 4,
