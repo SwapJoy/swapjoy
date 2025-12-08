@@ -243,7 +243,7 @@ const styles = StyleSheet.create({
   },
   sectionHeaderInner: {
     paddingHorizontal: 20,
-    marginBottom: 12,
+    marginBottom: 0,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
@@ -251,9 +251,9 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: '400',
-    color: '#19191a',
+    fontSize: 30,
+    fontWeight: '700',
+    color: '#707070',
   },
   horizontalScroller: {
     marginTop: 4,

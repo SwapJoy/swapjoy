@@ -15,9 +15,10 @@ import CachedImage from './CachedImage';
 import { useLocalization } from '../localization';
 import { getConditionPresentation } from '../utils/conditions';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 export const TOP_MATCH_CARD_WIDTH = width * 0.75;
+export const TOP_MATCH_CARD_HEIGHT = height * 0.5; // Card height based on screen height
 
 const useFadeAnimation = () => {
   const opacity = useRef(new Animated.Value(0.4)).current;
@@ -67,6 +68,7 @@ interface TopMatchCardOwner {
   initials: string;
   username?: string;
   displayName?: string;
+  profileImageUrl?: string;
 }
 
 interface TopMatchCardProps {
@@ -126,109 +128,122 @@ const TopMatchCard: React.FC<TopMatchCardProps> = ({
   }, [category, condition, language, t]);
 
   return (
-    <TouchableOpacity
-      style={[styles.card, containerStyle]}
-      activeOpacity={0.85}
-      onPress={onPress}
-    >
-      <View style={styles.mediaWrapper}>
-        <CachedImage
-          uri={imageUrl || 'https://via.placeholder.com/320x240'}
-          style={styles.heroImage}
-          resizeMode="cover"
-          fallbackUri="https://picsum.photos/320/240?random=7"
-        />
-        {!disableLikeButton && (
-          <TouchableOpacity
-            style={[styles.likeButton, isLikeActive ? styles.likeButtonActive : null]}
-            activeOpacity={0.6}
-            onPress={onLikePress}
-          >
-            <Ionicons
-              name={likeIconName}
-              size={18}
-              color={isLikeActive ? likeActiveColor : likeIconColor}
+    <View>
+      {ownerUsername.length > 0 ? (
+        <View style={styles.ownerHeader}>
+          {owner.profileImageUrl ? (
+            <CachedImage
+              uri={owner.profileImageUrl}
+              style={styles.ownerProfileImage}
+              resizeMode="cover"
             />
-          </TouchableOpacity>
-        )}
-      </View>
-
-      <View style={styles.content}>
-        <Text style={styles.title} numberOfLines={1} ellipsizeMode="tail">
-          {displayTitle}
-        </Text>
-
-        {description ? (
-          <Text
-            style={styles.description}
-            numberOfLines={descriptionLines ?? 3}
-            ellipsizeMode="tail"
-          >
-            {description}
+          ) : (
+            <View style={styles.ownerProfileImagePlaceholder}>
+              <Text style={styles.ownerProfileImageText}>
+                {owner.initials || ownerUsername.charAt(0).toUpperCase()}
+              </Text>
+            </View>
+          )}
+          <Text style={styles.ownerUsername} numberOfLines={1}>
+            {ownerUsername}
           </Text>
-        ) : null}
+        </View>
+      ) : null}
 
-        {ownerUsername.length > 0 ? (
-          <View style={styles.ownerSection}>
-            <Text style={styles.metaLabel}>Owner</Text>
-            <Text style={styles.ownerValue} numberOfLines={1}>
-              {ownerUsername}
+      <TouchableOpacity
+        style={[styles.card, containerStyle]}
+        activeOpacity={0.85}
+        onPress={onPress}
+      >
+        <View style={styles.mediaSection}>
+          <CachedImage
+            uri={imageUrl || 'https://via.placeholder.com/320x240'}
+            style={styles.heroImage}
+            resizeMode="cover"
+            fallbackUri="https://picsum.photos/320/240?random=7"
+          />
+          {!disableLikeButton && (
+            <TouchableOpacity
+              style={[styles.likeButton, isLikeActive ? styles.likeButtonActive : null]}
+              activeOpacity={0.6}
+              onPress={onLikePress}
+            >
+              <Ionicons
+                name={likeIconName}
+                size={18}
+                color={isLikeActive ? likeActiveColor : likeIconColor}
+              />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <View style={styles.infoSection}>
+          <View style={styles.titleRow}>
+            <Text style={styles.title} numberOfLines={1} ellipsizeMode="tail">
+              {displayTitle}
             </Text>
-          </View>
-        ) : null}
-
-        {(conditionPresentation || normalizedCategory || price) && (
-          <View style={styles.metaSection}>
-            {normalizedCategory ? (
-              <View style={styles.metaRow}>
-                <Text style={styles.metaLabel}>Category</Text>
-                <View
-                  style={[styles.chip, { backgroundColor: '#e2e8f0' }]}
-                >
-                  <Text style={[styles.chipText, { color: '#0f172a' }]}>
-                    {normalizedCategory}
-                  </Text>
-                </View>
-              </View>
+            {price ? (
+              <Text style={styles.priceText}>{price}</Text>
             ) : null}
+          </View>
 
-            {conditionPresentation ? (
-              <View style={styles.metaRow}>
-                <Text style={styles.metaLabel}>Condition</Text>
-                <View
-                  style={[
-                    styles.chip,
-                    { backgroundColor: conditionPresentation.backgroundColor },
-                  ]}
-                >
-                  <Text
+          {description ? (
+            <Text
+              style={styles.description}
+              numberOfLines={2}
+              ellipsizeMode="tail"
+            >
+              {description}
+            </Text>
+          ) : null}
+
+          {(conditionPresentation || normalizedCategory) && (
+            <View style={styles.metaSection}>
+              {normalizedCategory ? (
+                <View style={styles.metaRowItem}>
+                  <Text style={styles.metaLabelVertical}>Category</Text>
+                  <View
+                    style={[styles.chip, { backgroundColor: '#e2e8f0' }]}
+                  >
+                    <Text style={[styles.chipText, { color: '#0f172a' }]}>
+                      {normalizedCategory}
+                    </Text>
+                  </View>
+                </View>
+              ) : null}
+
+              {conditionPresentation ? (
+                <View style={[styles.metaRowItem, styles.metaRowItemSpaced]}>
+                  <Text style={styles.metaLabelVertical}>Condition</Text>
+                  <View
                     style={[
-                      styles.chipText,
-                      { color: conditionPresentation.textColor },
+                      styles.chip,
+                      { backgroundColor: conditionPresentation.backgroundColor },
                     ]}
                   >
-                    {conditionPresentation.label}
-                  </Text>
+                    <Text
+                      style={[
+                        styles.chipText,
+                        { color: conditionPresentation.textColor },
+                      ]}
+                    >
+                      {conditionPresentation.label}
+                    </Text>
+                  </View>
                 </View>
-              </View>
-            ) : null}
-
-            {price ? (
-              <View style={styles.metaRow}>
-                <Text style={styles.metaLabel}>Price</Text>
-                <Text style={styles.priceText}>{price}</Text>
-              </View>
-            ) : null}
-          </View>
-        )}
-      </View>
-    </TouchableOpacity>
+              ) : null}
+            </View>
+          )}
+        </View>
+      </TouchableOpacity>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   card: {
     width: TOP_MATCH_CARD_WIDTH,
+    height: TOP_MATCH_CARD_HEIGHT,
     backgroundColor: '#ffffff',
     borderRadius: 2,
     marginRight: 8,
@@ -238,10 +253,44 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 4,
     overflow: 'hidden',
+    flexDirection: 'column',
   },
-  mediaWrapper: {
+  ownerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingTop: 12,
+    paddingBottom: 8,
+    paddingLeft: 8,
+    gap: 10,
+  },
+  ownerProfileImage: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#e2e8f0',
+  },
+  ownerProfileImagePlaceholder: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#e2e8f0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ownerProfileImageText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  ownerUsername: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#0f172a',
+    flex: 1,
+  },
+  mediaSection: {
+    flex: 0.7,
     position: 'relative',
-    height: 200,
   },
   heroImage: {
     width: '100%',
@@ -308,7 +357,7 @@ const styles = StyleSheet.create({
   ownerName: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#0f172a',
+    color: '#000',
   },
   ownerSection: {
     marginTop: 8,
@@ -319,22 +368,30 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#0f172a',
   },
-  content: {
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+  infoSection: {
+    flex: 0.3,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    justifyContent: 'flex-start',
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
   },
   title: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '600',
     color: '#0f172a',
+    flex: 1,
   },
   description: {
     marginTop: 4,
     fontSize: 12,
     lineHeight: 18,
     color: '#475569',
-    minHeight: 54,
-    maxHeight: 54,
+    maxHeight: 36, // 2 lines max (2 * lineHeight)
   },
   chipsRow: {
     marginTop: 8,
@@ -353,7 +410,22 @@ const styles = StyleSheet.create({
     color: '#0f172a',
   },
   metaSection: {
-    marginTop: 10,
+    marginTop: 12,
+  },
+  metaRowItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  metaRowItemSpaced: {
+    marginTop: 8,
+  },
+  metaLabelVertical: {
+    fontSize: 10,
+    fontWeight: '300',
+    fontStyle: 'italic',
+    color: '#6b7280',
+    textTransform: 'uppercase',
   },
   metaRow: {
     flexDirection: 'row',
@@ -379,8 +451,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
   },
   skeletonMedia: {
+    flex: 0.7,
     width: '100%',
-    height: 170,
   },
   skeletonLineLarge: {
     width: '70%',
@@ -423,7 +495,7 @@ const styles = StyleSheet.create({
 export const TopMatchCardSkeleton = memo(({ style }: { style?: StyleProp<ViewStyle> }) => (
   <View style={[styles.card, styles.skeletonCard, style]}>
     <FadePlaceholder style={styles.skeletonMedia} borderRadius={16} />
-    <View style={styles.content}>
+    <View style={styles.infoSection}>
       <FadePlaceholder style={styles.skeletonLineLarge} />
       <FadePlaceholder style={styles.skeletonLineMedium} />
       <FadePlaceholder style={styles.skeletonLineSmall} />
