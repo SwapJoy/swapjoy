@@ -14,12 +14,16 @@ import CachedImage from './CachedImage';
 import { useLocalization } from '../localization';
 import { getConditionPresentation } from '../utils/conditions';
 import { useCategories } from '../contexts/CategoriesContext';
+import { resolveCategoryName } from '../utils/category';
+import type { AppLanguage } from '../types/language';
 import SJText from './SJText';
 
-const { width, height } = Dimensions.get('window');
+const { height } = Dimensions.get('window');
 
-export const TOP_MATCH_CARD_WIDTH = width * 0.75;
 export const TOP_MATCH_CARD_HEIGHT = height * 0.55; // Card height based on screen height
+
+// Default card width (can be overridden via prop)
+const DEFAULT_CARD_WIDTH = Dimensions.get('window').width * 0.75;
 
 const useFadeAnimation = () => {
   const opacity = useRef(new Animated.Value(0.4)).current;
@@ -91,6 +95,7 @@ interface TopMatchCardProps {
   likeActiveColor?: string;
   isLikeActive?: boolean;
   disableLikeButton?: boolean;
+  cardWidth?: number;
 }
 
 const TopMatchCard: React.FC<TopMatchCardProps> = ({
@@ -111,9 +116,10 @@ const TopMatchCard: React.FC<TopMatchCardProps> = ({
   likeActiveColor = '#ef4444',
   isLikeActive = false,
   disableLikeButton,
+  cardWidth = DEFAULT_CARD_WIDTH,
 }) => {
   const { language, t } = useLocalization();
-  const { getCategoryByName } = useCategories();
+  const { getCategoryByName, getCategoryById } = useCategories();
   const displayTitle = (title ?? '').trim() || 'Untitled item';
   const ownerUsername = owner.username?.trim() || owner.displayName?.trim() || '';
 
@@ -131,8 +137,38 @@ const TopMatchCard: React.FC<TopMatchCardProps> = ({
       translate: t,
     });
 
-    const normalizedCategoryResult = category?.trim();
-    const categoryData = normalizedCategoryResult ? getCategoryByName(normalizedCategoryResult) : null;
+    // Handle category - it can be a string, an object with id, or an object with name properties
+    let categoryData = null;
+    let normalizedCategoryResult: string | null = null;
+
+    if (category) {
+      // If category is an object with an id
+      if (typeof category === 'object' && category !== null && 'id' in category && typeof (category as any).id === 'string') {
+        categoryData = getCategoryById((category as any).id);
+        if (categoryData) {
+          // Use the localized name from the category data
+          normalizedCategoryResult = categoryData.name || categoryData.title_en || categoryData.title_ka || null;
+        }
+      }
+      // If category is an object without id (might have name/title properties)
+      else if (typeof category === 'object' && category !== null) {
+        // Try to resolve using resolveCategoryName utility
+        const resolvedName = resolveCategoryName({ category }, language as AppLanguage);
+        if (resolvedName) {
+          normalizedCategoryResult = resolvedName;
+          categoryData = getCategoryByName(resolvedName);
+        }
+      }
+      // If category is a string
+      else if (typeof category === 'string') {
+        const trimmed = category.trim();
+        if (trimmed.length > 0) {
+          normalizedCategoryResult = trimmed;
+          categoryData = getCategoryByName(trimmed);
+        }
+      }
+    }
+
     const categoryIconResult = categoryData?.icon || '📦'; // Default emoji if no icon
 
     return {
@@ -140,7 +176,7 @@ const TopMatchCard: React.FC<TopMatchCardProps> = ({
       normalizedCategory: normalizedCategoryResult,
       categoryIcon: categoryIconResult,
     };
-  }, [category, condition, language, t, getCategoryByName]);
+  }, [category, condition, language, t, getCategoryByName, getCategoryById]);
 
   return (
     <View>
@@ -170,7 +206,7 @@ const TopMatchCard: React.FC<TopMatchCardProps> = ({
         </TouchableOpacity>
       ) : null}
 
-      <View style={styles.cardWrapper}>
+      <View style={[styles.cardWrapper, { width: cardWidth }]}>
         <TouchableOpacity
           style={[styles.card, containerStyle]}
           activeOpacity={0.85}
@@ -259,7 +295,6 @@ const TopMatchCard: React.FC<TopMatchCardProps> = ({
 
 const styles = StyleSheet.create({
   cardWrapper: {
-    width: TOP_MATCH_CARD_WIDTH,
     height: TOP_MATCH_CARD_HEIGHT,
     marginRight: 8,
     marginBottom: 8, // Add space for shadow to be visible at bottom
@@ -269,7 +304,24 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 1
   },
+  skeletonCardWrapper: {
+    height: TOP_MATCH_CARD_HEIGHT,
+    marginRight: 8,
+    marginBottom: 8, // Add space for shadow to be visible at bottom
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1
+  },
   card: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#ffffff',
+    borderRadius: 2,
+    overflow: 'hidden',
+    flexDirection: 'column',
+  },
+  skeletonBackground: {
     width: '100%',
     height: '100%',
     backgroundColor: '#ffffff',
@@ -302,15 +354,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#e2e8f0',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#E0E0E0'
   },
   ownerProfileImageText: {
     fontSize: 14,
-    fontWeight: 'bold', // or use '700' for numeric weight
+    fontWeight: '500', // or use '700' for numeric weight
     color: '#0f172a',
   },
   ownerUsername: {
     fontSize: 14,
-    fontWeight: '900',
+    fontWeight: '400',
     color: '#0f172a',
     flex: 1,
   },
@@ -406,13 +460,8 @@ const styles = StyleSheet.create({
   },
   ownerAvatarText: {
     fontSize: 10,
-    fontWeight: '700',
+    fontWeight: '500',
     color: '#0f172a',
-  },
-  ownerName: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#000',
   },
   ownerSection: {
     marginTop: 8,
@@ -420,7 +469,7 @@ const styles = StyleSheet.create({
   ownerValue: {
     marginTop: 2,
     fontSize: 13,
-    fontWeight: '500',
+    fontWeight: '400',
     color: '#0f172a',
   },
   titleRow: {
@@ -548,9 +597,9 @@ const styles = StyleSheet.create({
   },
 });
 
-export const TopMatchCardSkeleton = memo(({ style }: { style?: StyleProp<ViewStyle> }) => (
-  <View style={styles.cardWrapper}>
-    <View style={[styles.card, styles.skeletonCard, style, { paddingLeft: 16, paddingTop: 8 }]}>
+export const TopMatchCardSkeleton = memo(({ style, cardWidth = DEFAULT_CARD_WIDTH }: { style?: StyleProp<ViewStyle>; cardWidth?: number }) => (
+  <View style={[styles.skeletonCardWrapper, { width: cardWidth }]}>
+    <View style={[styles.skeletonBackground, styles.skeletonCard, style, { paddingLeft: 16, paddingTop: 8 }]}>
       <FadePlaceholder style={styles.skeletonMedia} borderRadius={16} />
       <View style={styles.infoSection}>
         <FadePlaceholder style={styles.skeletonLineLarge} />

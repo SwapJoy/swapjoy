@@ -8,15 +8,14 @@ import { useAuth } from '../contexts/AuthContext';
 import { useLocalization } from '../localization';
 import { useFavorites } from '../contexts/FavoritesContext';
 import { SJCardItem } from '../hooks/useExploreData';
-import TopMatchCard, { TOP_MATCH_CARD_WIDTH, TopMatchCardSkeleton } from './TopMatchCard';
-import ItemCard, { ItemCardSkeleton } from './ItemCard';
+import TopMatchCard, { TopMatchCardSkeleton } from './TopMatchCard';
 import { ExploreScreenProps } from '../types/navigation';
-import type { AppLanguage } from '../types/language';
 
 interface SectionViewProps {
   sectionType: SectionType;
   functionParams: Record<string, any>;
   autoFetch?: boolean;
+  cardWidth?: number;
 }
 
 interface SectionItemCardProps {
@@ -25,10 +24,11 @@ interface SectionItemCardProps {
   toggleFavorite: (id: string, data: any) => void;
   isFavorite: (id: string) => boolean;
   swapSuggestionsLabel: string;
+  cardWidth?: number;
 }
 
 const SectionItemCard: React.FC<SectionItemCardProps> = memo(
-  ({ item, navigation, toggleFavorite, isFavorite, swapSuggestionsLabel }) => {
+  ({ item, navigation, toggleFavorite, isFavorite, swapSuggestionsLabel, cardWidth }) => {
     const ownerInitials =
       `${item.user?.first_name?.[0] ?? ''}${item.user?.last_name?.[0] ?? ''}`.trim() ||
       item.user?.username?.[0]?.toUpperCase() ||
@@ -84,6 +84,7 @@ const SectionItemCard: React.FC<SectionItemCardProps> = memo(
         likeIconColor="#1f2933"
         likeActiveColor="#ef4444"
         isLikeActive={isFavorite(item.id)}
+        cardWidth={cardWidth}
       />
     );
   }
@@ -92,11 +93,11 @@ const SectionItemCard: React.FC<SectionItemCardProps> = memo(
 SectionItemCard.displayName = 'SectionItemCard';
 
 // Skeleton loader component
-const SectionSkeleton = () => (
+const SectionSkeleton = ({ cardWidth }: { cardWidth?: number }) => (
   <View style={styles.horizontalScroller}>
     <View style={styles.horizontalList}>
       {[1, 2].map((index) => (
-        <TopMatchCardSkeleton key={index} style={{ width: TOP_MATCH_CARD_WIDTH }} />
+        <TopMatchCardSkeleton key={index} cardWidth={cardWidth} />
       ))}
     </View>
   </View>
@@ -121,7 +122,8 @@ const ErrorDisplay: React.FC<{
 export const SectionView: React.FC<SectionViewProps> = memo(({ 
   sectionType, 
   functionParams, 
-  autoFetch = false 
+  autoFetch = false,
+  cardWidth
 }) => {
   const navigation = useNavigation<ExploreScreenProps['navigation']>();
   const { t } = useLocalization();
@@ -149,22 +151,23 @@ export const SectionView: React.FC<SectionViewProps> = memo(({
       const sideInset = 12;
       const betweenSpacing = 8;
 
-      return (
-        <View
-          style={{
-            marginLeft: isFirst ? sideInset : 0,
-            marginRight: isLast ? sideInset : betweenSpacing,
-          }}
-        >
-          <SectionItemCard
-            item={item}
-            navigation={navigation}
-            toggleFavorite={toggleFavorite}
-            isFavorite={isFavorite}
-            swapSuggestionsLabel={t('explore.labels.swapSuggestions', { defaultValue: 'Possible matches' })}
-          />
-        </View>
-      );
+    return (
+      <View
+        style={{
+          marginLeft: isFirst ? sideInset : 0,
+          marginRight: isLast ? sideInset : betweenSpacing,
+        }}
+      >
+        <SectionItemCard
+          item={item}
+          navigation={navigation}
+          toggleFavorite={toggleFavorite}
+          isFavorite={isFavorite}
+          swapSuggestionsLabel={t('explore.labels.swapSuggestions', { defaultValue: 'Possible matches' })}
+          cardWidth={cardWidth}
+        />
+      </View>
+    );
     },
     [items?.length, isFavorite, navigation, toggleFavorite, t]
   );
@@ -210,7 +213,7 @@ export const SectionView: React.FC<SectionViewProps> = memo(({
             <SJText style={styles.sectionTitle}>{sectionTitle}</SJText>
           </View>
         </View>
-        <SectionSkeleton />
+        <SectionSkeleton cardWidth={cardWidth} />
       </View>
     );
   }

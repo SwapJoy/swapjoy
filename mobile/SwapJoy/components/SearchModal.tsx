@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useRef } from 'react';
-import {View, StyleSheet, TextInput, ActivityIndicator, TouchableOpacity} from 'react-native';
+import {View, StyleSheet, TextInput, ActivityIndicator, TouchableOpacity, FlatList, Dimensions} from 'react-native';
 import SJText from '../components/SJText';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import ItemCardCollection from './ItemCardCollection';
-import type { AppLanguage } from '../types/language';
+import TopMatchCard from './TopMatchCard';
 import { useRecentSearches } from '../hooks/useRecentSearches';
 import type { useExploreScreenState } from '../hooks/useExploreScreenState';
+import { formatCurrency } from '../utils';
+import { useFavorites } from '../contexts/FavoritesContext';
 
 interface SearchModalProps {
   visible: boolean;
@@ -25,6 +26,7 @@ interface SearchModalProps {
   onItemPress: (item: any) => void;
   renderFavoriteButton: (item: any) => React.ReactNode;
   resolveSimilarityLabel: (item: any) => string | null;
+  cardWidth?: number;
 }
 
 const SearchModal: React.FC<SearchModalProps> = ({
@@ -41,14 +43,14 @@ const SearchModal: React.FC<SearchModalProps> = ({
   searchError,
   hasSearchQuery,
   onClearSearch,
-  onItemPress,
-  renderFavoriteButton,
-  resolveSimilarityLabel,
+  onItemPress
 }) => {
   const inputRef = useRef<TextInput | null>(null);
   const { recentSearches, loadingRecent, saveRecentSearch, clearRecentSearches } = useRecentSearches();
   const insets = useSafeAreaInsets();
-
+  const { isFavorite, toggleFavorite } = useFavorites();
+  const { width: SCREEN_WIDTH } = Dimensions.get('window');
+  
   const handleSubmit = useCallback(
     async (query: string) => {
       const trimmed = query.trim();
@@ -87,6 +89,78 @@ const SearchModal: React.FC<SearchModalProps> = ({
     }
   }, [visible]);
 
+  const renderSearchItem = useCallback(
+    ({ item }: { item: any }) => {
+      const ownerInitials =
+        `${item.user?.first_name?.[0] ?? ''}${item.user?.last_name?.[0] ?? ''}`.trim() ||
+        item.user?.username?.[0]?.toUpperCase() ||
+        '?';
+      const ownerDisplayName =
+        `${item.user?.first_name ?? ''} ${item.user?.last_name ?? ''}`.trim() || '';
+      const ownerUsername = item.user?.username || ownerDisplayName;
+
+      const imageUrl =
+        item?.image_url ||
+        item?.item_images?.[0]?.image_url ||
+        item?.images?.[0]?.image_url ||
+        null;
+
+      const priceValue = item?.price || item?.estimated_value || 0;
+      const displayedPrice = formatCurrency(priceValue, item?.currency || 'USD');
+
+      const favoriteData = {
+        id: item?.id,
+        title: item?.title,
+        description: item?.description,
+        price: item?.price || item?.estimated_value || 0,
+        currency: item?.currency || 'USD',
+        condition: item?.condition,
+        image_url: imageUrl,
+        created_at: item?.created_at || item?.updated_at || null,
+        category_name: item?.category_name ?? item?.category_name_en ?? item?.category_name_ka ?? null,
+        category_name_en: item?.category_name_en ?? null,
+        category_name_ka: item?.category_name_ka ?? null,
+        category: item?.category ?? item?.categories ?? null,
+        categories: item?.categories ?? null,
+      };
+
+      return (
+        <View style={styles.searchResultItem}>
+          <TopMatchCard
+            title={item.title || 'Untitled item'}
+            price={displayedPrice}
+            imageUrl={imageUrl}
+            description={item.description}
+            category={item?.category ?? item?.category_name ?? item?.category_name_en ?? item?.category_name_ka ?? null}
+            condition={item.condition}
+            owner={{
+              username: ownerUsername,
+              displayName: ownerDisplayName,
+              initials: ownerInitials,
+              userId: item.user?.id,
+            }}
+            onPress={() => onItemPress(item)}
+            onOwnerPress={() => {
+              if (item.user?.id) {
+                // Navigate to user profile if needed
+              }
+            }}
+            onLikePress={(event) => {
+              event?.stopPropagation?.();
+              toggleFavorite(item.id, favoriteData);
+            }}
+            likeIconName={isFavorite(item.id) ? 'heart' : 'heart-outline'}
+            likeIconColor="#1f2933"
+            likeActiveColor="#ef4444"
+            isLikeActive={isFavorite(item.id)}
+            cardWidth={SCREEN_WIDTH - 32}
+          />
+        </View>
+      );
+    },
+    [onItemPress, isFavorite, toggleFavorite]
+  );
+
   const searchResultsNode =
     hasSearchQuery || searchLoading || searchError ? (
       <View style={styles.searchResultsContainer}>
@@ -96,23 +170,16 @@ const SearchModal: React.FC<SearchModalProps> = ({
             <SJText style={styles.searchStatusSubtitle}>{searchStrings.noResultsSubtitle}</SJText>
           </View>
         ) : (
-          <ItemCardCollection
-            items={searchResults}
-            t={t}
-            language={language as AppLanguage}
-            onItemPress={onItemPress}
-            favoriteButtonRenderer={renderFavoriteButton}
-            metaRightResolver={resolveSimilarityLabel}
-            placeholderLabel={searchStrings.noImage}
-            categoryFallback={strings.labels.categoryFallback}
-            columnSpacing={16}
-            rowSpacing={18}
-            scrollEnabled
-            showsVerticalScrollIndicator
-            contentContainerStyle={styles.searchResultsContent}
-            flatListProps={{
-              removeClippedSubviews: false,
-            }}
+          <FlatList
+            data={searchResults}
+            renderItem={renderSearchItem}
+            keyExtractor={(item) => (item?.id ? String(item.id) : `item-${Math.random()}`)}
+            contentContainerStyle={[
+              styles.searchResultsContent,
+              { paddingBottom: Math.max(insets.bottom, 40) },
+            ]}
+            showsVerticalScrollIndicator={true}
+            removeClippedSubviews={false}
           />
         )}
         {searchError ? <SJText style={styles.searchErrorText}>{searchError}</SJText> : null}
@@ -208,11 +275,16 @@ const styles = StyleSheet.create({
     zIndex: 20,
   },
   searchResultsContainer: {
+    flex: 1,
     marginTop: 16,
   },
   searchResultsContent: {
     paddingTop: 8,
     paddingBottom: 4,
+    paddingHorizontal: 16,
+  },
+  searchResultItem: {
+    marginBottom: 24,
   },
   searchStatusContainer: {
     paddingVertical: 16,

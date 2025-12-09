@@ -27,7 +27,8 @@ serve(async (req) => {
   );
 
   try {
-    const { itemId } = await req.json();
+    // Accept both old format (itemId only) and new format (with title, description, category titles)
+    const { itemId, title, description, category_title_en, category_title_ka } = await req.json();
 
     if (!itemId) {
       return new Response(
@@ -39,33 +40,48 @@ serve(async (req) => {
       );
     }
 
-    // Get item details
-    const { data: item, error: itemError } = await supabaseClient
-      .from('items')
-      .select('title, description, category_id')
-      .eq('id', itemId)
-      .single();
+    // If title/description/category titles are provided, use them directly (from trigger)
+    // Otherwise, fetch from database (backward compatibility)
+    let itemTitle = title;
+    let itemDescription = description;
+    let categoryNameEn = category_title_en || '';
+    let categoryNameKa = category_title_ka || '';
 
-    if (itemError || !item) {
-      console.error('Error fetching item:', itemError?.message || 'Item not found');
-      return new Response(
-        JSON.stringify({ error: itemError?.message || 'Item not found' }),
-        {
-          headers: { 'Content-Type': 'application/json' },
-          status: 404,
+    if (!itemTitle || !itemDescription) {
+      // Fallback: fetch item details if not provided
+      const { data: item, error: itemError } = await supabaseClient
+        .from('items')
+        .select('title, description, category_id')
+        .eq('id', itemId)
+        .single();
+
+      if (itemError || !item) {
+        console.error('Error fetching item:', itemError?.message || 'Item not found');
+        return new Response(
+          JSON.stringify({ error: itemError?.message || 'Item not found' }),
+          {
+            headers: { 'Content-Type': 'application/json' },
+            status: 404,
+          }
+        );
+      }
+
+      itemTitle = itemTitle || item.title;
+      itemDescription = itemDescription || item.description;
+
+      // Fetch category if not provided and category_id exists
+      if ((!categoryNameEn && !categoryNameKa) && item.category_id) {
+        const { data: category, error: categoryError } = await supabaseClient
+          .from('categories')
+          .select('title_en, title_ka, name')
+          .eq('id', item.category_id)
+          .single();
+
+        if (!categoryError && category) {
+          categoryNameEn = category.title_en || category.name || '';
+          categoryNameKa = category.title_ka || '';
         }
-      );
-    }
-
-    // Get category name
-    const { data: category, error: categoryError } = await supabaseClient
-      .from('categories')
-      .select('name')
-      .eq('id', item.category_id)
-      .single();
-
-    if (categoryError || !category) {
-      console.warn('Warning: Category not found for item, proceeding without category name.');
+      }
     }
 
     // Get item images with meta data
@@ -109,8 +125,16 @@ serve(async (req) => {
       : '';
 
     // Create text for embedding with image information
-    const categoryName = category ? category.name : '';
-    let text = `${item.title}. ${item.description}. Category: ${categoryName}`;
+    // Include title, description, and category titles in both languages for better semantic matching
+    let text = `${itemTitle || ''}. ${itemDescription || ''}`;
+    
+    // Add category information in both languages for better semantic search
+    if (categoryNameEn) {
+      text += ` Category (English): ${categoryNameEn}.`;
+    }
+    if (categoryNameKa && categoryNameKa !== categoryNameEn) {
+      text += ` Category (Georgian): ${categoryNameKa}.`;
+    }
     
     if (imageContext || imageDescriptions) {
       text += ` Images: ${imageContext} ${imageDescriptions}`.trim();

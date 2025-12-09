@@ -293,7 +293,6 @@ export const useExploreScreenState = (): ExploreScreenState => {
       setSearchLoading(true);
       setSearchError(null);
       const currentRequestId = ++searchRequestIdRef.current;
-      let fuzzyData: ExploreSearchItem[] = [];
 
       const normalizeSearchItems = (items: ExploreSearchItem[]): ExploreSearchItem[] =>
         items.map((item) => {
@@ -314,62 +313,28 @@ export const useExploreScreenState = (): ExploreScreenState => {
         });
 
       try {
-        const { data: kwData } = await ApiService.keywordSearch(query, 20);
-        if (Array.isArray(kwData)) {
-          fuzzyData = normalizeSearchItems(kwData);
-          if (currentRequestId === searchRequestIdRef.current) {
-            setSearchResults(fuzzyData);
-          }
-        }
-      } catch {
-        // swallow keyword search errors; semantic search fallback will run
-      }
-
-      try {
-        const { data: semData, error: apiError } = await ApiService.semanticSearch(query, 30);
+        // semanticSearch Edge Function already uses match_items for semantic search
+        // and includes fuzzy text search fallback when semantic results are sparse
+        const { data: searchData, error: apiError } = await ApiService.semanticSearch(query, 30);
+        
         if (currentRequestId !== searchRequestIdRef.current) {
           return;
         }
 
         if (apiError) {
           setSearchError(apiError.message || searchStrings.error);
-          setSearchResults(fuzzyData);
-        } else if (Array.isArray(semData)) {
-          const byId: Record<string, ExploreSearchItem & { _score?: number; _fuzzySim?: number }> = {};
-
-          for (const item of fuzzyData) {
-            byId[item.id] = { ...item, _fuzzySim: (item as any).similarity ?? 0 }; // eslint-disable-line @typescript-eslint/no-explicit-any
-          }
-
-          for (const item of semData) {
-            const previous = byId[item.id];
-            const fused: ExploreSearchItem & { _score?: number; _fuzzySim?: number } = { ...(previous || {}), ...item };
-            const fuzzySim = (previous?._fuzzySim ?? (item as any).similarity ?? 0) as number; // eslint-disable-line @typescript-eslint/no-explicit-any
-            const semanticSim = ((item as any).similarity ?? 0) as number; // eslint-disable-line @typescript-eslint/no-explicit-any
-            fused._score = 0.6 * semanticSim + 0.4 * Math.min(1, fuzzySim);
-            byId[item.id] = fused;
-          }
-
-          for (const item of fuzzyData) {
-            if (!byId[item.id]) {
-              byId[item.id] = {
-                ...item,
-                _score: Math.min(1, ((item as any).similarity ?? 0)) * 0.4, // eslint-disable-line @typescript-eslint/no-explicit-any
-              };
-            } else if (byId[item.id]._score == null) {
-              byId[item.id]._score = Math.min(1, byId[item.id]._fuzzySim ?? 0) * 0.4;
-            }
-          }
-
-          const merged = Object.values(byId);
-          merged.sort((a, b) => (b._score ?? 0) - (a._score ?? 0));
-          setSearchResults(normalizeSearchItems(merged));
+          setSearchResults([]);
+        } else if (Array.isArray(searchData)) {
+          // Results from Edge Function are already sorted by similarity
+          // and include both semantic matches (from match_items) and fuzzy text matches
+          setSearchResults(normalizeSearchItems(searchData));
         } else {
-          setSearchResults(fuzzyData);
+          setSearchResults([]);
         }
       } catch (error: any) {
         if (currentRequestId === searchRequestIdRef.current) {
           setSearchError(error?.message || searchStrings.error);
+          setSearchResults([]);
         }
       } finally {
         if (currentRequestId === searchRequestIdRef.current) {

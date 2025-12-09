@@ -1,6 +1,6 @@
 import React, { memo, useEffect, useLayoutEffect, useState, useMemo, useCallback } from 'react';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Platform, Alert } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Platform, Alert, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ExploreScreenProps, RootStackParamList } from '../types/navigation';
 import { SectionType } from '../types/section';
@@ -13,6 +13,9 @@ import SearchModal from '../components/SearchModal';
 import { Ionicons } from '@expo/vector-icons';
 import type { NavigationProp } from '@react-navigation/native';
 import { ApiService } from '../services/api';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const TOP_MATCH_CARD_WIDTH = SCREEN_WIDTH * 0.75;
 
 const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
   // Request push notification permission when user reaches the main Explore screen (post-onboarding)
@@ -258,6 +261,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
             sectionType={section.type}
             functionParams={section.functionParams}
             autoFetch={true}
+            cardWidth={TOP_MATCH_CARD_WIDTH}
           />
         ))}
       </ScrollView>

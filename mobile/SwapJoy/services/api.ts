@@ -360,58 +360,35 @@ export class ApiService {
     });
   }
 
-  // Semantic search by free text. Tries vector RPC, falls back to simple title match.
+  // Semantic search by free text. Tries vector RPC, falls back to fuzzy text search.
+  // Semantic search using Edge Function which calls match_items database function
+  // The Edge Function already handles:
+  // 1. Semantic search via match_items (vector embeddings)
+  // 2. Fuzzy text search fallback when semantic results are sparse
   static async semanticSearch(query: string, limit: number = 30) {
     const q = (query || '').trim();
     if (!q) return { data: [], error: null } as any;
 
     return this.authenticatedCall(async (client) => {
-      // Preferred: call Edge Function for semantic search (one round trip)
       try {
         const { data, error } = await client.functions.invoke('semantic-search', {
           body: { query: q, limit }
         });
-        if (!error && data && Array.isArray(data.items)) {
+        
+        if (error) {
+          console.warn('[semanticSearch] Edge Function error:', error);
+          return { data: [], error } as any;
+        }
+        
+        if (data && Array.isArray(data.items)) {
           return { data: data.items, error: null } as any;
         }
+        
+        return { data: [], error: null } as any;
       } catch (e) {
-        // Fall through to fallback search
+        console.error('[semanticSearch] Edge Function exception:', e);
+        return { data: [], error: e } as any;
       }
-
-      // Fallback: basic keyword search on title with minimal fields
-      const { data, error } = await client
-        .from('items')
-        .select('id, title, description, price, currency, condition, category_id, category:categories!items_category_id_fkey(title_en, title_ka), item_images(image_url)')
-        .ilike('title', `%${q}%`)
-        .limit(limit);
-
-      return { data, error } as any;
-    });
-  }
-
-  // Fast keyword search for snappy UX while semantic loads
-  static async keywordSearch(query: string, limit: number = 20) {
-    const q = (query || '').trim();
-    if (!q) return { data: [], error: null } as any;
-    return this.authenticatedCall(async (client) => {
-      const searchPattern = `%${q}%`;
-      return await client
-        .from('items')
-        .select(
-          [
-            'id',
-            'title',
-            'description',
-            'price',
-            'currency',
-            'condition',
-            'category_id',
-            'category:categories!items_category_id_fkey(title_en, title_ka)',
-            'item_images(image_url)',
-          ].join(', ')
-        )
-        .or([`title.ilike.${searchPattern}`, `description.ilike.${searchPattern}`].join(','))
-        .limit(limit);
     });
   }
 
