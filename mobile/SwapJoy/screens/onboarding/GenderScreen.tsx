@@ -1,14 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  ActivityIndicator,
-} from 'react-native';
+import {View, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, } from 'react-native';
+import SJText from '../../components/SJText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useOnboarding } from '../../hooks/useOnboarding';
@@ -84,18 +76,18 @@ const GenderScreen: React.FC = () => {
               </TouchableOpacity>
             )}
             <View style={styles.headerContent}>
-              <Text style={styles.stepIndicator}>Step {currentStepIndex + 1} of 6</Text>
+              <SJText style={styles.stepIndicator}>Step {currentStepIndex + 1} of 6</SJText>
             </View>
           </View>
 
           {/* Content */}
           <View style={styles.content}>
-            <Text style={styles.title}>
+            <SJText style={styles.title}>
               {t('onboarding.gender.title', { defaultValue: 'What\'s Your Gender?' })}
-            </Text>
-            <Text style={styles.description}>
+            </SJText>
+            <SJText style={styles.description}>
               {t('onboarding.gender.description', { defaultValue: 'This helps us personalize your experience.' })}
-            </Text>
+            </SJText>
 
             <View style={styles.optionsContainer}>
               {GENDER_OPTIONS.map((option) => {
@@ -107,9 +99,9 @@ const GenderScreen: React.FC = () => {
                     onPress={() => handleGenderSelect(option.value)}
                   >
                     <View style={styles.optionContent}>
-                      <Text style={[styles.optionText, isSelected && styles.optionTextSelected]}>
+                      <SJText style={[styles.optionText, isSelected && styles.optionTextSelected]}>
                         {t(`onboarding.gender.options.${option.value}`, { defaultValue: option.label })}
-                      </Text>
+                      </SJText>
                     </View>
                     {isSelected && (
                       <Ionicons name="checkmark-circle" size={24} color="#007AFF" />
@@ -122,9 +114,9 @@ const GenderScreen: React.FC = () => {
             {isSaving && (
               <View style={styles.savingContainer}>
                 <ActivityIndicator size="small" color="#007AFF" />
-                <Text style={styles.savingText}>
+                <SJText style={styles.savingText}>
                   {t('onboarding.common.saving', { defaultValue: 'Saving...' })}
-                </Text>
+                </SJText>
               </View>
             )}
           </View>
@@ -136,17 +128,17 @@ const GenderScreen: React.FC = () => {
             style={styles.skipButton}
             onPress={skipOnboarding}
           >
-            <Text style={styles.skipButtonText}>
+            <SJText style={styles.skipButtonText}>
               {t('onboarding.common.skip', { defaultValue: 'Skip' })}
-            </Text>
+            </SJText>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.nextButton}
             onPress={handleNext}
           >
-            <Text style={styles.nextButtonText}>
+            <SJText style={styles.nextButtonText}>
               {t('onboarding.common.next', { defaultValue: 'Next' })}
-            </Text>
+            </SJText>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>

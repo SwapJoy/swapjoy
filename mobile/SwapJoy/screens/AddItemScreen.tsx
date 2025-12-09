@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
+import {View, StyleSheet, TouchableOpacity, SafeAreaView} from 'react-native';
+import SJText from '../components/SJText';
 import { Ionicons } from '@expo/vector-icons';
 import { AddItemScreenProps } from '../types/navigation';
 
@@ -20,27 +21,27 @@ const AddItemScreen: React.FC<AddItemScreenProps> = ({ navigation }) => {
           <Ionicons name="add-circle" size={80} color="#fff" />
         </View>
         
-        <Text style={styles.title}>Add New Item</Text>
-        <Text style={styles.subtitle}>
+        <SJText style={styles.title}>Add New Item</SJText>
+        <SJText style={styles.subtitle}>
           Create a new listing to share with the SwapJoy community
-        </Text>
+        </SJText>
         
         <View style={styles.featureList}>
           <View style={styles.featureItem}>
             <Ionicons name="camera" size={20} color="#fff" />
-            <Text style={styles.featureText}>Take photos of your item</Text>
+            <SJText style={styles.featureText}>Take photos of your item</SJText>
           </View>
           <View style={styles.featureItem}>
             <Ionicons name="text" size={20} color="#fff" />
-            <Text style={styles.featureText}>Add description and details</Text>
+            <SJText style={styles.featureText}>Add description and details</SJText>
           </View>
           <View style={styles.featureItem}>
             <Ionicons name="location" size={20} color="#fff" />
-            <Text style={styles.featureText}>Set your location</Text>
+            <SJText style={styles.featureText}>Set your location</SJText>
           </View>
           <View style={styles.featureItem}>
             <Ionicons name="swap-horizontal" size={20} color="#fff" />
-            <Text style={styles.featureText}>Choose what you want to swap for</Text>
+            <SJText style={styles.featureText}>Choose what you want to swap for</SJText>
           </View>
         </View>
         
@@ -50,7 +51,7 @@ const AddItemScreen: React.FC<AddItemScreenProps> = ({ navigation }) => {
             navigation.navigate('Camera');
           }}
         >
-          <Text style={styles.startButtonText}>Start Creating</Text>
+          <SJText style={styles.startButtonText}>Start Creating</SJText>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

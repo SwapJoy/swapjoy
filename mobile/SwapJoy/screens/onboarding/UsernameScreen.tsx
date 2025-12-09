@@ -1,16 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  Alert,
-} from 'react-native';
+import {View, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Alert, } from 'react-native';
+import SJText from '../../components/SJText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useOnboarding } from '../../hooks/useOnboarding';
@@ -184,18 +174,18 @@ const UsernameScreen: React.FC = () => {
               </TouchableOpacity>
             )}
             <View style={styles.headerContent}>
-              <Text style={styles.stepIndicator}>Step {currentStepIndex + 1} of 6</Text>
+              <SJText style={styles.stepIndicator}>Step {currentStepIndex + 1} of 6</SJText>
             </View>
           </View>
 
           {/* Content */}
           <View style={styles.content}>
-            <Text style={styles.title}>
+            <SJText style={styles.title}>
               {t('onboarding.username.title', { defaultValue: 'Choose Your Username' })}
-            </Text>
-            <Text style={styles.description}>
+            </SJText>
+            <SJText style={styles.description}>
               {t('onboarding.username.description', { defaultValue: 'Pick a unique username that others will see when you swap items.' })}
-            </Text>
+            </SJText>
 
             <View style={styles.inputContainer}>
               <TextInput
@@ -219,16 +209,16 @@ const UsernameScreen: React.FC = () => {
             {error && (
               <View style={styles.errorContainer}>
                 <Ionicons name="alert-circle" size={16} color="#FF3B30" />
-                <Text style={styles.errorText}>{error}</Text>
+                <SJText style={styles.errorText}>{error}</SJText>
               </View>
             )}
 
             {isSaving && (
               <View style={styles.savingContainer}>
                 <ActivityIndicator size="small" color="#007AFF" />
-                <Text style={styles.savingText}>
+                <SJText style={styles.savingText}>
                   {t('onboarding.common.saving', { defaultValue: 'Saving...' })}
-                </Text>
+                </SJText>
               </View>
             )}
           </View>
@@ -241,9 +231,9 @@ const UsernameScreen: React.FC = () => {
             onPress={handleNext}
             disabled={!isValid || isChecking}
           >
-            <Text style={[styles.nextButtonText, (!isValid || isChecking) && styles.nextButtonTextDisabled]}>
+            <SJText style={[styles.nextButtonText, (!isValid || isChecking) && styles.nextButtonTextDisabled]}>
               {t('onboarding.common.next', { defaultValue: 'Next' })}
-            </Text>
+            </SJText>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>

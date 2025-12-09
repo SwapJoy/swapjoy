@@ -1,7 +1,6 @@
 import React, { useCallback } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
   Dimensions,
   ScrollView,
@@ -12,6 +11,7 @@ import { useAppIntro } from '../hooks/useAppIntro';
 import { IntroScreenProps } from '../types/navigation';
 import { useLocalization } from '../localization';
 import { LanguageSelector } from '../components/LanguageSelector';
+import SJText from '../components/SJText';
 
 const { width } = Dimensions.get('window');
 
@@ -61,7 +61,7 @@ const IntroScreen: React.FC<IntroScreenProps> = ({ navigation }) => {
           onSelect={handleLanguageSelect}
         />
         <TouchableOpacity style={styles.skipButton} onPress={handleGetStartedPress}>
-          <Text style={styles.skipText}>{t('onboarding.actions.skip')}</Text>
+          <SJText style={styles.skipText}>{t('onboarding.actions.skip')}</SJText>
         </TouchableOpacity>
       </View>
 
@@ -77,10 +77,10 @@ const IntroScreen: React.FC<IntroScreenProps> = ({ navigation }) => {
         {slides.map((item) => (
           <View key={item.key} style={styles.slide}>
             <View style={styles.imageContainer}>
-              <Text style={styles.emoji}>{item.image}</Text>
+              <SJText style={styles.emoji}>{item.image}</SJText>
             </View>
-            <Text style={styles.title}>{item.title}</Text>
-            <Text style={styles.description}>{item.text}</Text>
+            <SJText style={styles.title}>{item.title}</SJText>
+            <SJText style={styles.description}>{item.text}</SJText>
           </View>
         ))}
       </ScrollView>
@@ -102,17 +102,17 @@ const IntroScreen: React.FC<IntroScreenProps> = ({ navigation }) => {
       <View style={styles.navigationContainer}>
         {activeSlide > 0 && (
           <TouchableOpacity style={styles.navButton} onPress={goToPrevious}>
-            <Text style={styles.navButtonText}>{t('onboarding.actions.previous')}</Text>
+            <SJText style={styles.navButtonText}>{t('onboarding.actions.previous')}</SJText>
           </TouchableOpacity>
         )}
         
         {activeSlide < slides.length - 1 ? (
           <TouchableOpacity style={styles.navButton} onPress={goToNext}>
-            <Text style={styles.navButtonText}>{t('onboarding.actions.next')}</Text>
+            <SJText style={styles.navButtonText}>{t('onboarding.actions.next')}</SJText>
           </TouchableOpacity>
         ) : (
           <TouchableOpacity style={styles.signInButton} onPress={handleGetStartedPress}>
-            <Text style={styles.signInButtonText}>{t('onboarding.actions.getStarted')}</Text>
+            <SJText style={styles.signInButtonText}>{t('onboarding.actions.getStarted')}</SJText>
           </TouchableOpacity>
         )}
       </View>

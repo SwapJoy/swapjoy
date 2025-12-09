@@ -1,14 +1,6 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-} from 'react-native';
+import {View, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, } from 'react-native';
+import SJText from '../components/SJText';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { EmailSignInScreenProps } from '../types/navigation';
@@ -87,14 +79,14 @@ const EmailSignInScreen: React.FC<EmailSignInScreenProps> = ({ navigation }) => 
       >
         {/* Content */}
         <View style={styles.content}>
-          <Text style={styles.subtitle}>{t('auth.signIn.title')}</Text>
-          <Text style={styles.description}>
+          <SJText style={styles.subtitle}>{t('auth.signIn.title')}</SJText>
+          <SJText style={styles.description}>
             {t('auth.signIn.description')}
-          </Text>
+          </SJText>
 
           {error && (
             <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>{error}</Text>
+              <SJText style={styles.errorText}>{error}</SJText>
             </View>
           )}
 
@@ -109,14 +101,14 @@ const EmailSignInScreen: React.FC<EmailSignInScreenProps> = ({ navigation }) => 
             ) : (
               <>
                 <Ionicons name="logo-google" size={20} color="#fff" style={styles.googleIcon} />
-                <Text style={styles.googleButtonText}>{t('auth.common.continueWithGoogle')}</Text>
+                <SJText style={styles.googleButtonText}>{t('auth.common.continueWithGoogle')}</SJText>
               </>
             )}
           </TouchableOpacity>
 
           <View style={styles.divider}>
             <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>{t('auth.common.dividerLabel')}</Text>
+            <SJText style={styles.dividerText}>{t('auth.common.dividerLabel')}</SJText>
             <View style={styles.dividerLine} />
           </View>
 
@@ -173,14 +165,14 @@ const EmailSignInScreen: React.FC<EmailSignInScreenProps> = ({ navigation }) => 
             {isLoading ? (
               <ActivityIndicator color="white" />
             ) : (
-              <Text style={styles.signInButtonText}>{t('auth.common.buttons.signInWithEmail')}</Text>
+              <SJText style={styles.signInButtonText}>{t('auth.common.buttons.signInWithEmail')}</SJText>
             )}
           </TouchableOpacity>
 
           <View style={styles.signUpContainer}>
-            <Text style={styles.signUpText}>{t('auth.common.links.noAccount')} </Text>
+            <SJText style={styles.signUpText}>{t('auth.common.links.noAccount')} </SJText>
             <TouchableOpacity onPress={handleSignUpPress}>
-              <Text style={styles.signUpLink}>{t('auth.common.links.signUp')}</Text>
+              <SJText style={styles.signUpLink}>{t('auth.common.links.signUp')}</SJText>
             </TouchableOpacity>
           </View>
         </View>

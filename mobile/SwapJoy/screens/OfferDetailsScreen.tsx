@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, FlatList, Dimensions } from 'react-native';
+import {View, StyleSheet, TouchableOpacity, ScrollView, FlatList, Dimensions} from 'react-native';
+import SJText from '../components/SJText';
 import { NavigationProp, RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../types/navigation';
 import { useAuth } from '../contexts/AuthContext';
@@ -110,22 +111,22 @@ const OfferDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
       .filter((it): it is any => Boolean(it));
 
     if (items.length === 0) {
-      return <Text style={styles.itemsEmpty}>—</Text>;
+      return <SJText style={styles.itemsEmpty}>—</SJText>;
     }
 
     return (
       <View style={styles.itemsList}>
         {items.map((it, idx) => (
           <View key={it.id || idx} style={styles.itemRow}>
-            <Text style={styles.itemBullet}>•</Text>
+            <SJText style={styles.itemBullet}>•</SJText>
             <View style={{ flex: 1 }}>
-              <Text style={styles.itemTitle} numberOfLines={1}>
+              <SJText style={styles.itemTitle} numberOfLines={1}>
                 {it.title}
-              </Text>
+              </SJText>
               {typeof it.price === 'number' && (
-                <Text style={styles.itemPrice}>
+                <SJText style={styles.itemPrice}>
                   {formatCurrency(it.price, it.currency || 'USD')}
-                </Text>
+                </SJText>
               )}
             </View>
           </View>
@@ -157,31 +158,31 @@ const OfferDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>{primaryItem?.title || 'Offer'}</Text>
-        <Text style={styles.price}>{priceLabel}</Text>
+        <SJText style={styles.title}>{primaryItem?.title || 'Offer'}</SJText>
+        <SJText style={styles.price}>{priceLabel}</SJText>
 
         {category && (
-          <Text style={styles.meta}>
+          <SJText style={styles.meta}>
             Category: {category}
-          </Text>
+          </SJText>
         )}
 
         {primaryItem?.condition && (
-          <Text style={styles.meta}>
+          <SJText style={styles.meta}>
             Condition: {primaryItem.condition}
-          </Text>
+          </SJText>
         )}
 
-        <Text style={styles.meta}>
+        <SJText style={styles.meta}>
           {userLabel}
-        </Text>
+        </SJText>
 
-        <Text style={styles.meta}>
+        <SJText style={styles.meta}>
           Created at: {createdAtLabel}
-        </Text>
+        </SJText>
 
         {offer.message && offer.message.trim().length > 0 && (
-          <Text style={styles.description}>{offer.message}</Text>
+          <SJText style={styles.description}>{offer.message}</SJText>
         )}
 
         {primaryImage && (
@@ -195,23 +196,23 @@ const OfferDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
         )}
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{strings.youOffer}</Text>
+          <SJText style={styles.sectionTitle}>{strings.youOffer}</SJText>
           {renderItemsList(youGiveItems)}
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{strings.youWant}</Text>
+          <SJText style={styles.sectionTitle}>{strings.youWant}</SJText>
           {renderItemsList(youReceiveItems)}
         </View>
 
         <View style={styles.topUpBox}>
-          <Text style={styles.topUpText}>{topUpText}</Text>
+          <SJText style={styles.topUpText}>{topUpText}</SJText>
         </View>
       </ScrollView>
 
       <View style={styles.bottomBar}>
         <TouchableOpacity style={styles.chatButton} onPress={onStartChat}>
-          <Text style={styles.chatButtonText}>Message about this offer</Text>
+          <SJText style={styles.chatButtonText}>Message about this offer</SJText>
         </TouchableOpacity>
       </View>
     </View>

@@ -1,5 +1,6 @@
 import React, { useCallback } from 'react';
-import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, StyleSheet } from 'react-native';
+import {View, FlatList, TouchableOpacity, ActivityIndicator, StyleSheet} from 'react-native';
+import SJText from '../components/SJText';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { MainTabParamList, RootStackParamList } from '../types/navigation';
 import { useNotifications } from '../contexts/NotificationsContext';
@@ -44,14 +45,14 @@ const ChatListScreen: React.FC = () => {
         </View>
         <View style={styles.content}>
           <View style={styles.titleRow}>
-            <Text style={styles.title} numberOfLines={1}>
+            <SJText style={styles.title} numberOfLines={1}>
               {counterpartName}
-            </Text>
+            </SJText>
             {item.unread_count > 0 && <View style={styles.unreadDot} />}
           </View>
-          <Text style={styles.subtitle} numberOfLines={1}>
+          <SJText style={styles.subtitle} numberOfLines={1}>
             {item.last_message_preview || item.offer?.message || 'Start chatting about this offer'}
-          </Text>
+          </SJText>
         </View>
       </TouchableOpacity>
     );
@@ -76,8 +77,8 @@ const ChatListScreen: React.FC = () => {
       ListEmptyComponent={
         !chatsLoading ? (
           <View style={styles.center}>
-            <Text style={styles.emptyTitle}>No chats yet</Text>
-            <Text style={styles.emptySubtitle}>Chats will appear here when you exchange messages about offers.</Text>
+            <SJText style={styles.emptyTitle}>No chats yet</SJText>
+            <SJText style={styles.emptySubtitle}>Chats will appear here when you exchange messages about offers.</SJText>
           </View>
         ) : null
       }

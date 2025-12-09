@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Dimensions } from 'react-native';
+import {View, StyleSheet, FlatList, TouchableOpacity, Dimensions} from 'react-native';
+import SJText from '../components/SJText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BundleItemsScreenProps } from '../types/navigation';
 import CachedImage from '../components/CachedImage';
@@ -30,10 +31,10 @@ const BundleItemsScreen: React.FC<BundleItemsScreenProps> = ({ navigation, route
         fallbackUri="https://picsum.photos/200/150?random=4"
       />
       <View style={styles.details}>
-        <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
-        <Text style={styles.price}>{formatCurrency(item.price || item.estimated_value || 0, item.currency || 'USD')}</Text>
+        <SJText style={styles.title} numberOfLines={1}>{item.title}</SJText>
+        <SJText style={styles.price}>{formatCurrency(item.price || item.estimated_value || 0, item.currency || 'USD')}</SJText>
         {item.condition ? (
-          <Text style={styles.condition} numberOfLines={1}>{item.condition}</Text>
+          <SJText style={styles.condition} numberOfLines={1}>{item.condition}</SJText>
         ) : null}
       </View>
     </TouchableOpacity>
@@ -42,15 +43,15 @@ const BundleItemsScreen: React.FC<BundleItemsScreenProps> = ({ navigation, route
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <View style={styles.infoSection}> 
-        <Text style={styles.bundleTitle} numberOfLines={2}>{title}</Text>
-        <Text style={styles.bundleSubtitle}>Bundle includes {bundleItems.length} items</Text>
+        <SJText style={styles.bundleTitle} numberOfLines={2}>{title}</SJText>
+        <SJText style={styles.bundleSubtitle}>Bundle includes {bundleItems.length} items</SJText>
         {ownerId ? (
           <TouchableOpacity
             style={{ marginTop: 8 }}
             onPress={() => (navigation as any).navigate('UserProfile', { userId: ownerId })}
             activeOpacity={0.8}
           >
-            <Text style={{ color: '#007AFF', fontWeight: '600' }}>View seller profile</Text>
+            <SJText style={{ color: '#007AFF', fontWeight: '600' }}>View seller profile</SJText>
           </TouchableOpacity>
         ) : null}
       </View>
@@ -75,7 +76,7 @@ const BundleItemsScreen: React.FC<BundleItemsScreenProps> = ({ navigation, route
               });
             }}
           >
-            <Text style={styles.offerText}>Offer</Text>
+            <SJText style={styles.offerText}>Offer</SJText>
           </TouchableOpacity>
         </View>
       )}

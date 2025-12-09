@@ -1,9 +1,10 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView } from 'react-native';
-import { MainScreenProps } from '../types/navigation';
+import {View, StyleSheet, TouchableOpacity, SafeAreaView} from 'react-native';
+import SJText from '../components/SJText';
+import { MainTabsScreenProps } from '../types/navigation';
 import { useAuth } from '../contexts/AuthContext';
 
-const MainScreen: React.FC<MainScreenProps> = ({ navigation, route }) => {
+const MainScreen: React.FC<MainTabsScreenProps> = ({ navigation }) => {
   const { user, signOut } = useAuth();
 
   const handleSignOut = async () => {
@@ -18,16 +19,16 @@ const MainScreen: React.FC<MainScreenProps> = ({ navigation, route }) => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
-        <Text style={styles.welcome}>Welcome to SwapJoy!</Text>
-        <Text style={styles.userInfo}>
+        <SJText style={styles.welcome}>Welcome to SwapJoy!</SJText>
+        <SJText style={styles.userInfo}>
           Hello, {user?.first_name || 'User'}!
-        </Text>
-        <Text style={styles.userInfo}>Phone: {user?.phone}</Text>
-        <Text style={styles.userInfo}>Username: {user?.username}</Text>
-        <Text style={styles.userInfo}>User ID: {user?.id}</Text>
+        </SJText>
+        <SJText style={styles.userInfo}>Phone: {user?.phone}</SJText>
+        <SJText style={styles.userInfo}>Username: {user?.username}</SJText>
+        <SJText style={styles.userInfo}>User ID: {user?.id}</SJText>
 
         <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
-          <Text style={styles.signOutButtonText}>Sign Out</Text>
+          <SJText style={styles.signOutButtonText}>Sign Out</SJText>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

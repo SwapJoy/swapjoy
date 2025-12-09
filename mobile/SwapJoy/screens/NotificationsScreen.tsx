@@ -1,14 +1,6 @@
 import React, { memo, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  RefreshControl,
-  Modal,
-  Pressable,
-} from 'react-native';
+import {View, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Modal, Pressable, } from 'react-native';
+import SJText from '../components/SJText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { CommonActions } from '@react-navigation/native';
@@ -199,21 +191,21 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = memo(() => {
               />
             ) : (
               <View style={styles.iconContainer}>
-                <Text style={styles.notificationIcon}>
+                <SJText style={styles.notificationIcon}>
                   {getNotificationIcon(item.type)}
-                </Text>
+                </SJText>
               </View>
             )}
             <View style={styles.notificationText}>
-              <Text style={styles.notificationTitle}>{item.title}</Text>
-              <Text style={styles.notificationMessage} numberOfLines={2}>
+              <SJText style={styles.notificationTitle}>{item.title}</SJText>
+              <SJText style={styles.notificationMessage} numberOfLines={2}>
                 {item.message}
-              </Text>
+              </SJText>
             </View>
             <View style={styles.notificationMeta}>
-              <Text style={styles.notificationTime}>
+              <SJText style={styles.notificationTime}>
                 {formatTimeAgo(item.created_at)}
-              </Text>
+              </SJText>
               {!item.is_read && (
                 <View style={[styles.unreadDot, { backgroundColor: getNotificationColor(item.type) }]} />
               )}
@@ -228,7 +220,7 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = memo(() => {
     return (
       <View style={styles.container}>
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading notifications...</Text>
+          <SJText style={styles.loadingText}>Loading notifications...</SJText>
         </View>
       </View>
     );
@@ -252,7 +244,7 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = memo(() => {
               onPress={handleMarkAllAsRead}
             >
               <Ionicons name="checkmark-done" size={20} color="#007AFF" style={styles.popoverIcon} />
-              <Text style={styles.popoverText}>Mark all as read</Text>
+              <SJText style={styles.popoverText}>Mark all as read</SJText>
             </Pressable>
           </View>
         </Pressable>
@@ -272,10 +264,10 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = memo(() => {
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyTitle}>No notifications</Text>
-            <Text style={styles.emptySubtitle}>
+            <SJText style={styles.emptyTitle}>No notifications</SJText>
+            <SJText style={styles.emptySubtitle}>
               You're all caught up! New notifications will appear here.
-            </Text>
+            </SJText>
           </View>
         }
       />

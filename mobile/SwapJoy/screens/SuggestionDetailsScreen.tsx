@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity } from 'react-native';
+import {View, StyleSheet, FlatList, Image, TouchableOpacity} from 'react-native';
+import SJText from '../components/SJText';
 import { NavigationProp, RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { RootStackParamList } from '../types/navigation';
 import { formatCurrency } from '../utils';
@@ -17,10 +18,10 @@ const SuggestionDetailsScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Bundle Details</Text>
-        {targetTitle ? <Text style={styles.subtitle}>Target: {targetTitle}</Text> : null}
-        <Text style={styles.subtitle}>Signature: {signature}</Text>
-        <Text style={styles.total}>Total: {formatCurrency(total, currency)}</Text>
+        <SJText style={styles.title}>Bundle Details</SJText>
+        {targetTitle ? <SJText style={styles.subtitle}>Target: {targetTitle}</SJText> : null}
+        <SJText style={styles.subtitle}>Signature: {signature}</SJText>
+        <SJText style={styles.total}>Total: {formatCurrency(total, currency)}</SJText>
       </View>
       <FlatList
         data={items}
@@ -29,17 +30,17 @@ const SuggestionDetailsScreen: React.FC = () => {
           <View style={styles.row}>
             <Image source={{ uri: item.image_url || 'https://via.placeholder.com/64' }} style={styles.thumb} />
             <View style={styles.info}>
-              <Text style={styles.itemTitle} numberOfLines={1}>{item.title || item.id}</Text>
-              <Text style={styles.itemId}>{item.id}</Text>
+              <SJText style={styles.itemTitle} numberOfLines={1}>{item.title || item.id}</SJText>
+              <SJText style={styles.itemId}>{item.id}</SJText>
             </View>
-            <Text style={styles.itemPrice}>{formatCurrency(item.price || 0, item.currency || 'USD')}</Text>
+            <SJText style={styles.itemPrice}>{formatCurrency(item.price || 0, item.currency || 'USD')}</SJText>
           </View>
         )}
         ItemSeparatorComponent={() => <View style={styles.sep} />}
         contentContainerStyle={{ padding: 12 }}
       />
       <TouchableOpacity style={styles.closeBtn} onPress={() => navigation.goBack()}>
-        <Text style={styles.closeText}>Close</Text>
+        <SJText style={styles.closeText}>Close</SJText>
       </TouchableOpacity>
     </View>
   );

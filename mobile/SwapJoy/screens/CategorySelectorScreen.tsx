@@ -1,13 +1,6 @@
 import React, { useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  ActivityIndicator,
-  Alert,
-} from 'react-native';
+import {View, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert, } from 'react-native';
+import SJText from '../components/SJText';
 import { Ionicons } from '@expo/vector-icons';
 import { CommonActions } from '@react-navigation/native';
 import { CategoryTreeNode } from '../hooks/useCategories';
@@ -135,7 +128,7 @@ const CategorySelectorScreen: React.FC<CategorySelectorScreenProps> = ({ route, 
                   />
                 </View>
               )}
-              <Text
+              <SJText
                 style={[
                   styles.categoryName,
                   isSelected && styles.categoryNameSelected,
@@ -144,7 +137,7 @@ const CategorySelectorScreen: React.FC<CategorySelectorScreenProps> = ({ route, 
                 numberOfLines={1}
               >
                 {category.name}
-              </Text>
+              </SJText>
             </View>
             {multiselect ? (
               // Multi-select mode: show checkboxes
@@ -164,9 +157,9 @@ const CategorySelectorScreen: React.FC<CategorySelectorScreenProps> = ({ route, 
                   <View style={styles.categoryItemRight}>
                     {hasSelectedChildren && !isSelected && (
                       <View style={styles.selectionBadge}>
-                        <Text style={styles.selectionBadgeText}>
+                        <SJText style={styles.selectionBadgeText}>
                           {getSelectedDescendantsCount(category.id)}
-                        </Text>
+                        </SJText>
                       </View>
                     )}
                   </View>
@@ -212,9 +205,9 @@ const CategorySelectorScreen: React.FC<CategorySelectorScreenProps> = ({ route, 
       ) : rootCategories.length === 0 ? (
         <View style={styles.centerContainer}>
           <Ionicons name="list-outline" size={48} color="#cbd5e1" />
-          <Text style={styles.emptyText}>
+          <SJText style={styles.emptyText}>
             {t('common.empty', { defaultValue: 'No categories available' })}
-          </Text>
+          </SJText>
         </View>
       ) : (
         <ScrollView
@@ -230,12 +223,12 @@ const CategorySelectorScreen: React.FC<CategorySelectorScreenProps> = ({ route, 
       {(multiselect || updateProfile) && (
         <View style={styles.footer}>
           {multiselect && selectedCount > 0 && (
-            <Text style={styles.footerText}>
+            <SJText style={styles.footerText}>
               {selectedCount}{' '}
               {selectedCount === 1
                 ? t('common.selected', { defaultValue: 'selected' })
                 : t('common.selectedPlural', { defaultValue: 'selected' })}
-            </Text>
+            </SJText>
           )}
           <TouchableOpacity
             style={[
@@ -247,14 +240,14 @@ const CategorySelectorScreen: React.FC<CategorySelectorScreenProps> = ({ route, 
             activeOpacity={0.8}
             disabled={selectedCount === 0 && !multiselect}
           >
-            <Text
+            <SJText
               style={[
                 styles.doneButtonText,
                 selectedCount === 0 && styles.doneButtonTextDisabled,
               ]}
             >
               {t('common.done', { defaultValue: 'Done' })}
-            </Text>
+            </SJText>
           </TouchableOpacity>
         </View>
       )}

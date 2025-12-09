@@ -1,15 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Alert,
-  ActivityIndicator,
-  TextInput,
-  TouchableOpacity,
-  PanResponder,
-} from 'react-native';
+import {View, StyleSheet, ScrollView, Alert, ActivityIndicator, TextInput, TouchableOpacity, PanResponder, } from 'react-native';
+import SJText from '../components/SJText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ApiService } from '../services/api';
 import { NotificationService } from '../services/notificationService';
@@ -104,7 +95,7 @@ const DevRecommendationSettingsScreen: React.FC = () => {
     return (
       <View style={styles.centerContainer}>
         <ActivityIndicator size="large" color="#007AFF" />
-        <Text style={styles.loadingText}>Loading settings...</Text>
+        <SJText style={styles.loadingText}>Loading settings...</SJText>
       </View>
     );
   }
@@ -185,7 +176,7 @@ const DevRecommendationSettingsScreen: React.FC = () => {
     return (
       <View style={styles.sliderContainer}>
         <View style={styles.sliderHeader}>
-          <Text style={styles.sliderLabel}>{label}</Text>
+          <SJText style={styles.sliderLabel}>{label}</SJText>
           <View style={styles.valueContainer}>
             <TextInput
               style={styles.valueInput}
@@ -199,10 +190,10 @@ const DevRecommendationSettingsScreen: React.FC = () => {
               keyboardType="numeric"
               maxLength={3}
             />
-            <Text style={styles.percentSign}>%</Text>
+            <SJText style={styles.percentSign}>%</SJText>
           </View>
         </View>
-        <Text style={styles.sliderDescription}>{description}</Text>
+        <SJText style={styles.sliderDescription}>{description}</SJText>
         <View style={styles.sliderWrapper}>
           <TouchableOpacity
             activeOpacity={1}
@@ -244,7 +235,7 @@ const DevRecommendationSettingsScreen: React.FC = () => {
                 onValueChange(newValue);
               }}
             >
-              <Text style={styles.quickButtonText}>0%</Text>
+              <SJText style={styles.quickButtonText}>0%</SJText>
             </TouchableOpacity>
             <TouchableOpacity 
               style={styles.quickButton}
@@ -254,7 +245,7 @@ const DevRecommendationSettingsScreen: React.FC = () => {
                 onValueChange(newValue);
               }}
             >
-              <Text style={styles.quickButtonText}>50%</Text>
+              <SJText style={styles.quickButtonText}>50%</SJText>
             </TouchableOpacity>
             <TouchableOpacity 
               style={styles.quickButton}
@@ -264,13 +255,13 @@ const DevRecommendationSettingsScreen: React.FC = () => {
                 onValueChange(newValue);
               }}
             >
-              <Text style={styles.quickButtonText}>100%</Text>
+              <SJText style={styles.quickButtonText}>100%</SJText>
             </TouchableOpacity>
           </View>
         </View>
         <View style={styles.sliderLabels}>
-          <Text style={styles.sliderLabelText}>0% (ignored)</Text>
-          <Text style={styles.sliderLabelText}>100% (critical)</Text>
+          <SJText style={styles.sliderLabelText}>0% (ignored)</SJText>
+          <SJText style={styles.sliderLabelText}>100% (critical)</SJText>
         </View>
       </View>
     );
@@ -280,18 +271,18 @@ const DevRecommendationSettingsScreen: React.FC = () => {
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
         <View style={styles.header}>
-          <Text style={styles.title}>🔧 DEV: Recommendation Weights</Text>
-          <Text style={styles.subtitle}>
+          <SJText style={styles.title}>🔧 DEV: Recommendation Weights</SJText>
+          <SJText style={styles.subtitle}>
             Adjust how strongly different factors influence your Top Picks
-          </Text>
+          </SJText>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Scoring Weights</Text>
-          <Text style={styles.sectionDescription}>
+          <SJText style={styles.sectionTitle}>Scoring Weights</SJText>
+          <SJText style={styles.sectionDescription}>
             Each weight controls how much that factor affects recommendations. 
             0% = factor ignored, 100% = factor is critical.
-          </Text>
+          </SJText>
 
           <SliderControl
             label="Category Score"
@@ -330,26 +321,26 @@ const DevRecommendationSettingsScreen: React.FC = () => {
         </View>
 
         <View style={styles.infoSection}>
-          <Text style={styles.infoTitle}>💡 How It Works</Text>
-          <Text style={styles.infoText}>
+          <SJText style={styles.infoTitle}>💡 How It Works</SJText>
+          <SJText style={styles.infoText}>
             • Setting a weight to 100% makes that factor critical (e.g., category_score = 1.0 means only show favorite categories)
-          </Text>
-          <Text style={styles.infoText}>
+          </SJText>
+          <SJText style={styles.infoText}>
             • Setting to 50% means that factor is moderately important
-          </Text>
-          <Text style={styles.infoText}>
+          </SJText>
+          <SJText style={styles.infoText}>
             • Setting to 0% means that factor is ignored completely
-          </Text>
-          <Text style={styles.infoText}>
+          </SJText>
+          <SJText style={styles.infoText}>
             • Final score combines all weighted factors automatically
-          </Text>
+          </SJText>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🔔 Test Push Notifications</Text>
-          <Text style={styles.sectionDescription}>
+          <SJText style={styles.sectionTitle}>🔔 Test Push Notifications</SJText>
+          <SJText style={styles.sectionDescription}>
             Test push notifications by creating a notification for yourself.
-          </Text>
+          </SJText>
           
           <View style={styles.testButtonContainer}>
             <TouchableOpacity
@@ -378,7 +369,7 @@ const DevRecommendationSettingsScreen: React.FC = () => {
                 }
               }}
             >
-              <Text style={styles.testButtonText}>Test New Offer Notification</Text>
+              <SJText style={styles.testButtonText}>Test New Offer Notification</SJText>
             </TouchableOpacity>
           </View>
 
@@ -408,7 +399,7 @@ const DevRecommendationSettingsScreen: React.FC = () => {
                 }
               }}
             >
-              <Text style={styles.testButtonText}>Test New Follower Notification</Text>
+              <SJText style={styles.testButtonText}>Test New Follower Notification</SJText>
             </TouchableOpacity>
           </View>
         </View>
@@ -416,20 +407,20 @@ const DevRecommendationSettingsScreen: React.FC = () => {
         <View style={styles.actions}>
           <View style={styles.buttonRow}>
             <View style={styles.buttonContainer}>
-              <Text
+              <SJText
                 style={[styles.resetButton, !hasChanges && styles.disabledButton]}
                 onPress={resetToDefaults}
               >
                 Reset to Defaults
-              </Text>
+              </SJText>
             </View>
             <View style={styles.buttonContainer}>
-              <Text
+              <SJText
                 style={[styles.saveButton, (!hasChanges || saving) && styles.disabledButton]}
                 onPress={handleSave}
               >
                 {saving ? 'Saving...' : 'Save Changes'}
-              </Text>
+              </SJText>
             </View>
           </View>
         </View>

@@ -2,12 +2,12 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   TextInput,
-  Text,
   StyleSheet,
   Animated,
   ActivityIndicator,
   TextInputProps,
 } from 'react-native';
+import SJText from './SJText';
 
 interface SWInputFieldProps extends TextInputProps {
   label?: string;
@@ -118,7 +118,7 @@ const SWInputField: React.FC<SWInputFieldProps> = ({
               ]}
             >
               {displayLabel}
-              {required && <Text style={styles.required}> *</Text>}
+              {required && <SJText style={styles.required}> *</SJText>}
             </Animated.Text>
           </Animated.View>
         )}
@@ -129,7 +129,7 @@ const SWInputField: React.FC<SWInputFieldProps> = ({
             </View>
           )}
           {prefix && (
-            <Text style={styles.prefix}>{prefix}</Text>
+            <SJText style={styles.prefix}>{prefix}</SJText>
           )}
           <TextInput
             {...textInputProps}
@@ -163,11 +163,11 @@ const SWInputField: React.FC<SWInputFieldProps> = ({
         <View style={[styles.bottomBorder, isFocused && styles.bottomBorderFocused]} />
       </View>
       {maxLength && (
-        <Text style={styles.charCount}>
+        <SJText style={styles.charCount}>
           {value.length}/{maxLength}
-        </Text>
+        </SJText>
       )}
-      {error && <Text style={styles.errorText}>{error}</Text>}
+      {error && <SJText style={styles.errorText}>{error}</SJText>}
     </View>
   );
 };

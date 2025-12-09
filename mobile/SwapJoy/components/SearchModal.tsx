@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TextInput, ActivityIndicator, TouchableOpacity } from 'react-native';
+import {View, StyleSheet, TextInput, ActivityIndicator, TouchableOpacity} from 'react-native';
+import SJText from '../components/SJText';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import ItemCardCollection from './ItemCardCollection';
@@ -91,8 +92,8 @@ const SearchModal: React.FC<SearchModalProps> = ({
       <View style={styles.searchResultsContainer}>
         {!searchLoading && hasSearchQuery && searchResults.length === 0 ? (
           <View style={styles.searchStatusContainer}>
-            <Text style={styles.searchStatusTitle}>{searchStrings.noResultsTitle}</Text>
-            <Text style={styles.searchStatusSubtitle}>{searchStrings.noResultsSubtitle}</Text>
+            <SJText style={styles.searchStatusTitle}>{searchStrings.noResultsTitle}</SJText>
+            <SJText style={styles.searchStatusSubtitle}>{searchStrings.noResultsSubtitle}</SJText>
           </View>
         ) : (
           <ItemCardCollection
@@ -114,7 +115,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
             }}
           />
         )}
-        {searchError ? <Text style={styles.searchErrorText}>{searchError}</Text> : null}
+        {searchError ? <SJText style={styles.searchErrorText}>{searchError}</SJText> : null}
       </View>
     ) : null;
 
@@ -156,23 +157,23 @@ const SearchModal: React.FC<SearchModalProps> = ({
             ) : null}
           </View>
           <TouchableOpacity style={styles.searchModalCancelButton} onPress={handleCancel}>
-            <Text style={styles.searchModalCancelText}>
+            <SJText style={styles.searchModalCancelText}>
               {t('common.cancel', { defaultValue: 'Cancel' })}
-            </Text>
+            </SJText>
           </TouchableOpacity>
         </View>
 
         {showRecent && (
           <View style={styles.recentSearchesContainer}>
             <View style={styles.recentSearchesHeader}>
-              <Text style={styles.recentSearchesTitle}>
+              <SJText style={styles.recentSearchesTitle}>
                 {t('search.recentTitle', { defaultValue: 'Recent searches' })}
-              </Text>
+              </SJText>
               {!loadingRecent && recentSearches.length > 0 && (
                 <TouchableOpacity onPress={clearRecentSearches}>
-                  <Text style={styles.recentSearchesClearText}>
+                  <SJText style={styles.recentSearchesClearText}>
                     {t('search.clearRecent', { defaultValue: 'Clear' })}
-                  </Text>
+                  </SJText>
                 </TouchableOpacity>
               )}
             </View>
@@ -187,7 +188,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
                     onPress={() => handleRecentPress(item.query)}
                   >
                     <Ionicons name="time-outline" size={14} color="#64748b" />
-                    <Text style={styles.recentSearchChipText}>{item.query}</Text>
+                    <SJText style={styles.recentSearchChipText}>{item.query}</SJText>
                   </TouchableOpacity>
                 ))}
               </View>

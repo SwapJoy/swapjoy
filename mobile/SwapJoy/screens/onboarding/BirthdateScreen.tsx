@@ -1,15 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  ActivityIndicator,
-  Modal,
-} from 'react-native';
+import {View, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Modal, } from 'react-native';
+import SJText from '../../components/SJText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
@@ -117,18 +108,18 @@ const BirthdateScreen: React.FC = () => {
               </TouchableOpacity>
             )}
             <View style={styles.headerContent}>
-              <Text style={styles.stepIndicator}>Step {currentStepIndex + 1} of 6</Text>
+              <SJText style={styles.stepIndicator}>Step {currentStepIndex + 1} of 6</SJText>
             </View>
           </View>
 
           {/* Content */}
           <View style={styles.content}>
-            <Text style={styles.title}>
+            <SJText style={styles.title}>
               {t('onboarding.birthdate.title', { defaultValue: 'When Were You Born?' })}
-            </Text>
-            <Text style={styles.description}>
+            </SJText>
+            <SJText style={styles.description}>
               {t('onboarding.birthdate.description', { defaultValue: 'This helps us personalize your experience and verify age requirements.' })}
-            </Text>
+            </SJText>
 
             <TouchableOpacity
               style={styles.dateButton}
@@ -136,12 +127,12 @@ const BirthdateScreen: React.FC = () => {
             >
               <Ionicons name="calendar-outline" size={24} color="#007AFF" />
               <View style={styles.dateButtonContent}>
-                <Text style={styles.dateButtonLabel}>
+                <SJText style={styles.dateButtonLabel}>
                   {t('onboarding.birthdate.label', { defaultValue: 'Birthdate' })}
-                </Text>
-                <Text style={styles.dateButtonText}>
+                </SJText>
+                <SJText style={styles.dateButtonText}>
                   {formatDate(birthDate)}
-                </Text>
+                </SJText>
               </View>
               <Ionicons name="chevron-forward" size={20} color="#999" />
             </TouchableOpacity>
@@ -157,16 +148,16 @@ const BirthdateScreen: React.FC = () => {
                 <View style={styles.modalOverlay}>
                   <View style={styles.modalContent}>
                     <View style={styles.modalHeader}>
-                      <Text style={styles.modalTitle}>
+                      <SJText style={styles.modalTitle}>
                         {t('onboarding.birthdate.selectDate', { defaultValue: 'Select Birthdate' })}
-                      </Text>
+                      </SJText>
                       <TouchableOpacity
                         onPress={handleClosePicker}
                         style={styles.modalCloseButton}
                       >
-                        <Text style={styles.modalCloseText}>
+                        <SJText style={styles.modalCloseText}>
                           {t('onboarding.common.done', { defaultValue: 'Done' })}
-                        </Text>
+                        </SJText>
                       </TouchableOpacity>
                     </View>
                     <DateTimePicker
@@ -199,9 +190,9 @@ const BirthdateScreen: React.FC = () => {
             {isSaving && (
               <View style={styles.savingContainer}>
                 <ActivityIndicator size="small" color="#007AFF" />
-                <Text style={styles.savingText}>
+                <SJText style={styles.savingText}>
                   {t('onboarding.common.saving', { defaultValue: 'Saving...' })}
-                </Text>
+                </SJText>
               </View>
             )}
           </View>
@@ -213,17 +204,17 @@ const BirthdateScreen: React.FC = () => {
             style={styles.skipButton}
             onPress={skipOnboarding}
           >
-            <Text style={styles.skipButtonText}>
+            <SJText style={styles.skipButtonText}>
               {t('onboarding.common.skip', { defaultValue: 'Skip' })}
-            </Text>
+            </SJText>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.nextButton}
             onPress={handleNext}
           >
-            <Text style={styles.nextButtonText}>
+            <SJText style={styles.nextButtonText}>
               {t('onboarding.common.next', { defaultValue: 'Next' })}
-            </Text>
+            </SJText>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>

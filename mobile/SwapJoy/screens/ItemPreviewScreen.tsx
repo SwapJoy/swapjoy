@@ -1,15 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  Alert,
-  ActivityIndicator,
-  Image,
-  Dimensions,
-} from 'react-native';
+import {View, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Image, Dimensions, } from 'react-native';
+import SJText from '../components/SJText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { ItemPreviewScreenProps } from '../types/navigation';
@@ -179,7 +170,7 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#007AFF" />
-          <Text style={styles.loadingText}>{strings.loading}</Text>
+          <SJText style={styles.loadingText}>{strings.loading}</SJText>
         </View>
       </SafeAreaView>
     );
@@ -192,7 +183,7 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
         <TouchableOpacity style={styles.backButton} onPress={handleEdit}>
           <Ionicons name="arrow-back" size={24} color="#007AFF" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{strings.headerTitle}</Text>
+        <SJText style={styles.headerTitle}>{strings.headerTitle}</SJText>
         <View style={{ width: 40 }} />
       </View>
 
@@ -235,10 +226,10 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
         <View style={styles.detailsContainer}>
           {/* Title and Price */}
           <View style={styles.titleSection}>
-            <Text style={styles.title}>{itemData.title}</Text>
-            <Text style={styles.price}>
+            <SJText style={styles.title}>{itemData.title}</SJText>
+            <SJText style={styles.price}>
               {formatCurrency(itemData.price, itemData.currency)}
-            </Text>
+            </SJText>
           </View>
 
           {/* Category and Condition */}
@@ -246,15 +237,15 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
             {category && (
               <View style={styles.tag}>
                 <Ionicons name="pricetag" size={14} color="#007AFF" />
-                <Text style={styles.tagText}>{category.name}</Text>
+                <SJText style={styles.tagText}>{category.name}</SJText>
               </View>
             )}
             {itemData.condition && (
               <View style={styles.tag}>
                 <Ionicons name="checkmark-circle" size={14} color="#34C759" />
-                <Text style={styles.tagText}>
+                <SJText style={styles.tagText}>
                   {getConditionLabel(itemData.condition)}
-                </Text>
+                </SJText>
               </View>
             )}
           </View>
@@ -264,44 +255,44 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
 
           {/* Description */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{strings.descriptionTitle}</Text>
-            <Text style={styles.description}>{itemData.description}</Text>
+            <SJText style={styles.sectionTitle}>{strings.descriptionTitle}</SJText>
+            <SJText style={styles.description}>{itemData.description}</SJText>
           </View>
 
           {/* Item Info */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>{strings.infoTitle}</Text>
+            <SJText style={styles.sectionTitle}>{strings.infoTitle}</SJText>
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>{strings.info.category}</Text>
-              <Text style={styles.infoValue}>{category?.name || t('common.notAvailable')}</Text>
+              <SJText style={styles.infoLabel}>{strings.info.category}</SJText>
+              <SJText style={styles.infoValue}>{category?.name || t('common.notAvailable')}</SJText>
             </View>
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>{strings.info.condition}</Text>
-              <Text style={styles.infoValue}>{getConditionLabel(itemData.condition)}</Text>
+              <SJText style={styles.infoLabel}>{strings.info.condition}</SJText>
+              <SJText style={styles.infoValue}>{getConditionLabel(itemData.condition)}</SJText>
             </View>
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>{strings.info.price}</Text>
-              <Text style={styles.infoValue}>
+              <SJText style={styles.infoLabel}>{strings.info.price}</SJText>
+              <SJText style={styles.infoValue}>
                 {formatCurrency(itemData.price, itemData.currency)}
-              </Text>
+              </SJText>
             </View>
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>{strings.info.location}</Text>
-              <Text style={styles.infoValue}>
+              <SJText style={styles.infoLabel}>{strings.info.location}</SJText>
+              <SJText style={styles.infoValue}>
                 {itemData.location_label ??
                   (itemData.location_lat !== null && itemData.location_lng !== null
                     ? `${itemData.location_lat.toFixed(4)}, ${itemData.location_lng.toFixed(4)}`
                     : t('common.notAvailable'))}
-              </Text>
+              </SJText>
             </View>
           </View>
 
           {/* Note */}
           <View style={styles.noteContainer}>
             <Ionicons name="information-circle" size={20} color="#8e8e93" />
-            <Text style={styles.noteText}>
+            <SJText style={styles.noteText}>
               {strings.note}
-            </Text>
+            </SJText>
           </View>
         </View>
       </ScrollView>
@@ -313,7 +304,7 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
           onPress={handleEdit}
           disabled={submitting}
         >
-          <Text style={styles.editButtonText}>{strings.buttons.edit}</Text>
+          <SJText style={styles.editButtonText}>{strings.buttons.edit}</SJText>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.submitButton, submitting && styles.submitButtonDisabled]}
@@ -323,11 +314,11 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
           {submitting ? (
             <>
               <ActivityIndicator size="small" color="#fff" />
-              <Text style={styles.submitButtonText}>{strings.buttons.submitting}</Text>
+              <SJText style={styles.submitButtonText}>{strings.buttons.submitting}</SJText>
             </>
           ) : (
             <>
-              <Text style={styles.submitButtonText}>{strings.buttons.submit}</Text>
+              <SJText style={styles.submitButtonText}>{strings.buttons.submit}</SJText>
               <Ionicons name="checkmark" size={20} color="#fff" />
             </>
           )}

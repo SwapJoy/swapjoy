@@ -1,14 +1,6 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Platform,
-  Image,
-  ScrollView,
-  Animated,
-} from 'react-native';
+import {View, StyleSheet, TouchableOpacity, Platform, Image, ScrollView, Animated, } from 'react-native';
+import SJText from '../components/SJText';
 import { BlurView } from 'expo-blur';
 import { Camera } from 'react-native-vision-camera';
 import { Ionicons } from '@expo/vector-icons';
@@ -139,15 +131,15 @@ const CameraScreen: React.FC<CameraScreenOwnProps> = ({ onNavigateToMain, isVisi
         <View style={styles.permissionOverlay} pointerEvents="box-none">
           <View style={styles.permissionOverlayContent}>
             <Ionicons name="camera-outline" size={64} color="#fff" />
-            <Text style={styles.permissionOverlayTitle}>Camera Access Required</Text>
-            <Text style={styles.permissionOverlayText}>
+            <SJText style={styles.permissionOverlayTitle}>Camera Access Required</SJText>
+            <SJText style={styles.permissionOverlayText}>
               Please grant camera permission to take photos for your listings.
-            </Text>
+            </SJText>
             <TouchableOpacity
               style={styles.permissionOverlayButton}
               onPress={handleRequestCameraPermission}
             >
-              <Text style={styles.permissionOverlayButtonText}>Grant Permission</Text>
+              <SJText style={styles.permissionOverlayButtonText}>Grant Permission</SJText>
             </TouchableOpacity>
           </View>
         </View>
@@ -169,7 +161,7 @@ const CameraScreen: React.FC<CameraScreenOwnProps> = ({ onNavigateToMain, isVisi
               style={[styles.topButton, styles.nextButton]}
               onPress={handleNext}
             >
-              <Text style={styles.nextButtonText}>Next</Text>
+              <SJText style={styles.nextButtonText}>Next</SJText>
             </TouchableOpacity>
           )}
         </View>

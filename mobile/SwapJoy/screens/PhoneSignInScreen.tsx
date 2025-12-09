@@ -1,15 +1,6 @@
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  ActivityIndicator,
-  SafeAreaView,
-  KeyboardAvoidingView,
-  Platform,
-} from 'react-native';
+import {View, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, SafeAreaView, KeyboardAvoidingView, Platform, } from 'react-native';
+import SJText from '../components/SJText';
 import { Ionicons } from '@expo/vector-icons';
 import { usePhoneSignIn } from '../hooks/usePhoneSignIn';
 import { useAuth } from '../contexts/AuthContext';
@@ -65,21 +56,21 @@ const PhoneSignInScreen: React.FC<PhoneSignInScreenProps> = ({ navigation }) => 
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
-            <Text style={styles.backButtonText}>← Back</Text>
+            <SJText style={styles.backButtonText}>← Back</SJText>
           </TouchableOpacity>
-          <Text style={styles.title}>Sign In</Text>
+          <SJText style={styles.title}>Sign In</SJText>
           <View style={styles.placeholder} />
         </View>
 
         {/* Content */}
         <View style={styles.content}>
-          <Text style={styles.subtitle}>Enter your phone number</Text>
-          <Text style={styles.description}>
+          <SJText style={styles.subtitle}>Enter your phone number</SJText>
+          <SJText style={styles.description}>
             We'll send you a verification code to confirm your phone number
-          </Text>
+          </SJText>
 
           <View style={styles.inputContainer}>
-            <Text style={styles.countryCode}>+1</Text>
+            <SJText style={styles.countryCode}>+1</SJText>
             <TextInput
               style={styles.phoneInput}
               placeholder="5177606110"
@@ -99,13 +90,13 @@ const PhoneSignInScreen: React.FC<PhoneSignInScreenProps> = ({ navigation }) => 
             {isLoading ? (
               <ActivityIndicator color="white" />
             ) : (
-              <Text style={styles.sendButtonText}>Send Code</Text>
+              <SJText style={styles.sendButtonText}>Send Code</SJText>
             )}
           </TouchableOpacity>
 
           <View style={styles.divider}>
             <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>OR</Text>
+            <SJText style={styles.dividerText}>OR</SJText>
             <View style={styles.dividerLine} />
           </View>
 
@@ -115,7 +106,7 @@ const PhoneSignInScreen: React.FC<PhoneSignInScreenProps> = ({ navigation }) => 
             disabled={isLoading}
           >
             <Ionicons name="mail-outline" size={20} color="#007AFF" style={styles.emailIcon} />
-            <Text style={styles.emailButtonText}>Sign in with Email</Text>
+            <SJText style={styles.emailButtonText}>Sign in with Email</SJText>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -128,7 +119,7 @@ const PhoneSignInScreen: React.FC<PhoneSignInScreenProps> = ({ navigation }) => 
             ) : (
               <>
                 <Ionicons name="logo-google" size={20} color="#fff" style={styles.googleIcon} />
-                <Text style={styles.googleButtonText}>Continue with Google</Text>
+                <SJText style={styles.googleButtonText}>Continue with Google</SJText>
               </>
             )}
           </TouchableOpacity>

@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import {View, StyleSheet, TouchableOpacity} from 'react-native';
+import SJText from '../components/SJText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CreateListingScreenProps } from '../types/navigation';
 
@@ -7,13 +8,13 @@ const CreateListingScreen: React.FC<CreateListingScreenProps> = ({ navigation })
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
-        <Text style={styles.title}>Create Listing</Text>
-        <Text style={styles.subtitle}>Coming soon!</Text>
+        <SJText style={styles.title}>Create Listing</SJText>
+        <SJText style={styles.subtitle}>Coming soon!</SJText>
         <TouchableOpacity
           style={styles.button}
           onPress={() => navigation.goBack()}
         >
-          <Text style={styles.buttonText}>Go Back</Text>
+          <SJText style={styles.buttonText}>Go Back</SJText>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

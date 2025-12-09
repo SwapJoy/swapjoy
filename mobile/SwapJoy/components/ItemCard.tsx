@@ -2,13 +2,13 @@ import React, { memo, ReactNode, useEffect, useRef } from 'react';
 import {
   TouchableOpacity,
   View,
-  Text,
   StyleSheet,
   StyleProp,
   ViewStyle,
   Animated,
 } from 'react-native';
 import CachedImage from './CachedImage';
+import SJText from './SJText';
 
 export type ItemCardVariant = 'list' | 'horizontal' | 'grid';
 
@@ -131,7 +131,7 @@ const ItemCard: React.FC<ItemCardProps> = memo(
             />
           ) : (
             <View style={[styles.image, styles.imagePlaceholder, { height: computedImageHeight }]}>
-              <Text style={styles.imagePlaceholderText}>{placeholderLabel}</Text>
+              <SJText style={styles.imagePlaceholderText}>{placeholderLabel}</SJText>
             </View>
           )}
 
@@ -140,7 +140,7 @@ const ItemCard: React.FC<ItemCardProps> = memo(
               <View style={styles.metadataRow}>
                 {priceLabel ? (
                   <View style={styles.priceBadge}>
-                    <Text style={styles.priceBadgeText}>{priceLabel}</Text>
+                    <SJText style={styles.priceBadgeText}>{priceLabel}</SJText>
                   </View>
                 ) : null}
                 {metaBadges?.map((badge, index) => (
@@ -151,14 +151,14 @@ const ItemCard: React.FC<ItemCardProps> = memo(
                       badge.backgroundColor ? { backgroundColor: badge.backgroundColor } : null,
                     ]}
                   >
-                    <Text
+                    <SJText
                       style={[
                         styles.metaBadgeText,
                         badge.textColor ? { color: badge.textColor } : null,
                       ]}
                     >
                       {badge.label}
-                    </Text>
+                    </SJText>
                   </View>
                 ))}
               </View>
@@ -174,42 +174,42 @@ const ItemCard: React.FC<ItemCardProps> = memo(
                 conditionBadge.backgroundColor ? { backgroundColor: conditionBadge.backgroundColor } : null,
               ]}
             >
-              <Text
+              <SJText
                 style={[
                   styles.conditionBadgeText,
                   conditionBadge.textColor ? { color: conditionBadge.textColor } : null,
                 ]}
               >
                 {conditionBadge.label}
-              </Text>
+              </SJText>
             </View>
           ) : null}
         </View>
 
         <View style={styles.content}>
-          <Text numberOfLines={computedTitleLines} style={styles.title}>
+          <SJText numberOfLines={computedTitleLines} style={styles.title}>
             {title}
-          </Text>
+          </SJText>
 
           {ownerHandle ? (
-            <Text style={styles.ownerHandle} numberOfLines={1}>
+            <SJText style={styles.ownerHandle} numberOfLines={1}>
               {ownerHandle.startsWith('@') ? ownerHandle : `@${ownerHandle}`}
-            </Text>
+            </SJText>
           ) : null}
 
           {description ? (
-            <Text
+            <SJText
               numberOfLines={computedDescriptionLines}
               ellipsizeMode="tail"
               style={styles.description}
             >
               {description}
-            </Text>
+            </SJText>
           ) : null}
 
           {hasMetaRight ? (
             <View style={styles.metaRow}>
-              <Text style={styles.metaRight}>{metaRightLabel}</Text>
+              <SJText style={styles.metaRight}>{metaRightLabel}</SJText>
             </View>
           ) : null}
 
@@ -223,14 +223,14 @@ const ItemCard: React.FC<ItemCardProps> = memo(
                     chip.backgroundColor ? { backgroundColor: chip.backgroundColor } : null,
                   ]}
                 >
-                  <Text
+                  <SJText
                     style={[
                       styles.chipText,
                       chip.textColor ? { color: chip.textColor } : null,
                     ]}
                   >
                     {chip.label}
-                  </Text>
+                  </SJText>
                 </View>
               ))}
             </View>

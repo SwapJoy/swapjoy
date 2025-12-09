@@ -1,14 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  ActivityIndicator,
-} from 'react-native';
+import {View, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, } from 'react-native';
+import SJText from '../../components/SJText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useOnboarding } from '../../hooks/useOnboarding';
@@ -85,9 +77,9 @@ const CategoriesScreen: React.FC = () => {
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#007AFF" />
-          <Text style={styles.loadingText}>
+          <SJText style={styles.loadingText}>
             {t('onboarding.common.loading', { defaultValue: 'Loading...' })}
-          </Text>
+          </SJText>
         </View>
       </SafeAreaView>
     );
@@ -111,18 +103,18 @@ const CategoriesScreen: React.FC = () => {
               </TouchableOpacity>
             )}
             <View style={styles.headerContent}>
-              <Text style={styles.stepIndicator}>Step {currentStepIndex + 1} of 6</Text>
+              <SJText style={styles.stepIndicator}>Step {currentStepIndex + 1} of 6</SJText>
             </View>
           </View>
 
           {/* Content */}
           <View style={styles.content}>
-            <Text style={styles.title}>
+            <SJText style={styles.title}>
               {t('onboarding.categories.title', { defaultValue: 'Choose Your Interests' })}
-            </Text>
-            <Text style={styles.description}>
+            </SJText>
+            <SJText style={styles.description}>
               {t('onboarding.categories.description', { defaultValue: 'Select categories you\'re interested in. You can change this later.' })}
-            </Text>
+            </SJText>
 
             <View style={styles.categoriesContainer}>
               {categories.map((category) => {
@@ -133,9 +125,9 @@ const CategoriesScreen: React.FC = () => {
                     style={[styles.categoryButton, isSelected && styles.categoryButtonSelected]}
                     onPress={() => handleCategoryToggle(category.id)}
                   >
-                    <Text style={[styles.categoryText, isSelected && styles.categoryTextSelected]}>
+                    <SJText style={[styles.categoryText, isSelected && styles.categoryTextSelected]}>
                       {category.name}
-                    </Text>
+                    </SJText>
                     {isSelected && (
                       <Ionicons name="checkmark-circle" size={20} color="#007AFF" style={styles.checkIcon} />
                     )}
@@ -147,9 +139,9 @@ const CategoriesScreen: React.FC = () => {
             {isSaving && (
               <View style={styles.savingContainer}>
                 <ActivityIndicator size="small" color="#007AFF" />
-                <Text style={styles.savingText}>
+                <SJText style={styles.savingText}>
                   {t('onboarding.common.saving', { defaultValue: 'Saving...' })}
-                </Text>
+                </SJText>
               </View>
             )}
           </View>
@@ -161,17 +153,17 @@ const CategoriesScreen: React.FC = () => {
             style={styles.skipButton}
             onPress={skipOnboarding}
           >
-            <Text style={styles.skipButtonText}>
+            <SJText style={styles.skipButtonText}>
               {t('onboarding.common.skip', { defaultValue: 'Skip' })}
-            </Text>
+            </SJText>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.nextButton}
             onPress={handleNext}
           >
-            <Text style={styles.nextButtonText}>
+            <SJText style={styles.nextButtonText}>
               {t('onboarding.common.next', { defaultValue: 'Next' })}
-            </Text>
+            </SJText>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>

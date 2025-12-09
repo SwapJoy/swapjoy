@@ -1,15 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  Modal,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import {ActivityIndicator, Alert, FlatList, Modal, StyleSheet, TextInput, TouchableOpacity, View, } from 'react-native';
+import SJText from '../components/SJText';
 import * as ExpoLocation from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -228,10 +219,10 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
           disabled={processingSelection}
         >
           <View>
-            <Text style={styles.cityName}>{item.name}</Text>
-            <Text style={styles.cityMeta}>
+            <SJText style={styles.cityName}>{item.name}</SJText>
+            <SJText style={styles.cityMeta}>
               {[item.state_province, item.country].filter(Boolean).join(', ')}
-            </Text>
+            </SJText>
           </View>
           {isSelected ? <Ionicons name="checkmark-circle" size={20} color="#0ea5e9" /> : null}
         </TouchableOpacity>
@@ -247,9 +238,9 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
       <View style={styles.backdrop}>
         <View style={styles.sheet}>
           <View style={styles.header}>
-            <Text style={styles.headerTitle}>{headerTitle}</Text>
+            <SJText style={styles.headerTitle}>{headerTitle}</SJText>
             <TouchableOpacity onPress={onClose} disabled={processingSelection}>
-              <Text style={styles.cancelText}>{cancelLabel}</Text>
+              <SJText style={styles.cancelText}>{cancelLabel}</SJText>
             </TouchableOpacity>
           </View>
 
@@ -260,7 +251,7 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
               disabled={processingSelection}
             >
               <Ionicons name="locate" size={18} color="#0ea5e9" />
-              <Text style={styles.currentLocationText}>{useCurrentLocationLabel}</Text>
+              <SJText style={styles.currentLocationText}>{useCurrentLocationLabel}</SJText>
               {processingSelection ? (
                 <ActivityIndicator size="small" color="#0ea5e9" style={styles.currentLocationSpinner} />
               ) : null}
@@ -280,11 +271,11 @@ const LocationSelector: React.FC<LocationSelectorProps> = ({
             {loadingCities ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="small" color="#0ea5e9" />
-                <Text style={styles.loadingText}>{locatingLabel}</Text>
+                <SJText style={styles.loadingText}>{locatingLabel}</SJText>
               </View>
             ) : filtered.length === 0 ? (
               <View style={styles.emptyState}>
-                <Text style={styles.emptyStateText}>{noCitiesLabel}</Text>
+                <SJText style={styles.emptyStateText}>{noCitiesLabel}</SJText>
               </View>
             ) : (
               <FlatList

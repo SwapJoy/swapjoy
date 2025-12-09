@@ -1,12 +1,6 @@
 import React, { memo, useCallback, useEffect, useMemo, useState, useRef } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ActivityIndicator,
-  Animated,
-} from 'react-native';
+import {View, StyleSheet, TouchableOpacity, ActivityIndicator, Animated, } from 'react-native';
+import SJText from '../components/SJText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ProfileScreenProps } from '../types/navigation';
 import { useProfileData } from '../hooks/useProfileData';
@@ -75,7 +69,7 @@ const FollowButton: React.FC<{ targetUserId: string }> = ({ targetUserId }) => {
         isFollowing ? styles.followButtonFollowing : styles.followButtonPrimary,
       ]}
     >
-      <Text
+      <SJText
         style={[
           styles.followButtonText,
           isFollowing ? styles.followButtonTextFollowing : styles.followButtonTextPrimary,
@@ -86,7 +80,7 @@ const FollowButton: React.FC<{ targetUserId: string }> = ({ targetUserId }) => {
           : isFollowing
             ? t('profileScreen.followButton.unfollow')
             : t('profileScreen.followButton.follow')}
-      </Text>
+      </SJText>
     </TouchableOpacity>
   );
 };
@@ -359,11 +353,11 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
                 (user as any)?.user_metadata?.username ||
                 (user as any)?.email?.split?.('@')?.[0]
               ) && (
-                <Text style={styles.username}>@
+                <SJText style={styles.username}>@
                   {profile?.username ||
                     (user as any)?.user_metadata?.username ||
                     (user as any)?.email?.split?.('@')?.[0]}
-                </Text>
+                </SJText>
               )}
 
               {/* Followers & Following - Under Username */}
@@ -380,8 +374,8 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
                       }
                       activeOpacity={0.7}
                     >
-                      <Text style={styles.socialStatValue}>{followCounts.followers}</Text>
-                      <Text style={styles.socialStatLabel}>{strings.stats.followers}</Text>
+                      <SJText style={styles.socialStatValue}>{followCounts.followers}</SJText>
+                      <SJText style={styles.socialStatLabel}>{strings.stats.followers}</SJText>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.socialStatItem}
@@ -393,8 +387,8 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
                       }
                       activeOpacity={0.7}
                     >
-                      <Text style={styles.socialStatValue}>{followCounts.following}</Text>
-                      <Text style={styles.socialStatLabel}>{strings.stats.following}</Text>
+                      <SJText style={styles.socialStatValue}>{followCounts.following}</SJText>
+                      <SJText style={styles.socialStatLabel}>{strings.stats.following}</SJText>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -404,16 +398,16 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
 
           {/* Full Name - Under Avatar */}
           <View style={styles.userNameSection}>
-            <Text style={styles.userName}>
+            <SJText style={styles.userName}>
               {profile?.first_name || (user as any)?.user_metadata?.first_name || ''}{' '}
               {profile?.last_name || (user as any)?.user_metadata?.last_name || ''}
-            </Text>
+            </SJText>
           </View>
 
           {/* Bio - Under Full Name */}
           {profile?.bio && (
             <View style={styles.bioSection}>
-              <Text style={styles.bio}>{profile.bio}</Text>
+              <SJText style={styles.bio}>{profile.bio}</SJText>
             </View>
           )}
 
@@ -429,11 +423,11 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
       {/* Rating */}
       {!loadingMetrics && rating.totalRatings > 0 && (
         <View style={styles.ratingContainer}>
-          <Text style={styles.ratingTitle}>{strings.stats.ratingTitle}</Text>
+          <SJText style={styles.ratingTitle}>{strings.stats.ratingTitle}</SJText>
           <View style={styles.ratingContent}>
-            <Text style={styles.ratingValue}>{formatRating(rating.averageRating)}</Text>
-            <Text style={styles.ratingStars}>★★★★★</Text>
-            <Text style={styles.ratingCount}>{reviewsLabel(rating.totalRatings)}</Text>
+            <SJText style={styles.ratingValue}>{formatRating(rating.averageRating)}</SJText>
+            <SJText style={styles.ratingStars}>★★★★★</SJText>
+            <SJText style={styles.ratingCount}>{reviewsLabel(rating.totalRatings)}</SJText>
           </View>
         </View>
       )}
@@ -447,17 +441,17 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
                 onPress={() => setActiveTab('published')}
                 style={[styles.tabButton, activeTab === 'published' && styles.tabButtonActive]}
               >
-                <Text style={[styles.tabText, activeTab === 'published' && styles.tabTextActive]}>
+                <SJText style={[styles.tabText, activeTab === 'published' && styles.tabTextActive]}>
                   {strings.tabs.published}
-                </Text>
+                </SJText>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => setActiveTab('saved')}
                 style={[styles.tabButton, activeTab === 'saved' && styles.tabButtonActive]}
               >
-                <Text style={[styles.tabText, activeTab === 'saved' && styles.tabTextActive]}>
+                <SJText style={[styles.tabText, activeTab === 'saved' && styles.tabTextActive]}>
                   {strings.tabs.saved}
-                </Text>
+                </SJText>
               </TouchableOpacity>
             </View>
           </View>
@@ -465,18 +459,18 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
           {isLoadingCurrentTab ? (
             <View style={styles.loadingItemsContainer}>
               <ActivityIndicator size="large" color="#007AFF" />
-              <Text style={styles.loadingItemsText}>{strings.loading.items}</Text>
+              <SJText style={styles.loadingItemsText}>{strings.loading.items}</SJText>
             </View>
           ) : gridData.length === 0 ? (
             <View style={styles.emptyItemsContainer}>
-              <Text style={styles.emptyItemsText}>{strings.empty.title}</Text>
-              <Text style={styles.emptyItemsSubtext}>
+              <SJText style={styles.emptyItemsText}>{strings.empty.title}</SJText>
+              <SJText style={styles.emptyItemsSubtext}>
                 {activeTab === 'published'
                   ? strings.empty.published
                   : activeTab === 'saved'
                     ? strings.empty.saved
                     : strings.empty.drafts}
-              </Text>
+              </SJText>
             </View>
           ) : null}
         </View>

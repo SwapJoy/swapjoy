@@ -1,17 +1,6 @@
 import React, { useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  Platform,
-  ActivityIndicator,
-  Image,
-  Modal,
-  KeyboardAvoidingView,
-} from 'react-native';
+import {View, StyleSheet, TextInput, TouchableOpacity, ScrollView, Platform, ActivityIndicator, Image, Modal, KeyboardAvoidingView, } from 'react-native';
+import SJText from '../components/SJText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { ItemDetailsFormScreenProps } from '../types/navigation';
@@ -76,7 +65,7 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#007AFF" />
-          <Text style={styles.loadingText}>{strings.loading}</Text>
+          <SJText style={styles.loadingText}>{strings.loading}</SJText>
         </View>
       </SafeAreaView>
     );
@@ -93,7 +82,7 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
           <TouchableOpacity style={styles.backButton} onPress={handleBack}>
             <Ionicons name="arrow-back" size={24} color="#007AFF" />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>{strings.headerTitle}</Text>
+          <SJText style={styles.headerTitle}>{strings.headerTitle}</SJText>
         </View>
 
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
@@ -102,9 +91,9 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
             <View style={styles.uploadProgressContainer}>
               <View style={styles.progressHeader}>
                 <Ionicons name="cloud-upload" size={20} color="#007AFF" />
-                <Text style={styles.uploadProgressText}>
+                <SJText style={styles.uploadProgressText}>
                   {uploadingText(getOverallProgress())}
-                </Text>
+                </SJText>
               </View>
               <View style={styles.progressBar}>
                 <View
@@ -195,9 +184,9 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
             <View style={styles.fieldContainerWithLabel}>
               {strings.labels.condition && (
                 <View style={styles.floatingLabelContainer}>
-                  <Text style={styles.floatingLabelText}>
-                {strings.labels.condition} <Text style={styles.required}>*</Text>
-              </Text>
+                  <SJText style={styles.floatingLabelText}>
+                {strings.labels.condition} <SJText style={styles.required}>*</SJText>
+              </SJText>
             </View>
               )}
               <View style={styles.inlineSelectionContainer}>
@@ -216,14 +205,14 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
                       color={condition === cond.value ? '#fff' : '#666'}
                       style={styles.inlineSelectionIcon}
                     />
-                    <Text
+                    <SJText
                       style={[
                         styles.inlineSelectionText,
                         condition === cond.value && styles.inlineSelectionTextSelected,
                       ]}
                     >
                       {cond.label}
-                </Text>
+                </SJText>
               </TouchableOpacity>
                 ))}
               </View>
@@ -248,9 +237,9 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
                   }}
                   activeOpacity={0.7}
                 >
-                  <Text style={styles.currencySwitcherText}>
+                  <SJText style={styles.currencySwitcherText}>
                     {currency === 'GEL' ? '🇬🇪' : currency === 'USD' ? '🇺🇸' : '🇪🇺'} {getCurrencySymbol(currency)}
-                </Text>
+                </SJText>
               </TouchableOpacity>
               }
             />
@@ -264,7 +253,7 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
               required
             />
             {resolvingLocation ?? (
-                <Text style={styles.locationStatus}>{strings.location.resolving}</Text>
+                <SJText style={styles.locationStatus}>{strings.location.resolving}</SJText>
             )}
           </View>
         </ScrollView>
@@ -279,12 +268,12 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
             onPress={handleNext}
             disabled={uploading || images.length === 0}
           >
-            <Text style={[
+            <SJText style={[
               styles.nextButtonText,
               (uploading || images.length === 0) && styles.nextButtonTextDisabled
             ]}>
               {strings.buttons.next}
-            </Text>
+            </SJText>
             <Ionicons 
               name="arrow-forward" 
               size={20} 
@@ -310,7 +299,7 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>{strings.modals.selectCategory}</Text>
+                <SJText style={styles.modalTitle}>{strings.modals.selectCategory}</SJText>
                 <TouchableOpacity onPress={() => setShowCategoryPicker(false)}>
                   <Ionicons name="close" size={24} color="#666" />
                 </TouchableOpacity>
@@ -325,7 +314,7 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
                     ]}
                     onPress={() => setCategory(cat.id)}
                   >
-                    <Text style={styles.modalItemText}>{cat.name}</Text>
+                    <SJText style={styles.modalItemText}>{cat.name}</SJText>
                     {category === cat.id && (
                       <Ionicons name="checkmark" size={24} color="#007AFF" />
                     )}

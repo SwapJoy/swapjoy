@@ -1,9 +1,6 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-} from 'react-native';
+import {View, TouchableOpacity, } from 'react-native';
+import SJText from '../components/SJText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -62,7 +59,7 @@ const CustomHeader: React.FC<CustomHeaderProps> = React.memo(({
         </TouchableOpacity>
 
         <View style={styles.titleContainer}>
-          <Text style={styles.title}>SwapJoy</Text>
+          <SJText style={styles.title}>SwapJoy</SJText>
         </View>
 
         <TouchableOpacity

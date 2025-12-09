@@ -1,17 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-} from 'react-native';
+import {ActivityIndicator, Alert, FlatList, StyleSheet, TextInput, TouchableOpacity, View, KeyboardAvoidingView, Platform, ScrollView, } from 'react-native';
+import SJText from '../../components/SJText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ExpoLocation from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
@@ -232,10 +221,10 @@ const LocationScreen: React.FC = () => {
           disabled={processingSelection}
         >
           <View>
-            <Text style={styles.cityName}>{item.name}</Text>
-            <Text style={styles.cityMeta}>
+            <SJText style={styles.cityName}>{item.name}</SJText>
+            <SJText style={styles.cityMeta}>
               {[item.state_province, item.country].filter(Boolean).join(', ')}
-            </Text>
+            </SJText>
           </View>
           {isSelected ? <Ionicons name="checkmark-circle" size={20} color="#0ea5e9" /> : null}
         </TouchableOpacity>
@@ -265,18 +254,18 @@ const LocationScreen: React.FC = () => {
               </TouchableOpacity>
             )}
             <View style={styles.headerContent}>
-              <Text style={styles.stepIndicator}>Step {currentStepIndex + 1} of 6</Text>
+              <SJText style={styles.stepIndicator}>Step {currentStepIndex + 1} of 6</SJText>
             </View>
           </View>
 
           {/* Content */}
           <View style={styles.content}>
-            <Text style={styles.title}>
+            <SJText style={styles.title}>
               {t('onboarding.location.title', { defaultValue: 'Choose Your Location' })}
-            </Text>
-            <Text style={styles.description}>
+            </SJText>
+            <SJText style={styles.description}>
               {t('onboarding.location.description', { defaultValue: 'Select your location to find nearby swaps and matches.' })}
-            </Text>
+            </SJText>
 
             <TouchableOpacity
               style={styles.currentLocationButton}
@@ -284,9 +273,9 @@ const LocationScreen: React.FC = () => {
               disabled={processingSelection}
             >
               <Ionicons name="locate" size={18} color="#0ea5e9" />
-              <Text style={styles.currentLocationText}>
+              <SJText style={styles.currentLocationText}>
                 {t('locationSelector.useCurrentLocation', { defaultValue: 'Use my current location' })}
-              </Text>
+              </SJText>
               {processingSelection ? (
                 <ActivityIndicator size="small" color="#0ea5e9" style={styles.currentLocationSpinner} />
               ) : null}
@@ -306,15 +295,15 @@ const LocationScreen: React.FC = () => {
             {loadingCities ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="small" color="#0ea5e9" />
-                <Text style={styles.loadingText}>
+                <SJText style={styles.loadingText}>
                   {t('locationSelector.locating', { defaultValue: 'Loading cities...' })}
-                </Text>
+                </SJText>
               </View>
             ) : filtered.length === 0 ? (
               <View style={styles.emptyState}>
-                <Text style={styles.emptyStateText}>
+                <SJText style={styles.emptyStateText}>
                   {t('locationSelector.empty', { defaultValue: 'No cities match your search.' })}
-                </Text>
+                </SJText>
               </View>
             ) : (
               <FlatList
@@ -330,11 +319,11 @@ const LocationScreen: React.FC = () => {
             {selectedLocation && (
               <View style={styles.selectedLocationContainer}>
                 <Ionicons name="checkmark-circle" size={20} color="#34C759" />
-                <Text style={styles.selectedLocationText}>
+                <SJText style={styles.selectedLocationText}>
                   {selectedLocation.cityName && selectedLocation.country
                     ? `${selectedLocation.cityName}, ${selectedLocation.country}`
                     : t('onboarding.location.selected', { defaultValue: 'Location selected' })}
-                </Text>
+                </SJText>
               </View>
             )}
           </View>
@@ -346,17 +335,17 @@ const LocationScreen: React.FC = () => {
             style={styles.skipButton}
             onPress={skipOnboarding}
           >
-            <Text style={styles.skipButtonText}>
+            <SJText style={styles.skipButtonText}>
               {t('onboarding.common.skip', { defaultValue: 'Skip' })}
-            </Text>
+            </SJText>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.finishButton}
             onPress={handleFinish}
           >
-            <Text style={styles.finishButtonText}>
+            <SJText style={styles.finishButtonText}>
               {t('onboarding.common.finish', { defaultValue: 'Finish' })}
-            </Text>
+            </SJText>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>

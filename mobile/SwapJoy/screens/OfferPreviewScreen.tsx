@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
+import {View, StyleSheet, FlatList, TouchableOpacity, Alert} from 'react-native';
+import SJText from '../components/SJText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { OfferPreviewScreenProps } from '../types/navigation';
 import CachedImage from '../components/CachedImage';
@@ -76,8 +77,8 @@ const OfferPreviewScreen: React.FC<OfferPreviewScreenProps> = ({ navigation, rou
         fallbackUri="https://picsum.photos/200/150?random=8"
       />
       <View style={{ flex: 1 }}>
-        <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
-        <Text style={styles.price}>{formatCurrency(item.price || 0, item.currency || 'USD')}</Text>
+        <SJText style={styles.title} numberOfLines={1}>{item.title}</SJText>
+        <SJText style={styles.price}>{formatCurrency(item.price || 0, item.currency || 'USD')}</SJText>
       </View>
     </View>
   );
@@ -87,7 +88,7 @@ const OfferPreviewScreen: React.FC<OfferPreviewScreenProps> = ({ navigation, rou
       <FlatList
         ListHeaderComponent={
           <View>
-            <Text style={styles.sectionTitle}>{strings.youOffer}</Text>
+            <SJText style={styles.sectionTitle}>{strings.youOffer}</SJText>
             <FlatList
               data={summary.offered}
               keyExtractor={(it) => it.id}
@@ -96,7 +97,7 @@ const OfferPreviewScreen: React.FC<OfferPreviewScreenProps> = ({ navigation, rou
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={{ paddingHorizontal: 16 }}
             />
-            <Text style={styles.sectionTitle}>{strings.youWant}</Text>
+            <SJText style={styles.sectionTitle}>{strings.youWant}</SJText>
             <FlatList
               data={summary.requested}
               keyExtractor={(it) => it.id}
@@ -106,13 +107,13 @@ const OfferPreviewScreen: React.FC<OfferPreviewScreenProps> = ({ navigation, rou
               contentContainerStyle={{ paddingHorizontal: 16 }}
             />
             <View style={styles.infoBox}>
-              <Text style={styles.infoLabel}>{strings.moneyLabel}</Text>
-              <Text style={styles.infoValue}>{moneyDescriptor}</Text>
+              <SJText style={styles.infoLabel}>{strings.moneyLabel}</SJText>
+              <SJText style={styles.infoValue}>{moneyDescriptor}</SJText>
             </View>
             {message ? (
               <View style={styles.infoBox}>
-                <Text style={styles.infoLabel}>{strings.messageLabel}</Text>
-                <Text style={styles.message}>{message}</Text>
+                <SJText style={styles.infoLabel}>{strings.messageLabel}</SJText>
+                <SJText style={styles.message}>{message}</SJText>
               </View>
             ) : null}
           </View>
@@ -124,7 +125,7 @@ const OfferPreviewScreen: React.FC<OfferPreviewScreenProps> = ({ navigation, rou
 
       <View style={styles.footer}>
         <TouchableOpacity style={[styles.submitBtn, submitting && { opacity: 0.6 }]} onPress={onSubmit} disabled={submitting}>
-          <Text style={styles.submitText}>{submitting ? strings.submittingButton : strings.submitButton}</Text>
+          <SJText style={styles.submitText}>{submitting ? strings.submittingButton : strings.submitButton}</SJText>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

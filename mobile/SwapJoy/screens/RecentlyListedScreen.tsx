@@ -1,14 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  ActivityIndicator,
-  RefreshControl,
-  Dimensions,
-} from 'react-native';
+import {View, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, RefreshControl, Dimensions, } from 'react-native';
+import SJText from '../components/SJText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -181,15 +173,15 @@ const RecentlyListedScreen: React.FC = () => {
             fallbackUri="https://picsum.photos/200/150?random=12"
           />
           <View style={styles.gridDetails}>
-            <Text style={styles.gridTitle} numberOfLines={2}>
+            <SJText style={styles.gridTitle} numberOfLines={2}>
               {item.title}
-            </Text>
-            <Text style={styles.gridPrice}>{formatCurrency(item.price, item.currency)}</Text>
+            </SJText>
+            <SJText style={styles.gridPrice}>{formatCurrency(item.price, item.currency)}</SJText>
             {chips.length > 0 ? (
               <View style={styles.itemChipsRow}>
                 {chips.map((chip) => (
                   <View key={`${item.id}-${chip.label}`} style={[styles.itemChip, { backgroundColor: chip.backgroundColor }]}> 
-                    <Text style={[styles.itemChipText, { color: chip.textColor }]}>{chip.label}</Text>
+                    <SJText style={[styles.itemChipText, { color: chip.textColor }]}>{chip.label}</SJText>
                   </View>
                 ))}
               </View>
@@ -213,14 +205,14 @@ const RecentlyListedScreen: React.FC = () => {
     if (error) {
       return (
         <View style={styles.loaderContainer}>
-          <Text style={styles.errorText}>{t('explore.errors.unknown', { defaultValue: 'Something went wrong' })}</Text>
+          <SJText style={styles.errorText}>{t('explore.errors.unknown', { defaultValue: 'Something went wrong' })}</SJText>
         </View>
       );
     }
 
     return (
       <View style={styles.loaderContainer}>
-        <Text style={styles.emptyText}>{t('explore.empty.recentItems', { defaultValue: 'No recent items found' })}</Text>
+        <SJText style={styles.emptyText}>{t('explore.empty.recentItems', { defaultValue: 'No recent items found' })}</SJText>
       </View>
     );
   }, [initialLoading, error, t]);
@@ -229,9 +221,9 @@ const RecentlyListedScreen: React.FC = () => {
     return (
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.loaderContainer}>
-          <Text style={styles.emptyText}>
+          <SJText style={styles.emptyText}>
             {t('explore.loading.signInRequired', { defaultValue: 'Please sign in to view AI Matches…' })}
-          </Text>
+          </SJText>
         </View>
       </SafeAreaView>
     );
@@ -243,7 +235,7 @@ const RecentlyListedScreen: React.FC = () => {
         <TouchableOpacity style={styles.backButton} onPress={() => rootNavigation.goBack()} activeOpacity={0.8}>
           <Ionicons name="chevron-back" size={22} color="#0f172a" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{headerTitle}</Text>
+        <SJText style={styles.headerTitle}>{headerTitle}</SJText>
         <View style={styles.headerSpacer} />
       </View>
 

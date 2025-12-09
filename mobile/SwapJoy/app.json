@@ -43,6 +43,10 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
+    "fonts": [
+      "./assets/fonts/NotoSansGeorgian-Regular.ttf",
+      "./assets/fonts/NotoSansGeorgian-Bold.ttf"
+    ],
     "plugins": [
       "expo-web-browser",
       [

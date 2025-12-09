@@ -1,13 +1,6 @@
 import React, { memo, useMemo, useState, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  RefreshControl,
-  Dimensions,
-} from 'react-native';
+import {View, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Dimensions, } from 'react-native';
+import SJText from '../components/SJText';
 import { OffersScreenProps } from '../types/navigation';
 import { useOffersData, Offer } from '../hooks/useOffersData';
 import { useLocalization } from '../localization';
@@ -142,7 +135,7 @@ const OffersScreen: React.FC<OffersScreenProps> = memo(({ route, navigation }) =
           .filter((title): title is string => Boolean(title && title.trim().length > 0));
 
         if (titles.length === 0) {
-          return <Text style={styles.offerItemEmpty}>—</Text>;
+          return <SJText style={styles.offerItemEmpty}>—</SJText>;
         }
 
         const visible = titles.slice(0, 2);
@@ -151,12 +144,12 @@ const OffersScreen: React.FC<OffersScreenProps> = memo(({ route, navigation }) =
         return (
           <View style={styles.offerItemsList}>
             {visible.map((title, idx) => (
-              <Text key={`${title}-${idx}`} style={styles.offerItemText} numberOfLines={1}>
+              <SJText key={`${title}-${idx}`} style={styles.offerItemText} numberOfLines={1}>
                 • {title}
-              </Text>
+              </SJText>
             ))}
             {remaining > 0 ? (
-              <Text style={styles.offerMoreItems}>{formatMoreItems(remaining)}</Text>
+              <SJText style={styles.offerMoreItems}>{formatMoreItems(remaining)}</SJText>
             ) : null}
           </View>
         );
@@ -185,23 +178,23 @@ const OffersScreen: React.FC<OffersScreenProps> = memo(({ route, navigation }) =
             <View style={styles.offerMetaSection}>
               <View style={styles.offerMetaHeader}>
                 <View style={[styles.statusBadge, { backgroundColor: statusColor }]}>
-                  <Text style={styles.statusText}>{statusText}</Text>
+                  <SJText style={styles.statusText}>{statusText}</SJText>
                 </View>
-                <Text style={styles.offerMetaUser} numberOfLines={1}>
+                <SJText style={styles.offerMetaUser} numberOfLines={1}>
                   {userLabel}
-                </Text>
-                <Text style={styles.offerMetaDate}>{createdAtLabel}</Text>
+                </SJText>
+                <SJText style={styles.offerMetaDate}>{createdAtLabel}</SJText>
               </View>
               <View style={styles.offerMetaRow}>
-                <Text style={styles.offerMetaLabel}>{strings.youOffer}</Text>
+                <SJText style={styles.offerMetaLabel}>{strings.youOffer}</SJText>
                 <View style={styles.offerMetaContent}>{renderItemsList(youGiveItems)}</View>
               </View>
               <View style={styles.offerMetaRow}>
-                <Text style={styles.offerMetaLabel}>{strings.youWant}</Text>
+                <SJText style={styles.offerMetaLabel}>{strings.youWant}</SJText>
                 <View style={styles.offerMetaContent}>{renderItemsList(youReceiveItems)}</View>
               </View>
               <View style={styles.offerTopUpRow}>
-                <Text style={styles.offerTopUpLabel}>{topUpText}</Text>
+                <SJText style={styles.offerTopUpLabel}>{topUpText}</SJText>
               </View>
             </View>
           }
@@ -231,13 +224,13 @@ const OffersScreen: React.FC<OffersScreenProps> = memo(({ route, navigation }) =
               onPress={() => setActiveTab('sent')}
               style={[styles.tabButton, activeTab === 'sent' && styles.tabButtonActive]}
             >
-              <Text style={[styles.tabText, activeTab === 'sent' && styles.tabTextActive]}>{strings.tabs.sent}</Text>
+              <SJText style={[styles.tabText, activeTab === 'sent' && styles.tabTextActive]}>{strings.tabs.sent}</SJText>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => setActiveTab('received')}
               style={[styles.tabButton, activeTab === 'received' && styles.tabButtonActive]}
             >
-              <Text style={[styles.tabText, activeTab === 'received' && styles.tabTextActive]}>{strings.tabs.received}</Text>
+              <SJText style={[styles.tabText, activeTab === 'received' && styles.tabTextActive]}>{strings.tabs.received}</SJText>
             </TouchableOpacity>
           </View>
         </View>
@@ -261,13 +254,13 @@ const OffersScreen: React.FC<OffersScreenProps> = memo(({ route, navigation }) =
               onPress={() => setActiveTab('sent')}
               style={[styles.tabButton, activeTab === 'sent' && styles.tabButtonActive]}
             >
-              <Text style={[styles.tabText, activeTab === 'sent' && styles.tabTextActive]}>{strings.tabs.sent}</Text>
+              <SJText style={[styles.tabText, activeTab === 'sent' && styles.tabTextActive]}>{strings.tabs.sent}</SJText>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => setActiveTab('received')}
             style={[styles.tabButton, activeTab === 'received' && styles.tabButtonActive]}
           >
-              <Text style={[styles.tabText, activeTab === 'received' && styles.tabTextActive]}>{strings.tabs.received}</Text>
+              <SJText style={[styles.tabText, activeTab === 'received' && styles.tabTextActive]}>{strings.tabs.received}</SJText>
           </TouchableOpacity>
         </View>
       </View>
@@ -291,12 +284,12 @@ const OffersScreen: React.FC<OffersScreenProps> = memo(({ route, navigation }) =
         removeClippedSubviews={false}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyTitle}>
+            <SJText style={styles.emptyTitle}>
               {activeTab === 'sent' ? strings.emptySentTitle : strings.emptyReceivedTitle}
-            </Text>
-            <Text style={styles.emptySubtitle}>
+            </SJText>
+            <SJText style={styles.emptySubtitle}>
               {activeTab === 'sent' ? strings.emptySentSubtitle : strings.emptyReceivedSubtitle}
-            </Text>
+            </SJText>
           </View>
         }
       />

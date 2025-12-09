@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Switch, Dimensions, ActivityIndicator, Alert } from 'react-native';
+import {View, StyleSheet, FlatList, TouchableOpacity, TextInput, Switch, Dimensions, ActivityIndicator, Alert} from 'react-native';
+import SJText from '../components/SJText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import CachedImage from '../components/CachedImage';
 import { OfferCreateScreenProps } from '../types/navigation';
@@ -110,8 +111,8 @@ const OfferCreateScreen: React.FC<OfferCreateScreenProps> = ({ navigation, route
         defaultSource={require('../assets/icon.png')}
       />
       <View style={{ flex: 1 }}>
-        <Text style={styles.reqTitle} numberOfLines={1}>{item.title}</Text>
-        <Text style={styles.reqPrice}>{formatCurrency(item.price || 0, item.currency || 'USD')}</Text>
+        <SJText style={styles.reqTitle} numberOfLines={1}>{item.title}</SJText>
+        <SJText style={styles.reqPrice}>{formatCurrency(item.price || 0, item.currency || 'USD')}</SJText>
       </View>
     </View>
   );
@@ -132,10 +133,10 @@ const OfferCreateScreen: React.FC<OfferCreateScreenProps> = ({ navigation, route
             defaultSource={require('../assets/icon.png')}
           />
           <View style={{ flex: 1 }}>
-            <Text style={styles.myItemTitle} numberOfLines={1}>{item.title}</Text>
-            <Text style={styles.myItemMeta}>
+            <SJText style={styles.myItemTitle} numberOfLines={1}>{item.title}</SJText>
+            <SJText style={styles.myItemMeta}>
               {formatCurrency(item.price || 0, item.currency || 'USD')} • {item.condition || strings.unknownCondition}
-            </Text>
+            </SJText>
           </View>
           <View style={[styles.checkbox, selected && styles.checkboxOn]} />
         </TouchableOpacity>
@@ -163,7 +164,7 @@ const OfferCreateScreen: React.FC<OfferCreateScreenProps> = ({ navigation, route
 
   const listHeader = useMemo(() => (
     <View>
-      <Text style={styles.sectionTitle}>{contextTitle || strings.requestedTitle}</Text>
+      <SJText style={styles.sectionTitle}>{contextTitle || strings.requestedTitle}</SJText>
       <FlatList
         data={requestedItems}
         keyExtractor={(it) => it.id}
@@ -175,7 +176,7 @@ const OfferCreateScreen: React.FC<OfferCreateScreenProps> = ({ navigation, route
 
       <View style={styles.moneyBox}>
         <View style={styles.toggleRow}>
-          <Text style={styles.toggleLabel}>{strings.toggleLabel}</Text>
+          <SJText style={styles.toggleLabel}>{strings.toggleLabel}</SJText>
           <Switch value={iWillAddMoney} onValueChange={setIWillAddMoney} />
         </View>
         <TextInput
@@ -188,7 +189,7 @@ const OfferCreateScreen: React.FC<OfferCreateScreenProps> = ({ navigation, route
       </View>
 
       <View style={{ paddingHorizontal: 16, paddingTop: 8 }}>
-        <Text style={styles.sectionTitle}>{strings.selectYourItems}</Text>
+        <SJText style={styles.sectionTitle}>{strings.selectYourItems}</SJText>
       </View>
     </View>
   ), [contextTitle, requestedItems, iWillAddMoney, amountInput, renderRequestedItemFn, strings.placeholderAdd, strings.placeholderRequest, strings.requestedTitle, strings.selectYourItems, strings.toggleLabel]);
@@ -227,7 +228,7 @@ const OfferCreateScreen: React.FC<OfferCreateScreenProps> = ({ navigation, route
           multiline
         />
         <TouchableOpacity style={[styles.nextBtn, !canProceed && { opacity: 0.5 }]} disabled={!canProceed} onPress={onNext}>
-          <Text style={styles.nextText}>{strings.nextButton}</Text>
+          <SJText style={styles.nextText}>{strings.nextButton}</SJText>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

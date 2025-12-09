@@ -1,7 +1,6 @@
 import React, { memo, useEffect, useMemo, useRef } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
   TouchableOpacity,
   Dimensions,
@@ -15,11 +14,12 @@ import CachedImage from './CachedImage';
 import { useLocalization } from '../localization';
 import { getConditionPresentation } from '../utils/conditions';
 import { useCategories } from '../contexts/CategoriesContext';
+import SJText from './SJText';
 
 const { width, height } = Dimensions.get('window');
 
 export const TOP_MATCH_CARD_WIDTH = width * 0.75;
-export const TOP_MATCH_CARD_HEIGHT = height * 0.5; // Card height based on screen height
+export const TOP_MATCH_CARD_HEIGHT = height * 0.55; // Card height based on screen height
 
 const useFadeAnimation = () => {
   const opacity = useRef(new Animated.Value(0.4)).current;
@@ -159,22 +159,23 @@ const TopMatchCard: React.FC<TopMatchCardProps> = ({
             />
           ) : (
             <View style={styles.ownerProfileImagePlaceholder}>
-              <Text style={styles.ownerProfileImageText}>
+              <SJText style={styles.ownerProfileImageText}>
                 {owner.initials || ownerUsername.charAt(0).toUpperCase()}
-              </Text>
+              </SJText>
             </View>
           )}
-          <Text style={styles.ownerUsername} numberOfLines={1}>
+          <SJText style={styles.ownerUsername} numberOfLines={1}>
             {ownerUsername}
-          </Text>
+          </SJText>
         </TouchableOpacity>
       ) : null}
 
-      <TouchableOpacity
-        style={[styles.card, containerStyle]}
-        activeOpacity={0.85}
-        onPress={onPress}
-      >
+      <View style={styles.cardWrapper}>
+        <TouchableOpacity
+          style={[styles.card, containerStyle]}
+          activeOpacity={0.85}
+          onPress={onPress}
+        >
         <View style={styles.mediaSection}>
           <CachedImage
             uri={imageUrl || 'https://via.placeholder.com/320x240'}
@@ -202,33 +203,33 @@ const TopMatchCard: React.FC<TopMatchCardProps> = ({
                 { backgroundColor: conditionPresentation.backgroundColor },
               ]}
             >
-              <Text
+              <SJText
                 style={[
                   styles.conditionText,
                   { color: conditionPresentation.textColor },
                 ]}
               >
                 {conditionPresentation.label}
-              </Text>
+              </SJText>
             </View>
           )}
         </View>
 
         <View style={styles.infoSection}>
           <View style={styles.titleRow}>
-            <Text style={styles.title} numberOfLines={1} ellipsizeMode="tail">
+            <SJText style={styles.title} numberOfLines={1} ellipsizeMode="tail">
               {displayTitle}
-            </Text>
+            </SJText>
           </View>
 
           {description ? (
-            <Text
+            <SJText
               style={styles.description}
               numberOfLines={1}
               ellipsizeMode="tail"
             >
               {description}
-            </Text>
+            </SJText>
           ) : null}
 
           {normalizedCategory && (
@@ -237,36 +238,42 @@ const TopMatchCard: React.FC<TopMatchCardProps> = ({
                 <View
                   style={[styles.chip, { backgroundColor: '#e2e8f0' }]}
                 >
-                  <Text style={styles.chipEmoji}>{categoryIcon}</Text>
-                  <Text style={[styles.chipText, { color: '#0f172a' }]}>
+                  <SJText style={styles.chipEmoji}>{categoryIcon}</SJText>
+                  <SJText style={[styles.chipText, { color: '#0f172a' }]}>
                     {normalizedCategory}
-                  </Text>
+                  </SJText>
                 </View>
               </View>
             </View>
           )}
 
           {price ? (
-            <Text style={styles.priceText}>{price}</Text>
+            <SJText style={styles.priceText}>{price}</SJText>
           ) : null}
         </View>
       </TouchableOpacity>
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  card: {
+  cardWrapper: {
     width: TOP_MATCH_CARD_WIDTH,
     height: TOP_MATCH_CARD_HEIGHT,
+    marginRight: 8,
+    marginBottom: 8, // Add space for shadow to be visible at bottom
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1
+  },
+  card: {
+    width: '100%',
+    height: '100%',
     backgroundColor: '#ffffff',
     borderRadius: 2,
-    marginRight: 8,
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
     overflow: 'hidden',
     flexDirection: 'column',
   },
@@ -277,6 +284,10 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
     paddingLeft: 8,
     gap: 10,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1
   },
   ownerProfileImage: {
     width: 36,
@@ -294,12 +305,12 @@ const styles = StyleSheet.create({
   },
   ownerProfileImageText: {
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: 'bold', // or use '700' for numeric weight
     color: '#0f172a',
   },
   ownerUsername: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '900',
     color: '#0f172a',
     flex: 1,
   },
@@ -450,7 +461,7 @@ const styles = StyleSheet.create({
   },
   chipText: {
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: '300',
     color: '#0f172a',
   },
   metaSection: {
@@ -485,7 +496,7 @@ const styles = StyleSheet.create({
   },
   priceText: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '500',
     color: '#0f172a',
     marginTop: 8,
   },
@@ -538,15 +549,17 @@ const styles = StyleSheet.create({
 });
 
 export const TopMatchCardSkeleton = memo(({ style }: { style?: StyleProp<ViewStyle> }) => (
-  <View style={[styles.card, styles.skeletonCard, style, { paddingLeft: 16, paddingTop: 8 }]}>
-    <FadePlaceholder style={styles.skeletonMedia} borderRadius={16} />
-    <View style={styles.infoSection}>
-      <FadePlaceholder style={styles.skeletonLineLarge} />
-      <FadePlaceholder style={styles.skeletonLineMedium} />
-      <FadePlaceholder style={styles.skeletonLineSmall} />
-      <View style={styles.skeletonChipRow}>
-        <FadePlaceholder style={styles.skeletonChip} />
-        <FadePlaceholder style={styles.skeletonChipWide} />
+  <View style={styles.cardWrapper}>
+    <View style={[styles.card, styles.skeletonCard, style, { paddingLeft: 16, paddingTop: 8 }]}>
+      <FadePlaceholder style={styles.skeletonMedia} borderRadius={16} />
+      <View style={styles.infoSection}>
+        <FadePlaceholder style={styles.skeletonLineLarge} />
+        <FadePlaceholder style={styles.skeletonLineMedium} />
+        <FadePlaceholder style={styles.skeletonLineSmall} />
+        <View style={styles.skeletonChipRow}>
+          <FadePlaceholder style={styles.skeletonChip} />
+          <FadePlaceholder style={styles.skeletonChipWide} />
+        </View>
       </View>
     </View>
   </View>

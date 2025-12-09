@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, Dimensions, ActivityIndicator } from 'react-native';
+import {View, StyleSheet, TouchableOpacity, FlatList, Dimensions, ActivityIndicator} from 'react-native';
+import SJText from '../components/SJText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ItemDetailsScreenProps } from '../types/navigation';
 import CachedImage from '../components/CachedImage';
@@ -93,9 +94,9 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
   if (error || !item) {
     return (
       <SafeAreaView style={styles.centered}>
-        <Text style={styles.errorText}>{error || strings.itemNotFound}</Text>
+        <SJText style={styles.errorText}>{error || strings.itemNotFound}</SJText>
         <TouchableOpacity style={styles.retry} onPress={() => navigation.goBack()}>
-          <Text style={styles.retryText}>{strings.goBack}</Text>
+          <SJText style={styles.retryText}>{strings.goBack}</SJText>
         </TouchableOpacity>
       </SafeAreaView>
     );
@@ -141,19 +142,19 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
           if (section.key === 'details') {
             return (
               <View style={styles.details}>
-                <Text style={styles.itemTitle}>{item.title}</Text>
-                <Text style={styles.price}>{formatCurrency(item.price || item.estimated_value || 0, item.currency || 'USD')}</Text>
+                <SJText style={styles.itemTitle}>{item.title}</SJText>
+                <SJText style={styles.price}>{formatCurrency(item.price || item.estimated_value || 0, item.currency || 'USD')}</SJText>
                 {item.category?.name ? (
-                  <Text style={styles.meta}>
+                  <SJText style={styles.meta}>
                     {strings.category}: {item.category.name}
-                  </Text>
+                  </SJText>
                 ) : null}
                 {item.condition ? (
-                  <Text style={styles.meta}>
+                  <SJText style={styles.meta}>
                     {strings.condition}: {item.condition}
-                  </Text>
+                  </SJText>
                 ) : null}
-                <Text style={styles.description}>{item.description}</Text>
+                <SJText style={styles.description}>{item.description}</SJText>
 
                 {item.user ? (
                   <TouchableOpacity
@@ -161,10 +162,10 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
                     style={styles.sellerBox}
                     onPress={() => (navigation as any).navigate('UserProfile', { userId: item.user.id })}
                   >
-                    <Text style={styles.sellerTitle}>{strings.seller}</Text>
-                    <Text style={styles.sellerName}>
+                    <SJText style={styles.sellerTitle}>{strings.seller}</SJText>
+                    <SJText style={styles.sellerName}>
                       {item.user.first_name} {item.user.last_name} @{item.user.username}
-                    </Text>
+                    </SJText>
                   </TouchableOpacity>
                 ) : null}
               </View>
@@ -196,7 +197,7 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
               });
             }}
           >
-            <Text style={styles.offerText}>{strings.offer}</Text>
+            <SJText style={styles.offerText}>{strings.offer}</SJText>
           </TouchableOpacity>
         </View>
       )}

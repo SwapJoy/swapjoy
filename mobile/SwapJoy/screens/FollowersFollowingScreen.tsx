@@ -1,12 +1,6 @@
 import React, { memo, useCallback, useEffect, useMemo, useState, useRef } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  FlatList,
-  ActivityIndicator,
-} from 'react-native';
+import {View, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator, } from 'react-native';
+import SJText from '../components/SJText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { ApiService } from '../services/api';
@@ -129,13 +123,13 @@ const FollowersFollowingScreen: React.FC = memo(() => {
           />
         </View>
         <View style={styles.userInfo}>
-          <Text style={styles.userName} numberOfLines={1}>
+          <SJText style={styles.userName} numberOfLines={1}>
             {displayName}
-          </Text>
+          </SJText>
           {item.username && (
-            <Text style={styles.username} numberOfLines={1}>
+            <SJText style={styles.username} numberOfLines={1}>
               @{item.username}
-            </Text>
+            </SJText>
           )}
         </View>
       </TouchableOpacity>
@@ -151,17 +145,17 @@ const FollowersFollowingScreen: React.FC = memo(() => {
             onPress={() => setActiveTab('followers')}
             style={[styles.tabButton, activeTab === 'followers' && styles.tabButtonActive]}
           >
-            <Text style={[styles.tabText, activeTab === 'followers' && styles.tabTextActive]}>
+            <SJText style={[styles.tabText, activeTab === 'followers' && styles.tabTextActive]}>
               Followers
-            </Text>
+            </SJText>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => setActiveTab('following')}
             style={[styles.tabButton, activeTab === 'following' && styles.tabButtonActive]}
           >
-            <Text style={[styles.tabText, activeTab === 'following' && styles.tabTextActive]}>
+            <SJText style={[styles.tabText, activeTab === 'following' && styles.tabTextActive]}>
               Following
-            </Text>
+            </SJText>
           </TouchableOpacity>
         </View>
       </View>
@@ -170,7 +164,7 @@ const FollowersFollowingScreen: React.FC = memo(() => {
       {isLoading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#007AFF" />
-          <Text style={styles.loadingText}>Loading...</Text>
+          <SJText style={styles.loadingText}>Loading...</SJText>
         </View>
       ) : (
         <FlatList
@@ -180,9 +174,9 @@ const FollowersFollowingScreen: React.FC = memo(() => {
           contentContainerStyle={currentData.length === 0 ? styles.emptyContainer : styles.listContent}
           ListEmptyComponent={
             <View style={styles.emptyView}>
-              <Text style={styles.emptyText}>
+              <SJText style={styles.emptyText}>
                 No {activeTab === 'followers' ? 'followers' : 'following'} yet
-              </Text>
+              </SJText>
             </View>
           }
           showsVerticalScrollIndicator={false}

@@ -1,17 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  TextInput,
-  ScrollView,
-  Image,
-  Alert,
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-} from 'react-native';
+import {View, StyleSheet, TouchableOpacity, TextInput, ScrollView, Image, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, } from 'react-native';
+import SJText from '../components/SJText';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -210,9 +199,9 @@ const ProfileEditScreen: React.FC<ProfileEditScreenProps> = ({ navigation, route
             ) : (
               <View style={styles.avatarPlaceholder}>
                 <Ionicons name="camera" size={32} color="#94a3b8" />
-                <Text style={styles.avatarPlaceholderText}>
+                <SJText style={styles.avatarPlaceholderText}>
                   {t('settings.profile.editFormPhotoPlaceholder', { defaultValue: 'Add photo' })}
-                </Text>
+                </SJText>
               </View>
             )}
             <TouchableOpacity
@@ -224,9 +213,9 @@ const ProfileEditScreen: React.FC<ProfileEditScreenProps> = ({ navigation, route
               {uploadingPhoto ? (
                 <ActivityIndicator size="small" color="#1f7ae0" />
               ) : (
-                <Text style={styles.changePhotoText}>
+                <SJText style={styles.changePhotoText}>
                   {t('settings.profile.editFormChangePhoto', { defaultValue: 'Change photo' })}
-                </Text>
+                </SJText>
               )}
             </TouchableOpacity>
             {profileImageUrl ? (
@@ -235,9 +224,9 @@ const ProfileEditScreen: React.FC<ProfileEditScreenProps> = ({ navigation, route
                 onPress={handleRemovePhoto}
                 disabled={saving}
               >
-                <Text style={styles.removePhotoText}>
+                <SJText style={styles.removePhotoText}>
                   {t('settings.profile.editFormRemovePhoto', { defaultValue: 'Remove photo' })}
-                </Text>
+                </SJText>
               </TouchableOpacity>
             ) : null}
           </View>
@@ -245,9 +234,9 @@ const ProfileEditScreen: React.FC<ProfileEditScreenProps> = ({ navigation, route
 
         <View style={styles.form}>
           <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>
+            <SJText style={styles.fieldLabel}>
               {t('settings.profile.editFormFirstNameLabel', { defaultValue: 'First name' })}
-            </Text>
+            </SJText>
             <TextInput
               style={[styles.textInput, firstNameError ? styles.textInputError : null]}
               value={firstName}
@@ -258,9 +247,9 @@ const ProfileEditScreen: React.FC<ProfileEditScreenProps> = ({ navigation, route
           </View>
 
           <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>
+            <SJText style={styles.fieldLabel}>
               {t('settings.profile.editFormLastNameLabel', { defaultValue: 'Last name' })}
-            </Text>
+            </SJText>
             <TextInput
               style={styles.textInput}
               value={lastName}
@@ -271,9 +260,9 @@ const ProfileEditScreen: React.FC<ProfileEditScreenProps> = ({ navigation, route
           </View>
 
           <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>
+            <SJText style={styles.fieldLabel}>
               {t('settings.profile.editFormUsernameLabel', { defaultValue: 'Username' })}
-            </Text>
+            </SJText>
             <TextInput
               style={styles.textInput}
               value={username}
@@ -286,12 +275,12 @@ const ProfileEditScreen: React.FC<ProfileEditScreenProps> = ({ navigation, route
 
           <View style={styles.fieldGroup}>
             <View style={styles.fieldLabelRow}>
-              <Text style={styles.fieldLabel}>
+              <SJText style={styles.fieldLabel}>
                 {t('settings.profile.editFormBioLabel', { defaultValue: 'Bio' })}
-              </Text>
-              <Text style={styles.fieldHelper}>
+              </SJText>
+              <SJText style={styles.fieldHelper}>
                 {bio.length}/{BIO_MAX_LENGTH}
-              </Text>
+              </SJText>
             </View>
             <TextInput
               style={[styles.textInput, styles.bioInput]}
@@ -317,7 +306,7 @@ const ProfileEditScreen: React.FC<ProfileEditScreenProps> = ({ navigation, route
           {saving ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
-            <Text style={styles.saveButtonText}>{t('common.save')}</Text>
+            <SJText style={styles.saveButtonText}>{t('common.save')}</SJText>
           )}
         </TouchableOpacity>
       </ScrollView>

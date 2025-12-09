@@ -1,15 +1,6 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-} from 'react-native';
+import {View, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, } from 'react-native';
+import SJText from '../components/SJText';
 import { Ionicons } from '@expo/vector-icons';
 import { EmailSignUpScreenProps } from '../types/navigation';
 import { useLocalization } from '../localization';
@@ -64,14 +55,14 @@ const EmailSignUpScreen: React.FC<EmailSignUpScreenProps> = ({ navigation }) => 
         >
           {/* Content */}
           <View style={styles.content}>
-            <Text style={styles.subtitle}>{t('auth.signUp.title')}</Text>
-            <Text style={styles.description}>
+            <SJText style={styles.subtitle}>{t('auth.signUp.title')}</SJText>
+            <SJText style={styles.description}>
               {t('auth.signUp.description')}
-            </Text>
+            </SJText>
 
             {error && (
               <View style={styles.errorContainer}>
-                <Text style={styles.errorText}>{error}</Text>
+                <SJText style={styles.errorText}>{error}</SJText>
               </View>
             )}
 
@@ -155,14 +146,14 @@ const EmailSignUpScreen: React.FC<EmailSignUpScreenProps> = ({ navigation }) => 
               {isLoading ? (
                 <ActivityIndicator color="white" />
               ) : (
-                <Text style={styles.signUpButtonText}>{t('auth.common.buttons.signUp')}</Text>
+                <SJText style={styles.signUpButtonText}>{t('auth.common.buttons.signUp')}</SJText>
               )}
             </TouchableOpacity>
 
             <View style={styles.signInContainer}>
-            <Text style={styles.signInText}>{t('auth.common.links.haveAccount')} </Text>
+            <SJText style={styles.signInText}>{t('auth.common.links.haveAccount')} </SJText>
               <TouchableOpacity onPress={handleSignInPress}>
-              <Text style={styles.signInLink}>{t('auth.common.links.signIn')}</Text>
+              <SJText style={styles.signInLink}>{t('auth.common.links.signIn')}</SJText>
               </TouchableOpacity>
             </View>
           </View>

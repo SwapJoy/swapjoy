@@ -1,15 +1,6 @@
 import React, { useState, useRef } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  ActivityIndicator,
-  SafeAreaView,
-  KeyboardAvoidingView,
-  Platform,
-} from 'react-native';
+import {View, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, SafeAreaView, KeyboardAvoidingView, Platform, } from 'react-native';
+import SJText from '../components/SJText';
 import { useOTPVerification } from '../hooks/useOTPVerification';
 import { useAuth } from '../contexts/AuthContext';
 import { OTPVerificationScreenProps } from '../types/navigation';
@@ -64,23 +55,23 @@ const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
-            <Text style={styles.backButtonText}>← Back</Text>
+            <SJText style={styles.backButtonText}>← Back</SJText>
           </TouchableOpacity>
-          <Text style={styles.title}>Verify Phone</Text>
+          <SJText style={styles.title}>Verify Phone</SJText>
           <View style={styles.placeholder} />
         </View>
 
         {/* Content */}
         <View style={styles.content}>
-          <Text style={styles.subtitle}>Enter verification code</Text>
-          <Text style={styles.description}>
+          <SJText style={styles.subtitle}>Enter verification code</SJText>
+          <SJText style={styles.description}>
             We sent a 6-digit code to{'\n'}
-            <Text style={styles.phoneNumber}>{phone}</Text>
-          </Text>
+            <SJText style={styles.phoneNumber}>{phone}</SJText>
+          </SJText>
           
-          <Text style={styles.testCode}>
+          <SJText style={styles.testCode}>
             ⚠️ Test Mode: Enter exactly "1234" to verify
-          </Text>
+          </SJText>
 
           <View style={styles.otpContainer}>
             <TextInput
@@ -104,19 +95,19 @@ const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
             {isLoading ? (
               <ActivityIndicator color="white" />
             ) : (
-              <Text style={styles.verifyButtonText}>Verify Code</Text>
+              <SJText style={styles.verifyButtonText}>Verify Code</SJText>
             )}
           </TouchableOpacity>
 
           <View style={styles.resendContainer}>
-            <Text style={styles.resendText}>Didn't receive the code? </Text>
+            <SJText style={styles.resendText}>Didn't receive the code? </SJText>
             <TouchableOpacity
               onPress={handleResendOTPPress}
               disabled={!canResend || isLoading}
             >
-              <Text style={[styles.resendLink, !canResend && styles.disabledText]}>
+              <SJText style={[styles.resendLink, !canResend && styles.disabledText]}>
                 {canResend ? 'Resend' : `Resend in ${resendTimer}s`}
-              </Text>
+              </SJText>
             </TouchableOpacity>
           </View>
         </View>

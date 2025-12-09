@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, Modal, TextInput, Keyboard, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import {View, StyleSheet, TouchableOpacity, Alert, ScrollView, Modal, TextInput, Keyboard, KeyboardAvoidingView, Platform, ActivityIndicator} from 'react-native';
+import SJText from '../components/SJText';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { ProfileSettingsScreenProps } from '../types/navigation';
@@ -282,21 +283,21 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigatio
       activeOpacity={disabled ? 1 : 0.7}
     >
       <View style={styles.itemLeft}>
-        <Text style={styles.itemIcon}>{icon}</Text>
+        <SJText style={styles.itemIcon}>{icon}</SJText>
         <View style={styles.itemTextWrap}>
-          <Text style={styles.itemTitle}>{title}</Text>
-          {subtitle ? <Text style={styles.itemSubtitle}>{subtitle}</Text> : null}
+          <SJText style={styles.itemTitle}>{title}</SJText>
+          {subtitle ? <SJText style={styles.itemSubtitle}>{subtitle}</SJText> : null}
         </View>
       </View>
-      {rightContent ?? <Text style={styles.itemArrow}>›</Text>}
+      {rightContent ?? <SJText style={styles.itemArrow}>›</SJText>}
     </TouchableOpacity>
   );
 
   return (
     <ScrollView contentContainerStyle={styles.scrollContainer}>
       <View style={styles.card}>
-        <Text style={styles.sectionTitle}>{t('settings.languageSectionTitle')}</Text>
-        <Text style={styles.sectionSubtitle}>{t('settings.restartNotice')}</Text>
+        <SJText style={styles.sectionTitle}>{t('settings.languageSectionTitle')}</SJText>
+        <SJText style={styles.sectionSubtitle}>{t('settings.restartNotice')}</SJText>
         <View style={styles.languageSelectorWrapper}>
           <LanguageSelector
             selectedLanguage={language}
@@ -316,7 +317,7 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigatio
             savingRadius ? (
               <ActivityIndicator size="small" color="#1f7ae0" />
             ) : (
-              <Text style={styles.itemArrow}>›</Text>
+              <SJText style={styles.itemArrow}>›</SJText>
             )
           }
           disabled={profileLoading || savingRadius}
@@ -330,7 +331,7 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigatio
             savingCurrency ? (
               <ActivityIndicator size="small" color="#1f7ae0" />
             ) : (
-              <Text style={styles.itemArrow}>›</Text>
+              <SJText style={styles.itemArrow}>›</SJText>
             )
           }
           disabled={profileLoading || savingCurrency}
@@ -339,7 +340,7 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigatio
 
       <View style={styles.card}>
         <View style={styles.categoryHeaderRow}>
-          <Text style={styles.sectionTitle}>{t('settings.profile.favoriteCategoriesTitle')}</Text>
+          <SJText style={styles.sectionTitle}>{t('settings.profile.favoriteCategoriesTitle')}</SJText>
           <TouchableOpacity
             onPress={handleNavigateToCategorySelector}
             disabled={categoriesLoading}
@@ -349,26 +350,26 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigatio
             {categoriesLoading ? (
               <ActivityIndicator size="small" color="#1f7ae0" />
             ) : (
-              <Text style={styles.manageCategoriesText}>
+              <SJText style={styles.manageCategoriesText}>
                 {t('settings.profile.favoriteCategoriesManage')}
-              </Text>
+              </SJText>
             )}
           </TouchableOpacity>
         </View>
-        <Text style={styles.sectionSubtitle}>{t('settings.profile.favoriteCategoriesSubtitle')}</Text>
+        <SJText style={styles.sectionSubtitle}>{t('settings.profile.favoriteCategoriesSubtitle')}</SJText>
         {categoriesLoading ? (
           <View style={styles.categoriesLoading}>
             <ActivityIndicator size="small" color="#1f7ae0" />
           </View>
         ) : selectedCategoryObjects.length === 0 ? (
-          <Text style={styles.categoriesEmptyText}>
+          <SJText style={styles.categoriesEmptyText}>
             {t('settings.profile.favoriteCategoriesNoneSelected')}
-          </Text>
+          </SJText>
         ) : (
           <View style={styles.selectedCategoriesWrap}>
             {selectedCategoryObjects.map((category) => (
               <View key={category.id} style={styles.selectedCategoryChip}>
-                <Text style={styles.selectedCategoryChipText}>{category.name}</Text>
+                <SJText style={styles.selectedCategoryChipText}>{category.name}</SJText>
               </View>
             ))}
           </View>
@@ -386,7 +387,7 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigatio
             profileLoading ? (
               <ActivityIndicator size="small" color="#1f7ae0" />
             ) : (
-              <Text style={styles.itemArrow}>›</Text>
+              <SJText style={styles.itemArrow}>›</SJText>
             )
           }
         />
@@ -440,7 +441,7 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigatio
 
       <View style={styles.dangerCard}>
         <TouchableOpacity style={styles.dangerButton} onPress={confirmSignOut}>
-          <Text style={styles.dangerText}>{t('settings.profile.signOut')}</Text>
+          <SJText style={styles.dangerText}>{t('settings.profile.signOut')}</SJText>
         </TouchableOpacity>
       </View>
 
@@ -452,7 +453,7 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigatio
       >
         <View style={styles.modalOverlay}>
           <View style={styles.choiceModalCard}>
-            <Text style={styles.choiceModalTitle}>{t('settings.profile.radiusModalTitle')}</Text>
+            <SJText style={styles.choiceModalTitle}>{t('settings.profile.radiusModalTitle')}</SJText>
             <View style={styles.choiceOptionList}>
               {RADIUS_OPTIONS.map((option) => {
                 const isActive = preferredRadius === option;
@@ -464,14 +465,14 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigatio
                     disabled={savingRadius}
                     activeOpacity={0.85}
                   >
-                    <Text
+                    <SJText
                       style={[
                         styles.choiceOptionLabel,
                         isActive && styles.choiceOptionLabelActive,
                       ]}
                     >
                       {t('settings.profile.radiusOptionLabel', { radius: option })}
-                    </Text>
+                    </SJText>
                     {isActive ? <Ionicons name="checkmark" size={18} color="#1f2937" /> : null}
                   </TouchableOpacity>
                 );
@@ -482,7 +483,7 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigatio
               onPress={() => setRadiusModalVisible(false)}
               activeOpacity={0.8}
             >
-              <Text style={styles.choiceModalCancelText}>{t('common.cancel')}</Text>
+              <SJText style={styles.choiceModalCancelText}>{t('common.cancel')}</SJText>
             </TouchableOpacity>
           </View>
         </View>
@@ -497,9 +498,9 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigatio
       >
         <View style={styles.modalOverlay}>
           <View style={styles.choiceModalCard}>
-            <Text style={styles.choiceModalTitle}>
+            <SJText style={styles.choiceModalTitle}>
               {t('settings.profile.currencyModalTitle', { defaultValue: 'Select Currency' })}
-            </Text>
+            </SJText>
             <View style={styles.choiceOptionList}>
               {currencyOptions.map((curr) => {
                 const isActive = preferredCurrency === curr.code;
@@ -512,8 +513,8 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigatio
                     activeOpacity={0.85}
                   >
                     <View style={styles.conditionItem}>
-                      <Text style={styles.modalItemText}>{curr.symbol}</Text>
-                      <Text style={styles.modalItemText}>{curr.label}</Text>
+                      <SJText style={styles.modalItemText}>{curr.symbol}</SJText>
+                      <SJText style={styles.modalItemText}>{curr.label}</SJText>
                     </View>
                     {isActive ? <Ionicons name="checkmark" size={18} color="#1f2937" /> : null}
                   </TouchableOpacity>
@@ -525,7 +526,7 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigatio
               onPress={() => setCurrencyModalVisible(false)}
               activeOpacity={0.8}
             >
-              <Text style={styles.choiceModalCancelText}>{t('common.cancel')}</Text>
+              <SJText style={styles.choiceModalCancelText}>{t('common.cancel')}</SJText>
             </TouchableOpacity>
           </View>
         </View>

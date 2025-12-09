@@ -59,7 +59,7 @@ const MainTabNavigator: React.FC<MainTabNavigatorProps> = ({ onNavigateToAdd }) 
       })}
     >
       <Tab.Screen
-        name="Explore"
+        name='SwapJoy'
         component={ExploreScreen}
         options={{
           tabBarIcon: ({ color, size, focused }) => (
@@ -69,6 +69,7 @@ const MainTabNavigator: React.FC<MainTabNavigatorProps> = ({ onNavigateToAdd }) 
               color={color} 
             />
           ),
+          // Font will be applied globally via Text.defaultProps and StyleSheet.create patch
         }}
       />
       <Tab.Screen

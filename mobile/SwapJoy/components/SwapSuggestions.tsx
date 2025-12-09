@@ -1,13 +1,6 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  ActivityIndicator,
-  Dimensions,
-} from 'react-native';
+import {View, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Dimensions, } from 'react-native';
+import SJText from '../components/SJText';
 import CachedImage from './CachedImage';
 import { useAuth } from '@contexts/AuthContext';
 import { formatCurrency } from '@utils/index';
@@ -62,7 +55,7 @@ const SwapSuggestions: React.FC<SwapSuggestionsProps> = ({
     return (
       <View style={styles.feedbackContainer}>
         <ActivityIndicator size="small" color="#047857" />
-        <Text style={styles.feedbackText}>{loadingLabel}</Text>
+        <SJText style={styles.feedbackText}>{loadingLabel}</SJText>
       </View>
     );
   }
@@ -71,7 +64,7 @@ const SwapSuggestions: React.FC<SwapSuggestionsProps> = ({
     console.warn('[SwapSuggestions] Error loading suggestions:', error);
     return (
       <View style={styles.feedbackContainer}>
-        <Text style={styles.feedbackText}>{errorLabel}</Text>
+        <SJText style={styles.feedbackText}>{errorLabel}</SJText>
       </View>
     );
   }
@@ -83,7 +76,7 @@ const SwapSuggestions: React.FC<SwapSuggestionsProps> = ({
     }
     return (
       <View style={styles.feedbackContainer}>
-        <Text style={styles.feedbackText}>{emptyLabel}</Text>
+        <SJText style={styles.feedbackText}>{emptyLabel}</SJText>
       </View>
     );
   }
@@ -136,16 +129,16 @@ const SwapSuggestions: React.FC<SwapSuggestionsProps> = ({
             />
 
             <View style={styles.suggestionContent}>
-              <Text style={styles.suggestionTitle} numberOfLines={2}>
+              <SJText style={styles.suggestionTitle} numberOfLines={2}>
                 {isBundle
                   ? suggestion.items.map((item) => item.title).filter(Boolean).join(' • ')
                   : suggestion.items[0]?.title}
-              </Text>
-              <Text style={styles.suggestionSubtitle} numberOfLines={1}>
+              </SJText>
+              <SJText style={styles.suggestionSubtitle} numberOfLines={1}>
                 {subtitle}
-              </Text>
+              </SJText>
               <View style={styles.suggestionMetaRow}>
-                <Text style={styles.suggestionPrice}>{formatCurrency(priceValue, currency)}</Text>
+                <SJText style={styles.suggestionPrice}>{formatCurrency(priceValue, currency)}</SJText>
               </View>
             </View>
           </TouchableOpacity>
@@ -157,9 +150,9 @@ const SwapSuggestions: React.FC<SwapSuggestionsProps> = ({
   return (
     <View>
       <View style={styles.headerRow}>
-        <Text style={styles.headerLabel}>
+        <SJText style={styles.headerLabel}>
           {suggestionCount > 1 ? `${headerLabel} (${suggestionCount})` : headerLabel}
-        </Text>
+        </SJText>
       </View>
       {content}
     </View>

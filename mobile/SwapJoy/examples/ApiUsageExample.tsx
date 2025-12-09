@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, Alert } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, FlatList, Alert } from 'react-native';
 import { ApiService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import SJText from '../components/SJText';
 
 // Example component showing how to use the authenticated API service
 const ApiUsageExample: React.FC = () => {
@@ -97,45 +98,45 @@ const ApiUsageExample: React.FC = () => {
   if (!isAuthenticated) {
     return (
       <View style={styles.container}>
-        <Text style={styles.message}>Please sign in to use the API</Text>
+        <SJText style={styles.message}>Please sign in to use the API</SJText>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>API Usage Example</Text>
-      <Text style={styles.subtitle}>Welcome, {user?.first_name}!</Text>
+      <SJText style={styles.title}>API Usage Example</SJText>
+      <SJText style={styles.subtitle}>Welcome, {user?.first_name}!</SJText>
 
       <View style={styles.buttonContainer}>
         <TouchableOpacity style={styles.button} onPress={fetchItems}>
-          <Text style={styles.buttonText}>Fetch Items</Text>
+          <SJText style={styles.buttonText}>Fetch Items</SJText>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.button} onPress={createItem}>
-          <Text style={styles.buttonText}>Create Item</Text>
+          <SJText style={styles.buttonText}>Create Item</SJText>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.button} onPress={updateProfile}>
-          <Text style={styles.buttonText}>Update Profile</Text>
+          <SJText style={styles.buttonText}>Update Profile</SJText>
         </TouchableOpacity>
       </View>
 
-      <Text style={styles.listTitle}>Your Items:</Text>
+      <SJText style={styles.listTitle}>Your Items:</SJText>
       {loading ? (
-        <Text>Loading...</Text>
+        <SJText>Loading...</SJText>
       ) : (
         <FlatList
           data={items}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
             <View style={styles.item}>
-              <Text style={styles.itemTitle}>{item.title}</Text>
-              <Text style={styles.itemDescription}>{item.description}</Text>
-              <Text style={styles.itemCondition}>Condition: {item.condition}</Text>
+              <SJText style={styles.itemTitle}>{item.title}</SJText>
+              <SJText style={styles.itemDescription}>{item.description}</SJText>
+              <SJText style={styles.itemCondition}>Condition: {item.condition}</SJText>
             </View>
           )}
-          ListEmptyComponent={<Text>No items found</Text>}
+          ListEmptyComponent={<SJText>No items found</SJText>}
         />
       )}
     </View>

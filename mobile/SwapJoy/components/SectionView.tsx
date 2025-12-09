@@ -1,5 +1,6 @@
 import React, { memo, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
+import {View, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator} from 'react-native';
+import SJText from '../components/SJText';
 import { useNavigation } from '@react-navigation/native';
 import { SectionType } from '../types/section';
 import { useSection } from '../hooks/useSection';
@@ -109,10 +110,10 @@ const ErrorDisplay: React.FC<{
   onRetry: () => void 
 }> = ({ title, message, retryLabel, onRetry }) => (
   <View style={styles.errorContainer}>
-    <Text style={styles.errorText}>{title}</Text>
-    {!!message && <Text style={styles.errorMessage}>{message}</Text>}
+    <SJText style={styles.errorText}>{title}</SJText>
+    {!!message && <SJText style={styles.errorMessage}>{message}</SJText>}
     <TouchableOpacity style={styles.retryButton} onPress={onRetry}>
-      <Text style={styles.retryButtonText}>{retryLabel}</Text>
+      <SJText style={styles.retryButtonText}>{retryLabel}</SJText>
     </TouchableOpacity>
   </View>
 );
@@ -188,7 +189,7 @@ export const SectionView: React.FC<SectionViewProps> = memo(({
       <View style={styles.sectionCard}>
         <View style={styles.sectionHeaderInner}>
           <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>{sectionTitle}</Text>
+            <SJText style={styles.sectionTitle}>{sectionTitle}</SJText>
           </View>
         </View>
         <ErrorDisplay
@@ -206,7 +207,7 @@ export const SectionView: React.FC<SectionViewProps> = memo(({
       <View style={styles.sectionCard}>
         <View style={styles.sectionHeaderInner}>
           <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>{sectionTitle}</Text>
+            <SJText style={styles.sectionTitle}>{sectionTitle}</SJText>
           </View>
         </View>
         <SectionSkeleton />
@@ -222,7 +223,7 @@ export const SectionView: React.FC<SectionViewProps> = memo(({
     <View style={styles.sectionCard}>
       <View style={styles.sectionHeaderInner}>
         <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionTitle}>{sectionTitle}</Text>
+          <SJText style={styles.sectionTitle}>{sectionTitle}</SJText>
         </View>
       </View>
       <View style={styles.horizontalScroller}>
@@ -257,7 +258,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   sectionTitle: {
-    fontSize: 30,
+    fontSize: 22,
     fontWeight: '500',
     color: '#A3A3A3',
   },

@@ -1,13 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import {
-  View,
-  TouchableOpacity,
-  Text,
-  StyleSheet,
-  Modal,
-  FlatList,
-  Pressable,
-} from 'react-native';
+import {View, TouchableOpacity, StyleSheet, Modal, FlatList, Pressable, } from 'react-native';
+import SJText from '../components/SJText';
 import { Ionicons } from '@expo/vector-icons';
 import { AppLanguage, LANGUAGE_LABELS, SUPPORTED_LANGUAGES } from '../types/language';
 import { useLocalization } from '../localization';
@@ -61,10 +54,10 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
         accessibilityState={{ selected: isActive }}
       >
         <View style={styles.optionTextGroup}>
-          <Text style={[styles.optionTitle, isActive && styles.optionTitleActive]}>
+          <SJText style={[styles.optionTitle, isActive && styles.optionTitleActive]}>
             {LANGUAGE_LABELS[item]}
-          </Text>
-          <Text style={styles.optionValue}>{item.toUpperCase()}</Text>
+          </SJText>
+          <SJText style={styles.optionValue}>{item.toUpperCase()}</SJText>
         </View>
         {isActive ? (
           <Ionicons name="checkmark-circle" size={20} color="#2563eb" />
@@ -86,8 +79,8 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
         activeOpacity={0.82}
       >
         <View>
-          <Text style={styles.triggerLabel}>{triggerLabel}</Text>
-          <Text style={styles.triggerValue}>{LANGUAGE_LABELS[selectedLanguage]}</Text>
+          <SJText style={styles.triggerLabel}>{triggerLabel}</SJText>
+          <SJText style={styles.triggerValue}>{LANGUAGE_LABELS[selectedLanguage]}</SJText>
         </View>
         <Ionicons name="chevron-down" size={18} color="#1f2937" />
       </TouchableOpacity>
@@ -101,7 +94,7 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{modalTitle}</Text>
+              <SJText style={styles.modalTitle}>{modalTitle}</SJText>
               <TouchableOpacity onPress={() => setModalVisible(false)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
                 <Ionicons name="close" size={22} color="#475569" />
               </TouchableOpacity>
@@ -120,7 +113,7 @@ export const LanguageSelector: React.FC<LanguageSelectorProps> = ({
               onPress={() => setModalVisible(false)}
               activeOpacity={0.8}
             >
-              <Text style={styles.modalCancelText}>{cancelLabel}</Text>
+              <SJText style={styles.modalCancelText}>{cancelLabel}</SJText>
             </TouchableOpacity>
           </View>
         </View>

@@ -37,6 +37,7 @@ export const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#111827',
     letterSpacing: 0.3,
+    fontFamily: 'Noto Sans Georgian',
   },
   tabBarStyle: {
     backgroundColor: '#fff',
@@ -55,6 +56,7 @@ export const styles = StyleSheet.create({
     fontSize: Platform.OS === 'ios' ? 10 : 12,
     fontWeight: '500',
     marginTop: Platform.OS === 'ios' ? 2 : 0,
+    fontFamily: 'Noto Sans Georgian',
   },
   tabBarIconStyle: {
     marginTop: Platform.OS === 'ios' ? 2 : 0,

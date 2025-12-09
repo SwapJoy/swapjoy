@@ -1,10 +1,12 @@
 import 'react-native-gesture-handler';
 import React, { useEffect, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { View, Text, StyleSheet, ActivityIndicator, Platform } from 'react-native';
+import { View, StyleSheet, ActivityIndicator, Platform } from 'react-native';
+import SJText from './components/SJText';
 import { NavigationContainerRef } from '@react-navigation/native';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import Toast, { BaseToast } from 'react-native-toast-message';
+import { useFonts } from 'expo-font';
 // React Native Firebase is initialized natively via FirebaseApp.configure() in AppDelegate.swift
 import AppNavigator from './navigation/AppNavigator';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -74,6 +76,21 @@ function AppContent() {
   const { isLoading: authIsLoading } = useAuth();
   const { isLoading: localizationIsLoading, t } = useLocalization();
   const navigationRef = useRef<NavigationContainerRef<RootStackParamList>>(null);
+  
+  // Load custom fonts
+  const [fontsLoaded, fontError] = useFonts({
+    'Noto Sans Georgian': require('./assets/fonts/NotoSansGeorgian-Regular.ttf'),
+    'Noto Sans Georgian Bold': require('./assets/fonts/NotoSansGeorgian-Bold.ttf'),
+  });
+
+  // Log font loading status
+  useEffect(() => {
+    if (fontError) {
+      console.error('[Fonts] ❌ Error loading fonts:', fontError);
+    } else if (fontsLoaded) {
+      console.log('[Fonts] ✅ Fonts loaded successfully: Noto Sans Georgian');
+    }
+  }, [fontsLoaded, fontError]);
 
   // (Moved) Google Sign-In is configured at module scope above
 
@@ -107,7 +124,7 @@ function AppContent() {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#007AFF" />
-        <Text style={styles.loadingText}>{t('common.loading')}</Text>
+        <SJText style={styles.loadingText}>{t('common.loading')}</SJText>
         <StatusBar style="auto" />
       </View>
     );

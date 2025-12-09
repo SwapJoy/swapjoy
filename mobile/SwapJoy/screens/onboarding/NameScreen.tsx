@@ -1,15 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  ActivityIndicator,
-} from 'react-native';
+import {View, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, } from 'react-native';
+import SJText from '../../components/SJText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useOnboarding } from '../../hooks/useOnboarding';
@@ -88,23 +79,23 @@ const NameScreen: React.FC = () => {
               </TouchableOpacity>
             )}
             <View style={styles.headerContent}>
-              <Text style={styles.stepIndicator}>Step {currentStepIndex + 1} of 6</Text>
+              <SJText style={styles.stepIndicator}>Step {currentStepIndex + 1} of 6</SJText>
             </View>
           </View>
 
           {/* Content */}
           <View style={styles.content}>
-            <Text style={styles.title}>
+            <SJText style={styles.title}>
               {t('onboarding.name.title', { defaultValue: 'Tell Us Your Name' })}
-            </Text>
-            <Text style={styles.description}>
+            </SJText>
+            <SJText style={styles.description}>
               {t('onboarding.name.description', { defaultValue: 'Help others recognize you with your first and last name.' })}
-            </Text>
+            </SJText>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>
+              <SJText style={styles.label}>
                 {t('onboarding.name.firstName', { defaultValue: 'First Name' })}
-              </Text>
+              </SJText>
               <TextInput
                 style={styles.input}
                 placeholder={t('onboarding.name.firstNamePlaceholder', { defaultValue: 'Enter your first name' })}
@@ -117,9 +108,9 @@ const NameScreen: React.FC = () => {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>
+              <SJText style={styles.label}>
                 {t('onboarding.name.lastName', { defaultValue: 'Last Name' })}
-              </Text>
+              </SJText>
               <TextInput
                 style={styles.input}
                 placeholder={t('onboarding.name.lastNamePlaceholder', { defaultValue: 'Enter your last name' })}
@@ -134,9 +125,9 @@ const NameScreen: React.FC = () => {
             {isSaving && (
               <View style={styles.savingContainer}>
                 <ActivityIndicator size="small" color="#007AFF" />
-                <Text style={styles.savingText}>
+                <SJText style={styles.savingText}>
                   {t('onboarding.common.saving', { defaultValue: 'Saving...' })}
-                </Text>
+                </SJText>
               </View>
             )}
           </View>
@@ -148,17 +139,17 @@ const NameScreen: React.FC = () => {
             style={styles.skipButton}
             onPress={skipOnboarding}
           >
-            <Text style={styles.skipButtonText}>
+            <SJText style={styles.skipButtonText}>
               {t('onboarding.common.skip', { defaultValue: 'Skip' })}
-            </Text>
+            </SJText>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.nextButton}
             onPress={handleNext}
           >
-            <Text style={styles.nextButtonText}>
+            <SJText style={styles.nextButtonText}>
               {t('onboarding.common.next', { defaultValue: 'Next' })}
-            </Text>
+            </SJText>
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>

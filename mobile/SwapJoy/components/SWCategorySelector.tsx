@@ -1,11 +1,6 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ActivityIndicator,
-} from 'react-native';
+import {View, StyleSheet, TouchableOpacity, ActivityIndicator, } from 'react-native';
+import SJText from '../components/SJText';
 import { Ionicons } from '@expo/vector-icons';
 
 interface SWCategorySelectorProps {
@@ -51,7 +46,7 @@ const SWCategorySelector: React.FC<SWCategorySelectorProps> = ({
             ]}
             pointerEvents="none"
           >
-            <Text
+            <SJText
               style={[
                 styles.floatingLabel,
                 {
@@ -60,12 +55,12 @@ const SWCategorySelector: React.FC<SWCategorySelectorProps> = ({
               ]}
             >
               {placeholder}
-              {required && <Text style={styles.required}> *</Text>}
-            </Text>
+              {required && <SJText style={styles.required}> *</SJText>}
+            </SJText>
           </View>
         )}
         <View style={styles.contentWrapper}>
-          <Text
+          <SJText
             style={[
               styles.selectorText,
               !hasValue && styles.selectorTextPlaceholder,
@@ -74,7 +69,7 @@ const SWCategorySelector: React.FC<SWCategorySelectorProps> = ({
             numberOfLines={1}
           >
             {hasValue ? displayValue || value : placeholder}
-          </Text>
+          </SJText>
           {showLoading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="small" color="#007AFF" />
@@ -85,7 +80,7 @@ const SWCategorySelector: React.FC<SWCategorySelectorProps> = ({
         </View>
         <View style={styles.bottomBorder} />
       </TouchableOpacity>
-      {error && <Text style={styles.errorText}>{error}</Text>}
+      {error && <SJText style={styles.errorText}>{error}</SJText>}
     </View>
   );
 };

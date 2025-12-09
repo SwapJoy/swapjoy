@@ -1,16 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TextInput,
-  TouchableOpacity,
-  KeyboardAvoidingView,
-  Platform,
-  Alert,
-  Modal,
-} from 'react-native';
+import {View, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Alert, Modal, } from 'react-native';
+import SJText from '../components/SJText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
@@ -123,16 +113,16 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route }) => {
       <View style={[styles.messageRow, alignmentStyle]}>
         <View style={bubbleStyle}>
           {item.content_type === 'text' && !!item.content_text && (
-            <Text style={textStyle}>{item.content_text}</Text>
+            <SJText style={textStyle}>{item.content_text}</SJText>
           )}
           {item.content_type === 'image' && item.media_url && (
             <TouchableOpacity onPress={() => openImagePreview(item.media_url)}>
               <CachedImage uri={item.media_url} style={styles.imageBubble} resizeMode="cover" />
             </TouchableOpacity>
           )}
-          <Text style={timeStyle}>
+          <SJText style={timeStyle}>
             {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-          </Text>
+          </SJText>
         </View>
       </View>
     );
@@ -156,12 +146,12 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route }) => {
           <CachedImage uri={primaryImage} style={styles.offerImage} resizeMode="cover" />
         ) : null}
         <View style={styles.offerInfo}>
-          <Text style={styles.offerTitle} numberOfLines={1}>
+          <SJText style={styles.offerTitle} numberOfLines={1}>
             {offerTitle}
-          </Text>
-          <Text style={styles.offerSubtitle} numberOfLines={1}>
+          </SJText>
+          <SJText style={styles.offerSubtitle} numberOfLines={1}>
             {t('chat.scopedToOffer', { defaultValue: 'This chat is about this offer only.' })}
-          </Text>
+          </SJText>
         </View>
       </View>
 
@@ -199,7 +189,7 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route }) => {
           onPress={handleSend}
           disabled={!text.trim() || sending}
         >
-          <Text style={styles.sendText}>{t('chat.send', { defaultValue: 'Send' })}</Text>
+          <SJText style={styles.sendText}>{t('chat.send', { defaultValue: 'Send' })}</SJText>
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
