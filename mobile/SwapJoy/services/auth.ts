@@ -10,6 +10,49 @@ const SESSION_KEY = 'supabase_session';
 const REFRESH_TOKEN_KEY = 'supabase_refresh_token';
 const ACCESS_TOKEN_KEY = 'supabase_access_token';
 
+// Request queue to block all requests during token refresh
+class RequestQueue {
+  private queue: Array<{
+    resolve: () => void;
+    reject: (error: any) => void;
+  }> = [];
+  private isBlocked: boolean = false;
+
+  // Block all requests (called when refresh starts)
+  block(): void {
+    this.isBlocked = true;
+    console.log('[RequestQueue] 🔒 Blocking all requests - token refresh in progress');
+  }
+
+  // Unblock all requests (called when refresh completes)
+  unblock(): void {
+    this.isBlocked = false;
+    console.log('[RequestQueue] 🔓 Unblocking requests - token refresh completed');
+    // Resolve all queued requests
+    const queued = [...this.queue];
+    this.queue = [];
+    queued.forEach(({ resolve }) => resolve());
+  }
+
+  // Wait if requests are blocked, otherwise proceed immediately
+  async waitIfBlocked(): Promise<void> {
+    if (!this.isBlocked) {
+      return;
+    }
+    return new Promise<void>((resolve, reject) => {
+      this.queue.push({ resolve, reject });
+    });
+  }
+
+  // Reject all queued requests (called on error)
+  rejectAll(error: any): void {
+    const queued = [...this.queue];
+    this.queue = [];
+    this.isBlocked = false;
+    queued.forEach(({ reject }) => reject(error));
+  }
+}
+
 // Gate keeper to prevent parallel token refresh requests
 // Singleton instance shared across AuthService and ApiService
 class RefreshGateKeeper {
@@ -19,9 +62,13 @@ class RefreshGateKeeper {
   private refreshRejector: ((error: any) => void) | null = null;
   private lastRefreshTime: number = 0;
   private readonly REFRESH_COOLDOWN_MS = 5000; // 5 seconds cooldown between refreshes
+  private requestQueue = new RequestQueue();
 
   // Wait if refresh is in progress, otherwise proceed immediately
   async waitIfNeeded(): Promise<void> {
+    // First wait for request queue (blocks all requests during refresh)
+    await this.requestQueue.waitIfBlocked();
+    // Then wait for refresh promise if it exists
     if (this.refreshPromise) {
       const waitStartTime = Date.now();
       console.log(`[Token Refresh] 🔄 [RefreshGateKeeper] Waiting for refresh in progress at ${new Date(waitStartTime).toISOString()}...`);
@@ -34,16 +81,7 @@ class RefreshGateKeeper {
   // Start a refresh - returns a promise that resolves when refresh completes
   // CRITICAL: Check and set must be atomic - use local variable to ensure atomicity
   startRefresh(refreshFn: () => Promise<void>): Promise<void> {
-    // Store current promise in local variable (atomic read)
-    const currentPromise = this.refreshPromise;
-    
-    // If promise exists, return it (another call is refreshing)
-    if (currentPromise) {
-      console.log(`[Token Refresh] ⏳ [RefreshGateKeeper] Refresh already in progress at ${new Date().toISOString()}, waiting for existing refresh...`);
-      return currentPromise;
-    }
-
-    // CRITICAL: Check cooldown - don't refresh if we just refreshed recently
+    // CRITICAL: Check cooldown FIRST - don't refresh if we just refreshed recently
     // This prevents multiple refreshes when the refreshed token still has time left
     const now = Date.now();
     const timeSinceLastRefresh = now - this.lastRefreshTime;
@@ -56,11 +94,24 @@ class RefreshGateKeeper {
       return Promise.resolve();
     }
 
-    // CRITICAL: Create promise in local variable first, then assign to instance
-    // This ensures the promise is created before assignment
-    console.log(`[Token Refresh] 🔒 [RefreshGateKeeper] Acquiring lock and starting refresh - closing gate at ${new Date(now).toISOString()}`);
+    // CRITICAL: Check and set must be atomic to prevent race conditions
+    // Use isRefreshing flag as a mutex to ensure only one refresh starts
+    if (this.isRefreshing) {
+      // If already refreshing, wait for existing promise
+      const currentPromise = this.refreshPromise;
+      if (currentPromise) {
+        console.log(`[Token Refresh] ⏳ [RefreshGateKeeper] Refresh already in progress at ${new Date().toISOString()}, waiting for existing refresh...`);
+        return currentPromise;
+      }
+    }
+
+    // Set flag FIRST to prevent other calls from starting
     this.isRefreshing = true;
+    // CRITICAL: Block all requests while refreshing
+    this.requestQueue.block();
+    console.log(`[Token Refresh] 🔒 [RefreshGateKeeper] Acquiring lock and starting refresh - closing gate at ${new Date(now).toISOString()}`);
     
+    // Create promise AFTER setting flag
     const newPromise = new Promise<void>((resolve, reject) => {
       this.refreshResolver = resolve;
       this.refreshRejector = reject;
@@ -95,6 +146,8 @@ class RefreshGateKeeper {
         this.lastRefreshTime = refreshEndTime; // Update last refresh time
         const totalRefreshDuration = refreshEndTime - refreshStartTime;
         console.log(`[Token Refresh] ✅ [RefreshGateKeeper] Refresh completed in ${totalRefreshDuration}ms - opening gate at ${new Date(refreshEndTime).toISOString()}`);
+        // CRITICAL: Unblock all requests AFTER refresh is complete and stored
+        this.requestQueue.unblock();
       }
     })();
 
@@ -280,11 +333,15 @@ export class AuthService {
       const refreshDuration = Date.now() - refreshStartTime;
       
       if (session) {
+        // CRITICAL: Store session BEFORE unblocking requests
+        // This ensures all waiting requests get the fresh token
+        await this.storeSession(session);
+        
         const newExpiresAtMs = session.expires_at ? session.expires_at * 1000 : 0;
         const newExpiresIn = session.expires_in || 3600;
         const expiresAtDate = newExpiresAtMs ? new Date(newExpiresAtMs).toISOString() : 'unknown';
         
-        console.log(`[Token Refresh] ✅ Token refresh completed successfully in ${refreshDuration}ms`);
+        console.log(`[Token Refresh] ✅ Token refresh completed and stored successfully in ${refreshDuration}ms`);
         console.log(`[Token Refresh] New token expires in: ${Math.floor(newExpiresIn / 60)} minutes (${newExpiresIn}s)`);
         console.log(`[Token Refresh] New token expires at: ${expiresAtDate}`);
       } else {
@@ -310,8 +367,10 @@ export class AuthService {
           errorMsg.includes('refresh_token_already_used') ||
           errorMsg.includes('Invalid Refresh Token: Already Used')) {
         console.warn('[Token Refresh] ⚠️ Refresh token already used - another refresh may have completed');
+        // Wait a short time for the other refresh to complete and save the session
+        await new Promise(resolve => setTimeout(resolve, 100));
         // Try to read the new session - another refresh might have succeeded
-        const sessionData = await SecureStore.getItemAsync(SESSION_KEY);
+        let sessionData = await SecureStore.getItemAsync(SESSION_KEY);
         if (sessionData) {
           const session = JSON.parse(sessionData) as AuthSession;
           const now = Date.now();
@@ -326,8 +385,22 @@ export class AuthService {
             console.warn(`[Token Refresh] ❌ Session found but is expired (expired ${Math.abs(Math.floor((now - expiresAtMs) / 60000))} minutes ago)`);
           }
         }
-        // If no valid session found, return null (will trigger sign out)
-        console.warn('[Token Refresh] ❌ No valid session found after refresh_token_already_used error');
+        // If still no valid session, wait a bit more and check again (refresh might still be saving)
+        await new Promise(resolve => setTimeout(resolve, 200));
+        sessionData = await SecureStore.getItemAsync(SESSION_KEY);
+        if (sessionData) {
+          const session = JSON.parse(sessionData) as AuthSession;
+          const now = Date.now();
+          const expiresAtMs = session.expires_at ? session.expires_at * 1000 : 0;
+          if (expiresAtMs > now) {
+            const timeUntilExpiry = expiresAtMs - now;
+            console.log(`[Token Refresh] ✅ Found valid session after second check`);
+            console.log(`[Token Refresh] Session expires in: ${Math.floor(timeUntilExpiry / 60000)} minutes`);
+            return session;
+          }
+        }
+        // If no valid session found after waiting, return null (will trigger sign out)
+        console.warn('[Token Refresh] ❌ No valid session found after refresh_token_already_used error (checked twice)');
         return null;
       }
       
@@ -837,6 +910,75 @@ export class AuthService {
       console.error('Unexpected error:', error);
       return { user: null, session: null, error: 'Failed to verify OTP. Please try again.' };
     }
+  }
+
+  // CRITICAL: Validate and refresh token if needed BEFORE any request
+  // This ensures token is always valid before API calls
+  // All requests are blocked during refresh
+  static async ensureValidToken(): Promise<AuthSession | null> {
+    // Wait for any ongoing refresh first (this blocks if refresh is in progress)
+    await refreshGateKeeper.waitIfNeeded();
+    
+    // Get current session directly from storage
+    let session: AuthSession | null = null;
+    try {
+      const sessionData = await SecureStore.getItemAsync(SESSION_KEY);
+      if (sessionData) {
+        session = JSON.parse(sessionData) as AuthSession;
+      }
+    } catch (error) {
+      console.error('[AuthService] Error reading session from storage:', error);
+    }
+    
+    if (!session) {
+      // No session - try to refresh from refresh token
+      const refreshToken = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
+      if (refreshToken) {
+        session = await this.refreshSessionWithGate();
+        // Wait for refresh to complete and session to be stored
+        await refreshGateKeeper.waitIfNeeded();
+      }
+      if (!session) {
+        return null;
+      }
+    }
+    
+    // Check if token needs refresh (expired or expiring soon)
+    const now = Date.now();
+    const expiresAtMs = session.expires_at ? session.expires_at * 1000 : 0;
+    const isExpired = !!expiresAtMs && now >= expiresAtMs;
+    const refreshThresholdMs = 5 * 60 * 1000; // 5 minutes before expiry
+    const timeUntilExpiry = expiresAtMs - now;
+    const needsRefresh = isExpired || (!!expiresAtMs && !isExpired && timeUntilExpiry <= refreshThresholdMs);
+    
+    if (needsRefresh) {
+      console.log(`[Token Validation] 🔄 Token ${isExpired ? 'expired' : 'expiring soon'} - refreshing before request`);
+      // Refresh the session (this will block all requests during refresh)
+      session = await this.refreshSessionWithGate();
+      // CRITICAL: Wait for refresh to complete and session to be stored
+      await refreshGateKeeper.waitIfNeeded();
+      
+      if (!session) {
+        console.error('[Token Validation] ❌ Failed to refresh token');
+        return null;
+      }
+      
+      // Re-read session from storage to ensure we have the latest
+      const storedSessionData = await SecureStore.getItemAsync(SESSION_KEY);
+      if (storedSessionData) {
+        session = JSON.parse(storedSessionData) as AuthSession;
+      }
+      
+      // Verify it's now valid
+      const newExpiresAtMs = session.expires_at ? session.expires_at * 1000 : 0;
+      if (newExpiresAtMs && now >= newExpiresAtMs) {
+        console.error('[Token Validation] ❌ Token still expired after refresh');
+        return null;
+      }
+      console.log('[Token Validation] ✅ Token refreshed and stored successfully');
+    }
+    
+    return session;
   }
 
   // Get current session (with automatic refresh)

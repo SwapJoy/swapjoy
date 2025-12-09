@@ -3,6 +3,7 @@ import * as Application from 'expo-application';
 import messaging from '@react-native-firebase/messaging';
 import firebaseApp from '@react-native-firebase/app';
 import { supabase } from '../lib/supabase';
+import { ApiService } from './api';
 
 /**
  * Service for device registration and FCM token management
@@ -201,39 +202,115 @@ export class DeviceService {
 
       const platform = this.getPlatform();
 
-      // Upsert device in Supabase, using fcm_token as the unique key:
-      // - Ensures a token is stored only once in the devices table
-      // - If the same device/token is already registered, we simply update metadata
-      const { data, error } = await supabase
-        .from('devices')
-        .upsert(
-          {
-            user_id: userId,
-            device_id: deviceId,
-            platform,
-            fcm_token: fcmToken,
-            enabled: true,
-            last_seen: new Date().toISOString(),
-          },
-          {
-            onConflict: 'fcm_token',
-            ignoreDuplicates: false,
-          }
-        )
-        .select()
-        .single();
+      // Get authenticated client to ensure RLS policies work correctly
+      // The base supabase client doesn't have the session, so auth.uid() would be null
+      const client = await ApiService.getAuthenticatedClient();
+
+      // CRITICAL: Handle case where fcm_token might be registered to a different user
+      // This can happen when a user signs out and a new user signs in on the same device
+      // We use a database function that bypasses RLS to transfer the device to the new user
+      
+      // Use RPC function to register or transfer device
+      // This function will:
+      // 1. Check if device with this FCM token exists (even if it belongs to another user)
+      // 2. If exists, update it to the new user
+      // 3. If not exists, insert a new device
+      const { data, error } = await client.rpc('register_or_transfer_device', {
+        p_user_id: userId,
+        p_device_id: deviceId,
+        p_platform: platform,
+        p_fcm_token: fcmToken,
+      });
 
       if (error) {
-        console.error('Error registering device:', error);
+        console.error('[DeviceService] Error registering/transferring device:', error);
+        // Fallback: Try the old method if RPC function doesn't exist yet
+        if (error.message?.includes('function') || error.message?.includes('does not exist')) {
+          console.warn('[DeviceService] RPC function not found, falling back to direct insert/update');
+          return await this.registerDeviceFallback(userId, deviceId, platform, fcmToken, client);
+        }
         return false;
       }
 
-      console.log('Device registered successfully:', data);
+      if (!data || data.length === 0) {
+        console.error('[DeviceService] Device registration returned no data');
+        return false;
+      }
+
+      console.log('[DeviceService] Device registered/transferred successfully:', data[0]);
       return true;
     } catch (error) {
       console.error('Error in registerDevice:', error);
       return false;
     }
+  }
+
+  /**
+   * Fallback method for device registration (used if RPC function doesn't exist)
+   * This method tries to insert, and if it fails due to unique constraint,
+   * it means the device belongs to another user and we can't transfer it without the RPC function
+   */
+  private static async registerDeviceFallback(
+    userId: string,
+    deviceId: string,
+    platform: 'ios' | 'android' | 'web',
+    fcmToken: string,
+    client: any
+  ): Promise<boolean> {
+    const deviceData = {
+      user_id: userId,
+      device_id: deviceId,
+      platform,
+      fcm_token: fcmToken,
+      enabled: true,
+      last_seen: new Date().toISOString(),
+    };
+
+    // First, try to find existing device with this fcm_token (only works if it belongs to current user)
+    const { data: existingDevice } = await client
+      .from('devices')
+      .select('*')
+      .eq('fcm_token', fcmToken)
+      .single();
+
+    let data, error;
+
+    if (existingDevice) {
+      // Device exists and belongs to current user - update it
+      const { data: updateData, error: updateError } = await client
+        .from('devices')
+        .update(deviceData)
+        .eq('fcm_token', fcmToken)
+        .select()
+        .single();
+      data = updateData;
+      error = updateError;
+    } else {
+      // Device doesn't exist for current user - try to insert
+      // If it exists for another user, we'll get a unique constraint error
+      const { data: insertData, error: insertError } = await client
+        .from('devices')
+        .insert(deviceData)
+        .select()
+        .single();
+      data = insertData;
+      error = insertError;
+
+      // If insert fails due to unique constraint, the device exists but belongs to another user
+      if (insertError && insertError.code === '23505') {
+        console.error('[DeviceService] Device with this FCM token exists but belongs to another user.');
+        console.error('[DeviceService] Cannot transfer device without RPC function. Please run migration: 20251210000000_create_transfer_device_function.sql');
+        return false;
+      }
+    }
+
+    if (error) {
+      console.error('[DeviceService] Error in fallback registration:', error);
+      return false;
+    }
+
+    console.log('[DeviceService] Device registered successfully (fallback):', data);
+    return true;
   }
 
   /**
@@ -271,22 +348,60 @@ export class DeviceService {
 
   /**
    * Disable device (on sign out)
+   * CRITICAL: Delete the device instead of just disabling it
+   * This prevents RLS issues when a new user signs in on the same device
    */
   static async disableDevice(userId: string, deviceId: string): Promise<boolean> {
     try {
-      const { error } = await supabase
-        .from('devices')
-        .update({
-          enabled: false,
-        })
-        .eq('user_id', userId)
-        .eq('device_id', deviceId);
-
-      if (error) {
-        console.error('Error disabling device:', error);
-        return false;
+      // Get authenticated client to ensure RLS policies work correctly
+      const client = await ApiService.getAuthenticatedClient();
+      
+      // Try to get FCM token to delete by fcm_token (more reliable than device_id)
+      let fcmToken: string | null = null;
+      try {
+        fcmToken = await this.getFCMToken();
+      } catch (error) {
+        console.warn('Could not get FCM token for device deletion:', error);
+      }
+      
+      // Delete the device - try by fcm_token first (more reliable), then by device_id
+      let deleteError = null;
+      if (fcmToken) {
+        const { error } = await client
+          .from('devices')
+          .delete()
+          .eq('user_id', userId)
+          .eq('fcm_token', fcmToken);
+        deleteError = error;
+      }
+      
+      // If delete by fcm_token failed or we don't have fcm_token, try by device_id
+      if (deleteError || !fcmToken) {
+        const { error } = await client
+          .from('devices')
+          .delete()
+          .eq('user_id', userId)
+          .eq('device_id', deviceId);
+        deleteError = error;
       }
 
+      if (deleteError) {
+        console.error('Error deleting device on sign-out:', deleteError);
+        // Fallback: try to disable it if delete fails
+        const { error: updateError } = await client
+          .from('devices')
+          .update({ enabled: false })
+          .eq('user_id', userId)
+          .or(`device_id.eq.${deviceId}${fcmToken ? `,fcm_token.eq.${fcmToken}` : ''}`);
+        
+        if (updateError) {
+          console.error('Error disabling device (fallback):', updateError);
+          return false;
+        }
+        return true;
+      }
+
+      console.log('Device deleted successfully on sign-out');
       return true;
     } catch (error) {
       console.error('Error in disableDevice:', error);

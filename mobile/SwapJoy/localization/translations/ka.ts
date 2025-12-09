@@ -194,11 +194,12 @@ const ka = {
     },
     conditions: {
       mint: 'იდეალური',
+      new: 'ახალი',
       like_new: 'თითქმის ახალი',
       excellent: 'შესანიშნავი',
       good: 'კარგი',
       fair: 'დამაკმაყოფილებელი',
-      poor: 'გამოყენებული',
+      poor: 'დაზიანებული',
     },
     counts: {
       items: '{count} ნივთი',

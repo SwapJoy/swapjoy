@@ -157,7 +157,25 @@ export const CategoriesProvider: React.FC<CategoriesProviderProps> = ({ children
       }
 
       // Fetch from API only if no valid cache or forcing refresh
-      const { data, error: fetchError } = await ApiService.getCategories(languageRef.current);
+      const result = await ApiService.getCategories(languageRef.current);
+      
+      // Handle case where getCategories returns null (shouldn't happen, but be defensive)
+      if (!result) {
+        console.error('[CategoriesContext] getCategories returned null');
+        if (isMountedRef.current) {
+          setError(new Error('Failed to fetch categories: API returned null'));
+          // If we have cached data, keep using it
+          if (categories.length === 0) {
+            const cached = await loadCachedCategories();
+            if (cached && cached.length > 0) {
+              updateCategories(cached);
+            }
+          }
+        }
+        return;
+      }
+
+      const { data, error: fetchError } = result;
 
       if (fetchError) {
         console.error('[CategoriesContext] Error fetching categories:', fetchError);

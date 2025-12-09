@@ -32,25 +32,25 @@ export class ApiService {
   private static async getAuthenticatedClient() {
     console.log('[ApiService] getAuthenticatedClient ENTRY');
     if (this.isAuthReady) {
+      // Even if auth is ready, ensure token is valid before returning client
+      await AuthService.ensureValidToken();
       return supabase;
     }
     if (this.authInitInFlight) {
       console.log('[ApiService] awaiting existing authInitInFlight');
       await this.authInitInFlight;
+      // Ensure token is valid after waiting
+      await AuthService.ensureValidToken();
       return supabase;
     }
     // Start a single-flight auth init
     this.authInitInFlight = (async () => {
-      // CRITICAL: Wait for any in-progress refresh BEFORE getting session
-      // This ensures we get a fresh token and don't trigger duplicate refreshes
-      await refreshGateKeeper.waitIfNeeded();
+      // CRITICAL: Ensure token is valid before setting up client
+      // This will refresh if needed and block all requests during refresh
+      const session = await AuthService.ensureValidToken();
       
-      // Get stored session from SecureStore
-      // This will automatically refresh if expired, but we've already waited for any in-progress refresh
-      let session: any = await AuthService.getCurrentSession();
-
       if (!session?.access_token) {
-        console.warn('[ApiService] No stored session found - user needs to sign in');
+        console.warn('[ApiService] No valid session found - user needs to sign in');
         // Notify AuthContext that session has expired so user gets redirected to sign in
         AuthService.notifySessionExpired().catch((err) => {
           console.error('[ApiService] Error notifying session expired:', err);
@@ -58,41 +58,12 @@ export class ApiService {
         throw new Error('No access token available. Please sign in.');
       }
 
-      // CRITICAL: Verify token is NOT expired before setting session
-      // setSession() with expired token triggers automatic refresh in Supabase
+      // Session is guaranteed to be valid at this point (ensureValidToken handles refresh)
       const now = Date.now();
       const expiresAtMs = session.expires_at ? session.expires_at * 1000 : 0;
-      const isExpired = !!expiresAtMs && now >= expiresAtMs;
-      
-      if (isExpired) {
-        const expiredAgo = Math.abs(Math.floor((now - expiresAtMs) / 60000));
-        console.warn(`[Token Expiry] ⚠️ [ApiService] Session expired ${expiredAgo} minutes ago after getCurrentSession() - refreshing again`);
-        console.warn(`[Token Expiry] Expired at: ${new Date(expiresAtMs).toISOString()}, Current time: ${new Date(now).toISOString()}`);
-        // Wait for any refresh that might have been triggered
-        await refreshGateKeeper.waitIfNeeded();
-        // Get fresh session
-        session = await AuthService.getCurrentSession();
-        
-        if (!session?.access_token) {
-          console.error('[Token Expiry] ❌ [ApiService] Session expired and refresh failed');
-          throw new Error('Session expired and refresh failed');
-        }
-        
-        // Double-check it's not expired
-        const newExpiresAtMs = session.expires_at ? session.expires_at * 1000 : 0;
-        if (newExpiresAtMs && now >= newExpiresAtMs) {
-          console.error(`[Token Expiry] ❌ [ApiService] Session still expired after refresh`);
-          console.error(`[Token Expiry] Still expired at: ${new Date(newExpiresAtMs).toISOString()}, Current time: ${new Date(now).toISOString()}`);
-          throw new Error('Session still expired after refresh');
-        }
-        
-        const newExpiresIn = session.expires_in || 0;
-        console.log(`[Token Expiry] ✅ [ApiService] Session refreshed successfully, expires in ${Math.floor(newExpiresIn / 60)} minutes`);
-      } else {
-        const timeUntilExpiry = expiresAtMs - now;
-        const minutesUntilExpiry = Math.floor(timeUntilExpiry / 60000);
-        console.log(`[Token Expiry] ✅ [ApiService] Session valid, expires in ${minutesUntilExpiry} minutes (${Math.floor(timeUntilExpiry / 1000)}s)`);
-      }
+      const timeUntilExpiry = expiresAtMs - now;
+      const minutesUntilExpiry = Math.floor(timeUntilExpiry / 60000);
+      console.log(`[Token Expiry] ✅ [ApiService] Session valid, expires in ${minutesUntilExpiry} minutes (${Math.floor(timeUntilExpiry / 1000)}s)`);
 
       // CRITICAL: Set session on Supabase client so RLS policies work
       // RLS uses auth.uid() which comes from the Supabase client's session
@@ -162,8 +133,24 @@ export class ApiService {
     apiCall: (client: typeof supabase) => Promise<{ data: T | null; error: any }>
   ): Promise<{ data: T | null; error: any }> {
     try {
-      // CRITICAL: Wait for any ongoing token refresh BEFORE making any API calls
-      // This ensures all parallel API calls wait for a single refresh to complete
+      // CRITICAL: Validate and refresh token BEFORE making any API calls
+      // This ensures token is always valid before requests are sent
+      // All requests are blocked during refresh
+      const validSession = await AuthService.ensureValidToken();
+      if (!validSession) {
+        console.error('[ApiService] No valid session available - cannot make authenticated request');
+        return {
+          data: null,
+          error: {
+            message: 'Authentication required. Please sign in.',
+            code: 'AUTH_REQUIRED',
+            status: 401
+          }
+        };
+      }
+
+      // CRITICAL: Wait for any ongoing token refresh (double-check)
+      // This ensures we don't make requests while refresh is in progress
       await refreshGateKeeper.waitIfNeeded();
 
       const client = await this.getAuthenticatedClient();
@@ -1645,9 +1632,7 @@ export class ApiService {
       try {
         const session = await client.auth.getSession();
         sessionUserId = session.data.session?.user?.id || null;
-        console.log(`[ApiService.getNotifications] Session user ID: ${sessionUserId}`);
-        console.log(`[ApiService.getNotifications] Current user ID: ${currentUser.id}`);
-        console.log(`[ApiService.getNotifications] IDs match: ${sessionUserId === currentUser.id}`);
+        
       } catch (sessionError) {
         console.warn('[ApiService.getNotifications] Could not get session:', sessionError);
       }
@@ -1660,21 +1645,12 @@ export class ApiService {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('[ApiService.getNotifications] Error:', error);
         console.error('[ApiService.getNotifications] Error details:', JSON.stringify(error, null, 2));
         return { data: null, error };
       }
 
       console.log(`[ApiService.getNotifications] Found ${data?.length || 0} notifications`);
-      if (data && data.length > 0) {
-        console.log('[ApiService.getNotifications] Notification IDs:', data.map(n => n.id));
-        console.log('[ApiService.getNotifications] Notification user_ids:', data.map(n => n.user_id));
-      } else {
-        console.warn('[ApiService.getNotifications] No notifications returned. This could mean:');
-        console.warn('  1. RLS policy is blocking (auth.uid() != notification.user_id)');
-        console.warn(`  2. Session user ID: ${sessionUserId}`);
-        console.warn(`  3. Expected user ID: ${currentUser.id}`);
-      }
+     
 
       return { data, error: null };
     });
@@ -3297,52 +3273,74 @@ export class ApiService {
     // Cached categories for performance (used for favorite category chips and filters)
     // NOTE: Categories are public and don't require authentication
     console.log('[ApiService.getCategories] Starting fetch, bypassCache=true');
-    return RedisCache.cache(
+    
+    const fetchCategories = async () => {
+      console.log('[ApiService.getCategories] Fetch function called');
+      return this.publicCall(async (client) => {
+        console.log('[ApiService.getCategories] Calling RPC function (public)');
+        // Use RPC function to fetch all categories at once (bypasses 1000 row limit)
+        // This is a public endpoint - no authentication required
+        const { data, error } = await client.rpc('get_all_active_categories');
+        console.log('[ApiService.getCategories] RPC response received, error:', !!error, 'data:', data ? data.length : 'null');
+
+        if (error || !data) {
+          console.error('[ApiService.getCategories] Error:', error);
+          return { data: null, error };
+        }
+
+        console.log('[ApiService.getCategories] getCategories.count', data.length);
+
+        // Sort by localized column
+        const sortedData = [...data].sort((a: any, b: any) => {
+          const aName = a[localizedColumn] || a[fallbackColumn] || '';
+          const bName = b[localizedColumn] || b[fallbackColumn] || '';
+          return aName.localeCompare(bName);
+        });
+
+        const dataWithLocalizedName = sortedData.map((category: any) => ({
+          ...category,
+          name: category?.[localizedColumn] || category?.[fallbackColumn] || '',
+        }));
+
+        return {
+          data: dataWithLocalizedName,
+          error: null,
+        };
+      });
+    };
+
+    // Try RedisCache first (may return null if disabled)
+    const cachedResult = await RedisCache.cache(
       'all-categories',
       ['active', lang],
-      () => {
-        console.log('[ApiService.getCategories] Fetch function called');
-        return this.publicCall(async (client) => {
-          console.log('[ApiService.getCategories] Calling RPC function (public)');
-          // Use RPC function to fetch all categories at once (bypasses 1000 row limit)
-          // This is a public endpoint - no authentication required
-          const { data, error } = await client.rpc('get_all_active_categories');
-          console.log('[ApiService.getCategories] RPC response received, error:', !!error, 'data:', data ? data.length : 'null');
-
-          if (error || !data) {
-            console.error('[ApiService.getCategories] Error:', error);
-            return { data: null, error };
-          }
-
-          console.log('[ApiService.getCategories] getCategories.count', data.length);
-
-          // Sort by localized column
-          const sortedData = [...data].sort((a: any, b: any) => {
-            const aName = a[localizedColumn] || a[fallbackColumn] || '';
-            const bName = b[localizedColumn] || b[fallbackColumn] || '';
-            return aName.localeCompare(bName);
-          });
-
-          const dataWithLocalizedName = sortedData.map((category: any) => ({
-            ...category,
-            name: category?.[localizedColumn] || category?.[fallbackColumn] || '',
-          }));
-
-          return {
-            data: dataWithLocalizedName,
-            error: null,
-          };
-        });
-      },
+      fetchCategories,
       true
     );
+
+    // If RedisCache is disabled (returns null), call fetch function directly
+    if (cachedResult === null) {
+      console.log('[ApiService.getCategories] RedisCache disabled, calling fetch directly');
+      return await fetchCategories();
+    }
+
+    return cachedResult;
   }
 
   static async getCategoryIdToNameMap(lang: AppLanguage = DEFAULT_LANGUAGE) {
-    const { data } = await this.getCategories(lang);
-    const map: Record<string, string> = {};
-    (data || []).forEach((c: any) => { if (c?.id) map[c.id] = c.name || String(c.id); });
-    return map;
+    try {
+      const result = await this.getCategories(lang);
+      if (!result || !result.data) {
+        console.warn('[ApiService.getCategoryIdToNameMap] No data returned from getCategories');
+        return {};
+      }
+      const { data } = result;
+      const map: Record<string, string> = {};
+      (data || []).forEach((c: any) => { if (c?.id) map[c.id] = c.name || String(c.id); });
+      return map;
+    } catch (error) {
+      console.error('[ApiService.getCategoryIdToNameMap] Error:', error);
+      return {};
+    }
   }
 
   /**

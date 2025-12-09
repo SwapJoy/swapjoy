@@ -150,10 +150,16 @@ export const useProfileData = (targetUserId?: string) => {
           (async () => {
             try {
               const idToName = await ApiService.getCategoryIdToNameMap(language);
-              const names = fav.map((id: string) => idToName[id]).filter(Boolean);
-              setFavoriteCategoryNames(names);
+              if (idToName && typeof idToName === 'object') {
+                const names = fav.map((id: string) => idToName[id]).filter(Boolean);
+                setFavoriteCategoryNames(names);
+              } else {
+                console.warn('[useProfileData] Invalid category map returned');
+                setFavoriteCategoryNames([]);
+              }
             } catch (error) {
               console.error('Error fetching category names:', error);
+              setFavoriteCategoryNames([]);
             }
           })();
         }

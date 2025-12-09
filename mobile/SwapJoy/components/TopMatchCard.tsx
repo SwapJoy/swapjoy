@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import CachedImage from './CachedImage';
 import { useLocalization } from '../localization';
 import { getConditionPresentation } from '../utils/conditions';
+import { useCategories } from '../contexts/CategoriesContext';
 
 const { width, height } = Dimensions.get('window');
 
@@ -112,6 +113,7 @@ const TopMatchCard: React.FC<TopMatchCardProps> = ({
   disableLikeButton,
 }) => {
   const { language, t } = useLocalization();
+  const { getCategoryByName } = useCategories();
   const displayTitle = (title ?? '').trim() || 'Untitled item';
   const ownerUsername = owner.username?.trim() || owner.displayName?.trim() || '';
 
@@ -122,7 +124,7 @@ const TopMatchCard: React.FC<TopMatchCardProps> = ({
     }
   };
 
-  const { conditionPresentation, normalizedCategory } = useMemo(() => {
+  const { conditionPresentation, normalizedCategory, categoryIcon } = useMemo(() => {
     const conditionPresentationResult = getConditionPresentation({
       condition,
       language,
@@ -130,12 +132,15 @@ const TopMatchCard: React.FC<TopMatchCardProps> = ({
     });
 
     const normalizedCategoryResult = category?.trim();
+    const categoryData = normalizedCategoryResult ? getCategoryByName(normalizedCategoryResult) : null;
+    const categoryIconResult = categoryData?.icon || '📦'; // Default emoji if no icon
 
     return {
       conditionPresentation: conditionPresentationResult,
       normalizedCategory: normalizedCategoryResult,
+      categoryIcon: categoryIconResult,
     };
-  }, [category, condition, language, t]);
+  }, [category, condition, language, t, getCategoryByName]);
 
   return (
     <View>
@@ -190,6 +195,23 @@ const TopMatchCard: React.FC<TopMatchCardProps> = ({
               />
             </TouchableOpacity>
           )}
+          {conditionPresentation && (
+            <View
+              style={[
+                styles.conditionBadge,
+                { backgroundColor: conditionPresentation.backgroundColor },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.conditionText,
+                  { color: conditionPresentation.textColor },
+                ]}
+              >
+                {conditionPresentation.label}
+              </Text>
+            </View>
+          )}
         </View>
 
         <View style={styles.infoSection}>
@@ -197,58 +219,36 @@ const TopMatchCard: React.FC<TopMatchCardProps> = ({
             <Text style={styles.title} numberOfLines={1} ellipsizeMode="tail">
               {displayTitle}
             </Text>
-            {price ? (
-              <Text style={styles.priceText}>{price}</Text>
-            ) : null}
           </View>
 
           {description ? (
             <Text
               style={styles.description}
-              numberOfLines={2}
+              numberOfLines={1}
               ellipsizeMode="tail"
             >
               {description}
             </Text>
           ) : null}
 
-          {(conditionPresentation || normalizedCategory) && (
+          {normalizedCategory && (
             <View style={styles.metaSection}>
-              {normalizedCategory ? (
-                <View style={styles.metaRowItem}>
-                  <Text style={styles.metaLabelVertical}>Category</Text>
-                  <View
-                    style={[styles.chip, { backgroundColor: '#e2e8f0' }]}
-                  >
-                    <Text style={[styles.chipText, { color: '#0f172a' }]}>
-                      {normalizedCategory}
-                    </Text>
-                  </View>
+              <View style={styles.chipsRow}>
+                <View
+                  style={[styles.chip, { backgroundColor: '#e2e8f0' }]}
+                >
+                  <Text style={styles.chipEmoji}>{categoryIcon}</Text>
+                  <Text style={[styles.chipText, { color: '#0f172a' }]}>
+                    {normalizedCategory}
+                  </Text>
                 </View>
-              ) : null}
-
-              {conditionPresentation ? (
-                <View style={[styles.metaRowItem, styles.metaRowItemSpaced]}>
-                  <Text style={styles.metaLabelVertical}>Condition</Text>
-                  <View
-                    style={[
-                      styles.chip,
-                      { backgroundColor: conditionPresentation.backgroundColor },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.chipText,
-                        { color: conditionPresentation.textColor },
-                      ]}
-                    >
-                      {conditionPresentation.label}
-                    </Text>
-                  </View>
-                </View>
-              ) : null}
+              </View>
             </View>
           )}
+
+          {price ? (
+            <Text style={styles.priceText}>{price}</Text>
+          ) : null}
         </View>
       </TouchableOpacity>
     </View>
@@ -304,8 +304,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   mediaSection: {
-    flex: 0.7,
+    flex: 0.75,
     position: 'relative',
+  },
+  infoSection: {
+    flex: 0.25,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    justifyContent: 'flex-start',
   },
   heroImage: {
     width: '100%',
@@ -324,6 +330,29 @@ const styles = StyleSheet.create({
   },
   likeButtonActive: {
     backgroundColor: '#fee2e2',
+  },
+  conditionBadge: {
+    position: 'absolute',
+    bottom: 12,
+    right: 12,
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  conditionEmoji: {
+    fontSize: 12,
+  },
+  conditionText: {
+    fontSize: 11,
+    fontWeight: '600',
   },
   priceBadge: {
     position: 'absolute',
@@ -383,12 +412,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#0f172a',
   },
-  infoSection: {
-    flex: 0.3,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    justifyContent: 'flex-start',
-  },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -397,7 +420,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: '400',
     color: '#0f172a',
     flex: 1,
   },
@@ -406,18 +429,24 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
     color: '#475569',
-    maxHeight: 36, // 2 lines max (2 * lineHeight)
+    maxHeight: 18, // 1 line max
   },
   chipsRow: {
-    marginTop: 8,
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
+    alignItems: 'center',
   },
   chip: {
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  chipEmoji: {
+    fontSize: 12,
   },
   chipText: {
     fontSize: 11,
@@ -425,7 +454,7 @@ const styles = StyleSheet.create({
     color: '#0f172a',
   },
   metaSection: {
-    marginTop: 12,
+    marginTop: 8,
   },
   metaRowItem: {
     flexDirection: 'row',
@@ -455,9 +484,10 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   priceText: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 16,
+    fontWeight: '600',
     color: '#0f172a',
+    marginTop: 8,
   },
   suggestionsSlot: {
     marginTop: 12,
@@ -466,7 +496,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
   },
   skeletonMedia: {
-    flex: 0.7,
+    flex: 0.8,
     width: '100%',
   },
   skeletonLineLarge: {

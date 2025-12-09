@@ -1,20 +1,21 @@
 import { AppLanguage } from '../types/language';
 import { capitalizeWords } from './string';
 
-type ConditionKey = 'mint' | 'like_new' | 'excellent' | 'good' | 'fair' | 'poor';
+type ConditionKey = 'mint' | 'new' | 'like_new' | 'excellent' | 'good' | 'fair' | 'poor';
 
 type ConditionStyle = {
   backgroundColor: string;
   textColor: string;
 };
 
-const CONDITION_STYLES: Record<ConditionKey, ConditionStyle> = {
-  mint: { backgroundColor: '#dcfce7', textColor: '#047857' },
-  like_new: { backgroundColor: '#dbeafe', textColor: '#1d4ed8' },
-  excellent: { backgroundColor: '#e0f2fe', textColor: '#0369a1' },
-  good: { backgroundColor: '#f0f9ff', textColor: '#0c4a6e' },
-  fair: { backgroundColor: '#fef3c7', textColor: '#b45309' },
-  poor: { backgroundColor: '#fee2e2', textColor: '#b91c1c' },
+const CONDITION_STYLES: Record<ConditionKey, ConditionStyle & { emoji: string }> = {
+  mint: { backgroundColor: '#0BDA51', textColor: '#fff', emoji: '✨' },
+  new: { backgroundColor: '#5CE65C', textColor: '#fff', emoji: '🆕' },
+  like_new: { backgroundColor: '#0BDA51', textColor: '#fff', emoji: '🌿' },
+  excellent: { backgroundColor: '#B163FF', textColor: '#fff', emoji: '⭐' },
+  good: { backgroundColor: '#E4C80A', textColor: '#fff', emoji: '👍' },
+  fair: { backgroundColor: '#6D8196', textColor: '#fff', emoji: '⚠️' },
+  poor: { backgroundColor: '#FA5053', textColor: '#fff', emoji: '🔧' },
 };
 
 const normalizeConditionKey = (condition?: string): ConditionKey | null => {
@@ -41,6 +42,7 @@ export interface ConditionPresentation {
   label: string;
   backgroundColor: string;
   textColor: string;
+  emoji: string;
 }
 
 export const getConditionPresentation = ({
@@ -62,6 +64,7 @@ export const getConditionPresentation = ({
       label: defaultLabel || translate('explore.conditions.unknown', { defaultValue: 'Unknown' }),
       backgroundColor: '#e2e8f0',
       textColor: '#0f172a',
+      emoji: '❓',
     };
   }
 
@@ -72,5 +75,6 @@ export const getConditionPresentation = ({
     label,
     backgroundColor: styling.backgroundColor,
     textColor: styling.textColor,
+    emoji: styling.emoji,
   };
 };

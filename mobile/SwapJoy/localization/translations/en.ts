@@ -194,6 +194,7 @@ const en = {
     },
     conditions: {
       mint: 'Mint',
+      new: 'New',
       like_new: 'Like new',
       excellent: 'Excellent',
       good: 'Good',
