@@ -301,3 +301,4 @@ Both count as database queries, but RPC calls may be more expensive.
 **Potential Total Reduction**: 5-6 queries → **2-3 queries** (happy path)
 
 
+

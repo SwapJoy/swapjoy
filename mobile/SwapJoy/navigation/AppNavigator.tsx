@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../types/navigation';
 import { useAuth } from '../contexts/AuthContext';
 import { ApiService } from '../services/api';
+import { hasCompletedIntro } from '../utils/introStorage';
 import IntroScreen from '../screens/IntroScreen';
 import PhoneSignInScreen from '../screens/PhoneSignInScreen';
 import EmailSignInScreen from '../screens/EmailSignInScreen';
@@ -47,14 +48,24 @@ interface AppNavigatorProps {
 }
 
 const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((props, ref) => {
-  const { isAuthenticated, isLoading, user } = useAuth();
+  const { isAuthenticated, isLoading, user, isAnonymous } = useAuth();
   const [hasUsername, setHasUsername] = useState<boolean | null>(null);
   const [checkingUsername, setCheckingUsername] = useState(false);
+  const [introCompleted, setIntroCompleted] = useState<boolean | null>(null);
 
-  // Check if user has username when authenticated
+  // Check intro completion status
+  useEffect(() => {
+    const checkIntroStatus = async () => {
+      const completed = await hasCompletedIntro();
+      setIntroCompleted(completed);
+    };
+    checkIntroStatus();
+  }, []);
+
+  // Check if user has username when authenticated (skip for anonymous users)
   useEffect(() => {
     const checkUsernameStatus = async () => {
-      if (!isAuthenticated || !user) {
+      if (!isAuthenticated || !user || isAnonymous) {
         setHasUsername(null);
         return;
       }
@@ -77,13 +88,13 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
       }
     };
 
-    if (isAuthenticated && !isLoading) {
+    if (isAuthenticated && !isLoading && !isAnonymous) {
       checkUsernameStatus();
     }
-  }, [isAuthenticated, user, isLoading]);
+  }, [isAuthenticated, user, isLoading, isAnonymous]);
 
-  // Show loading screen while checking authentication or username
-  if (isLoading || (isAuthenticated && checkingUsername)) {
+  // Show loading screen while checking authentication, intro status, or username
+  if (isLoading || introCompleted === null || (isAuthenticated && !isAnonymous && checkingUsername)) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
         <ActivityIndicator size="large" color="#007AFF" />
@@ -93,13 +104,17 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
 
   // Determine initial route
   const getInitialRoute = (): keyof RootStackParamList => {
-    if (!isAuthenticated) {
+    // Show intro if not completed
+    if (!introCompleted) {
       return 'Intro';
     }
-    // If user doesn't have a username, show onboarding
-    if (hasUsername === false) {
+    
+    // If authenticated but not anonymous and doesn't have username, show onboarding
+    if (isAuthenticated && !isAnonymous && hasUsername === false) {
       return 'OnboardingUsername';
     }
+    
+    // Allow access to MainTabs for both authenticated and anonymous users
     return 'MainTabs';
   };
 
@@ -169,11 +184,67 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
           },
         }}
       >
-        {isAuthenticated ? (
-          // Authenticated screens
+        {/* Intro screen - always available (shown if not completed) */}
+        <Stack.Screen 
+          name="Intro" 
+          component={IntroScreen}
+          options={{ headerShown: false }}
+        />
+        
+        {/* Auth screens - always available (for sign-in modal navigation) */}
+        <Stack.Screen 
+          name="PhoneSignIn" 
+          component={PhoneSignInScreen}
+          options={{ title: 'Sign In' }}
+        />
+        <Stack.Screen 
+          name="EmailSignIn" 
+          component={EmailSignInScreen}
+          options={{ 
+            title: 'Sign In',
+            animationEnabled: false,
+            transitionSpec: {
+              open: { animation: 'timing', config: { duration: 0 } },
+              close: { animation: 'timing', config: { duration: 0 } },
+            },
+          }}
+        />
+        <Stack.Screen 
+          name="EmailSignUp" 
+          component={EmailSignUpScreen}
+          options={{ title: 'Sign Up' }}
+        />
+        <Stack.Screen 
+          name="EmailVerification" 
+          component={EmailVerificationScreen}
+          options={{ title: 'Verify Email' }}
+        />
+        <Stack.Screen 
+          name="OTPVerification" 
+          component={OTPVerificationScreen}
+          options={{ title: 'Verify Phone' }}
+        />
+        
+        {/* Screens accessible to both authenticated and anonymous users */}
+        <Stack.Screen 
+          name="MainTabs" 
+          component={MainPageContainer} 
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="ItemDetails" 
+          component={ItemDetailsScreen}
+          options={{ 
+            title: 'Item Details',
+            headerBackTitleVisible: false,
+          }}
+        />
+        
+        {/* Authenticated-only screens */}
+        {isAuthenticated && (
           <>
             {/* Onboarding screens */}
-            {hasUsername === false && (
+            {!isAnonymous && hasUsername === false && (
               <>
                 <Stack.Screen 
                   name="OnboardingUsername" 
@@ -207,11 +278,6 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
                 />
               </>
             )}
-            <Stack.Screen 
-              name="MainTabs" 
-              component={MainPageContainer} 
-              options={{ headerShown: false }}
-            />
             <Stack.Screen 
               name="CreateListing" 
               component={CreateListingScreen}
@@ -262,14 +328,6 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
               options={{ 
                 title: 'Preview',
                 headerShown: false,
-              }}
-            />
-            <Stack.Screen 
-              name="ItemDetails" 
-              component={ItemDetailsScreen}
-              options={{ 
-                title: 'Item Details',
-                headerBackTitleVisible: false,
               }}
             />
             <Stack.Screen
@@ -364,40 +422,6 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
               name="SuggestionDetails" 
               component={SuggestionDetailsScreen}
               options={{ title: 'Suggestion Details' }}
-            />
-          </>
-        ) : (
-          // Unauthenticated screens
-          <>
-            <Stack.Screen 
-              name="Intro" 
-                  component={IntroScreen}
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen 
-              name="PhoneSignIn" 
-              component={PhoneSignInScreen}
-              options={{ title: 'Sign In' }}
-            />
-            <Stack.Screen 
-              name="EmailSignIn" 
-              component={EmailSignInScreen}
-              options={{ title: 'Sign In' }}
-            />
-            <Stack.Screen 
-              name="EmailSignUp" 
-              component={EmailSignUpScreen}
-              options={{ title: 'Sign Up' }}
-            />
-            <Stack.Screen 
-              name="EmailVerification" 
-              component={EmailVerificationScreen}
-              options={{ title: 'Verify Email' }}
-            />
-            <Stack.Screen 
-              name="OTPVerification" 
-              component={OTPVerificationScreen}
-              options={{ title: 'Verify Phone' }}
             />
           </>
         )}

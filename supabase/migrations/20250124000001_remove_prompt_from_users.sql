@@ -14,3 +14,4 @@ DROP FUNCTION IF EXISTS match_items_to_user_prompt(UUID, INT);
 COMMENT ON TABLE users IS 'User profiles - prompt and prompt_embedding columns removed as of 2025-01-24';
 
 
+

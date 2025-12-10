@@ -12,16 +12,22 @@ import { IntroScreenProps } from '../types/navigation';
 import { useLocalization } from '../localization';
 import { LanguageSelector } from '../components/LanguageSelector';
 import SJText from '../components/SJText';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get('window');
+
+const INTRO_COMPLETED_KEY = 'intro_completed';
 
 const IntroScreen: React.FC<IntroScreenProps> = ({ navigation }) => {
   const { slides, activeSlide, handleSlideChange, handleGetStarted } = useAppIntro();
   const { t, language, setLanguage } = useLocalization();
 
-  const handleGetStartedPress = () => {
-    navigation.navigate('EmailSignIn');
+  const handleGetStartedPress = async () => {
+    // Mark intro as completed
+    await AsyncStorage.setItem(INTRO_COMPLETED_KEY, 'true');
     handleGetStarted();
+    // Navigate to MainTabs instead of EmailSignIn
+    navigation.navigate('MainTabs');
   };
 
   const handleLanguageSelect = useCallback(

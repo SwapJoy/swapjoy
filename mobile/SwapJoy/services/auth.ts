@@ -723,6 +723,40 @@ export class AuthService {
     }
   }
 
+  // Anonymous sign in
+  static async signInAnonymously(): Promise<AuthResponse> {
+    try {
+      console.log('[AuthService] Signing in anonymously...');
+      const { data, error } = await supabase.auth.signInAnonymously();
+
+      if (error) {
+        console.error('[AuthService] Anonymous sign-in error:', error.message);
+        return { user: null, session: null, error: error.message };
+      }
+
+      if (!data.session || !data.user) {
+        console.error('[AuthService] No session or user returned from anonymous sign-in');
+        return { user: null, session: null, error: 'Anonymous sign-in failed: no session returned' };
+      }
+
+      const session: AuthSession = {
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+        expires_at: data.session.expires_at || 0,
+        expires_in: data.session.expires_in || 3600,
+        token_type: data.session.token_type || 'bearer',
+        user: data.user as User,
+      };
+
+      await this.storeSession(session);
+      console.log('[AuthService] Anonymous sign-in successful');
+      return { user: data.user as User, session, error: null };
+    } catch (error: any) {
+      console.error('[AuthService] Exception during anonymous sign-in:', error);
+      return { user: null, session: null, error: error.message || 'Failed to sign in anonymously' };
+    }
+  }
+
   // Send email OTP
   static async sendEmailOTP(email: string): Promise<string | null> {
     try {

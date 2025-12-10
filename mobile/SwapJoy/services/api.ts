@@ -50,12 +50,32 @@ export class ApiService {
       const session = await AuthService.ensureValidToken();
       
       if (!session?.access_token) {
-        console.warn('[ApiService] No valid session found - user needs to sign in');
-        // Notify AuthContext that session has expired so user gets redirected to sign in
-        AuthService.notifySessionExpired().catch((err) => {
-          console.error('[ApiService] Error notifying session expired:', err);
-        });
-        throw new Error('No access token available. Please sign in.');
+        console.warn('[ApiService] No valid session found - attempting anonymous sign-in');
+        // Try to sign in anonymously if no session exists
+        try {
+          const { user: anonUser, session: anonSession, error } = await AuthService.signInAnonymously();
+          if (anonUser && anonSession && !error) {
+            console.log('[ApiService] Anonymous sign-in successful, using anonymous session');
+            // Set anonymous session on Supabase client
+            const { error: setSessionError } = await supabase.auth.setSession({
+              access_token: anonSession.access_token,
+              refresh_token: anonSession.refresh_token,
+            });
+            if (setSessionError) {
+              console.warn('[ApiService] Error setting anonymous session:', setSessionError.message);
+            }
+            this.isAuthReady = true;
+            return supabase;
+          }
+        } catch (anonError) {
+          console.error('[ApiService] Failed to sign in anonymously:', anonError);
+        }
+        
+        // If anonymous sign-in fails, still allow the client to be used
+        // RLS policies will handle access control
+        console.warn('[ApiService] No session available - using unauthenticated client (RLS will handle access)');
+        this.isAuthReady = true;
+        return supabase;
       }
 
       // Session is guaranteed to be valid at this point (ensureValidToken handles refresh)

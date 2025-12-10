@@ -1,6 +1,7 @@
 import React from 'react';
 import { TouchableOpacity } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { useNavigation } from '@react-navigation/native';
 import { MainTabParamList } from '../types/navigation';
 import { Ionicons } from '@expo/vector-icons';
 import ExploreScreen from '../screens/ExploreScreen';
@@ -10,6 +11,7 @@ import NotificationsScreen from '../screens/NotificationsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import { styles, colors } from './MainTabNavigator.styles';
 import { useNotifications } from '../contexts/NotificationsContext';
+import { useAuth } from '../contexts/AuthContext';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
@@ -19,26 +21,49 @@ interface MainTabNavigatorProps {
 
 const MainTabNavigator: React.FC<MainTabNavigatorProps> = ({ onNavigateToAdd }) => {
   const { unreadCount, totalUnreadChats } = useNotifications();
+  const { isAuthenticated, isAnonymous } = useAuth();
+  const navigation = useNavigation<any>();
+
+  const navigateToSignIn = () => {
+    navigation.navigate('EmailSignIn');
+  };
+
+  const handleTabPress = (tabName: string) => {
+    // Allow access to Explore tab (SwapJoy) for everyone
+    if (tabName === 'SwapJoy') {
+      return true;
+    }
+
+    // Check if user is authenticated (not anonymous)
+    if (!isAuthenticated || isAnonymous) {
+      navigateToSignIn();
+      return false; // Prevent navigation
+    }
+
+    return true; // Allow navigation
+  };
 
   return (
     <Tab.Navigator
-      screenOptions={({ route, navigation }) => ({
-        headerShown: true,
-        headerStyle: styles.headerStyle,
-        headerTitleStyle: styles.headerTitleStyle,
-        headerTitleAlign: 'center',
-        headerLeft: () => (
-          <TouchableOpacity
-            style={styles.headerButtonContainer}
-            onPress={() => {
-              if (onNavigateToAdd) {
-                onNavigateToAdd();
-              }
-            }}
-          >
-            <Ionicons name="add" size={24} color={colors.primary} />
-          </TouchableOpacity>
-        ),
+        screenOptions={({ route, navigation }) => ({
+          headerShown: true,
+          headerStyle: styles.headerStyle,
+          headerTitleStyle: styles.headerTitleStyle,
+          headerTitleAlign: 'center',
+          headerLeft: () => (
+            <TouchableOpacity
+              style={styles.headerButtonContainer}
+              onPress={() => {
+                if (!isAuthenticated || isAnonymous) {
+                  navigateToSignIn();
+                } else if (onNavigateToAdd) {
+                  onNavigateToAdd();
+                }
+              }}
+            >
+              <Ionicons name="add" size={24} color={colors.primary} />
+            </TouchableOpacity>
+          ),
         headerRight: () => {
           const isProfile = route.name === 'Profile';
           if (!isProfile) return null; // remove search from top bar for non-profile
@@ -75,6 +100,13 @@ const MainTabNavigator: React.FC<MainTabNavigatorProps> = ({ onNavigateToAdd }) 
       <Tab.Screen
         name="Offers"
         component={OffersScreen}
+        listeners={{
+          tabPress: (e) => {
+            if (!handleTabPress('Offers')) {
+              e.preventDefault();
+            }
+          },
+        }}
         options={{
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons 
@@ -88,6 +120,13 @@ const MainTabNavigator: React.FC<MainTabNavigatorProps> = ({ onNavigateToAdd }) 
       <Tab.Screen
         name="Chats"
         component={ChatListScreen}
+        listeners={{
+          tabPress: (e) => {
+            if (!handleTabPress('Chats')) {
+              e.preventDefault();
+            }
+          },
+        }}
         options={{
           tabBarBadge: totalUnreadChats > 0 ? (totalUnreadChats > 99 ? '99+' : totalUnreadChats) : undefined,
           tabBarIcon: ({ color, size, focused }) => (
@@ -102,6 +141,13 @@ const MainTabNavigator: React.FC<MainTabNavigatorProps> = ({ onNavigateToAdd }) 
       <Tab.Screen
         name="Notifications"
         component={NotificationsScreen}
+        listeners={{
+          tabPress: (e) => {
+            if (!handleTabPress('Notifications')) {
+              e.preventDefault();
+            }
+          },
+        }}
         options={{
           tabBarBadge: unreadCount > 0 ? (unreadCount > 99 ? '99+' : unreadCount) : undefined,
           tabBarIcon: ({ color, size, focused }) => (
@@ -116,6 +162,13 @@ const MainTabNavigator: React.FC<MainTabNavigatorProps> = ({ onNavigateToAdd }) 
       <Tab.Screen
         name="Profile"
         component={ProfileScreen}
+        listeners={{
+          tabPress: (e) => {
+            if (!handleTabPress('Profile')) {
+              e.preventDefault();
+            }
+          },
+        }}
         options={{
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons 

@@ -8,9 +8,11 @@ interface AuthContextType extends AuthState {
   signInWithEmail: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   signUpWithEmail: (email: string, password: string, userData: { username: string; first_name: string; last_name: string }) => Promise<{ success: boolean; error?: string; session?: AuthSession | null }>;
   signInWithGoogle: () => Promise<{ success: boolean; error?: string }>;
+  signInAnonymously: () => Promise<{ success: boolean; error?: string }>;
   signOut: () => Promise<void>;
   refreshSession: () => Promise<void>;
   isAuthenticated: boolean;
+  isAnonymous: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -27,6 +29,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const hasStoredSessionRef = useRef(false); // Track if we've initialized from stored session
 
   const isAuthenticated = !!user && !!session;
+  // Check if user is anonymous (has no email, phone, or is_anonymous flag)
+  const isAnonymous = !!user && !!session && (!user.email && !user.phone && (user as any).is_anonymous !== false);
 
   // Initialize auth state on app start
   useEffect(() => {
@@ -39,20 +43,50 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setSession(currentSession);
           hasStoredSessionRef.current = true; // Mark that we have a stored session
           // Ensure user row exists (handles cases where Google sign-in happened previously)
-          try {
-            // Lightweight check that also recreates row if missing
-            const { AuthService } = require('../services/auth');
-            AuthService.ensureUserRecord().catch((err: any) => {
-              console.warn('[AuthContext] ensureUserRecord on init failed', err?.message || err);
-            });
-          } catch {}
+          // Skip for anonymous users - they don't need a user record
+          const isAnonymousUser = !currentSession.user.email && !currentSession.user.phone;
+          if (!isAnonymousUser) {
+            try {
+              // Lightweight check that also recreates row if missing
+              const { AuthService } = require('../services/auth');
+              AuthService.ensureUserRecord().catch((err: any) => {
+                console.warn('[AuthContext] ensureUserRecord on init failed', err?.message || err);
+              });
+            } catch {}
+          }
         } else {
-          console.log('[AuthContext] No stored session found on startup');
+          console.log('[AuthContext] No stored session found on startup - signing in anonymously');
           hasStoredSessionRef.current = false;
+          // Auto-sign-in anonymously if no session exists
+          try {
+            const { user: anonUser, session: anonSession, error } = await AuthService.signInAnonymously();
+            if (anonUser && anonSession && !error) {
+              console.log('[AuthContext] Anonymous sign-in successful');
+              setUser(anonUser);
+              setSession(anonSession);
+              hasStoredSessionRef.current = true;
+            } else {
+              console.warn('[AuthContext] Failed to sign in anonymously:', error);
+            }
+          } catch (error) {
+            console.error('[AuthContext] Error during anonymous sign-in:', error);
+          }
         }
       } catch (error) {
         console.error('Error initializing auth:', error);
         hasStoredSessionRef.current = false;
+        // Try anonymous sign-in as fallback
+        try {
+          const { user: anonUser, session: anonSession, error } = await AuthService.signInAnonymously();
+          if (anonUser && anonSession && !error) {
+            console.log('[AuthContext] Anonymous sign-in successful (fallback)');
+            setUser(anonUser);
+            setSession(anonSession);
+            hasStoredSessionRef.current = true;
+          }
+        } catch (anonError) {
+          console.error('[AuthContext] Error during anonymous sign-in fallback:', anonError);
+        }
       } finally {
         setIsLoading(false);
       }
@@ -227,6 +261,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const signInAnonymously = async () => {
+    try {
+      setIsLoading(true);
+      const { user: anonUser, session: anonSession, error } = await AuthService.signInAnonymously();
+      
+      if (error) {
+        return { success: false, error };
+      }
+
+      if (anonUser && anonSession) {
+        setUser(anonUser);
+        setSession(anonSession);
+        return { success: true };
+      }
+
+      return { success: false, error: 'Anonymous sign-in failed' };
+    } catch (error: any) {
+      return { success: false, error: error.message || 'Failed to sign in anonymously' };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const signInWithGoogle = async () => {
     // Track if user was signed in before starting Google sign-in
     const wasSignedInBefore = !!user;
@@ -279,11 +336,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       if (newUser && newSession) {
         console.log('[AuthContext] Setting user and session after Google sign-in');
+        console.log('[AuthContext] Supabase automatically links anonymous identity to real user');
         setUser(newUser);
         setSession(newSession);
         console.log('[AuthContext] State set; registering device listeners');
         
         // Register device for push notifications
+        // Supabase automatically links anonymous identity to real user when signing in
+        // No additional user creation needed - Supabase handles the conversion
         await registerDeviceAndSetupListeners(newUser.id);
         console.log('[AuthContext] Device registration done');
         
@@ -368,10 +428,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     session,
     isLoading,
     isAuthenticated,
+    isAnonymous,
     signIn,
     signInWithEmail,
     signUpWithEmail,
     signInWithGoogle,
+    signInAnonymously,
     signOut,
     refreshSession,
   };

@@ -26,3 +26,4 @@ console.log('\n=== First 500 chars of Batch 1 ===');
 console.log(batches[0].sql.substring(0, 500));
 
 
+

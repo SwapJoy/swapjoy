@@ -13,7 +13,7 @@ import FavoriteToggleButton from '../components/FavoriteToggleButton';
 const { width } = Dimensions.get('window');
 
 const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route }) => {
-  const { user } = useAuth();
+  const { user, isAuthenticated, isAnonymous } = useAuth();
   const { language, t } = useLocalization();
   const strings = useMemo(
     () => ({
@@ -79,9 +79,12 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
   }, [itemId, language, strings]);
 
   const showOffer = useMemo(() => {
-    if (!item?.user?.id || !user?.id) return false;
+    if (!item?.user?.id) return false;
+    // Show offer button if user is authenticated and not the owner, or if anonymous user
+    if (!isAuthenticated || isAnonymous) return true;
+    if (!user?.id) return false;
     return item.user.id !== user.id;
-  }, [item?.user?.id, user?.id]);
+  }, [item?.user?.id, user?.id, isAuthenticated, isAnonymous]);
 
   if (loading) {
     return (
@@ -181,6 +184,12 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
           <TouchableOpacity
             style={styles.offerButton}
             onPress={() => {
+              // Check if user is authenticated (not anonymous)
+              if (!isAuthenticated || isAnonymous) {
+                (navigation as any).navigate('EmailSignIn');
+                return;
+              }
+              // Navigate to offer creation
               (navigation as any).navigate('OfferCreate', {
                 receiverId: item.user.id,
                 requestedItems: [
