@@ -169,3 +169,4 @@ If you already have Gmail SMTP configured:
 
 **Recommendation**: Use SendGrid for production. It's free, secure, and designed for transactional emails like OTP codes.
 
+

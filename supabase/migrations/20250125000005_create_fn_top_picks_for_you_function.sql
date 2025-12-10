@@ -176,3 +176,4 @@ $$;
 
 COMMENT ON FUNCTION public.fn_top_picks_for_you IS 'Returns AI-powered item recommendations based on vector similarity to user''s items';
 
+

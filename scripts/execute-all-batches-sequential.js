@@ -22,3 +22,4 @@ batches.forEach(b => {
   console.log(`  Batch ${b.num}: /tmp/categories_batch_${b.num}.sql (${b.sql.length} chars)`);
 });
 
+

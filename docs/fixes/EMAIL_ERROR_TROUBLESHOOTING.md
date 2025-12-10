@@ -97,3 +97,4 @@ The issue might be that Supabase is trying to send confirmation email during sig
 
 Let me update the code to handle this better.
 
+

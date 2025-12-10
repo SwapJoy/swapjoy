@@ -82,3 +82,4 @@ User clicks "Resend" → useEmailVerification.handleResendOTP()
 
 **Bottom line:** Supabase handles all email sending. Our code just tells Supabase when to send emails.
 
+

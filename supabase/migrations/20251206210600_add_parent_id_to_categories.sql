@@ -11,3 +11,4 @@ CREATE INDEX IF NOT EXISTS idx_categories_parent_id ON public.categories(parent_
 
 COMMIT;
 
+

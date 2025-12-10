@@ -231,6 +231,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   card: {
+    borderRadius: 4,
   },
 });
 

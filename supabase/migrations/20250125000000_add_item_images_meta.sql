@@ -5,3 +5,4 @@ ADD COLUMN IF NOT EXISTS meta JSONB DEFAULT NULL;
 -- Add GIN index for efficient querying of meta data
 CREATE INDEX IF NOT EXISTS idx_item_images_meta ON item_images USING gin (meta);
 
+

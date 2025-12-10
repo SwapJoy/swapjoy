@@ -206,3 +206,4 @@ If you've tried everything above:
 
 Share the exact error message from Supabase logs, and I can help debug further!
 
+

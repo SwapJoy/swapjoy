@@ -220,3 +220,4 @@ Based on timeout + no email:
 
 What do you see in the Supabase Auth Logs? That will tell us exactly what's failing.
 
+

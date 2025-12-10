@@ -139,3 +139,4 @@ $$;
 
 COMMENT ON FUNCTION public.fn_budget_picks IS 'Returns budget-friendly items priced below median/percentile price for each category';
 
+

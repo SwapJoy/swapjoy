@@ -145,3 +145,4 @@ Try signing up with a different email address:
 4. ✅ Try signup again and check logs
 5. ✅ If email still doesn't arrive, check spam folder
 
+
