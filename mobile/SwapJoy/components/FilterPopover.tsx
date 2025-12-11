@@ -11,7 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import SJText from './SJText';
@@ -315,7 +315,7 @@ const DistanceSection: React.FC<DistanceSectionProps> = ({ selectedDistance, onS
 );
 
 // ============================================================================
-// City Suggestions Component
+// City Suggestions Component – onPressOut hack
 // ============================================================================
 
 interface CitySuggestionsProps {
@@ -324,30 +324,25 @@ interface CitySuggestionsProps {
 }
 
 const CitySuggestions: React.FC<CitySuggestionsProps> = ({ cities, onSelectCity }) => (
-  <View style={styles.citySuggestionsContainer} pointerEvents="auto">
-    <ScrollView 
-      style={styles.citySuggestionsList} 
-      nestedScrollEnabled 
-      keyboardShouldPersistTaps="handled"
-    >
-      {cities.slice(0, 5).map((city) => (
-        <TouchableOpacity 
-          key={city.id} 
-          style={styles.citySuggestionItem} 
-          onPress={() => onSelectCity(city)}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="location" size={16} color="#64748b" />
-          <View style={styles.citySuggestionText}>
-            <SJText style={styles.citySuggestionName}>{city.name}</SJText>
-            <SJText style={styles.citySuggestionCountry}>
-              {city.state_province ? `${city.state_province}, ` : ''}
-              {city.country}
-            </SJText>
-          </View>
-        </TouchableOpacity>
-      ))}
-    </ScrollView>
+  <View style={styles.citySuggestionsContainer}>
+    {cities.slice(0, 5).map((city) => (
+      <TouchableOpacity
+        key={city.id}
+        style={styles.citySuggestionItem}
+        // ⬇️ Use onPressOut so first tap still selects even if keyboard blurs
+        onPressOut={() => onSelectCity(city)}
+        activeOpacity={0.7}
+      >
+        <Ionicons name="location" size={16} color="#64748b" />
+        <View style={styles.citySuggestionText}>
+          <SJText style={styles.citySuggestionName}>{city.name}</SJText>
+          <SJText style={styles.citySuggestionCountry}>
+            {city.state_province ? `${city.state_province}, ` : ''}
+            {city.country}
+          </SJText>
+        </View>
+      </TouchableOpacity>
+    ))}
   </View>
 );
 
@@ -409,7 +404,7 @@ const LocationInput: React.FC<LocationInputProps> = ({
 );
 
 // ============================================================================
-// Location Map Component (UPDATED)
+// Location Map Component (safe for ScrollView)
 // ============================================================================
 
 interface LocationMapProps {
@@ -419,18 +414,10 @@ interface LocationMapProps {
 }
 
 const LocationMap: React.FC<LocationMapProps> = ({ location, cityName, t }) => {
-  const [shouldRenderMap, setShouldRenderMap] = useState(false);
+  const mapRef = useRef<MapView | null>(null);
+  const isAndroid = Platform.OS === 'android';
 
-  // Small delay so the modal animation/layout can settle before MapView mounts
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      setShouldRenderMap(true);
-    }, 120); // tweak if you want, but keep it > 0
-
-    return () => clearTimeout(timeout);
-  }, []);
-
-  const initialRegion = useMemo<Region>(() => {
+  const targetRegion = useMemo<Region>(() => {
     if (location) {
       return {
         latitude: location.lat,
@@ -442,52 +429,40 @@ const LocationMap: React.FC<LocationMapProps> = ({ location, cityName, t }) => {
     return DEFAULT_REGION;
   }, [location]);
 
-  const mapKey = useMemo(
-    () =>
-      location
-        ? `map-${location.lat.toFixed(4)}-${location.lng.toFixed(4)}`
-        : 'map-default',
-    [location]
-  );
+  useEffect(() => {
+    if (mapRef.current && location) {
+      mapRef.current.animateToRegion(targetRegion, 300);
+    }
+  }, [location, targetRegion]);
 
   return (
-    <View style={styles.mapContainer}>
-      {shouldRenderMap ? (
-        <MapView
-          key={mapKey}
-          style={styles.map}
-          provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
-          initialRegion={initialRegion}
-          // ⚠️ No `region` prop → uncontrolled map
-          scrollEnabled={false}
-          zoomEnabled={false}
-          pitchEnabled={false}
-          rotateEnabled={false}
-          minZoomLevel={8}
-          maxZoomLevel={18}
-        >
-          {location && (
-            <Marker
-              coordinate={{ latitude: location.lat, longitude: location.lng }}
-              title={
-                cityName ||
-                t('search.currentLocation', { defaultValue: 'Current location' })
-              }
-              pinColor={cityName ? '#ef4444' : '#0ea5e9'}
-            />
-          )}
-        </MapView>
-      ) : (
-        <View style={styles.mapPlaceholder}>
-          <Ionicons name="map" size={20} color="#94a3b8" />
-          <SJText style={styles.mapPlaceholderText}>
-            {t('search.loadingMap', { defaultValue: 'Loading map...' })}
-          </SJText>
-        </View>
-      )}
+    <View style={styles.mapContainer} pointerEvents="none">
+      <MapView
+        ref={mapRef}
+        style={styles.map}
+        provider={isAndroid ? PROVIDER_GOOGLE : undefined}
+        initialRegion={targetRegion}
+        liteMode={isAndroid}
+        scrollEnabled={false}
+        zoomEnabled={false}
+        pitchEnabled={false}
+        rotateEnabled={false}
+      >
+        {location && (
+          <Marker
+            coordinate={{ latitude: location.lat, longitude: location.lng }}
+            title={
+              cityName ||
+              t('search.currentLocation', { defaultValue: 'Current location' })
+            }
+            pinColor={cityName ? '#ef4444' : '#0ea5e9'}
+          />
+        )}
+      </MapView>
     </View>
   );
 };
+
 // ============================================================================
 // Footer Component
 // ============================================================================
@@ -546,12 +521,10 @@ const FilterPopover: React.FC<FilterPopoverProps> = ({
   const [localFilters, setLocalFilters] = useState<FilterState>(filters);
   const [locationInputValue, setLocationInputValue] = useState<string>('');
   const [showCitySuggestions, setShowCitySuggestions] = useState(false);
-  
-  // Sync local filters and location input when modal opens or filters/manualLocation change
+
   useEffect(() => {
     if (visible) {
       setLocalFilters(filters);
-      // Sync location input from manualLocation
       if (manualLocation?.cityName) {
         const city = cities.find((c) => c.id === manualLocation.cityId);
         setLocationInputValue(
@@ -563,8 +536,6 @@ const FilterPopover: React.FC<FilterPopoverProps> = ({
     }
   }, [visible, filters, manualLocation, cities]);
 
-
-  // Filter cities based on input
   const filteredCities = useMemo(() => {
     if (locationInputValue.trim().length === 0) return [];
     return filterCitiesByName(locationInputValue);
@@ -594,6 +565,8 @@ const FilterPopover: React.FC<FilterPopoverProps> = ({
         cityId: city.id,
         cityName: city.name,
       });
+      // keyboard stays open – if you want to close it:
+      // Keyboard.dismiss();
     },
     [setManualLocation]
   );
@@ -612,11 +585,12 @@ const FilterPopover: React.FC<FilterPopoverProps> = ({
     const updatedFilters: FilterState = {
       ...localFilters,
       location: manualLocation?.cityName
-        ? `${manualLocation.cityName}, ${cities.find((c) => c.id === manualLocation.cityId)?.country || ''
+        ? `${manualLocation.cityName}, ${
+            cities.find((c) => c.id === manualLocation.cityId)?.country || ''
           }`.replace(/,\s*$/, '')
         : selectedLocation
-          ? t('search.currentLocation', { defaultValue: 'Current location' })
-          : null,
+        ? t('search.currentLocation', { defaultValue: 'Current location' })
+        : null,
       locationLat: loc ? loc.lat : null,
       locationLng: loc ? loc.lng : null,
       locationCityId: manualLocation?.cityId || null,
@@ -668,115 +642,113 @@ const FilterPopover: React.FC<FilterPopoverProps> = ({
           <View style={styles.popoverContainer}>
             <FilterPopoverHeader onClose={onClose} t={t} />
 
-            {/* ScrollView for form content - MapView is inside but now uncontrolled */}
             <View style={styles.scrollWrapper}>
-            <ScrollView
-              style={styles.content}
-              contentContainerStyle={styles.contentContainer}
-              showsVerticalScrollIndicator
-              nestedScrollEnabled
-              removeClippedSubviews={false} // helps avoid MapView clipping / crashes in ScrollView
-            >
-              {/* Price Range */}
-              <View style={styles.section}>
-                <SJText style={styles.sectionTitle}>
-                  {t('search.priceRange', { defaultValue: 'Price Range' })}
-                </SJText>
-                <PriceRangeSlider
-                  minValue={localFilters.priceMin}
-                  maxValue={localFilters.priceMax}
-                  onMinChange={(value) =>
+              <ScrollView
+                style={styles.content}
+                contentContainerStyle={styles.contentContainer}
+                showsVerticalScrollIndicator
+                nestedScrollEnabled
+                keyboardShouldPersistTaps="always"
+                keyboardDismissMode="none"
+                removeClippedSubviews={false}
+              >
+                {/* Price Range */}
+                <View style={styles.section}>
+                  <SJText style={styles.sectionTitle}>
+                    {t('search.priceRange', { defaultValue: 'Price Range' })}
+                  </SJText>
+                  <PriceRangeSlider
+                    minValue={localFilters.priceMin}
+                    maxValue={localFilters.priceMax}
+                    onMinChange={(value) =>
+                      setLocalFilters((prev) => ({
+                        ...prev,
+                        priceMin: Math.min(value, prev.priceMax - 100),
+                      }))
+                    }
+                    onMaxChange={(value) =>
+                      setLocalFilters((prev) => ({
+                        ...prev,
+                        priceMax: Math.max(value, prev.priceMin + 100),
+                      }))
+                    }
+                    t={t}
+                  />
+                </View>
+
+                {/* Categories */}
+                <CategorySection
+                  categories={categories}
+                  selectedCategories={localFilters.categories}
+                  onToggleCategory={(id) =>
                     setLocalFilters((prev) => ({
                       ...prev,
-                      priceMin: Math.min(value, prev.priceMax - 100),
+                      categories: prev.categories.includes(id)
+                        ? prev.categories.filter((cid) => cid !== id)
+                        : [...prev.categories, id],
                     }))
                   }
-                  onMaxChange={(value) =>
+                  onSelectAll={() =>
                     setLocalFilters((prev) => ({
                       ...prev,
-                      priceMax: Math.max(value, prev.priceMin + 100),
+                      categories: categories.map((c) => c.id),
+                    }))
+                  }
+                  onClearAll={() =>
+                    setLocalFilters((prev) => ({ ...prev, categories: [] }))
+                  }
+                  loading={categoriesLoading}
+                  t={t}
+                />
+
+                {/* Distance */}
+                <DistanceSection
+                  selectedDistance={localFilters.distance}
+                  onSelectDistance={(distance) =>
+                    setLocalFilters((prev) => ({
+                      ...prev,
+                      distance: prev.distance === distance ? null : distance,
                     }))
                   }
                   t={t}
                 />
-              </View>
 
-              {/* Categories */}
-              <CategorySection
-                categories={categories}
-                selectedCategories={localFilters.categories}
-                onToggleCategory={(id) =>
-                  setLocalFilters((prev) => ({
-                    ...prev,
-                    categories: prev.categories.includes(id)
-                      ? prev.categories.filter((cid) => cid !== id)
-                      : [...prev.categories, id],
-                  }))
-                }
-                onSelectAll={() =>
-                  setLocalFilters((prev) => ({
-                    ...prev,
-                    categories: categories.map((c) => c.id),
-                  }))
-                }
-                onClearAll={() =>
-                  setLocalFilters((prev) => ({ ...prev, categories: [] }))
-                }
-                loading={categoriesLoading}
-                t={t}
-              />
+                {/* Location */}
+                <View style={styles.section}>
+                  <SJText style={styles.sectionTitle}>
+                    {t('search.location', { defaultValue: 'Location' })}
+                  </SJText>
+                  <LocationInput
+                    value={locationInputValue}
+                    onChangeText={handleLocationInputChange}
+                    onFocus={() => {
+                      if (selectedLocation && !manualLocation && !locationInputValue.trim()) {
+                        setLocationInputValue('');
+                      }
+                      if (locationInputValue.trim().length > 0) {
+                        setShowCitySuggestions(true);
+                      }
+                    }}
+                    // ⬇️ no-op: we hide suggestions only on clear / select
+                    onBlur={() => {}}
+                    onUseCurrentLocation={handleUseCurrentLocation}
+                    placeholder={locationPlaceholder}
+                    hasCurrentLocation={!!currentLocation}
+                    showSuggestions={showCitySuggestions}
+                    suggestions={filteredCities}
+                    onSelectCity={handleCitySelect}
+                    t={t}
+                  />
 
-              {/* Distance */}
-              <DistanceSection
-                selectedDistance={localFilters.distance}
-                onSelectDistance={(distance) =>
-                  setLocalFilters((prev) => ({
-                    ...prev,
-                    distance: prev.distance === distance ? null : distance,
-                  }))
-                }
-                t={t}
-              />
+                  <LocationMap
+                    location={mapLocation}
+                    cityName={manualLocation?.cityName}
+                    t={t}
+                  />
+                </View>
+              </ScrollView>
+            </View>
 
-              {/* Location */}
-              <View style={styles.section}>
-                <SJText style={styles.sectionTitle}>
-                  {t('search.location', { defaultValue: 'Location' })}
-                </SJText>
-                <LocationInput
-                  value={locationInputValue}
-                  onChangeText={handleLocationInputChange}
-                  onFocus={() => {
-                    if (selectedLocation && !manualLocation && !locationInputValue.trim()) {
-                      setLocationInputValue('');
-                    }
-                    if (locationInputValue.trim().length > 0) {
-                      setShowCitySuggestions(true);
-                    }
-                  }}
-                  onBlur={() => {
-                    setTimeout(() => setShowCitySuggestions(false), 250);
-                  }}
-                  onUseCurrentLocation={handleUseCurrentLocation}
-                  placeholder={locationPlaceholder}
-                  hasCurrentLocation={!!currentLocation}
-                  showSuggestions={showCitySuggestions}
-                  suggestions={filteredCities}
-                  onSelectCity={handleCitySelect}
-                  t={t}
-                />
-              </View>
-            </ScrollView>
-          </View>
-
-          {/* Map - OUTSIDE ScrollView to prevent crashes */}
-          <LocationMap
-            location={mapLocation}
-            cityName={manualLocation?.cityName}
-            t={t}
-          />
-
-          {/* Footer */}
             <FilterPopoverFooter
               onClearAll={handleClearAll}
               onApply={handleApply}
@@ -1006,9 +978,6 @@ const styles = StyleSheet.create({
     maxHeight: 200,
     zIndex: 2000,
   },
-  citySuggestionsList: {
-    maxHeight: 200,
-  },
   citySuggestionItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1033,7 +1002,7 @@ const styles = StyleSheet.create({
   },
   mapContainer: {
     marginTop: 12,
-    height: 200, // Static height
+    height: 200,
     borderRadius: 12,
     overflow: 'hidden',
     borderWidth: 1,
@@ -1041,7 +1010,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
   },
   map: {
-    height: 200, // Static height
+    ...StyleSheet.absoluteFillObject,
   },
   mapPlaceholder: {
     width: '100%',
