@@ -41,9 +41,14 @@ Thumbs.db
 .expo/
 
 # iOS
-ios/Pods/
-ios/build/
-ios/DerivedData/
+**/ios/Pods/
+**/ios/build/
+**/ios/DerivedData/
+Podfile.lock
+**/Podfile.lock
+mobile/**/Podfile.lock
+**/*.xcworkspace/
+mobile/**/*.xcworkspace/
 xcuserdata/
 *.xcworkspace/xcuserdata/
 *.pbxuser
@@ -52,11 +57,15 @@ xcuserdata/
 *.perspectivev3
 
 # Android
-android/.gradle/
-android/app/build/
-android/app/.cxx/
-android/build/
-android/.idea/
+**/android/.gradle/
+**/android/app/build/
+**/android/app/.cxx/
+**/android/build/
+**/android/.idea/
+**/android/gradle/
+**/android/gradlew
+**/android/gradlew.bat
+**/android/app/debug.keystore
 *.iml
 local.properties
 
