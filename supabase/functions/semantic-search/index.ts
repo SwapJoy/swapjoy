@@ -108,7 +108,12 @@ serve(async (req) => {
               return {
                 ...item,
                 image_url: imagesByItemId.get(item.id) || null,
-                similarity: 0.3 + (matchRatio * 0.2) // Base similarity of 0.3-0.5 for text matches
+                similarity: 0.3 + (matchRatio * 0.2), // Base similarity of 0.3-0.5 for text matches
+                status: item.status || 'available',
+                location_lat: item.location_lat || null,
+                location_lng: item.location_lng || null,
+                created_at: item.created_at || null,
+                updated_at: item.updated_at || null,
               };
             })
             .sort((a: any, b: any) => b.similarity - a.similarity)
@@ -119,34 +124,140 @@ serve(async (req) => {
       }
     }
     
-    // Enrich items with images if needed
+    // Enrich items with user, category, and images data to match fetchSection structure
     const itemIds = items.map((it: any) => it.id).filter(Boolean);
-    if (itemIds.length > 0) {
-      const { data: imageData } = await supabaseClient
-        .from('item_images')
-        .select('item_id, image_url')
-        .in('item_id', itemIds)
-        .order('created_at', { ascending: true });
-      
-      // Group images by item_id
-      const imagesByItemId = new Map<string, string>();
-      if (imageData) {
-        imageData.forEach((img: any) => {
-          if (!imagesByItemId.has(img.item_id)) {
-            imagesByItemId.set(img.item_id, img.image_url);
-          }
-        });
-      }
-      
-      // Add image_url to items
-      items = items.map((item: any) => ({
-        ...item,
-        image_url: imagesByItemId.get(item.id) || null,
-      }));
+    if (itemIds.length === 0) {
+      console.log(`[semantic-search] Returning ${items.length} items for query: "${q}"`);
+      return new Response(JSON.stringify({ items: [] }), { headers: { 'Content-Type': 'application/json' }, status: 200 });
     }
 
-    console.log(`[semantic-search] Returning ${items.length} items for query: "${q}"`);
-    return new Response(JSON.stringify({ items }), { headers: { 'Content-Type': 'application/json' }, status: 200 });
+    // Get unique user_ids and category_ids
+    const userIds = [...new Set(items.map((it: any) => it.user_id).filter(Boolean))];
+    const categoryIds = [...new Set(items.map((it: any) => it.category_id).filter(Boolean))];
+
+    // Fetch user data
+    let usersMap = new Map();
+    if (userIds.length > 0) {
+      const { data: usersData } = await supabaseClient
+        .from('users')
+        .select('id, username, first_name, last_name, profile_image_url')
+        .in('id', userIds);
+      
+      if (usersData) {
+        usersData.forEach((user: any) => {
+          usersMap.set(user.id, user);
+        });
+      }
+    }
+
+    // Fetch category data
+    let categoriesMap = new Map();
+    if (categoryIds.length > 0) {
+      const { data: categoriesData } = await supabaseClient
+        .from('categories')
+        .select('id, title_en, title_ka')
+        .in('id', categoryIds);
+      
+      if (categoriesData) {
+        categoriesData.forEach((cat: any) => {
+          categoriesMap.set(cat.id, cat);
+        });
+      }
+    }
+
+    // Fetch images for all items
+    const { data: imageData } = await supabaseClient
+      .from('item_images')
+      .select('id, item_id, image_url, is_primary, created_at')
+      .in('item_id', itemIds)
+      .order('created_at', { ascending: true });
+
+    // Group images by item_id
+    const imagesByItemId = new Map();
+    if (imageData) {
+      imageData.forEach((img: any) => {
+        if (!imagesByItemId.has(img.item_id)) {
+          imagesByItemId.set(img.item_id, []);
+        }
+        imagesByItemId.get(img.item_id).push({
+          id: img.id,
+          image_url: img.image_url,
+          is_primary: img.is_primary || false,
+          created_at: img.created_at
+        });
+      });
+    }
+
+    // Transform items to match fetchSection structure (same as database functions)
+    // The structure should match fn_top_picks_for_you and other database functions:
+    // - images: JSONB array with { id, url, is_primary, created_at }
+    // - User fields: directly on item (username, first_name, last_name, profile_image_url)
+    const transformedItems = items.map((item: any) => {
+      const user = usersMap.get(item.user_id) || null;
+      const categoryData = item.category_id ? categoriesMap.get(item.category_id) : null;
+      const images = imagesByItemId.get(item.id) || [];
+      
+      // Transform images to match database function format (url property, not image_url)
+      const imagesArray = images.map((img: any) => ({
+        id: img.id,
+        url: img.image_url,  // Note: database functions use 'url', not 'image_url'
+        is_primary: img.is_primary || false,
+        created_at: img.created_at
+      }));
+
+      // Get primary image URL for easy access
+      const primaryImage = imagesArray.find((img: any) => img.is_primary) || imagesArray[0] || null;
+      const imageUrl = primaryImage?.url || null;
+
+      return {
+        id: item.id,
+        title: item.title,
+        description: item.description,
+        price: item.price,
+        currency: item.currency || 'USD',
+        condition: item.condition,
+        status: item.status || 'available',
+        location_lat: item.location_lat,
+        location_lng: item.location_lng,
+        created_at: item.created_at,
+        updated_at: item.updated_at,
+        category_id: item.category_id,
+        // Category fields (for display)
+        category_name: categoryData?.title_en || categoryData?.title_ka || null,
+        category_name_en: categoryData?.title_en || null,
+        category_name_ka: categoryData?.title_ka || null,
+        // Category object (for compatibility)
+        category: categoryData ? {
+          id: categoryData.id,
+          title_en: categoryData.title_en,
+          title_ka: categoryData.title_ka,
+          name: categoryData.title_en || categoryData.title_ka
+        } : null,
+        // User fields should be directly on the item (matching database function format)
+        user_id: item.user_id,
+        username: user?.username || null,
+        first_name: user?.first_name || null,
+        last_name: user?.last_name || null,
+        profile_image_url: user?.profile_image_url || null,
+        // Also include nested user object for backward compatibility
+        user: user ? {
+          id: user.id,
+          username: user.username,
+          first_name: user.first_name,
+          last_name: user.last_name,
+          profile_image_url: user.profile_image_url
+        } : null,
+        // Images array (matching database function format)
+        images: imagesArray,
+        // Primary image URL for easy access
+        image_url: imageUrl,
+        distance_km: item.distance_km || null,
+        similarity: item.similarity || null
+      };
+    });
+
+    console.log(`[semantic-search] Returning ${transformedItems.length} items for query: "${q}"`);
+    return new Response(JSON.stringify({ items: transformedItems }), { headers: { 'Content-Type': 'application/json' }, status: 200 });
   } catch (err) {
     return new Response(JSON.stringify({ error: (err as any).message || 'Unknown error' }), { headers: { 'Content-Type': 'application/json' }, status: 500 });
   }

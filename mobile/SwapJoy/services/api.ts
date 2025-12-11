@@ -524,7 +524,8 @@ export class ApiService {
 
 
   static async getActiveCities() {
-    return this.authenticatedCall(async (client) => {
+    // Cities should be publicly accessible without authentication
+    return this.publicCall(async (client) => {
       const { data, error } = await client
         .from('cities')
         .select('id, name, country, state_province, center_lat, center_lng, timezone, population')

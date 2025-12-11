@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useRef } from 'react';
-import {View, StyleSheet, TextInput, ActivityIndicator, TouchableOpacity, FlatList, Dimensions} from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {View, StyleSheet, TextInput, ActivityIndicator, TouchableOpacity, FlatList, Dimensions, Modal} from 'react-native';
 import SJText from '../components/SJText';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,6 +8,7 @@ import { useRecentSearches } from '../hooks/useRecentSearches';
 import type { useExploreScreenState } from '../hooks/useExploreScreenState';
 import { formatCurrency } from '../utils';
 import { useFavorites } from '../contexts/FavoritesContext';
+import FilterPopover from './FilterPopover';
 
 interface SearchModalProps {
   visible: boolean;
@@ -51,6 +52,26 @@ const SearchModal: React.FC<SearchModalProps> = ({
   const { isFavorite, toggleFavorite } = useFavorites();
   const { width: SCREEN_WIDTH } = Dimensions.get('window');
   
+  const [filterPopoverVisible, setFilterPopoverVisible] = useState(false);
+  const [filters, setFilters] = useState({
+    priceMin: 0,
+    priceMax: 10000,
+    categories: [] as string[],
+    distance: null as number | null,
+    location: null as string | null,
+    locationLat: null as number | null,
+    locationLng: null as number | null,
+    locationCityId: null as string | null,
+  });
+  
+  const hasActiveFilters = filters.categories.length > 0 || 
+    filters.priceMin > 0 || 
+    filters.priceMax < 10000 || 
+    filters.distance !== null || 
+    filters.location !== null ||
+    filters.locationLat !== null ||
+    filters.locationLng !== null;
+  
   const handleSubmit = useCallback(
     async (query: string) => {
       const trimmed = query.trim();
@@ -91,22 +112,50 @@ const SearchModal: React.FC<SearchModalProps> = ({
 
   const renderSearchItem = useCallback(
     ({ item }: { item: any }) => {
-      const ownerInitials =
-        `${item.user?.first_name?.[0] ?? ''}${item.user?.last_name?.[0] ?? ''}`.trim() ||
-        item.user?.username?.[0]?.toUpperCase() ||
-        '?';
-      const ownerDisplayName =
-        `${item.user?.first_name ?? ''} ${item.user?.last_name ?? ''}`.trim() || '';
-      const ownerUsername = item.user?.username || ownerDisplayName;
+      // More robust user extraction - handle different user data formats
+      // Check nested user object first, then flat fields (matching database function format)
+      const userData = item?.user || 
+        (item?.username || item?.first_name ? {
+          id: item?.user_id,
+          username: item?.username,
+          first_name: item?.first_name,
+          last_name: item?.last_name,
+          profile_image_url: item?.profile_image_url
+        } : null) ||
+        item?.owner || 
+        item?.user_profile || 
+        null;
+      
+      const ownerInitials = userData 
+        ? `${userData.first_name?.[0] ?? ''}${userData.last_name?.[0] ?? ''}`.trim() || 
+          userData.username?.[0]?.toUpperCase() || '?'
+        : '?';
+      const ownerDisplayName = userData
+        ? `${userData.first_name ?? ''} ${userData.last_name ?? ''}`.trim() || ''
+        : '';
+      const ownerUsername = userData?.username || ownerDisplayName || 'Anonymous';
+      const ownerUserId = userData?.id || item?.user_id || null;
 
+      // Image URL extraction - check image_url first, then images array
       const imageUrl =
         item?.image_url ||
+        item?.images?.[0]?.url ||
         item?.item_images?.[0]?.image_url ||
         item?.images?.[0]?.image_url ||
         null;
 
       const priceValue = item?.price || item?.estimated_value || 0;
       const displayedPrice = formatCurrency(priceValue, item?.currency || 'USD');
+
+      // More robust category extraction - handle different category formats
+      const categoryValue = 
+        item?.category?.name || 
+        item?.category?.title_en || 
+        item?.category?.title_ka ||
+        item?.category_name || 
+        item?.category_name_en || 
+        item?.category_name_ka || 
+        null;
 
       const favoriteData = {
         id: item?.id,
@@ -117,9 +166,9 @@ const SearchModal: React.FC<SearchModalProps> = ({
         condition: item?.condition,
         image_url: imageUrl,
         created_at: item?.created_at || item?.updated_at || null,
-        category_name: item?.category_name ?? item?.category_name_en ?? item?.category_name_ka ?? null,
-        category_name_en: item?.category_name_en ?? null,
-        category_name_ka: item?.category_name_ka ?? null,
+        category_name: categoryValue,
+        category_name_en: item?.category_name_en ?? item?.category?.title_en ?? null,
+        category_name_ka: item?.category_name_ka ?? item?.category?.title_ka ?? null,
         category: item?.category ?? item?.categories ?? null,
         categories: item?.categories ?? null,
       };
@@ -131,17 +180,18 @@ const SearchModal: React.FC<SearchModalProps> = ({
             price={displayedPrice}
             imageUrl={imageUrl}
             description={item.description}
-            category={item?.category ?? item?.category_name ?? item?.category_name_en ?? item?.category_name_ka ?? null}
+            category={categoryValue}
             condition={item.condition}
             owner={{
               username: ownerUsername,
               displayName: ownerDisplayName,
               initials: ownerInitials,
-              userId: item.user?.id,
+              userId: ownerUserId,
+              profileImageUrl: userData?.profile_image_url || userData?.avatar_url || null,
             }}
             onPress={() => onItemPress(item)}
             onOwnerPress={() => {
-              if (item.user?.id) {
+              if (ownerUserId) {
                 // Navigate to user profile if needed
               }
             }}
@@ -153,12 +203,14 @@ const SearchModal: React.FC<SearchModalProps> = ({
             likeIconColor="#1f2933"
             likeActiveColor="#ef4444"
             isLikeActive={isFavorite(item.id)}
-            cardWidth={SCREEN_WIDTH - 32}
+            cardWidth={SCREEN_WIDTH}
+            borderRadius={0}
+            sectionPaddingHorizontal={12}
           />
         </View>
       );
     },
-    [onItemPress, isFavorite, toggleFavorite]
+    [onItemPress, isFavorite, toggleFavorite, SCREEN_WIDTH]
   );
 
   const searchResultsNode =
@@ -170,17 +222,27 @@ const SearchModal: React.FC<SearchModalProps> = ({
             <SJText style={styles.searchStatusSubtitle}>{searchStrings.noResultsSubtitle}</SJText>
           </View>
         ) : (
-          <FlatList
-            data={searchResults}
-            renderItem={renderSearchItem}
-            keyExtractor={(item) => (item?.id ? String(item.id) : `item-${Math.random()}`)}
-            contentContainerStyle={[
-              styles.searchResultsContent,
-              { paddingBottom: Math.max(insets.bottom, 40) },
-            ]}
-            showsVerticalScrollIndicator={true}
-            removeClippedSubviews={false}
-          />
+          <>
+            {!searchLoading && searchResults.length > 0 && (
+              <View style={styles.resultsSummaryHeader}>
+                <SJText style={styles.resultsSummaryText}>
+                  {searchResults.length} {searchResults.length === 1 ? 'result' : 'results'}
+                  {searchQuery ? ` for "${searchQuery}"` : ''}
+                </SJText>
+              </View>
+            )}
+            <FlatList
+              data={searchResults}
+              renderItem={renderSearchItem}
+              keyExtractor={(item) => (item?.id ? String(item.id) : `item-${Math.random()}`)}
+              contentContainerStyle={[
+                styles.searchResultsContent,
+                { paddingBottom: Math.max(insets.bottom, 40) },
+              ]}
+              showsVerticalScrollIndicator={true}
+              removeClippedSubviews={false}
+            />
+          </>
         )}
         {searchError ? <SJText style={styles.searchErrorText}>{searchError}</SJText> : null}
       </View>
@@ -223,6 +285,18 @@ const SearchModal: React.FC<SearchModalProps> = ({
               </TouchableOpacity>
             ) : null}
           </View>
+          <TouchableOpacity 
+            style={[styles.searchModalFilterButton, hasActiveFilters && styles.searchModalFilterButtonActive]}
+            onPress={() => setFilterPopoverVisible(true)}
+            accessibilityLabel={t('search.filters', { defaultValue: 'Filters' })}
+          >
+            <Ionicons 
+              name="filter-outline" 
+              size={20} 
+              color={hasActiveFilters ? "#0ea5e9" : "#64748b"} 
+            />
+            {hasActiveFilters && <View style={styles.filterBadge} />}
+          </TouchableOpacity>
           <TouchableOpacity style={styles.searchModalCancelButton} onPress={handleCancel}>
             <SJText style={styles.searchModalCancelText}>
               {t('common.cancel', { defaultValue: 'Cancel' })}
@@ -265,13 +339,20 @@ const SearchModal: React.FC<SearchModalProps> = ({
 
         {searchResultsNode}
       </View>
+      
+      <FilterPopover
+        visible={filterPopoverVisible}
+        onClose={() => setFilterPopoverVisible(false)}
+        filters={filters}
+        onFiltersChange={setFilters}
+        t={t}
+      />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   overlayContainer: {
-    backgroundColor: '#f8fafc',
     zIndex: 20,
   },
   searchResultsContainer: {
@@ -280,11 +361,24 @@ const styles = StyleSheet.create({
   },
   searchResultsContent: {
     paddingTop: 8,
-    paddingBottom: 4,
+    paddingBottom: 4
+  },
+  resultsSummaryHeader: {
     paddingHorizontal: 16,
+    paddingBottom: 8,
+    backgroundColor: '#ffffff',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#e2e8f0',
+  },
+  resultsSummaryText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#64748b',
   },
   searchResultItem: {
-    marginBottom: 24,
+    marginBottom: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#e2e8f0',
   },
   searchStatusContainer: {
     paddingVertical: 16,
@@ -309,17 +403,12 @@ const styles = StyleSheet.create({
   },
   searchModalSafeArea: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#fff',
   },
   searchModalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 0,
-    paddingBottom: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#e2e8f0',
-    backgroundColor: '#f8fafc',
+    paddingHorizontal: 16
   },
   searchModalInputWrapper: {
     flex: 1,
@@ -337,6 +426,27 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     fontSize: 14,
     color: '#0f172a',
+  },
+  searchModalFilterButton: {
+    marginLeft: 12,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  searchModalFilterButtonActive: {
+    backgroundColor: '#eff6ff',
+  },
+  filterBadge: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#0ea5e9',
   },
   searchModalCancelButton: {
     marginLeft: 12,

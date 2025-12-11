@@ -63,7 +63,13 @@
         }
       ],
       "expo-localization",
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "react-native-maps",
+        {
+          "googleMapsApiKey": ""
+        }
+      ]
     ]
   }
 }

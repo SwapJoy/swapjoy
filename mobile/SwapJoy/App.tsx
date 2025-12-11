@@ -13,6 +13,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { FavoritesProvider } from './contexts/FavoritesContext';
 import { NotificationsProvider } from './contexts/NotificationsContext';
 import { CategoriesProvider } from './contexts/CategoriesContext';
+import { LocationProvider } from './contexts/LocationContext';
 import { PushNotificationService } from './services/pushNotificationService';
 import { NotificationNavigation } from './utils/notificationNavigation';
 import { RootStackParamList } from './types/navigation';
@@ -144,13 +145,15 @@ export default function App() {
     <LocalizationProvider>
       <AuthProvider>
         <CategoriesProvider>
-        <NotificationsProvider>
-          <FavoritesProvider>
-            <MatchInventoryProvider>
-              <AppContent />
-            </MatchInventoryProvider>
-          </FavoritesProvider>
-        </NotificationsProvider>
+          <LocationProvider>
+            <NotificationsProvider>
+              <FavoritesProvider>
+                <MatchInventoryProvider>
+                  <AppContent />
+                </MatchInventoryProvider>
+              </FavoritesProvider>
+            </NotificationsProvider>
+          </LocationProvider>
         </CategoriesProvider>
       </AuthProvider>
     </LocalizationProvider>

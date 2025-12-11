@@ -262,7 +262,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 22,
-    fontWeight: '500',
+    fontWeight: '400',
     color: '#A3A3A3',
   },
   horizontalScroller: {

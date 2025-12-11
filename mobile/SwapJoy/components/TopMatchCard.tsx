@@ -96,13 +96,14 @@ interface TopMatchCardProps {
   isLikeActive?: boolean;
   disableLikeButton?: boolean;
   cardWidth?: number;
+  sectionPaddingHorizontal?: number;
+  borderRadius?: number;
 }
 
 const TopMatchCard: React.FC<TopMatchCardProps> = ({
   title,
   price,
   description,
-  descriptionLines,
   category,
   condition,
   imageUrl,
@@ -117,6 +118,8 @@ const TopMatchCard: React.FC<TopMatchCardProps> = ({
   isLikeActive = false,
   disableLikeButton,
   cardWidth = DEFAULT_CARD_WIDTH,
+  sectionPaddingHorizontal = 0,
+  borderRadius = 12
 }) => {
   const { language, t } = useLocalization();
   const { getCategoryByName, getCategoryById } = useCategories();
@@ -212,7 +215,7 @@ const TopMatchCard: React.FC<TopMatchCardProps> = ({
           activeOpacity={0.85}
           onPress={onPress}
         >
-        <View style={styles.mediaSection}>
+        <View style={[styles.mediaSection, { borderRadius: borderRadius }]}>
           <CachedImage
             uri={imageUrl || 'https://via.placeholder.com/320x240'}
             style={styles.heroImage}
@@ -251,7 +254,7 @@ const TopMatchCard: React.FC<TopMatchCardProps> = ({
           )}
         </View>
 
-        <View style={styles.infoSection}>
+        <View style={[styles.infoSection, { paddingHorizontal: sectionPaddingHorizontal }]}>
           <View style={styles.titleRow}>
             <SJText style={styles.title} numberOfLines={1} ellipsizeMode="tail">
               {displayTitle}
@@ -298,26 +301,18 @@ const styles = StyleSheet.create({
     height: TOP_MATCH_CARD_HEIGHT,
     marginRight: 8,
     marginBottom: 8, // Add space for shadow to be visible at bottom
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 1
   },
   skeletonCardWrapper: {
     height: TOP_MATCH_CARD_HEIGHT,
     marginRight: 8,
     marginBottom: 8, // Add space for shadow to be visible at bottom
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 1
+    borderColor: '#E0E0E0',
+    borderWidth: 0.5
   },
   card: {
     width: '100%',
     height: '100%',
     backgroundColor: '#ffffff',
-    borderRadius: 2,
     overflow: 'hidden',
     flexDirection: 'column',
   },
@@ -326,7 +321,6 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: '#ffffff',
     borderRadius: 2,
-    overflow: 'hidden',
     flexDirection: 'column',
   },
   ownerHeader: {
@@ -335,11 +329,7 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 8,
     paddingLeft: 8,
-    gap: 10,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 1
+    gap: 10
   },
   ownerProfileImage: {
     width: 36,
@@ -354,8 +344,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#e2e8f0',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#E0E0E0'
   },
   ownerProfileImageText: {
     fontSize: 14,
@@ -371,11 +359,12 @@ const styles = StyleSheet.create({
   mediaSection: {
     flex: 0.75,
     position: 'relative',
+    overflow: 'hidden'
   },
   infoSection: {
     flex: 0.25,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
+    paddingHorizontal: 2,
+    paddingVertical: 6,
     justifyContent: 'flex-start',
   },
   heroImage: {
@@ -443,12 +432,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 6,
     borderRadius: 12,
-    backgroundColor: '#ffffffee',
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
+    backgroundColor: '#ffffffee'
   },
   ownerAvatar: {
     width: 20,
@@ -519,7 +503,6 @@ const styles = StyleSheet.create({
   metaRowItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
   },
   metaRowItemSpaced: {
     marginTop: 8,

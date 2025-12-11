@@ -399,8 +399,32 @@ export class AuthService {
             return session;
           }
         }
-        // If no valid session found after waiting, return null (will trigger sign out)
-        console.warn('[Token Refresh] ❌ No valid session found after refresh_token_already_used error (checked twice)');
+        // If no valid session found after waiting, check if we have an expired session
+        // On simulator, SecureStore might have issues - try one more time with a longer wait
+        await new Promise(resolve => setTimeout(resolve, 500));
+        sessionData = await SecureStore.getItemAsync(SESSION_KEY);
+        if (sessionData) {
+          const session = JSON.parse(sessionData) as AuthSession;
+          const now = Date.now();
+          const expiresAtMs = session.expires_at ? session.expires_at * 1000 : 0;
+          if (expiresAtMs > now) {
+            const timeUntilExpiry = expiresAtMs - now;
+            console.log(`[Token Refresh] ✅ Found valid session after third check (simulator delay)`);
+            console.log(`[Token Refresh] Session expires in: ${Math.floor(timeUntilExpiry / 60000)} minutes`);
+            return session;
+          } else {
+            // Session exists but expired - log for debugging simulator vs production differences
+            const expiredMinutesAgo = Math.abs(Math.floor((now - expiresAtMs) / 60000));
+            console.warn(`[Token Refresh] ⚠️ Session exists but expired ${expiredMinutesAgo} minutes ago`);
+            console.warn(`[Token Refresh] This may indicate SecureStore timing issues on simulator`);
+          }
+        }
+        
+        // If still no valid session, log but don't immediately sign out
+        // The app might recover on next interaction (e.g., user action triggers new refresh attempt)
+        console.warn('[Token Refresh] ❌ No valid session found after refresh_token_already_used error (checked 3 times)');
+        console.warn('[Token Refresh] This may be a simulator-specific issue. Session may recover on next refresh attempt.');
+        // Return null but don't force sign-out here - let the calling code decide
         return null;
       }
       

@@ -1,88 +1,97 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+# React Native
+/node_modules/
+/npm-debug.log
+/yarn-error.log
+/dist/
+/build/
+/logs/
+*.log
+package-lock.json
+yarn.lock
 
-# dependencies
-node_modules/
-
-# Expo
+# Metro Bundler
 .expo/
-dist/
-web-build/
-expo-env.d.ts
+.expo-shared/
+.expo-dev/
+.expo-web/
+.expo-packager/
 
-# Native
-.kotlin/
-*.orig.*
-*.jks
-*.p8
-*.p12
-*.key
-*.mobileprovision
+# TypeScript
+*.tsbuildinfo
 
-# Metro
-.metro-health-check*
-
-# debug
-npm-debug.*
-yarn-debug.*
-yarn-error.*
+# Babel
+.babelrc
+.cache/
+.tmp/
 
 # macOS
 .DS_Store
-*.pem
 
-# local env files
+# VSCode
+.vscode/
+
+# Environment
 .env
-.env*.local
-
-# typescript
-*.tsbuildinfo
-
-# Native folders - selectively ignore
-# Commit configuration files but ignore build artifacts
+.env.*
+!.env.example
 
 # iOS
 ios/Pods/
 ios/build/
-ios/*.xcworkspace/
-ios/*.xcworkspace/xcuserdata/
-ios/*.xcodeproj/xcuserdata/
-ios/*.xcodeproj/project.xcworkspace/xcuserdata/
-ios/*.xcodeproj/xcshareddata/xcschemes/*.xcscheme
 ios/DerivedData/
-ios/*.xcuserstate
-ios/.xcode.env.local
-ios/.swiftpm/
-ios/Podfile.lock
-ios/vendor/
+xcuserdata/
+*.xcworkspace/xcuserdata/
+project.xcworkspace/xcuserdata/
+project.xcworkspace/xcshareddata/*.xcscmblueprint
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
 
-# iOS - Sensitive files
-# Note: GoogleService-Info.plist contains project-specific config but is usually committed
-# Uncomment if you want to exclude it (but then you'll need to add it manually on each machine)
-# ios/SwapJoy/GoogleService-Info.plist
-ios/*.mobileprovision
-ios/*.p12
-ios/*.cer
+# iOS — Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots
+fastlane/test_output
 
 # Android
 android/.gradle/
-android/build/
 android/app/build/
-android/local.properties
+android/app/.cxx/
+android/build/
 android/.idea/
-android/*.iml
-android/app/release/
-android/app/debug/
-android/app/debugOptimized/
-android/.cxx/
-android/gradle/
-android/gradlew
-android/gradlew.bat
-android/gradle-wrapper.jar
-android/gradle-wrapper.properties
+*.iml
 
-# Android - Sensitive files
-# Note: google-services.json contains project-specific config but is usually committed
-# Uncomment if you want to exclude it (but then you'll need to add it manually on each machine)
-# android/app/google-services.json
-android/app/*.jks
-android/app/*.keystore
+# Gradle
+.gradle/
+local.properties
+**/gradle-wrapper.jar
+
+# NPM / Yarn
+.pnpm-store/
+.pnp/
+.pnp.js
+
+# Watchman
+.watchmanconfig
+
+# Jest
+/coverage/
+jest-cache/
+jest-stare/
+
+# Detox
+artifacts/
+e2e/*.log
+e2e/*.png
+e2e/*.mp4
+
+# Bundled JS
+*.bundle
+*.map
+
+# Misc
+.tmp/
+.cache/
+logs/
+*.orig
