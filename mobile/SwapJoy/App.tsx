@@ -14,6 +14,8 @@ import { FavoritesProvider } from './contexts/FavoritesContext';
 import { NotificationsProvider } from './contexts/NotificationsContext';
 import { CategoriesProvider } from './contexts/CategoriesContext';
 import { LocationProvider } from './contexts/LocationContext';
+import { FiltersProvider } from './contexts/FiltersContext';
+import { ProfileProvider } from './contexts/ProfileContext';
 import { PushNotificationService } from './services/pushNotificationService';
 import { NotificationNavigation } from './utils/notificationNavigation';
 import { RootStackParamList } from './types/navigation';
@@ -146,13 +148,17 @@ export default function App() {
       <AuthProvider>
         <CategoriesProvider>
           <LocationProvider>
-            <NotificationsProvider>
-              <FavoritesProvider>
-                <MatchInventoryProvider>
-                  <AppContent />
-                </MatchInventoryProvider>
-              </FavoritesProvider>
-            </NotificationsProvider>
+            <ProfileProvider>
+              <FiltersProvider>
+                <NotificationsProvider>
+                  <FavoritesProvider>
+                    <MatchInventoryProvider>
+                      <AppContent />
+                    </MatchInventoryProvider>
+                  </FavoritesProvider>
+                </NotificationsProvider>
+              </FiltersProvider>
+            </ProfileProvider>
           </LocationProvider>
         </CategoriesProvider>
       </AuthProvider>

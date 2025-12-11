@@ -4,6 +4,8 @@ import SJText from '../components/SJText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ProfileScreenProps } from '../types/navigation';
 import { useProfileData } from '../hooks/useProfileData';
+import { useProfile } from '../contexts/ProfileContext';
+import { useAuth } from '../contexts/AuthContext';
 import CachedImage from '../components/CachedImage';
 import FavoriteToggleButton from '../components/FavoriteToggleButton';
 import ItemCardCollection from '../components/ItemCardCollection';
@@ -203,6 +205,27 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
   const route = useRoute<any>();
   const viewedUserId: string | undefined = (route as any)?.name === 'UserProfile' ? (route as any)?.params?.userId : undefined;
   const { t, language } = useLocalization();
+  const { user: currentUser } = useAuth();
+  const isViewingOtherUser = Boolean(viewedUserId && currentUser?.id !== viewedUserId);
+  
+  // Use global ProfileContext for current user, useProfileData for other users
+  const globalProfile = useProfile();
+  const otherUserProfile = useProfileData(viewedUserId);
+  
+  // Select the appropriate profile data based on whether viewing other user
+  // For current user, use global profile context; for other users, use useProfileData
+  const profileData = isViewingOtherUser ? otherUserProfile : {
+    ...otherUserProfile,
+    // Override with global profile data for current user
+    profile: globalProfile.profile,
+    stats: globalProfile.stats,
+    rating: globalProfile.rating,
+    favoriteCategories: globalProfile.favoriteCategories,
+    favoriteCategoryNames: globalProfile.favoriteCategoryNames,
+    loadingProfile: globalProfile.loading,
+    loadingMetrics: globalProfile.loading,
+  };
+  
   const {
     user,
     profile,
@@ -225,9 +248,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
     formatRating,
     favoriteCategories,
     favoriteCategoryNames,
-  } = useProfileData(viewedUserId);
-
-  const isViewingOtherUser = Boolean(viewedUserId && user?.id !== viewedUserId);
+  } = profileData;
 
   const [activeTab, setActiveTab] = useState<'published' | 'saved' | 'drafts'>('published');
   useEffect(() => {

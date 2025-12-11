@@ -17,6 +17,7 @@ import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import SJText from './SJText';
 import { useCategories } from '../hooks/useCategories';
 import { useLocation, City } from '../hooks/useLocation';
+import { useFilters, FilterState } from '../contexts/FiltersContext';
 import { formatCurrency } from '../utils';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -29,22 +30,9 @@ const DEFAULT_REGION: Region = {
   longitudeDelta: 0.5,
 };
 
-export interface FilterState {
-  priceMin: number;
-  priceMax: number;
-  categories: string[];
-  distance: number | null;
-  location: string | null;
-  locationLat?: number | null;
-  locationLng?: number | null;
-  locationCityId?: string | null;
-}
-
 interface FilterPopoverProps {
   visible: boolean;
   onClose: () => void;
-  filters: FilterState;
-  onFiltersChange: (filters: FilterState) => void;
   t: (key: string, options?: { defaultValue?: string }) => string;
 }
 
@@ -74,9 +62,10 @@ const FilterPopoverHeader: React.FC<FilterPopoverHeaderProps> = ({ onClose, t })
 
 interface PriceRangeSliderProps {
   minValue: number;
-  maxValue: number;
+  maxValue: number | null; // null means infinite/no upper bound
   onMinChange: (value: number) => void;
-  onMaxChange: (value: number) => void;
+  onMaxChange: (value: number | null) => void;
+  currency: string;
   t: (key: string, options?: { defaultValue?: string }) => string;
 }
 
@@ -85,26 +74,45 @@ const PriceRangeSlider: React.FC<PriceRangeSliderProps> = ({
   maxValue,
   onMinChange,
   onMaxChange,
+  currency,
   t,
 }) => {
   const sliderWidth = SCREEN_WIDTH - 64;
   const thumbSize = 24;
   const trackRef = useRef<View>(null);
   const [trackX, setTrackX] = useState(0);
+  const INFINITE_THRESHOLD = 0.95; // 95% of slider width = infinite
 
   useEffect(() => {
     trackRef.current?.measureInWindow((x) => setTrackX(x));
   }, []);
 
-  const valueToPosition = (value: number) => (value / PRICE_MAX) * sliderWidth;
-  const positionToValue = (position: number) => Math.round((position / sliderWidth) * PRICE_MAX);
+  const valueToPosition = (value: number | null) => {
+    if (value === null) return sliderWidth;
+    return (value / PRICE_MAX) * sliderWidth;
+  };
+  
+  const positionToValue = (position: number): number | null => {
+    // If position is at or near the end (95%+), return null (infinite)
+    if (position >= sliderWidth * INFINITE_THRESHOLD) {
+      return null;
+    }
+    return Math.round((position / sliderWidth) * PRICE_MAX);
+  };
 
   const updateMinValue = useCallback(
     (pageX: number) => {
       const relativeX = pageX - trackX;
       const clampedX = Math.max(0, Math.min(sliderWidth, relativeX));
       const newValue = positionToValue(clampedX);
-      onMinChange(Math.min(newValue, maxValue - 100));
+      if (newValue === null) {
+        // Can't set min to infinite, set to max - 100 or PRICE_MAX - 100
+        const effectiveMax = maxValue ?? PRICE_MAX;
+        onMinChange(Math.max(0, effectiveMax - 100));
+      } else {
+        const effectiveMax = maxValue ?? PRICE_MAX;
+        onMinChange(Math.min(newValue, effectiveMax - 100));
+      }
     },
     [trackX, maxValue, onMinChange]
   );
@@ -114,9 +122,9 @@ const PriceRangeSlider: React.FC<PriceRangeSliderProps> = ({
       const relativeX = pageX - trackX;
       const clampedX = Math.max(0, Math.min(sliderWidth, relativeX));
       const newValue = positionToValue(clampedX);
-      onMaxChange(Math.max(newValue, minValue + 100));
+      onMaxChange(newValue);
     },
-    [trackX, minValue, onMaxChange]
+    [trackX, onMaxChange]
   );
 
   const minPanResponder = useRef(
@@ -151,8 +159,9 @@ const PriceRangeSlider: React.FC<PriceRangeSliderProps> = ({
     const touchX = event.nativeEvent.pageX;
     const relativeX = touchX - trackX;
     const value = positionToValue(relativeX);
-    const minDist = Math.abs(value - minValue);
-    const maxDist = Math.abs(value - maxValue);
+    const effectiveMax = maxValue ?? PRICE_MAX;
+    const minDist = Math.abs((value ?? 0) - minValue);
+    const maxDist = Math.abs((value ?? effectiveMax) - effectiveMax);
     if (minDist < maxDist) {
       updateMinValue(touchX);
     } else {
@@ -162,17 +171,22 @@ const PriceRangeSlider: React.FC<PriceRangeSliderProps> = ({
 
   const minPosition = valueToPosition(minValue);
   const maxPosition = valueToPosition(maxValue);
+  const effectiveMaxValue = maxValue ?? PRICE_MAX;
 
   return (
     <View style={styles.priceSliderContainer}>
       <View style={styles.priceDisplayRow}>
         <View style={styles.priceDisplay}>
           <SJText style={styles.priceLabel}>{t('search.min', { defaultValue: 'Min' })}</SJText>
-          <SJText style={styles.priceValue}>{formatCurrency(minValue, 'USD')}</SJText>
+          <SJText style={styles.priceValue}>{formatCurrency(minValue, currency)}</SJText>
         </View>
         <View style={styles.priceDisplay}>
           <SJText style={styles.priceLabel}>{t('search.max', { defaultValue: 'Max' })}</SJText>
-          <SJText style={styles.priceValue}>{formatCurrency(maxValue, 'USD')}</SJText>
+          <SJText style={styles.priceValue}>
+            {maxValue === null 
+              ? t('search.noLimit', { defaultValue: 'No limit' })
+              : formatCurrency(maxValue, currency)}
+          </SJText>
         </View>
       </View>
       <TouchableOpacity activeOpacity={1} onPress={handleTrackPress} style={styles.sliderTrackContainer}>
@@ -181,7 +195,10 @@ const PriceRangeSlider: React.FC<PriceRangeSliderProps> = ({
           <View
             style={[
               styles.sliderTrackFill,
-              { left: minPosition, width: maxPosition - minPosition },
+              { 
+                left: minPosition, 
+                width: maxValue === null ? sliderWidth - minPosition : maxPosition - minPosition 
+              },
             ]}
           />
           <View
@@ -190,7 +207,14 @@ const PriceRangeSlider: React.FC<PriceRangeSliderProps> = ({
           />
           <View
             {...maxPanResponder.panHandlers}
-            style={[styles.sliderThumb, { left: maxPosition - thumbSize / 2 }]}
+            style={[
+              styles.sliderThumb, 
+              { 
+                left: maxValue === null 
+                  ? sliderWidth - thumbSize / 2 
+                  : maxPosition - thumbSize / 2 
+              }
+            ]}
           />
         </View>
       </TouchableOpacity>
@@ -501,8 +525,6 @@ const FilterPopoverFooter: React.FC<FilterPopoverFooterProps> = ({
 const FilterPopover: React.FC<FilterPopoverProps> = ({
   visible,
   onClose,
-  filters,
-  onFiltersChange,
   t,
 }) => {
   const insets = useSafeAreaInsets();
@@ -517,6 +539,7 @@ const FilterPopover: React.FC<FilterPopoverProps> = ({
     setManualLocation,
     clearManualLocation,
   } = useLocation();
+  const { filters, updateFilters, setFilters, clearFilters } = useFilters();
 
   const [localFilters, setLocalFilters] = useState<FilterState>(filters);
   const [locationInputValue, setLocationInputValue] = useState<string>('');
@@ -524,7 +547,10 @@ const FilterPopover: React.FC<FilterPopoverProps> = ({
 
   useEffect(() => {
     if (visible) {
+      // Ensure currency is synced from global filters
+      console.log('[FilterPopover] Modal opened - filters.currency:', filters.currency, 'localFilters.currency:', localFilters.currency);
       setLocalFilters(filters);
+      console.log('[FilterPopover] Modal opened with currency:', filters.currency);
       if (manualLocation?.cityName) {
         const city = cities.find((c) => c.id === manualLocation.cityId);
         setLocationInputValue(
@@ -580,7 +606,7 @@ const FilterPopover: React.FC<FilterPopoverProps> = ({
     }
   }, [currentLocation, refreshLocation, clearManualLocation]);
 
-  const handleApply = useCallback(() => {
+  const handleApply = useCallback(async () => {
     const loc = selectedLocation;
     const updatedFilters: FilterState = {
       ...localFilters,
@@ -595,27 +621,37 @@ const FilterPopover: React.FC<FilterPopoverProps> = ({
       locationLng: loc ? loc.lng : null,
       locationCityId: manualLocation?.cityId || null,
     };
-    onFiltersChange(updatedFilters);
+    console.log('[FilterPopover] Applying filters:', updatedFilters);
+    
+    try {
+      await setFilters(updatedFilters);
+      console.log('[FilterPopover] ✅ Filters applied and saved successfully');
+    } catch (error) {
+      console.error('[FilterPopover] ❌ Failed to save filters:', error);
+      // Don't close modal if save failed - let user retry
+      return;
+    }
+    
     onClose();
-  }, [localFilters, selectedLocation, manualLocation, cities, onFiltersChange, onClose, t]);
+  }, [localFilters, selectedLocation, manualLocation, cities, setFilters, onClose, t]);
 
   const handleClearAll = useCallback(async () => {
-    const clearedFilters: FilterState = {
+    await clearFilters();
+    setLocalFilters({
       priceMin: 0,
       priceMax: PRICE_MAX,
+      currency: filters.currency, // Keep current currency
       categories: [],
       distance: null,
       location: null,
       locationLat: null,
       locationLng: null,
       locationCityId: null,
-    };
-    setLocalFilters(clearedFilters);
+    });
     await clearManualLocation();
     setLocationInputValue('');
     setShowCitySuggestions(false);
-    onFiltersChange(clearedFilters);
-  }, [onFiltersChange, clearManualLocation]);
+  }, [clearFilters, clearManualLocation, filters.currency]);
 
   const locationPlaceholder = useMemo(() => {
     if (selectedLocation && !manualLocation) {
@@ -660,16 +696,20 @@ const FilterPopover: React.FC<FilterPopoverProps> = ({
                   <PriceRangeSlider
                     minValue={localFilters.priceMin}
                     maxValue={localFilters.priceMax}
+                    currency={localFilters.currency}
                     onMinChange={(value) =>
-                      setLocalFilters((prev) => ({
-                        ...prev,
-                        priceMin: Math.min(value, prev.priceMax - 100),
-                      }))
+                      setLocalFilters((prev) => {
+                        const effectiveMax = prev.priceMax ?? PRICE_MAX;
+                        return {
+                          ...prev,
+                          priceMin: Math.min(value, effectiveMax - 100),
+                        };
+                      })
                     }
                     onMaxChange={(value) =>
                       setLocalFilters((prev) => ({
                         ...prev,
-                        priceMax: Math.max(value, prev.priceMin + 100),
+                        priceMax: value,
                       }))
                     }
                     t={t}

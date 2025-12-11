@@ -8,6 +8,7 @@ import { useRecentSearches } from '../hooks/useRecentSearches';
 import type { useExploreScreenState } from '../hooks/useExploreScreenState';
 import { formatCurrency } from '../utils';
 import { useFavorites } from '../contexts/FavoritesContext';
+import { useFilters } from '../contexts/FiltersContext';
 import FilterPopover from './FilterPopover';
 
 interface SearchModalProps {
@@ -50,27 +51,10 @@ const SearchModal: React.FC<SearchModalProps> = ({
   const { recentSearches, loadingRecent, saveRecentSearch, clearRecentSearches } = useRecentSearches();
   const insets = useSafeAreaInsets();
   const { isFavorite, toggleFavorite } = useFavorites();
+  const { filters, hasActiveFilters } = useFilters();
   const { width: SCREEN_WIDTH } = Dimensions.get('window');
   
   const [filterPopoverVisible, setFilterPopoverVisible] = useState(false);
-  const [filters, setFilters] = useState({
-    priceMin: 0,
-    priceMax: 10000,
-    categories: [] as string[],
-    distance: null as number | null,
-    location: null as string | null,
-    locationLat: null as number | null,
-    locationLng: null as number | null,
-    locationCityId: null as string | null,
-  });
-  
-  const hasActiveFilters = filters.categories.length > 0 || 
-    filters.priceMin > 0 || 
-    filters.priceMax < 10000 || 
-    filters.distance !== null || 
-    filters.location !== null ||
-    filters.locationLat !== null ||
-    filters.locationLng !== null;
   
   const handleSubmit = useCallback(
     async (query: string) => {
@@ -343,8 +327,6 @@ const SearchModal: React.FC<SearchModalProps> = ({
       <FilterPopover
         visible={filterPopoverVisible}
         onClose={() => setFilterPopoverVisible(false)}
-        filters={filters}
-        onFiltersChange={setFilters}
         t={t}
       />
     </View>
