@@ -385,14 +385,58 @@ export class ApiService {
   // The Edge Function already handles:
   // 1. Semantic search via match_items (vector embeddings)
   // 2. Fuzzy text search fallback when semantic results are sparse
-  static async semanticSearch(query: string, limit: number = 30) {
-    const q = (query || '').trim();
-    if (!q) return { data: [], error: null } as any;
+  // 3. Filter-only searches when query is null/empty
+  static async semanticSearch(
+    query: string | null,
+    limit: number = 30,
+    filters?: {
+      minPrice?: number;
+      maxPrice?: number | null;
+      categories?: string[];
+      distance?: number | null;
+      coordinates?: { lat: number; lng: number } | null;
+    }
+  ) {
+    const q = query ? query.trim() : null;
+    
+    // Prepare request body
+    const requestBody: any = {
+      query: q || null,  // Pass null if empty/whitespace
+      limit,
+    };
+    
+    // Add filter parameters if provided
+    if (filters) {
+      requestBody.minPrice = filters.minPrice ?? 0;
+      requestBody.maxPrice = filters.maxPrice ?? null;
+      requestBody.categories = filters.categories ?? [];
+      requestBody.distance = filters.distance ?? null;
+      requestBody.coordinates = filters.coordinates ?? null;
+    } else {
+      // Default filters if not provided
+      requestBody.minPrice = 0;
+      requestBody.maxPrice = null;
+      requestBody.categories = [];
+      requestBody.distance = null;
+      requestBody.coordinates = null;
+    }
+
+    console.log('[ApiService.semanticSearch] Sending request:', {
+      query: requestBody.query || '(null)',
+      limit: requestBody.limit,
+      minPrice: requestBody.minPrice,
+      maxPrice: requestBody.maxPrice,
+      categories: requestBody.categories,
+      categoriesCount: requestBody.categories.length,
+      categoriesType: Array.isArray(requestBody.categories) ? 'array' : typeof requestBody.categories,
+      distance: requestBody.distance,
+      coordinates: requestBody.coordinates,
+    });
 
     return this.authenticatedCall(async (client) => {
       try {
         const { data, error } = await client.functions.invoke('semantic-search', {
-          body: { query: q, limit }
+          body: requestBody
         });
         
         if (error) {

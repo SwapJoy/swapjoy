@@ -10,53 +10,128 @@ serve(async (req) => {
   );
 
   try {
-    const { query, limit = 30 } = await req.json();
+    const requestBody = await req.json();
+    const { 
+      query, 
+      limit = 30,
+      minPrice = 0,
+      maxPrice = null,
+      categories = [],
+      distance = null,
+      coordinates = null
+    } = requestBody;
+    
+    console.log('[semantic-search] Received request:', {
+      query: query || '(null)',
+      limit,
+      minPrice,
+      maxPrice,
+      categories,
+      categoriesCount: Array.isArray(categories) ? categories.length : 'not-array',
+      categoriesType: Array.isArray(categories) ? 'array' : typeof categories,
+      distance,
+      coordinates,
+    });
+    
     const q = (query || '').trim();
-    if (!q) return new Response(JSON.stringify({ items: [] }), { headers: { 'Content-Type': 'application/json' }, status: 200 });
+    const hasQuery = q.length > 0;
+    
+    let embedding: number[] | null = null;
+    
+    // Generate query embedding only if query is provided
+    if (hasQuery) {
+      const openaiResponse = await fetch('https://api.openai.com/v1/embeddings', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ input: q, model: 'text-embedding-ada-002' }),
+      });
 
-    // Generate query embedding using OpenAI
-    const openaiResponse = await fetch('https://api.openai.com/v1/embeddings', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ input: q, model: 'text-embedding-ada-002' }),
+      if (!openaiResponse.ok) {
+        const errorData = await openaiResponse.json();
+        return new Response(JSON.stringify({ error: errorData.message || 'OpenAI error' }), { headers: { 'Content-Type': 'application/json' }, status: 500 });
+      }
+
+      const embJson = await openaiResponse.json();
+      embedding = embJson?.data?.[0]?.embedding;
+      if (!embedding || !Array.isArray(embedding)) {
+        return new Response(JSON.stringify({ error: 'Invalid embedding' }), { headers: { 'Content-Type': 'application/json' }, status: 500 });
+      }
+    }
+
+    // Extract coordinates
+    const userLat = coordinates?.lat || null;
+    const userLng = coordinates?.lng || null;
+
+    // Prepare category_ids - ensure it's a proper UUID array
+    const categoryIds = Array.isArray(categories) && categories.length > 0 
+      ? categories.filter((cat: any) => cat && typeof cat === 'string' && cat.length > 0)
+      : [];
+
+    console.log('[semantic-search] Calling match_items with params:', {
+      hasQuery,
+      hasEmbedding: embedding !== null,
+      match_threshold: 0.5,
+      match_count: limit,
+      min_price: minPrice || 0,
+      max_price: maxPrice || null,
+      category_ids: categoryIds,
+      category_ids_count: categoryIds.length,
+      category_ids_sample: categoryIds.slice(0, 3),
+      distance_km: distance || null,
+      user_lat: userLat,
+      user_lng: userLng,
     });
 
-    if (!openaiResponse.ok) {
-      const errorData = await openaiResponse.json();
-      return new Response(JSON.stringify({ error: errorData.message || 'OpenAI error' }), { headers: { 'Content-Type': 'application/json' }, status: 500 });
-    }
-
-    const embJson = await openaiResponse.json();
-    const embedding = embJson?.data?.[0]?.embedding;
-    if (!embedding || !Array.isArray(embedding)) {
-      return new Response(JSON.stringify({ error: 'Invalid embedding' }), { headers: { 'Content-Type': 'application/json' }, status: 500 });
-    }
-
-    // Query Postgres for nearest neighbors
-    // Higher threshold for more strict/relevant results
+    // Query Postgres for nearest neighbors or filtered items
+    // Higher threshold for more strict/relevant results when using semantic search
     const { data, error } = await supabaseClient
       .rpc('match_items', {
-        query_embedding: embedding,
+        query_embedding: embedding,  // null if no query
         match_threshold: 0.5,  // Stricter threshold for more relevant semantic matches
         match_count: limit,
+        min_price: minPrice || 0,
         exclude_user_id: null,
+        max_price: maxPrice || null,
+        category_ids: categoryIds,
+        distance_km: distance || null,
+        user_lat: userLat,
+        user_lng: userLng,
       });
 
     if (error) {
       console.error('[semantic-search] match_items RPC error:', error);
+      console.error('[semantic-search] Error details:', JSON.stringify(error, null, 2));
       return new Response(JSON.stringify({ error: error.message }), { headers: { 'Content-Type': 'application/json' }, status: 500 });
+    }
+
+    const itemsCount = Array.isArray(data) ? data.length : 0;
+    console.log('[semantic-search] match_items returned', itemsCount, 'items');
+    
+    if (itemsCount > 0 && categoryIds.length > 0) {
+      // Log category distribution in results
+      const categoryCounts: Record<string, number> = {};
+      data.forEach((item: any) => {
+        const catId = item.category_id || 'null';
+        categoryCounts[catId] = (categoryCounts[catId] || 0) + 1;
+      });
+      console.log('[semantic-search] Result category distribution:', categoryCounts);
+      console.log('[semantic-search] Expected categories:', categoryIds);
+      const matchingCategories = data.filter((item: any) => 
+        item.category_id && categoryIds.includes(item.category_id)
+      ).length;
+      console.log('[semantic-search] Items matching category filter:', matchingCategories, 'out of', itemsCount);
     }
 
     // Enrich with primary image in a single query (if not included)
     let items = Array.isArray(data) ? data : [];
     
     // If no semantic results or very few, enhance with fuzzy text search
-    // Split query into words and search for items that match most words
-    // Only trigger fuzzy fallback if we have very few results (more strict)
-    if (items.length < 3) {
+    // Only apply fuzzy fallback if we have a query and very few results
+    // Skip fuzzy fallback for filter-only searches (no query)
+    if (hasQuery && items.length < 3) {
       console.log(`[semantic-search] Only ${items.length} semantic results, enhancing with text search`);
       const words = q.toLowerCase().split(/\s+/).filter(w => w.length > 2); // Get words longer than 2 chars
       
@@ -66,13 +141,34 @@ serve(async (req) => {
         const existingIds = new Set(items.map((it: any) => it.id));
         const wordConditions = words.map(word => `title.ilike.%${word}%`).join(',');
         
-        const { data: textResults } = await supabaseClient
+        // Build text search query with filters applied
+        let textQuery = supabaseClient
           .from('items')
           .select('id, title, description, price, currency, condition, category_id, user_id')
           .eq('status', 'available')
           .not('embedding', 'is', null)
           .or(wordConditions)
-          .limit(limit * 2); // Get more candidates
+          .gte('price', minPrice || 0);
+        
+        // Apply max price filter
+        if (maxPrice !== null && maxPrice !== undefined) {
+          textQuery = textQuery.lte('price', maxPrice);
+        }
+        
+        // Apply category filter if categories are provided
+        if (categoryIds.length > 0) {
+          textQuery = textQuery.in('category_id', categoryIds);
+          console.log('[semantic-search] Text search applying category filter:', categoryIds);
+        }
+        
+        // Apply distance filter if provided
+        if (distance !== null && userLat !== null && userLng !== null) {
+          // Note: Distance filtering in text search would require a more complex query
+          // For now, we'll rely on the semantic search for distance filtering
+          // and only use text search as a fallback when semantic results are sparse
+        }
+        
+        const { data: textResults } = await textQuery.limit(limit * 2); // Get more candidates
         
         if (textResults && textResults.length > 0) {
           // Get images separately to avoid ambiguous column reference
@@ -127,13 +223,14 @@ serve(async (req) => {
     // Enrich items with user, category, and images data to match fetchSection structure
     const itemIds = items.map((it: any) => it.id).filter(Boolean);
     if (itemIds.length === 0) {
-      console.log(`[semantic-search] Returning ${items.length} items for query: "${q}"`);
+      const searchType = hasQuery ? `query: "${q}"` : 'filter-only search';
+      console.log(`[semantic-search] Returning ${items.length} items for ${searchType}`);
       return new Response(JSON.stringify({ items: [] }), { headers: { 'Content-Type': 'application/json' }, status: 200 });
     }
 
-    // Get unique user_ids and category_ids
+    // Get unique user_ids and category_ids from results
     const userIds = [...new Set(items.map((it: any) => it.user_id).filter(Boolean))];
-    const categoryIds = [...new Set(items.map((it: any) => it.category_id).filter(Boolean))];
+    const resultCategoryIds = [...new Set(items.map((it: any) => it.category_id).filter(Boolean))];
 
     // Fetch user data
     let usersMap = new Map();
@@ -152,11 +249,11 @@ serve(async (req) => {
 
     // Fetch category data
     let categoriesMap = new Map();
-    if (categoryIds.length > 0) {
+    if (resultCategoryIds.length > 0) {
       const { data: categoriesData } = await supabaseClient
         .from('categories')
         .select('id, title_en, title_ka')
-        .in('id', categoryIds);
+        .in('id', resultCategoryIds);
       
       if (categoriesData) {
         categoriesData.forEach((cat: any) => {
@@ -256,7 +353,8 @@ serve(async (req) => {
       };
     });
 
-    console.log(`[semantic-search] Returning ${transformedItems.length} items for query: "${q}"`);
+    const searchType = hasQuery ? `query: "${q}"` : 'filter-only search';
+    console.log(`[semantic-search] Returning ${transformedItems.length} items for ${searchType}`);
     return new Response(JSON.stringify({ items: transformedItems }), { headers: { 'Content-Type': 'application/json' }, status: 200 });
   } catch (err) {
     return new Response(JSON.stringify({ error: (err as any).message || 'Unknown error' }), { headers: { 'Content-Type': 'application/json' }, status: 500 });
