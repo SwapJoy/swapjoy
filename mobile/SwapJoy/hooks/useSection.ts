@@ -120,6 +120,7 @@ export const useSection = (sectionType: SectionType, options?: UseSectionOptions
             username: item.users?.username || item.user?.username || `user_${(item.user_id || '').slice(-4)}`,
             first_name: item.users?.first_name || item.user?.first_name || `User ${(item.user_id || '').slice(-4)}`,
             last_name: item.users?.last_name || item.user?.last_name || '',
+            profile_image_url: item.users?.profile_image_url || item.user?.profile_image_url || null,
           },
           distance_km: item.distance_km ?? null,
           location_lat: item.location_lat ?? null,

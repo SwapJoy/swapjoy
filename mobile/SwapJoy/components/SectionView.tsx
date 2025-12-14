@@ -56,6 +56,7 @@ const SectionItemCard: React.FC<SectionItemCardProps> = memo(
           displayName: ownerDisplayName,
           initials: ownerInitials,
           userId: item.user?.id,
+          profileImageUrl: item.user?.profile_image_url ?? undefined,
         }}
         onPress={() => (navigation as any).navigate('ItemDetails', { itemId: item.id })}
         onOwnerPress={() => {

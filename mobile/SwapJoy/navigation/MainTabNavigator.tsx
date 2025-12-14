@@ -117,27 +117,7 @@ const MainTabNavigator: React.FC<MainTabNavigatorProps> = ({ onNavigateToAdd }) 
           ),
         }}
       />
-      <Tab.Screen
-        name="Chats"
-        component={ChatListScreen}
-        listeners={{
-          tabPress: (e) => {
-            if (!handleTabPress('Chats')) {
-              e.preventDefault();
-            }
-          },
-        }}
-        options={{
-          tabBarBadge: totalUnreadChats > 0 ? (totalUnreadChats > 99 ? '99+' : totalUnreadChats) : undefined,
-          tabBarIcon: ({ color, size, focused }) => (
-            <Ionicons 
-              name={focused ? "chatbubbles" : "chatbubbles-outline"} 
-              size={size} 
-              color={color} 
-            />
-          ),
-        }}
-      />
+     
       <Tab.Screen
         name="Notifications"
         component={NotificationsScreen}

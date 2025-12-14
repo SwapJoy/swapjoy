@@ -19,6 +19,7 @@ export interface SJCardItem {
     username: string;
     first_name: string;
     last_name: string;
+    profile_image_url?: string | null;
   };
   distance_km?: number | null;
   location_lat?: number | null;
@@ -163,6 +164,7 @@ export const useExploreData = (options?: UseExploreDataOptions) => {
             username: item.users?.username || item.user?.username || `user_${(item.user_id || '').slice(-4)}`,
             first_name: item.users?.first_name || item.user?.first_name || `User ${(item.user_id || '').slice(-4)}`,
             last_name: item.users?.last_name || item.user?.last_name || '',
+            profile_image_url: item.users?.profile_image_url || item.user?.profile_image_url || null,
           },
           view_count: item.view_count ?? item.item_metrics?.view_count ?? undefined,
         };
