@@ -23,6 +23,7 @@ export interface SJCardItem {
   distance_km?: number | null;
   location_lat?: number | null;
   location_lng?: number | null;
+  view_count?: number;
 }
 
 interface UseExploreDataOptions {
@@ -163,6 +164,7 @@ export const useExploreData = (options?: UseExploreDataOptions) => {
             first_name: item.users?.first_name || item.user?.first_name || `User ${(item.user_id || '').slice(-4)}`,
             last_name: item.users?.last_name || item.user?.last_name || '',
           },
+          view_count: item.view_count ?? item.item_metrics?.view_count ?? undefined,
         };
       });
 

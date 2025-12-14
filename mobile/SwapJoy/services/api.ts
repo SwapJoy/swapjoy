@@ -708,6 +708,7 @@ export class ApiService {
                 category_id: item.category_id,
                 category: categoryData || (item.category_id ? { id: item.category_id } : null),
                 category_name_en: categoryData?.title_en || null,
+                view_count: item.view_count ?? undefined,
                 category_name_ka: categoryData?.title_ka || null,
                 category_name: categoryData?.title_en || categoryData?.title_ka || null,
                 image_url: imageUrl,
@@ -3429,15 +3430,55 @@ export class ApiService {
         console.log('Error fetching images:', error);
       }
 
+      // Get view count from item_metrics
+      let viewCount: number | undefined = undefined;
+      try {
+        const { data: metricsData } = await client
+          .from('item_metrics')
+          .select('view_count')
+          .eq('item_id', itemId)
+          .single();
+        if (metricsData) {
+          viewCount = metricsData.view_count;
+        }
+      } catch (error) {
+        // Silently fail - view count is optional
+        console.log('Error fetching view count:', error);
+      }
+
       return {
         data: {
           ...item,
           category,
           user,
           images,
+          view_count: viewCount,
         },
         error: null,
       };
     });
+  }
+
+  /**
+   * Track a view for an item (fire-and-forget, non-blocking)
+   * This is called when a user opens the item details screen
+   */
+  static async trackItemView(itemId: string, userId?: string): Promise<void> {
+    // Fire-and-forget: don't await, handle errors silently
+    // This ensures view tracking doesn't block the UI
+    (async () => {
+      try {
+        const { error } = await supabase.rpc('fn_track_item_view', {
+          p_item_id: itemId,
+          p_user_id: userId || null,
+        });
+        if (error) {
+          console.warn('[ApiService] Failed to track item view:', error);
+        }
+      } catch (error) {
+        // Silently fail - view tracking is non-critical
+        console.warn('[ApiService] Error tracking item view:', error);
+      }
+    })();
   }
 }

@@ -98,6 +98,7 @@ interface TopMatchCardProps {
   cardWidth?: number;
   sectionPaddingHorizontal?: number;
   borderRadius?: number;
+  viewCount?: number;
 }
 
 const TopMatchCard: React.FC<TopMatchCardProps> = ({
@@ -119,7 +120,8 @@ const TopMatchCard: React.FC<TopMatchCardProps> = ({
   disableLikeButton,
   cardWidth = DEFAULT_CARD_WIDTH,
   sectionPaddingHorizontal = 0,
-  borderRadius = 12
+  borderRadius = 12,
+  viewCount
 }) => {
   const { language, t } = useLocalization();
   const { getCategoryByName, getCategoryById } = useCategories();
@@ -234,6 +236,14 @@ const TopMatchCard: React.FC<TopMatchCardProps> = ({
                 color={isLikeActive ? likeActiveColor : likeIconColor}
               />
             </TouchableOpacity>
+          )}
+          {viewCount !== undefined && viewCount > 0 && (
+            <View style={styles.viewCountBadge}>
+              <Ionicons name="eye-outline" size={12} color="#666" />
+              <SJText style={styles.viewCountText}>
+                {viewCount >= 1000 ? `${(viewCount / 1000).toFixed(1)}K` : viewCount}
+              </SJText>
+            </View>
           )}
           {conditionPresentation && (
             <View
@@ -577,6 +587,23 @@ const styles = StyleSheet.create({
   },
   fadePlaceholder: {
     backgroundColor: '#e2e8f0',
+  },
+  viewCountBadge: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 4,
+  },
+  viewCountText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#666',
   },
 });
 

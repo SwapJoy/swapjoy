@@ -124,6 +124,7 @@ export const useSection = (sectionType: SectionType, options?: UseSectionOptions
           distance_km: item.distance_km ?? null,
           location_lat: item.location_lat ?? null,
           location_lng: item.location_lng ?? null,
+          view_count: item.view_count ?? item.item_metrics?.view_count ?? undefined,
         };
       });
 

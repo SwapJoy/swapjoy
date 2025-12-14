@@ -87,6 +87,7 @@ const SectionItemCard: React.FC<SectionItemCardProps> = memo(
         likeActiveColor="#ef4444"
         isLikeActive={isFavorite(item.id)}
         cardWidth={cardWidth}
+        viewCount={item.view_count}
       />
     );
   }

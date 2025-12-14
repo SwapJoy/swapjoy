@@ -54,6 +54,7 @@ export interface Item {
   location_lng: number | null;
   created_at: string;
   updated_at: string;
+  view_count?: number;
 }
 
 export interface ItemImage {

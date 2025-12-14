@@ -6,6 +6,7 @@ export enum SectionType {
   TopPicksForYou = 'TopPicksForYou',
   TrendingCategories = 'TrendingCategories',
   BudgetPicks = 'BudgetPicks',
+  MostlyViewed = 'MostlyViewed',
 }
 
 // Extension to add functionName property to enum
@@ -26,6 +27,8 @@ export namespace SectionType {
         return 'fn_trending_categories';
       case SectionType.BudgetPicks:
         return 'fn_budget_picks';
+      case SectionType.MostlyViewed:
+        return 'fn_mostly_viewed';
       default:
         return 'fn_near_you';
     }
@@ -47,6 +50,8 @@ export namespace SectionType {
         return 'Trending Categories';
       case SectionType.BudgetPicks:
         return 'Budget Picks';
+      case SectionType.MostlyViewed:
+        return 'Mostly Viewed';
       default:
         return 'Near You';
     }

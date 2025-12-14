@@ -441,6 +441,13 @@ export const useExploreScreenState = (): ExploreScreenState => {
         },
       },
       {
+        type: SectionType.MostlyViewed,
+        functionParams: {
+          ...baseParams,
+          p_radius_km: userLocationParams.p_radius_km ?? 50
+        },
+      },
+      {
         type: SectionType.FavouriteCategories,
         functionParams: {
           ...baseParams,

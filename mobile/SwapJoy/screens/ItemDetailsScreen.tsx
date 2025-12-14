@@ -9,6 +9,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { formatCurrency } from '../utils';
 import { useLocalization } from '../localization';
 import FavoriteToggleButton from '../components/FavoriteToggleButton';
+import { Ionicons } from '@expo/vector-icons';
 
 const { width } = Dimensions.get('window');
 
@@ -70,13 +71,17 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
         setError(error.message || strings.loadFailed);
       } else {
         setItem(data);
+        // Track view asynchronously (non-blocking)
+        if (data) {
+          ApiService.trackItemView(itemId, user?.id);
+        }
       }
       setLoading(false);
     })();
     return () => {
       mounted = false;
     };
-  }, [itemId, language, strings]);
+  }, [itemId, language, strings, user?.id]);
 
   const showOffer = useMemo(() => {
     if (!item?.user?.id) return false;
@@ -147,6 +152,14 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
               <View style={styles.details}>
                 <SJText style={styles.itemTitle}>{item.title}</SJText>
                 <SJText style={styles.price}>{formatCurrency(item.price || item.estimated_value || 0, item.currency || 'USD')}</SJText>
+                {item.view_count !== undefined && item.view_count > 0 && (
+                  <View style={styles.viewCountRow}>
+                    <Ionicons name="eye-outline" size={14} color="#666" />
+                    <SJText style={styles.viewCountText}>
+                      {item.view_count >= 1000 ? `${(item.view_count / 1000).toFixed(1)}K` : item.view_count} {item.view_count === 1 ? 'view' : 'views'}
+                    </SJText>
+                  </View>
+                )}
                 {item.category?.name ? (
                   <SJText style={styles.meta}>
                     {strings.category}: {item.category.name}
@@ -320,6 +333,16 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '700',
+  },
+  viewCountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    gap: 6,
+  },
+  viewCountText: {
+    fontSize: 13,
+    color: '#666',
   },
 });
 
