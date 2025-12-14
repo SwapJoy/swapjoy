@@ -395,6 +395,7 @@ export class ApiService {
       categories?: string[];
       distance?: number | null;
       coordinates?: { lat: number; lng: number } | null;
+      currency?: string;  // Currency for price filtering
     }
   ) {
     const q = query ? query.trim() : null;
@@ -412,6 +413,7 @@ export class ApiService {
       requestBody.categories = filters.categories ?? [];
       requestBody.distance = filters.distance ?? null;
       requestBody.coordinates = filters.coordinates ?? null;
+      requestBody.currency = filters.currency ?? 'USD';
     } else {
       // Default filters if not provided
       requestBody.minPrice = 0;
@@ -419,6 +421,7 @@ export class ApiService {
       requestBody.categories = [];
       requestBody.distance = null;
       requestBody.coordinates = null;
+      requestBody.currency = 'USD';
     }
 
     console.log('[ApiService.semanticSearch] Sending request:', {
@@ -426,6 +429,7 @@ export class ApiService {
       limit: requestBody.limit,
       minPrice: requestBody.minPrice,
       maxPrice: requestBody.maxPrice,
+      currency: requestBody.currency,
       categories: requestBody.categories,
       categoriesCount: requestBody.categories.length,
       categoriesType: Array.isArray(requestBody.categories) ? 'array' : typeof requestBody.categories,

@@ -535,6 +535,7 @@ export const useExploreScreenState = (): ExploreScreenState => {
           maxPrice: filters.priceMax ?? null,
           categories: filters.categories ?? [],
           distance: filters.distance ?? null,
+          currency: filters.currency ?? 'USD',  // Pass currency for price conversion
           coordinates: 
             locationLat !== null && locationLng !== null
               ? { lat: locationLat, lng: locationLng }
@@ -544,6 +545,7 @@ export const useExploreScreenState = (): ExploreScreenState => {
         console.log('[useExploreScreenState] performSearch - Query:', query || '(empty)', 'Filters:', {
           minPrice: filterParams.minPrice,
           maxPrice: filterParams.maxPrice,
+          currency: filterParams.currency,
           categories: filterParams.categories,
           categoriesCount: filterParams.categories.length,
           distance: filterParams.distance,
