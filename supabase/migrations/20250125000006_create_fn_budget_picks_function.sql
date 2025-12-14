@@ -7,6 +7,7 @@ CREATE OR REPLACE FUNCTION public.fn_budget_picks(
   p_user_id    uuid,
   p_user_lat   numeric,
   p_user_lng   numeric,
+  p_radius_km  numeric DEFAULT 50,
   p_limit      int     DEFAULT 50,
   p_price_percentile numeric DEFAULT 0.5  -- 0.5 = median (50th percentile), 0.25 = 25th percentile
 )
@@ -86,8 +87,20 @@ BEGIN
       AND i.category_id IS NOT NULL
       AND i.price IS NOT NULL
       AND i.price > 0
+      AND i.location_lat IS NOT NULL
+      AND i.location_lng IS NOT NULL
       -- Only include items priced below the threshold (budget-friendly)
       AND (i.price * COALESCE(cur.rate, 1)) <= cps.threshold_price_gel
+      -- fast bounding box pre-filter
+      AND (
+        p_user_lat IS NULL OR p_user_lng IS NULL OR p_radius_km IS NULL OR
+        (
+          i.location_lat BETWEEN (p_user_lat - (p_radius_km / 111))
+                            AND (p_user_lat + (p_radius_km / 111))
+          AND i.location_lng BETWEEN (p_user_lng - (p_radius_km / (111 * COS(RADIANS(p_user_lat)))))
+                            AND (p_user_lng + (p_radius_km / (111 * COS(RADIANS(p_user_lat)))))
+        )
+      )
   ),
   images_agg AS (
     SELECT
@@ -130,6 +143,8 @@ BEGIN
   FROM items_with_distance iwd
   JOIN users u       ON u.id = iwd.user_id
   LEFT JOIN images_agg ia ON ia.item_id = iwd.id
+  WHERE
+    (iwd.distance_km IS NULL OR iwd.distance_km <= p_radius_km)
   ORDER BY
     iwd.price_gel ASC,        -- Cheapest first
     iwd.created_at DESC       -- Newest first for same price

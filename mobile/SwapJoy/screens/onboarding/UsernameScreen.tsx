@@ -9,8 +9,7 @@ import { useLocalization } from '../../localization';
 import { useAuth } from '../../contexts/AuthContext';
 
 const UsernameScreen: React.FC = () => {
-  const { nextStep, previousStep, skipOnboarding, isFirstStep } = useOnboarding();
-  const currentStepIndex = 0; // Username is step 1
+  const { nextStep, previousStep, skipOnboarding, isFirstStep, currentStepIndex, totalSteps } = useOnboarding();
   const { user } = useAuth();
   const { t } = useLocalization();
   const [username, setUsername] = useState('');
@@ -174,7 +173,7 @@ const UsernameScreen: React.FC = () => {
               </TouchableOpacity>
             )}
             <View style={styles.headerContent}>
-              <SJText style={styles.stepIndicator}>Step {currentStepIndex + 1} of 6</SJText>
+              <SJText style={styles.stepIndicator}>Step {currentStepIndex + 1} of {totalSteps}</SJText>
             </View>
           </View>
 

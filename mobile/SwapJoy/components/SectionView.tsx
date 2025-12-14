@@ -1,4 +1,4 @@
-import React, { memo, useCallback } from 'react';
+import React, { memo, useCallback, useEffect } from 'react';
 import {View, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator} from 'react-native';
 import SJText from '../components/SJText';
 import { useNavigation } from '@react-navigation/native';
@@ -10,6 +10,8 @@ import { useFavorites } from '../contexts/FavoritesContext';
 import { SJCardItem } from '../hooks/useExploreData';
 import TopMatchCard, { TopMatchCardSkeleton } from './TopMatchCard';
 import { ExploreScreenProps } from '../types/navigation';
+import { useLocation } from '../contexts/LocationContext';
+import { calculateDistance } from '../types/recommendation';
 
 interface SectionViewProps {
   sectionType: SectionType;
@@ -129,6 +131,7 @@ export const SectionView: React.FC<SectionViewProps> = memo(({
   const { t } = useLocalization();
   const { isFavorite, toggleFavorite } = useFavorites();
   const { user } = useAuth();
+  const { currentLocation } = useLocation();
   
   const {
     items,
@@ -142,6 +145,41 @@ export const SectionView: React.FC<SectionViewProps> = memo(({
   });
 
   const sectionTitle = SectionType.displayName(sectionType);
+
+  // Log section items with distances
+  useEffect(() => {
+    if (items && items.length > 0 && isInitialized && !loading) {
+      console.log(`\n[Section: ${sectionTitle}]`);
+      
+      items.forEach((item, index) => {
+        let distanceDisplay: string;
+        
+        if (item.distance_km !== null && item.distance_km !== undefined) {
+          // Use distance_km from database if available
+          distanceDisplay = item.distance_km.toFixed(2);
+        } else if (
+          currentLocation &&
+          item.location_lat !== null &&
+          item.location_lat !== undefined &&
+          item.location_lng !== null &&
+          item.location_lng !== undefined
+        ) {
+          // Calculate distance if not provided by database
+          const calculatedDistance = calculateDistance(
+            currentLocation.lat,
+            currentLocation.lng,
+            item.location_lat,
+            item.location_lng
+          );
+          distanceDisplay = calculatedDistance.toFixed(2);
+        } else {
+          distanceDisplay = 'N/A';
+        }
+        
+        console.log(`${item.title} - ${distanceDisplay}km`);
+      });
+    }
+  }, [items, sectionTitle, isInitialized, loading, currentLocation]);
 
   const renderItem = useCallback(
     ({ item, index }: { item: SJCardItem; index: number }) => {

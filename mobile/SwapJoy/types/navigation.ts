@@ -16,10 +16,6 @@ export type RootStackParamList = {
   };
   OnboardingUsername: undefined;
   OnboardingName: undefined;
-  OnboardingBirthdate: undefined;
-  OnboardingGender: undefined;
-  OnboardingCategories: undefined;
-  OnboardingLocation: undefined;
   MainTabs: undefined;
   CreateListing: undefined;
   AddItem: undefined;

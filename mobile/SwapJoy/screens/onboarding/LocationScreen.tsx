@@ -11,8 +11,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import type { CityOption, LocationSelection } from '../../types/location';
 
 const LocationScreen: React.FC = () => {
-  const { nextStep, previousStep, skipOnboarding, isFirstStep, completeOnboarding } = useOnboarding();
-  const currentStepIndex = 5; // Location is step 6
+  const { nextStep, previousStep, skipOnboarding, isFirstStep, completeOnboarding, currentStepIndex, totalSteps } = useOnboarding();
   const { user } = useAuth();
   const { t } = useLocalization();
   const [cities, setCities] = useState<CityOption[]>([]);
@@ -254,7 +253,7 @@ const LocationScreen: React.FC = () => {
               </TouchableOpacity>
             )}
             <View style={styles.headerContent}>
-              <SJText style={styles.stepIndicator}>Step {currentStepIndex + 1} of 6</SJText>
+              <SJText style={styles.stepIndicator}>Step {currentStepIndex + 1} of {totalSteps}</SJText>
             </View>
           </View>
 

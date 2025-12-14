@@ -121,6 +121,9 @@ export const useSection = (sectionType: SectionType, options?: UseSectionOptions
             first_name: item.users?.first_name || item.user?.first_name || `User ${(item.user_id || '').slice(-4)}`,
             last_name: item.users?.last_name || item.user?.last_name || '',
           },
+          distance_km: item.distance_km ?? null,
+          location_lat: item.location_lat ?? null,
+          location_lng: item.location_lng ?? null,
         };
       });
 

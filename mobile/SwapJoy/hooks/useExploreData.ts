@@ -20,6 +20,9 @@ export interface SJCardItem {
     first_name: string;
     last_name: string;
   };
+  distance_km?: number | null;
+  location_lat?: number | null;
+  location_lng?: number | null;
 }
 
 interface UseExploreDataOptions {

@@ -10,6 +10,7 @@ CREATE OR REPLACE FUNCTION public.fn_best_deals(
   p_user_id          uuid,
   p_user_lat         numeric,
   p_user_lng         numeric,
+  p_radius_km        numeric DEFAULT 50,
   p_limit            int     DEFAULT 50,
   p_price_tolerance  numeric DEFAULT 0.20   -- 20% price difference tolerance
 )
@@ -94,6 +95,18 @@ BEGIN
       AND ci.condition IS NOT NULL
       AND ci.price IS NOT NULL
       AND ci.price > 0
+      AND ci.location_lat IS NOT NULL
+      AND ci.location_lng IS NOT NULL
+      -- fast bounding box pre-filter
+      AND (
+        p_user_lat IS NULL OR p_user_lng IS NULL OR p_radius_km IS NULL OR
+        (
+          ci.location_lat BETWEEN (p_user_lat - (p_radius_km / 111))
+                            AND (p_user_lat + (p_radius_km / 111))
+          AND ci.location_lng BETWEEN (p_user_lng - (p_radius_km / (111 * COS(RADIANS(p_user_lat)))))
+                            AND (p_user_lng + (p_radius_km / (111 * COS(RADIANS(p_user_lat)))))
+        )
+      )
   ),
   matched_deals AS (
     -- Match candidate items to user's recent items
@@ -158,6 +171,8 @@ BEGIN
   FROM matched_deals md
   JOIN users u ON u.id = md.user_id
   LEFT JOIN images_agg ia ON ia.item_id = md.id
+  WHERE
+    (md.distance_km IS NULL OR md.distance_km <= p_radius_km)
   ORDER BY
     md.user_item_created_at DESC,  -- Most recent user items first
     md.price_diff_pct ASC,         -- Closest price matches first

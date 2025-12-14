@@ -128,7 +128,7 @@ BEGIN
   WHERE
     (iwd.distance_km IS NULL OR iwd.distance_km <= p_radius_km)
   ORDER BY
-    iwd.distance_km NULLS LAST,
+    iwd.distance_km ASC NULLS LAST,
     iwd.created_at DESC
   LIMIT p_limit;
 END;

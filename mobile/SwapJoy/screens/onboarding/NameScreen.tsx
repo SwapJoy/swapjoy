@@ -9,8 +9,7 @@ import { useLocalization } from '../../localization';
 import { useAuth } from '../../contexts/AuthContext';
 
 const NameScreen: React.FC = () => {
-  const { nextStep, previousStep, skipOnboarding, isFirstStep } = useOnboarding();
-  const currentStepIndex = 1; // Name is step 2
+  const { nextStep, previousStep, skipOnboarding, isFirstStep, isLastStep, currentStepIndex, totalSteps, completeOnboarding } = useOnboarding();
   const { user } = useAuth();
   const { t } = useLocalization();
   const [firstName, setFirstName] = useState('');
@@ -57,7 +56,11 @@ const NameScreen: React.FC = () => {
   }, [firstName, lastName]);
 
   const handleNext = () => {
-    nextStep();
+    if (isLastStep) {
+      completeOnboarding();
+    } else {
+      nextStep();
+    }
   };
 
   return (
@@ -79,7 +82,7 @@ const NameScreen: React.FC = () => {
               </TouchableOpacity>
             )}
             <View style={styles.headerContent}>
-              <SJText style={styles.stepIndicator}>Step {currentStepIndex + 1} of 6</SJText>
+              <SJText style={styles.stepIndicator}>Step {currentStepIndex + 1} of {totalSteps}</SJText>
             </View>
           </View>
 
@@ -148,7 +151,10 @@ const NameScreen: React.FC = () => {
             onPress={handleNext}
           >
             <SJText style={styles.nextButtonText}>
-              {t('onboarding.common.next', { defaultValue: 'Next' })}
+              {isLastStep 
+                ? t('onboarding.common.getStarted', { defaultValue: 'Get started' })
+                : t('onboarding.common.next', { defaultValue: 'Next' })
+              }
             </SJText>
           </TouchableOpacity>
         </View>

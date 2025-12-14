@@ -901,7 +901,7 @@ export class AuthService {
             
             // Create user in database
             const userData: CreateUserData = {
-              username: 'user_' + phone.replace('+', ''),
+              username: '', // Don't auto-generate - let user set during onboarding
               first_name: 'User',
               last_name: '',
               phone: phone,
@@ -1639,11 +1639,10 @@ export class AuthService {
         authMetadata.picture ??
         googleAccount.photo ??
         undefined;
-      const resolvedUsername: string =
-        authMetadata.username ??
-        (googleAccount.email ? String(googleAccount.email).split('@')[0] : undefined) ??
-        (resolvedEmail ? resolvedEmail.split('@')[0] : undefined) ??
-        `user_${Date.now()}`;
+      // Don't auto-generate username - let user set it during onboarding
+      // Only use username if explicitly provided in metadata
+      const resolvedUsername: string | undefined =
+        authMetadata.username ?? undefined;
       let latestUserRecord: User | null = null;
 
       // Check if user exists in database, create if not
@@ -1652,7 +1651,7 @@ export class AuthService {
       if (!userExists) {
         console.log('[GoogleAuth] User not found, creating in app database');
         const userData: CreateUserData = {
-          username: resolvedUsername,
+          username: resolvedUsername || '', // Empty string will become null in createUserInDatabase
           first_name: resolvedFirstName || 'User',
           last_name: resolvedLastName || '',
           phone: '',
@@ -1722,7 +1721,7 @@ export class AuthService {
       if (!verifyExists) {
         console.log('[GoogleAuth] Post-store verification: user still missing, retrying create');
         const retryUserData: CreateUserData = {
-          username: session.user.username || (session.user.email?.split('@')[0] ?? 'user_' + Date.now()),
+          username: session.user.username || '', // Don't auto-generate - let user set during onboarding
           first_name: session.user.first_name || '',
           last_name: session.user.last_name || '',
           phone: '',

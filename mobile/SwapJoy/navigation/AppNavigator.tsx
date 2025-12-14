@@ -1,4 +1,4 @@
-import React, { forwardRef, useState, useEffect } from 'react';
+import React, { forwardRef, useState, useEffect, useCallback, useRef } from 'react';
 import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { Platform, TouchableOpacity, ActivityIndicator, View } from 'react-native';
@@ -15,10 +15,6 @@ import EmailVerificationScreen from '../screens/EmailVerificationScreen';
 import OTPVerificationScreen from '../screens/OTPVerificationScreen';
 import UsernameScreen from '../screens/onboarding/UsernameScreen';
 import NameScreen from '../screens/onboarding/NameScreen';
-import BirthdateScreen from '../screens/onboarding/BirthdateScreen';
-import GenderScreen from '../screens/onboarding/GenderScreen';
-import CategoriesScreen from '../screens/onboarding/CategoriesScreen';
-import LocationScreen from '../screens/onboarding/LocationScreen';
 import MainPageContainer from '../screens/MainPageContainer';
 import CreateListingScreen from '../screens/CreateListingScreen';
 import AddItemScreen from '../screens/AddItemScreen';
@@ -52,6 +48,8 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
   const [hasUsername, setHasUsername] = useState<boolean | null>(null);
   const [checkingUsername, setCheckingUsername] = useState(false);
   const [introCompleted, setIntroCompleted] = useState<boolean | null>(null);
+  const navigationRef = useRef<NavigationContainerRef<RootStackParamList> | null>(null);
+  const previousRouteNameRef = useRef<string | undefined>(undefined);
 
   // Check intro completion status
   useEffect(() => {
@@ -62,36 +60,98 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
     checkIntroStatus();
   }, []);
 
+  // Function to check username status (extracted for reuse)
+  // Simple check: if user has a username, onboarding is complete
+  const checkUsernameStatus = useCallback(async () => {
+    if (!isAuthenticated || !user || isAnonymous) {
+      setHasUsername(null);
+      return;
+    }
+
+    setCheckingUsername(true);
+    try {
+      const { data: profile, error } = await ApiService.getProfile();
+      if (error) {
+        console.warn('[AppNavigator] Error fetching profile:', error);
+        setHasUsername(true); // Default to true to avoid blocking
+      } else {
+        const username = (profile as any)?.username;
+        const hasUsernameValue = !!username && username.trim() !== '';
+        
+        console.log('[AppNavigator] Username check result:', {
+          hasUsername: hasUsernameValue,
+          username: username || 'null',
+        });
+        
+        setHasUsername(hasUsernameValue);
+      }
+    } catch (error) {
+      console.error('[AppNavigator] Error checking username status:', error);
+      setHasUsername(true); // Default to true to avoid blocking
+    } finally {
+      setCheckingUsername(false);
+    }
+  }, [isAuthenticated, user, isAnonymous]);
+
   // Check if user has username when authenticated (skip for anonymous users)
   useEffect(() => {
-    const checkUsernameStatus = async () => {
-      if (!isAuthenticated || !user || isAnonymous) {
-        setHasUsername(null);
-        return;
-      }
-
-      setCheckingUsername(true);
-      try {
-        const { data: profile, error } = await ApiService.getProfile();
-        if (error) {
-          console.warn('[AppNavigator] Error fetching profile:', error);
-          setHasUsername(true); // Default to true to avoid blocking
-        } else {
-          // If user has a username, assume onboarding was completed
-          setHasUsername(!!profile?.username);
-        }
-      } catch (error) {
-        console.error('[AppNavigator] Error checking username status:', error);
-        setHasUsername(true); // Default to true to avoid blocking
-      } finally {
-        setCheckingUsername(false);
-      }
-    };
-
     if (isAuthenticated && !isLoading && !isAnonymous) {
       checkUsernameStatus();
     }
-  }, [isAuthenticated, user, isLoading, isAnonymous]);
+  }, [isAuthenticated, user, isLoading, isAnonymous, checkUsernameStatus]);
+
+  // Listen to navigation state changes to re-check username after onboarding
+  const handleNavigationStateChange = useCallback(() => {
+    const currentRouteName = navigationRef.current?.getCurrentRoute()?.name;
+    const previousRouteName = previousRouteNameRef.current;
+
+    // Re-check username when navigating to MainTabs (especially after onboarding)
+    // This handles both normal navigation and navigation.reset() cases
+    if (currentRouteName === 'MainTabs') {
+      // If we were on an onboarding screen before, re-check username
+      // This catches the case where user completes onboarding
+      if (previousRouteName && previousRouteName.startsWith('Onboarding')) {
+        console.log('[AppNavigator] Navigated to MainTabs from onboarding, re-checking username');
+        // Add a small delay to ensure profile update has been saved to database
+        setTimeout(() => {
+          checkUsernameStatus();
+        }, 500);
+      }
+    }
+
+    previousRouteNameRef.current = currentRouteName;
+  }, [checkUsernameStatus]);
+
+  // Also re-check username when hasUsername is false and we're authenticated
+  // This catches edge cases where navigation listener might not fire
+  useEffect(() => {
+    if (
+      isAuthenticated &&
+      !isAnonymous &&
+      hasUsername === false &&
+      !checkingUsername &&
+      navigationRef.current?.getCurrentRoute()?.name === 'MainTabs'
+    ) {
+      // If we're on MainTabs but still think user doesn't have username, re-check after a delay
+      // This handles cases where onboarding completed but navigation listener didn't catch it
+      const timeoutId = setTimeout(() => {
+        console.log('[AppNavigator] Re-checking username on MainTabs (hasUsername is false)');
+        checkUsernameStatus();
+      }, 1000);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [isAuthenticated, isAnonymous, hasUsername, checkingUsername, checkUsernameStatus]);
+
+  // Combine refs: both forward ref and internal ref
+  // MUST be declared before any conditional returns to follow Rules of Hooks
+  const setRef = useCallback((node: NavigationContainerRef<RootStackParamList> | null) => {
+    navigationRef.current = node;
+    if (typeof ref === 'function') {
+      ref(node);
+    } else if (ref) {
+      ref.current = node;
+    }
+  }, [ref]);
 
   // Show loading screen while checking authentication, intro status, or username
   if (isLoading || introCompleted === null || (isAuthenticated && !isAnonymous && checkingUsername)) {
@@ -133,7 +193,7 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
   };
 
   return (
-    <NavigationContainer ref={ref} linking={linking}>
+    <NavigationContainer ref={setRef} linking={linking} onStateChange={handleNavigationStateChange}>
       <Stack.Navigator
         initialRouteName={getInitialRoute()}
         screenOptions={{
@@ -254,26 +314,6 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
                 <Stack.Screen 
                   name="OnboardingName" 
                   component={NameScreen}
-                  options={{ headerShown: false }}
-                />
-                <Stack.Screen 
-                  name="OnboardingBirthdate" 
-                  component={BirthdateScreen}
-                  options={{ headerShown: false }}
-                />
-                <Stack.Screen 
-                  name="OnboardingGender" 
-                  component={GenderScreen}
-                  options={{ headerShown: false }}
-                />
-                <Stack.Screen 
-                  name="OnboardingCategories" 
-                  component={CategoriesScreen}
-                  options={{ headerShown: false }}
-                />
-                <Stack.Screen 
-                  name="OnboardingLocation" 
-                  component={LocationScreen}
                   options={{ headerShown: false }}
                 />
               </>

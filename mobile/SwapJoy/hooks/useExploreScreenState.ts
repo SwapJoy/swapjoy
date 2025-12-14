@@ -7,6 +7,8 @@ import { useOtherItems } from './useOtherItems';
 import { useFavorites } from '../contexts/FavoritesContext';
 import { ApiService } from '../services/api';
 import type { LocationSelection } from '../types/location';
+import { useLocation } from '../contexts/LocationContext';
+import { SectionType } from '../types/section';
 
 const DEFAULT_RADIUS = 50;
 
@@ -62,6 +64,19 @@ export interface ExploreScreenState {
   updatingLocation: boolean;
   listData: any[]; // eslint-disable-line @typescript-eslint/no-explicit-any
   loadManualLocation: () => Promise<void>;
+  userLocationParams: {
+    p_user_id?: string;
+    p_user_lat?: number | null;
+    p_user_lng?: number | null;
+    p_radius_km?: number;
+  };
+  sections: Array<{
+    type: SectionType;
+    functionParams: Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
+  }>;
+  handleLocationSelect: (selection: LocationSelection) => Promise<void>;
+  searchModalVisible: boolean;
+  setSearchModalVisible: (visible: boolean) => void;
 }
 
 const buildStrings = (t: ReturnType<typeof useLocalization>['t']) =>
@@ -160,6 +175,7 @@ export const useExploreScreenState = (): ExploreScreenState => {
     refresh: refreshOthers,
   } = useOtherItems(10, { autoFetch: false });
   const { isFavorite, toggleFavorite } = useFavorites();
+  const { currentLocation, locationLoading: locationContextLoading, setCurrentLocationFromIP, ensureLocationDetected } = useLocation();
 
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -182,6 +198,13 @@ export const useExploreScreenState = (): ExploreScreenState => {
   const [manualLocationLoaded, setManualLocationLoaded] = useState(false);
   const initialFetchTriggeredRef = useRef(false);
   const manualLocationLoadUserRef = useRef<string | null>(null);
+  const [userLocationParams, setUserLocationParams] = useState<{
+    p_user_id?: string;
+    p_user_lat?: number | null;
+    p_user_lng?: number | null;
+    p_radius_km?: number;
+  }>({});
+  const [searchModalVisible, setSearchModalVisible] = useState(false);
 
   const trimmedSearchQuery = useMemo(() => searchQuery.trim(), [searchQuery]);
   const hasSearchQuery = trimmedSearchQuery.length > 0;
@@ -229,9 +252,26 @@ export const useExploreScreenState = (): ExploreScreenState => {
       }
 
       const profile = data as any; // eslint-disable-line @typescript-eslint/no-explicit-any
-      const lat = profile.manual_location_lat ?? null;
-      const lng = profile.manual_location_lng ?? null;
+      let lat = profile.manual_location_lat ?? null;
+      let lng = profile.manual_location_lng ?? null;
       const radius = profile.preferred_radius_km ?? DEFAULT_RADIUS;
+
+      // If no manual location exists, try to use LocationContext.currentLocation first
+      // If that's also not available, trigger IP-based detection
+      if (lat === null || lng === null) {
+        if (currentLocation) {
+          lat = currentLocation.lat;
+          lng = currentLocation.lng;
+          console.log('[useExploreScreenState] Using LocationContext.currentLocation as fallback:', { lat, lng });
+        } else {
+          // No manual location and no currentLocation - trigger IP-based detection
+          console.log('[useExploreScreenState] No location available, triggering IP-based detection...');
+          setCurrentLocationFromIP().catch((ipError) => {
+            console.warn('[useExploreScreenState] IP location detection failed:', ipError);
+            // Continue without location - user can set manually later
+          });
+        }
+      }
 
       setLocationCoords({ lat, lng });
       setLocationRadius(radius);
@@ -253,18 +293,34 @@ export const useExploreScreenState = (): ExploreScreenState => {
           setLocationLabel(null);
           setLocationCityId(null);
         }
+        
+        // Only trigger initial fetch if we have location coordinates available
+        triggerInitialFetch();
       } else {
         setLocationLabel(null);
         setLocationCityId(null);
+        console.log('[useExploreScreenState] No location available yet, waiting for LocationContext...');
       }
     } catch (error) {
       console.error('[ExploreScreen] Failed to load manual location:', error);
+      // Even on error, check if we have currentLocation fallback from LocationContext
+      if (currentLocation) {
+        console.log('[useExploreScreenState] Using LocationContext.currentLocation after profile load error:', currentLocation);
+        setLocationCoords({ lat: currentLocation.lat, lng: currentLocation.lng });
+        setLocationRadius(DEFAULT_RADIUS);
+        triggerInitialFetch();
+      } else {
+        // Try IP-based detection as fallback
+        console.log('[useExploreScreenState] Triggering IP-based detection as fallback...');
+        setCurrentLocationFromIP().catch((ipError) => {
+          console.warn('[useExploreScreenState] IP location detection failed:', ipError);
+        });
+      }
     } finally {
       setLoadingLocation(false);
       setManualLocationLoaded(true);
-      triggerInitialFetch();
     }
-  }, [triggerInitialFetch, user?.id]);
+  }, [triggerInitialFetch, user?.id, currentLocation, setCurrentLocationFromIP]);
 
   useEffect(() => {
     const currentUserId = user?.id ?? null;
@@ -278,6 +334,154 @@ export const useExploreScreenState = (): ExploreScreenState => {
     // We intentionally depend only on user ID so the effect runs exactly once per login.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
+
+  // Trigger location detection when ExploreScreen is displayed and currentLocation is null
+  useFocusEffect(
+    useCallback(() => {
+      // When ExploreScreen comes into focus, check if we need to detect location
+      if (!currentLocation && !locationContextLoading) {
+        console.log('[useExploreScreenState] ExploreScreen displayed, currentLocation is null, triggering location detection...');
+        ensureLocationDetected().catch((error) => {
+          console.warn('[useExploreScreenState] Location detection failed on screen focus:', error);
+        });
+      }
+    }, [currentLocation, locationContextLoading, ensureLocationDetected])
+  );
+
+  // Wait for LocationContext.currentLocation if manual location is not available
+  useEffect(() => {
+    // If manual location is already loaded and we still don't have coordinates,
+    // and LocationContext is loading or has currentLocation, wait for it
+    if (manualLocationLoaded && locationCoords.lat === null && locationCoords.lng === null) {
+      if (locationContextLoading) {
+        // Still loading, wait
+        console.log('[useExploreScreenState] Waiting for LocationContext to finish loading...');
+        return;
+      }
+      
+      // LocationContext finished loading, check if we have currentLocation
+      if (currentLocation) {
+        console.log('[useExploreScreenState] LocationContext.currentLocation available, updating locationCoords');
+        setLocationCoords({ lat: currentLocation.lat, lng: currentLocation.lng });
+        // Trigger fetch now that we have location
+        if (!initialFetchTriggeredRef.current) {
+          triggerInitialFetch();
+        }
+      }
+    }
+  }, [manualLocationLoaded, locationCoords.lat, locationCoords.lng, currentLocation, locationContextLoading, triggerInitialFetch]);
+
+  // Load user location parameters for API calls
+  useEffect(() => {
+    const loadUserLocationParams = async () => {
+      if (!user?.id) {
+        setUserLocationParams({});
+        return;
+      }
+
+      try {
+        const { data: profile } = await ApiService.getProfile();
+        if (profile) {
+          const lat = (profile as any).manual_location_lat ?? locationCoords.lat ?? null; // eslint-disable-line @typescript-eslint/no-explicit-any
+          const lng = (profile as any).manual_location_lng ?? locationCoords.lng ?? null; // eslint-disable-line @typescript-eslint/no-explicit-any
+          const radius = (profile as any).preferred_radius_km ?? locationRadius ?? 50; // eslint-disable-line @typescript-eslint/no-explicit-any
+
+          setUserLocationParams({
+            p_user_id: user.id,
+            p_user_lat: lat,
+            p_user_lng: lng,
+            p_radius_km: radius,
+          });
+        }
+      } catch (error) {
+        console.error('[useExploreScreenState] Failed to load user location params:', error);
+        setUserLocationParams({
+          p_user_id: user.id,
+          p_user_lat: locationCoords.lat,
+          p_user_lng: locationCoords.lng,
+          p_radius_km: locationRadius ?? 50,
+        });
+      }
+    };
+
+    void loadUserLocationParams();
+  }, [user?.id, locationCoords.lat, locationCoords.lng, locationRadius]);
+
+  // Define all sections with their parameters
+  const sections = useMemo(() => {
+    // Don't create sections until we have user ID and location params are loaded
+    // Also wait for location coordinates to be available before fetching listings
+    if (!user?.id || !userLocationParams.p_user_id) return [];
+    
+    // Wait for location coordinates to be available (lat and lng should not both be null)
+    if (userLocationParams.p_user_lat === null && userLocationParams.p_user_lng === null) {
+      return [];
+    }
+
+    const baseParams = {
+      p_user_id: userLocationParams.p_user_id,
+      p_user_lat: userLocationParams.p_user_lat ?? null,
+      p_user_lng: userLocationParams.p_user_lng ?? null,
+      p_limit: 10,
+    };
+
+    return [
+      {
+        type: SectionType.NearYou,
+        functionParams: {
+          ...baseParams,
+          p_radius_km: userLocationParams.p_radius_km ?? 50
+        },
+      },
+      {
+        type: SectionType.FreshFinds,
+        functionParams: {
+          ...baseParams,
+          p_radius_km: userLocationParams.p_radius_km ?? 50
+        },
+      },
+      {
+        type: SectionType.FavouriteCategories,
+        functionParams: {
+          ...baseParams,
+          p_radius_km: userLocationParams.p_radius_km ?? 50
+        },
+      },
+      {
+        type: SectionType.BestDeals,
+        functionParams: {
+          ...baseParams,
+          p_radius_km: userLocationParams.p_radius_km ?? 50
+        },
+      },
+      {
+        type: SectionType.TopPicksForYou,
+        functionParams: {
+          ...baseParams,
+          p_radius_km: userLocationParams.p_radius_km ?? 50
+        },
+      },
+      {
+        type: SectionType.TrendingCategories,
+        functionParams: {
+          p_user_id: userLocationParams.p_user_id,
+          p_user_lat: userLocationParams.p_user_lat ?? null,
+          p_user_lng: userLocationParams.p_user_lng ?? null,
+          p_radius_km: userLocationParams.p_radius_km ?? 50,
+          p_days_interval: 7,
+          p_categories_limit: 10,
+          p_items_per_category: 5,
+        },
+      },
+      {
+        type: SectionType.BudgetPicks,
+        functionParams: {
+          ...baseParams,
+          p_radius_km: userLocationParams.p_radius_km ?? 50
+        },
+      },
+    ];
+  }, [user?.id, userLocationParams]);
 
   const performSearch = useCallback(
     async (rawQuery: string) => {
@@ -415,6 +619,16 @@ export const useExploreScreenState = (): ExploreScreenState => {
         setLocationRadius(nextRadius);
         setLocationCityId(selection.cityId ?? null);
 
+        // Update userLocationParams after successful location update
+        if (user?.id) {
+          setUserLocationParams({
+            p_user_id: user.id,
+            p_user_lat: selection.lat,
+            p_user_lng: selection.lng,
+            p_radius_km: nextRadius,
+          });
+        }
+
         await refreshTopPicks();
       } catch (error: any) {
         console.error('[ExploreScreen] Failed to update manual location:', error);
@@ -423,7 +637,20 @@ export const useExploreScreenState = (): ExploreScreenState => {
         setUpdatingLocation(false);
       }
     },
-    [locationRadius, refreshTopPicks, strings.location.badgePlaceholder]
+    [locationRadius, refreshTopPicks, strings.location.badgePlaceholder, user?.id]
+  );
+
+  // Wrapper for handleManualLocationSelect that handles errors
+  const handleLocationSelect = useCallback(
+    async (selection: LocationSelection) => {
+      try {
+        await handleManualLocationSelect(selection);
+      } catch (error: any) {
+        console.error('[useExploreScreenState] Failed to update manual location:', error);
+        throw error;
+      }
+    },
+    [handleManualLocationSelect]
   );
 
   const onRefresh = useCallback(async () => {
@@ -481,6 +708,11 @@ export const useExploreScreenState = (): ExploreScreenState => {
     updatingLocation,
     listData,
     loadManualLocation,
+    userLocationParams,
+    sections,
+    handleLocationSelect,
+    searchModalVisible,
+    setSearchModalVisible,
   };
 };
 

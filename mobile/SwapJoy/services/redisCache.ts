@@ -155,6 +155,7 @@ export class RedisCache {
   // Note: This is fire-and-forget and non-critical - failures are silently handled
   // Timeouts are expected and should not be logged as errors
   static async invalidatePattern(pattern: string): Promise<boolean> {
+    return false;
     // Wrap in a promise that catches and suppresses all errors
     return new Promise((resolve) => {
       // Start the invalidation in background

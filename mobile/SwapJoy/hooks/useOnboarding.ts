@@ -3,18 +3,14 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { ApiService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 
-export type OnboardingStep = 'username' | 'name' | 'birthdate' | 'gender' | 'categories' | 'location';
+export type OnboardingStep = 'username' | 'name';
 
-const ONBOARDING_STEPS: OnboardingStep[] = ['username', 'name', 'birthdate', 'gender', 'categories', 'location'];
+const ONBOARDING_STEPS: OnboardingStep[] = ['username', 'name'];
 
 // Map route names to step indices
 const ROUTE_TO_STEP_INDEX: Record<string, number> = {
   OnboardingUsername: 0,
   OnboardingName: 1,
-  OnboardingBirthdate: 2,
-  OnboardingGender: 3,
-  OnboardingCategories: 4,
-  OnboardingLocation: 5,
 };
 
 export const useOnboarding = () => {
@@ -79,15 +75,9 @@ export const useOnboarding = () => {
     const currentRouteName = (currentRoute?.name ?? route.name) as string;
     let stepIndex = ROUTE_TO_STEP_INDEX[currentRouteName];
     
-    // Fallback: if route name not found in map, try to infer from route name
+    // Fallback: if route name not found in map, default to first step
     if (stepIndex === undefined) {
-      if (currentRouteName === 'OnboardingCategories') {
-        stepIndex = 4;
-      } else if (currentRouteName === 'OnboardingLocation') {
-        stepIndex = 5;
-      } else {
-        stepIndex = 0;
-      }
+      stepIndex = 0;
     }
     
     const isLast = stepIndex === ONBOARDING_STEPS.length - 1;
@@ -116,18 +106,6 @@ export const useOnboarding = () => {
         case 'name':
           nextRoute = 'OnboardingName';
           break;
-        case 'birthdate':
-          nextRoute = 'OnboardingBirthdate';
-          break;
-        case 'gender':
-          nextRoute = 'OnboardingGender';
-          break;
-        case 'categories':
-          nextRoute = 'OnboardingCategories';
-          break;
-        case 'location':
-          nextRoute = 'OnboardingLocation';
-          break;
         default:
           nextRoute = 'MainTabs';
           break;
@@ -150,24 +128,11 @@ export const useOnboarding = () => {
   }, [route, navigation, completeOnboarding]);
 
   const previousStep = useCallback(() => {
-    // Recalculate current step index based on current route to avoid stale closures
-    const currentRouteName = route.name as string;
-    const stepIndex = ROUTE_TO_STEP_INDEX[currentRouteName] ?? 0;
-    const isFirst = stepIndex === 0;
-    
-    if (!isFirst) {
-      const prevStepName = ONBOARDING_STEPS[stepIndex - 1];
-      const stepRouteMap: Record<OnboardingStep, keyof any> = {
-        username: 'OnboardingUsername',
-        name: 'OnboardingUsername',
-        birthdate: 'OnboardingName',
-        gender: 'OnboardingBirthdate',
-        categories: 'OnboardingGender',
-        location: 'OnboardingCategories',
-      };
-      navigation.navigate(stepRouteMap[prevStepName] as any);
+    // Use goBack() to get proper back animation instead of navigate()
+    if (navigation.canGoBack()) {
+      navigation.goBack();
     }
-  }, [route, navigation]);
+  }, [navigation]);
 
   const skipOnboarding = useCallback(async () => {
     try {
@@ -187,10 +152,6 @@ export const useOnboarding = () => {
       const stepRouteMap: Record<OnboardingStep, keyof any> = {
         username: 'OnboardingUsername',
         name: 'OnboardingName',
-        birthdate: 'OnboardingBirthdate',
-        gender: 'OnboardingGender',
-        categories: 'OnboardingCategories',
-        location: 'OnboardingLocation',
       };
       navigation.navigate(stepRouteMap[step] as any);
     }

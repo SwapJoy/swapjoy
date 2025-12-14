@@ -7,6 +7,7 @@ CREATE OR REPLACE FUNCTION public.fn_trending_categories(
   p_user_id             uuid,
   p_user_lat            numeric,
   p_user_lng            numeric,
+  p_radius_km           numeric DEFAULT 50,
   p_days_interval       int DEFAULT 7,
   p_categories_limit    int DEFAULT 10,
   p_items_per_category  int DEFAULT 5
@@ -74,6 +75,18 @@ BEGIN
       AND i.user_id <> p_user_id
       AND i.created_at >= (NOW() - (p_days_interval || ' days')::interval)
       AND i.category_id IS NOT NULL
+      AND i.location_lat IS NOT NULL
+      AND i.location_lng IS NOT NULL
+      -- fast bounding box pre-filter
+      AND (
+        p_user_lat IS NULL OR p_user_lng IS NULL OR p_radius_km IS NULL OR
+        (
+          i.location_lat BETWEEN (p_user_lat - (p_radius_km / 111))
+                            AND (p_user_lat + (p_radius_km / 111))
+          AND i.location_lng BETWEEN (p_user_lng - (p_radius_km / (111 * COS(RADIANS(p_user_lat)))))
+                            AND (p_user_lng + (p_radius_km / (111 * COS(RADIANS(p_user_lat)))))
+        )
+      )
   ),
   category_stats AS (
     SELECT
@@ -154,6 +167,7 @@ BEGIN
   JOIN users u         ON u.id = il.user_id
   LEFT JOIN images_agg ia ON ia.item_id = il.id
   WHERE il.rn <= p_items_per_category
+    AND (il.distance_km IS NULL OR il.distance_km <= p_radius_km)
   ORDER BY
     il.category_rank ASC,      -- most trending categories first
     il.created_at DESC;        -- newest items inside each category
