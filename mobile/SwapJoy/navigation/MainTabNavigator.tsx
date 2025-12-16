@@ -87,7 +87,7 @@ const MainTabNavigator: React.FC<MainTabNavigatorProps> = ({ onNavigateToAdd }) 
         name="Explore"
         component={ExploreScreen}
         options={{
-          tabBarLabel: 'SwapJoy',
+          tabBarLabel: 'Explore',
           headerTitle: () => (
             <Image
               source={require('../assets/swapjoy-logo.png')}

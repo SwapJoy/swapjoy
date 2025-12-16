@@ -10,6 +10,7 @@ import type { LocationSelection } from '../types/location';
 import { useLocation } from '../contexts/LocationContext';
 import { SectionType } from '../types/section';
 import { ListingItem } from '../types/listing-item';
+import { useFilters } from '../contexts/FiltersContext';
 
 const DEFAULT_RADIUS = 50;
 
@@ -177,6 +178,7 @@ export const useExploreScreenState = (): ExploreScreenState => {
   } = useOtherItems(10, { autoFetch: false });
   const { isFavorite, toggleFavorite } = useFavorites();
   const { currentLocation, locationLoading: locationContextLoading, setCurrentLocationFromIP, ensureLocationDetected } = useLocation();
+  const { filters } = useFilters();
 
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -513,7 +515,19 @@ export const useExploreScreenState = (): ExploreScreenState => {
       try {
         // semanticSearch Edge Function already uses match_items for semantic search
         // and includes fuzzy text search fallback when semantic results are sparse
-        const { data: searchData, error: apiError } = await ApiService.semanticSearch(query, 30);
+        const searchFilters = {
+          minPrice: filters.priceMin,
+          maxPrice: filters.priceMax,
+          categories: filters.categories,
+          distance: filters.distance,
+          coordinates: (filters.locationLat !== null && filters.locationLat !== undefined && 
+                        filters.locationLng !== null && filters.locationLng !== undefined)
+            ? { lat: filters.locationLat, lng: filters.locationLng }
+            : null,
+          currency: filters.currency,
+        };
+        
+        const { data: searchData, error: apiError } = await ApiService.semanticSearch(query, 30, searchFilters);
         
         if (currentRequestId !== searchRequestIdRef.current) {
           return;
@@ -540,7 +554,7 @@ export const useExploreScreenState = (): ExploreScreenState => {
         }
       }
     },
-    [searchStrings.error]
+    [searchStrings.error, filters]
   );
 
   useEffect(() => {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import {View, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Image, Dimensions, } from 'react-native';
+import {View, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Image, Dimensions, Platform, } from 'react-native';
 import SJText from '../components/SJText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -161,25 +161,37 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
 
   if (loading || !itemData) {
     return (
-      <SafeAreaView style={styles.container}>
+      <View style={styles.container}>
+        <SafeAreaView edges={['top']} style={styles.header}>
+          <View style={styles.headerContent}>
+            <View style={styles.headerSpacer} />
+            <View style={styles.headerTitleContainer}>
+              <SJText style={styles.headerTitle}>{strings.headerTitle}</SJText>
+            </View>
+            <View style={styles.headerSpacer} />
+          </View>
+        </SafeAreaView>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#007AFF" />
           <SJText style={styles.loadingText}>{strings.loading}</SJText>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={handleEdit}>
-          <Ionicons name="arrow-back" size={24} color={colors.primary} />
-        </TouchableOpacity>
-        <SJText style={styles.headerTitle}>{strings.headerTitle}</SJText>
-        <View style={{ width: 40 }} />
-      </View>
+    <View style={styles.container}>
+      <SafeAreaView edges={['top']} style={styles.header}>
+        <View style={styles.headerContent}>
+          <TouchableOpacity style={styles.backButton} onPress={handleEdit}>
+            <Ionicons name="arrow-back" size={24} color={colors.primary} />
+          </TouchableOpacity>
+          <View style={styles.headerTitleContainer}>
+            <SJText style={styles.headerTitle}>{strings.headerTitle}</SJText>
+          </View>
+          <View style={styles.headerSpacer} />
+        </View>
+      </SafeAreaView>
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Image Carousel */}
@@ -318,7 +330,7 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
           )}
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -337,21 +349,40 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
     backgroundColor: colors.primaryYellow,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 44,
+    paddingHorizontal: 16,
   },
   backButton: {
-    padding: 8,
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: Platform.OS === 'ios' ? -4 : 0,
+  },
+  headerTitleContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 44,
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: '600'
+    fontWeight: '700',
+    color: colors.primary,
+    letterSpacing: 0.3,
+  },
+  headerSpacer: {
+    width: 44,
+    height: 44,
   },
   scrollView: {
     flex: 1,
@@ -419,6 +450,7 @@ const styles = StyleSheet.create({
   tagText: {
     fontSize: 14,
     fontWeight: '500',
+    color: colors.primary,
   },
   divider: {
     height: 1,
@@ -442,8 +474,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
   },
   infoLabel: {
     fontSize: 16
@@ -468,8 +498,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 12,
     padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
   },
   editButton: {
     flex: 1,
