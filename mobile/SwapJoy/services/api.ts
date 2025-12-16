@@ -677,10 +677,19 @@ export class ApiService {
       }
       const { data, error } = await client
         .from('items')
-        .select('id, price, currency, title, item_images(image_url)')
+        .select('id, price, currency, title, images')
         .eq('user_id', currentUser.id)
         .eq('status', 'available');
-      return { data: data || [], error } as any;
+      // For backward compatibility, also expose image_url from first image
+      const mapped = (data || []).map((item: any) => {
+        const images = Array.isArray(item.images) ? item.images : [];
+        const first = images[0] || null;
+        return {
+          ...item,
+          image_url: first?.url || null,
+        };
+      });
+      return { data: mapped, error } as any;
     });
   }
 
@@ -845,12 +854,15 @@ export class ApiService {
                 category_name_ka: categoryData?.title_ka || null,
                 category_name: categoryData?.title_en || categoryData?.title_ka || null,
                 image_url: imageUrl,
-                item_images: Array.isArray(images) ? images.map((img: any) => ({
-                  id: img.id,
-                  image_url: img.url,
-                  is_primary: img.is_primary,
-                  created_at: img.created_at
-                })) : [],
+                // Legacy item_images shape for backward compatibility
+                item_images: Array.isArray(images)
+                  ? images.map((img: any, index: number) => ({
+                      id: img.id ?? `${item.id}-${index}`,
+                      image_url: img.url,
+                      is_primary: img.is_primary ?? (index === 0),
+                      created_at: img.created_at ?? item.created_at,
+                    }))
+                  : [],
                 user: {
                   id: item.user_id,
                   username: normalizedUsername || undefined,
@@ -1072,23 +1084,23 @@ export class ApiService {
 
       if (userError || !userItems || userItems.length === 0) {
         // If no user items, use a default range
-        const query = client
+        const { data, error } = await client
           .from('items')
-          .select('*, item_images(image_url), users!items_user_id_fkey(username, first_name, last_name)')
+          .select('*, images, users!items_user_id_fkey(username, first_name, last_name)')
           .eq('status', 'available')
           .neq('user_id', userId)
           .order('created_at', { ascending: false })
           .limit(limit);
-        return await query;
+        return { data, error };
       }
 
       const avgValue = userItems.reduce((sum, item) => sum + (item.price || 0), 0) / userItems.length;
       const minValue = avgValue * 0.7;
       const maxValue = avgValue * 1.3;
 
-      const query = client
+      const { data, error } = await client
         .from('items')
-        .select('*, item_images(image_url), users!items_user_id_fkey(username, first_name, last_name)')
+        .select('*, images, users!items_user_id_fkey(username, first_name, last_name)')
         .eq('status', 'available')
         .neq('user_id', userId)
         .gte('price', minValue)
@@ -1096,7 +1108,7 @@ export class ApiService {
         .order('created_at', { ascending: false })
         .limit(limit);
 
-      return await query;
+      return { data, error };
     });
   }
 
@@ -1121,7 +1133,7 @@ export class ApiService {
       // Get all items in favorite categories
       const { data: categoryItems, error: categoryError } = await client
         .from('items')
-        .select('id, title, price, currency, category_id, user_id, embedding, item_images(image_url)')
+        .select('id, title, price, currency, category_id, user_id, embedding, images')
         .in('category_id', favoriteCategories)
         .eq('status', 'available')
         .neq('user_id', userId)
@@ -1264,7 +1276,10 @@ export class ApiService {
                   first_name: bundleOwner.first_name,
                   last_name: bundleOwner.last_name,
                 } : { id: ownerId },
-                image_url: itemA.item_images?.[0]?.image_url || itemB.item_images?.[0]?.image_url || null,
+                image_url:
+                  (Array.isArray(itemA.images) && itemA.images[0]?.url) ||
+                  (Array.isArray(itemB.images) && itemB.images[0]?.url) ||
+                  null,
                 created_at: new Date().toISOString(),
                 status: 'available'
               };
@@ -1397,7 +1412,7 @@ export class ApiService {
         const allItemIds = [...(similarItems1 || []), ...(similarItems2 || [])].map((it: any) => it.id);
         const { data: fullItems } = await client
           .from('items')
-          .select('*, item_images(image_url)')
+          .select('*, images')
           .in('id', allItemIds);
 
         if (fullItems) {
@@ -1429,8 +1444,12 @@ export class ApiService {
 
                   if (priceFilterPass) {
                     const bundleOwnerId = fullItemA.user_id;
-                    const imageA = fullItemA.item_images?.[0]?.image_url;
-                    const imageB = fullItemB.item_images?.[0]?.image_url;
+                    const imageA = Array.isArray(fullItemA.images) && fullItemA.images[0]?.url
+                      ? fullItemA.images[0].url
+                      : null;
+                    const imageB = Array.isArray(fullItemB.images) && fullItemB.images[0]?.url
+                      ? fullItemB.images[0].url
+                      : null;
                     const imageUrl = imageA || imageB || 'https://via.placeholder.com/200x150';
 
                     // Get full user data for the bundle owner (ownerMap may not be available in this scope)
@@ -1517,7 +1536,7 @@ export class ApiService {
 
       const { data: items, error } = await client
         .from('items')
-        .select('*, item_images(image_url), users!items_user_id_fkey(username, first_name, last_name)')
+        .select('*, images, users!items_user_id_fkey(username, first_name, last_name)')
         .in('category_id', user.favorite_categories || [])
         .eq('status', 'available')
         .neq('user_id', userId)
@@ -1526,11 +1545,15 @@ export class ApiService {
 
       if (error) return { data: [], error };
 
-      // Flatten image URLs
-      const itemsWithImages = items?.map(item => ({
-        ...item,
-        image_url: item.item_images?.[0]?.image_url || null
-      }));
+      // Flatten image URLs from denormalized images array
+      const itemsWithImages = items?.map(item => {
+        const images = Array.isArray(item.images) ? item.images : [];
+        const first = images[0] || null;
+        return {
+          ...item,
+          image_url: first?.url || null,
+        };
+      }) || [];
 
       return { data: itemsWithImages, error: null };
     });
@@ -1538,29 +1561,29 @@ export class ApiService {
 
   static async getRecentlyAddedItems(userId: string, limit: number = 10) {
     return this.authenticatedCall(async (client) => {
-      const query = client
+      const { data, error } = await client
         .from('items')
-        .select('*, item_images(image_url), users!items_user_id_fkey(username, first_name, last_name)')
+        .select('*, images, users!items_user_id_fkey(username, first_name, last_name)')
         .eq('status', 'available')
         .neq('user_id', userId)
         .order('created_at', { ascending: false })
         .limit(limit);
 
-      return await query;
+      return { data, error };
     });
   }
 
   static async getRandomItems(userId: string, limit: number = 10) {
     return this.authenticatedCall(async (client) => {
-      const query = client
+      const { data, error } = await client
         .from('items')
-        .select('*, item_images(image_url), users!items_user_id_fkey(username, first_name, last_name)')
+        .select('*, images, users!items_user_id_fkey(username, first_name, last_name)')
         .eq('status', 'available')
         .neq('user_id', userId)
         .order('created_at', { ascending: false })
         .limit(limit);
 
-      return await query;
+      return { data, error };
     });
   }
 
@@ -1800,7 +1823,7 @@ export class ApiService {
         .from('notifications')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(100); // Limit to most recent 100 notifications to prevent timeout
+        .limit(20); // Limit to most recent 20 notifications to prevent timeout
       
       // #region agent log
       const duration = Date.now() - startTime;
@@ -2491,12 +2514,12 @@ export class ApiService {
   // Get user's items for profile display
   static async getUserItems(userId: string) {
     return this.authenticatedCall(async (client) => {
-      // Get user items with images using explicit foreign key name
+      // Get user items with denormalized images
       const { data: items, error } = await client
         .from('items')
         .select(`
           *,
-          item_images!item_images_item_id_fkey(image_url),
+          images,
           categories:categories!items_category_id_fkey(title_en, title_ka)
         `)
         .eq('user_id', userId)
@@ -2508,14 +2531,18 @@ export class ApiService {
         return { data: null, error };
       }
 
-      // Flatten image URLs for easier access
-      const itemsWithImages = items?.map(item => ({
-        ...item,
-        image_url: item.item_images?.[0]?.image_url || null,
-        category_name: item.categories?.title_en || item.categories?.title_ka || null,
-        category_name_en: item.categories?.title_en || null,
-        category_name_ka: item.categories?.title_ka || null,
-      }));
+      // Flatten image URLs for easier access from denormalized images
+      const itemsWithImages = items?.map(item => {
+        const images = Array.isArray(item.images) ? item.images : [];
+        const first = images[0] || null;
+        return {
+          ...item,
+          image_url: first?.url || null,
+          category_name: item.categories?.title_en || item.categories?.title_ka || null,
+          category_name_en: item.categories?.title_en || null,
+          category_name_ka: item.categories?.title_ka || null,
+        };
+      });
 
       console.log('User items:', itemsWithImages?.map(item => ({
         id: item.id,
@@ -2543,6 +2570,7 @@ export class ApiService {
           condition,
           created_at,
           category_id,
+          images,
           categories:categories!items_category_id_fkey(title_en, title_ka)
         `)
         .eq('user_id', userId)
@@ -2551,28 +2579,11 @@ export class ApiService {
 
       if (error) return { data: null, error } as any;
 
-      const ids = (items || []).map((it: any) => it.id);
-      let imagesByItem: Record<string, any[]> = {};
-      if (ids.length) {
-        const { data: images } = await client
-          .from('item_images')
-          .select('item_id, image_url, sort_order, is_primary')
-          .in('item_id', ids);
-        console.log('getUserPublishedItems: fetched images count =', images?.length || 0, 'for items =', ids.length);
-        (images || []).forEach((img: any) => {
-          if (!imagesByItem[img.item_id]) imagesByItem[img.item_id] = [];
-          imagesByItem[img.item_id].push(img);
-        });
-        // Prefer primary, then lowest sort_order for deterministic cover image
-        Object.keys(imagesByItem).forEach(k => {
-          imagesByItem[k] = imagesByItem[k]
-            .sort((a, b) => (b.is_primary === true ? 1 : 0) - (a.is_primary === true ? 1 : 0) || (a.sort_order || 0) - (b.sort_order || 0));
-        });
-      }
-
       const itemsWithImages = (items || []).map((item: any) => {
-        const firstImg = imagesByItem[item.id]?.[0];
-        const chosenUrl = firstImg?.image_url || firstImg?.thumbnail_url || null;
+        // images stored directly on items.images as [{ url, order }]
+        const images = Array.isArray(item.images) ? item.images : [];
+        const firstImg = images[0] || null;
+        const chosenUrl = firstImg?.url || null;
         const categoryRelation = item.categories ?? null;
         const categoryNameEn = item.category_name_en ?? categoryRelation?.title_en ?? null;
         const categoryNameKa = item.category_name_ka ?? categoryRelation?.title_ka ?? null;
@@ -2611,6 +2622,7 @@ export class ApiService {
           created_at,
           updated_at,
           category_id,
+          images,
           categories:categories!items_category_id_fkey(title_en, title_ka)
         `)
         .eq('user_id', userId)
@@ -2619,27 +2631,10 @@ export class ApiService {
 
       if (error) return { data: null, error } as any;
 
-      const ids = (items || []).map((it: any) => it.id);
-      let imagesByItem: Record<string, any[]> = {};
-      if (ids.length) {
-        const { data: images } = await client
-          .from('item_images')
-          .select('item_id, image_url, sort_order, is_primary')
-          .in('item_id', ids);
-        console.log('getUserDraftItems: fetched images count =', images?.length || 0, 'for items =', ids.length);
-        (images || []).forEach((img: any) => {
-          if (!imagesByItem[img.item_id]) imagesByItem[img.item_id] = [];
-          imagesByItem[img.item_id].push(img);
-        });
-        Object.keys(imagesByItem).forEach(k => {
-          imagesByItem[k] = imagesByItem[k]
-            .sort((a, b) => (b.is_primary === true ? 1 : 0) - (a.is_primary === true ? 1 : 0) || (a.sort_order || 0) - (b.sort_order || 0));
-        });
-      }
-
       const itemsWithImages = (items || []).map((item: any) => {
-        const firstImg = imagesByItem[item.id]?.[0];
-        const chosenUrl = firstImg?.image_url || firstImg?.thumbnail_url || null;
+        const images = Array.isArray(item.images) ? item.images : [];
+        const firstImg = images[0] || null;
+        const chosenUrl = firstImg?.url || null;
         const categoryRelation = item.categories ?? null;
         const categoryNameEn = item.category_name_en ?? categoryRelation?.title_en ?? null;
         const categoryNameKa = item.category_name_ka ?? categoryRelation?.title_ka ?? null;
@@ -2678,59 +2673,36 @@ export class ApiService {
 
       const itemIds = favorites.map((fav: any) => fav.item_id);
 
-      // Fetch items and images in parallel for better performance
-      const [itemsResult, imagesResult] = await Promise.all([
-        client
-          .from('items')
-          .select(`
-            id,
-            title,
-            description,
-            price,
-            currency,
-            condition,
-            created_at,
-            category_id,
-            categories:categories!items_category_id_fkey(title_en, title_ka)
-          `)
-          .in('id', itemIds),
-        client
-          .from('item_images')
-          .select('item_id, image_url, sort_order, is_primary')
-          .in('item_id', itemIds)
-      ]);
+      // Fetch items with denormalized images and categories
+      const { data: items, error: itemsError } = await client
+        .from('items')
+        .select(`
+          id,
+          title,
+          description,
+          price,
+          currency,
+          condition,
+          created_at,
+          category_id,
+          images,
+          categories:categories!items_category_id_fkey(title_en, title_ka)
+        `)
+        .in('id', itemIds);
 
-      if (itemsResult.error) {
-        return { data: null, error: itemsResult.error } as any;
+      if (itemsError) {
+        return { data: null, error: itemsError } as any;
       }
 
-      const items = itemsResult.data || [];
-      const images = imagesResult.data || [];
-
-      // Group images by item_id and sort to get the first image
-      const imagesByItem: Record<string, any[]> = {};
-      images.forEach((img: any) => {
-        if (!imagesByItem[img.item_id]) imagesByItem[img.item_id] = [];
-        imagesByItem[img.item_id].push(img);
-      });
-
-      // Sort images: prefer primary, then lowest sort_order
-      Object.keys(imagesByItem).forEach(k => {
-        imagesByItem[k] = imagesByItem[k]
-          .sort((a, b) =>
-            (b.is_primary === true ? 1 : 0) - (a.is_primary === true ? 1 : 0) ||
-            (a.sort_order || 0) - (b.sort_order || 0)
-          );
-      });
-
       // Map items with their first image, preserving favorites order
-      const itemMap = new Map(items.map((item: any) => [item.id, item]));
+      const itemMap = new Map((items || []).map((item: any) => [item.id, item]));
       const flattened = favorites
         .map((fav: any) => {
           const item = itemMap.get(fav.item_id);
           if (!item) return null;
-          const firstImg = imagesByItem[fav.item_id]?.[0];
-          const chosenUrl = firstImg?.image_url || firstImg?.thumbnail_url || null;
+          const images = Array.isArray(item.images) ? item.images : [];
+          const firstImg = images[0] || null;
+          const chosenUrl = firstImg?.url || null;
           const categoryRelation = item.categories ?? null;
           const categoryNameEn = item.category_name_en ?? categoryRelation?.title_en ?? null;
           const categoryNameKa = item.category_name_ka ?? categoryRelation?.title_ka ?? null;
@@ -3023,7 +2995,7 @@ export class ApiService {
 
         const { data, error } = await client
           .from('items')
-          .select('*, category:categories!items_category_id_fkey(title_en, title_ka), item_images(image_url), users!items_user_id_fkey(username, first_name, last_name)')
+          .select('*, images, category:categories!items_category_id_fkey(title_en, title_ka), users!items_user_id_fkey(username, first_name, last_name)')
           .eq('status', 'available')
           .neq('user_id', userId)
           .gte('created_at', oneMonthAgo.toISOString())
@@ -3054,7 +3026,7 @@ export class ApiService {
       // Get recent items
       let query = client
         .from('items')
-        .select('*, category:categories!items_category_id_fkey(title_en, title_ka), item_images(image_url), users!items_user_id_fkey(username, first_name, last_name)')
+        .select('*, images, category:categories!items_category_id_fkey(title_en, title_ka), users!items_user_id_fkey(username, first_name, last_name)')
         .eq('status', 'available')
         .neq('user_id', userId)
         .gte('created_at', oneMonthAgo.toISOString());
@@ -3283,7 +3255,7 @@ export class ApiService {
 
         const { data, error } = await client
           .from('items')
-          .select('*, category:categories!items_category_id_fkey(title_en, title_ka), item_images(image_url), users!items_user_id_fkey(username, first_name, last_name)')
+          .select('*, images, category:categories!items_category_id_fkey(title_en, title_ka), users!items_user_id_fkey(username, first_name, last_name)')
           .eq('status', 'available')
           .neq('user_id', userId)
           .order('created_at', { ascending: false })
@@ -3315,7 +3287,7 @@ export class ApiService {
       
       const { data: rawItems, error } = await client
         .from('items')
-        .select('*, category:categories!items_category_id_fkey(title_en, title_ka), item_images(image_url), users!items_user_id_fkey(username, first_name, last_name)')
+        .select('*, images, category:categories!items_category_id_fkey(title_en, title_ka), users!items_user_id_fkey(username, first_name, last_name)')
         .eq('status', 'available')
         .neq('user_id', userId)
         .order('created_at', { ascending: false })
@@ -3393,7 +3365,7 @@ export class ApiService {
       // Get items with pagination
       const { data, error } = await client
         .from('items')
-        .select('*, category:categories!items_category_id_fkey(title_en, title_ka), item_images(image_url), users!items_user_id_fkey(username, first_name, last_name)')
+        .select('*, images, category:categories!items_category_id_fkey(title_en, title_ka), users!items_user_id_fkey(username, first_name, last_name)')
         .eq('status', 'available')
         .eq('category_id', categoryId)
         .neq('user_id', userId)
@@ -3522,24 +3494,6 @@ export class ApiService {
   }
 
   /**
-   * Create item images (batch insert)
-   */
-  static async createItemImages(images: Array<{
-    item_id: string;
-    image_url: string;
-    sort_order: number;
-    is_primary: boolean;
-    meta?: any; // JSONB metadata for image analysis results
-  }>) {
-    return this.authenticatedCall(async (client) => {
-      return await client
-        .from('item_images')
-        .insert(images)
-        .select();
-    });
-  }
-
-  /**
    * Get item by ID with relations
    */
   static async getItemById(itemId: string, lang: AppLanguage = DEFAULT_LANGUAGE) {
@@ -3598,16 +3552,15 @@ export class ApiService {
         console.log('Error fetching user:', error);
       }
 
-      // Get images
-      try {
-        const { data: imagesData } = await client
-          .from('item_images')
-          .select('id, image_url, thumbnail_url, sort_order, is_primary')
-          .eq('item_id', itemId);
-        images = imagesData || [];
-      } catch (error) {
-        console.log('Error fetching images:', error);
-      }
+      // Get images from denormalized items.images
+      const denormImages = Array.isArray(item.images) ? item.images : [];
+      images = denormImages.map((img: any, index: number) => ({
+        id: `${item.id}-${index}`,
+        image_url: img.url,
+        thumbnail_url: null,
+        sort_order: img.order ?? index,
+        is_primary: img.order === 0 || index === 0,
+      }));
 
       // Get view count from item_metrics
       let viewCount: number | undefined = undefined;
