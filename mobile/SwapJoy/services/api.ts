@@ -767,15 +767,64 @@ export class ApiService {
 
             // Transform database results to match expected format
             const transformed = data.map((item: any) => {
-              // Extract primary image from images array
-              const images = item.images || [];
-              const primaryImage = Array.isArray(images) && images.length > 0 
-                ? images.find((img: any) => img.is_primary) || images[0]
-                : null;
+              // Extract images from denormalized images jsonb
+              let images: Array<any> = [];
+              if (Array.isArray(item.images)) {
+                images = item.images;
+              } else if (item.images && typeof item.images === 'object') {
+                try {
+                  images = JSON.parse(item.images) || [];
+                } catch {
+                  images = [];
+                }
+              }
+              const primaryImage =
+                Array.isArray(images) && images.length > 0
+                  ? images.find((img: any) => img.is_primary) || images[0]
+                  : null;
               const imageUrl = primaryImage?.url || null;
 
-              // Get category data from provided map
-              const categoryData = item.category_id && categoryMap ? categoryMap.get(item.category_id) : null;
+              // Get category data either from map or from denormalized category jsonb
+              let categoryData = item.category_id && categoryMap ? categoryMap.get(item.category_id) : null;
+              if (!categoryData && item.category) {
+                if (typeof item.category === 'string') {
+                  try {
+                    categoryData = JSON.parse(item.category);
+                  } catch {
+                    categoryData = null;
+                  }
+                } else {
+                  categoryData = item.category;
+                }
+              }
+
+              // Normalize user from denormalized user jsonb or legacy flat fields
+              let userData: any = null;
+              if (item.user) {
+                if (typeof item.user === 'string') {
+                  try {
+                    userData = JSON.parse(item.user);
+                  } catch {
+                    userData = null;
+                  }
+                } else {
+                  userData = item.user;
+                }
+              }
+              if (!userData && (item.username || item.first_name || item.last_name)) {
+                userData = {
+                  username: item.username,
+                  firstname: item.first_name,
+                  lastname: item.last_name,
+                  profile_image_url: item.profile_image_url,
+                };
+              }
+
+              const normalizedUsername = userData?.username || item.username || null;
+              const normalizedFirstName = userData?.firstname || userData?.first_name || item.first_name || null;
+              const normalizedLastName = userData?.lastname || userData?.last_name || item.last_name || null;
+              const normalizedProfileImage =
+                userData?.profile_image_url || item.profile_image_url || null;
 
               return {
                 id: item.id,
@@ -804,11 +853,16 @@ export class ApiService {
                 })) : [],
                 user: {
                   id: item.user_id,
-                  username: item.username,
-                  first_name: item.first_name,
-                  last_name: item.last_name,
-                  profile_image_url: item.profile_image_url
+                  username: normalizedUsername || undefined,
+                  first_name: normalizedFirstName || undefined,
+                  last_name: normalizedLastName || undefined,
+                  profile_image_url: normalizedProfileImage || undefined,
                 },
+                // Legacy flat user fields for backward compatibility
+                username: normalizedUsername,
+                first_name: normalizedFirstName,
+                last_name: normalizedLastName,
+                profile_image_url: normalizedProfileImage,
                 distance_km: item.distance_km
               };
             });

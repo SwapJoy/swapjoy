@@ -221,24 +221,51 @@ serve(async (req) => {
       return new Response(JSON.stringify({ items: [] }), { headers: { 'Content-Type': 'application/json' }, status: 200 });
     }
 
-    // Transform items to match explore screen structure (same as fn_top_picks_for_you)
-    // Database function now provides: user fields, category names, images array
+    // Transform items to match explore screen structure
+    // Database function now provides denormalized images, category, and user data directly
     const transformedItems = items.map((item: any) => {
-      // Get primary image URL for easy access (images array is already in correct format from DB)
-      // Handle both JSONB array and regular array
+      // Handle images - already in correct format from DB: [{url, order}]
       let images = [];
       if (Array.isArray(item.images)) {
         images = item.images;
       } else if (item.images && typeof item.images === 'object') {
-        // Try to parse if it's a JSONB object
         try {
           images = JSON.parse(item.images) || [];
         } catch {
           images = [];
         }
       }
-      const primaryImage = images.find((img: any) => img.is_primary) || images[0] || null;
+      // Get primary image URL (first image or image with order 0)
+      const primaryImage = images.find((img: any) => img.order === 0) || images[0] || null;
       const imageUrl = primaryImage?.url || null;
+
+      // Handle category - already in correct format from DB: {title_en, title_ka, icon, color, slug}
+      let category: any = null;
+      if (item.category) {
+        if (typeof item.category === 'string') {
+          try {
+            category = JSON.parse(item.category);
+          } catch {
+            category = null;
+          }
+        } else {
+          category = item.category;
+        }
+      }
+
+      // Handle user - already in correct format from DB: {username, profile_image_url, firstname, lastname}
+      let user: any = null;
+      if (item.user) {
+        if (typeof item.user === 'string') {
+          try {
+            user = JSON.parse(item.user);
+          } catch {
+            user = null;
+          }
+        } else {
+          user = item.user;
+        }
+      }
 
       return {
         id: item.id,
@@ -253,32 +280,21 @@ serve(async (req) => {
         created_at: item.created_at,
         updated_at: item.updated_at,
         category_id: item.category_id,
-        // Category fields (from database JOIN)
-        category_name: item.category_name_en || item.category_name_ka || null,
-        category_name_en: item.category_name_en || null,
-        category_name_ka: item.category_name_ka || null,
-        // Category object (for compatibility)
-        category: item.category_id ? {
-          id: item.category_id,
-          title_en: item.category_name_en,
-          title_ka: item.category_name_ka,
-          name: item.category_name_en || item.category_name_ka
-        } : null,
-        // User fields (from database JOIN - matching fn_top_picks_for_you structure)
+        // Category fields (from denormalized column)
+        category_name: category?.title_en || category?.title_ka || null,
+        category_name_en: category?.title_en || null,
+        category_name_ka: category?.title_ka || null,
+        // Category object (from denormalized column)
+        category: category,
+        // User fields (from denormalized column)
         user_id: item.user_id,
-        username: item.username || null,
-        first_name: item.first_name || null,
-        last_name: item.last_name || null,
-        profile_image_url: item.profile_image_url || null,
-        // Also include nested user object for backward compatibility
-        user: item.user_id ? {
-          id: item.user_id,
-          username: item.username || item.username || null,
-          first_name: item.first_name || null,
-          last_name: item.last_name || null,
-          profile_image_url: item.profile_image_url || null
-        } : null,
-        // Images array (already in correct format from database: { id, url, is_primary, created_at })
+        username: user?.username || null,
+        first_name: user?.firstname || null,
+        last_name: user?.lastname || null,
+        profile_image_url: user?.profile_image_url || null,
+        // Nested user object (from denormalized column)
+        user: user,
+        // Images array (from denormalized column: [{url, order}])
         images: images,
         // Primary image URL for easy access
         image_url: imageUrl,

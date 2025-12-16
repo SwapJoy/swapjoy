@@ -3,29 +3,7 @@ import { ApiService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import { useLocalization } from '../localization';
 import { resolveCategoryName } from '../utils/category';
-
-export interface SJCardItem {
-  id: string;
-  title: string;
-  description: string;
-  condition: string;
-  estimated_value: number;
-  price?: number;
-  currency?: string;
-  image_url: string;
-  category?: string;
-  user: {
-    id: string;
-    username: string;
-    first_name: string;
-    last_name: string;
-    profile_image_url?: string | null;
-  };
-  distance_km?: number | null;
-  location_lat?: number | null;
-  location_lng?: number | null;
-  view_count?: number;
-}
+import { ListingItem } from '../types/listing-item';
 
 interface UseExploreDataOptions {
   autoFetch?: boolean;
@@ -35,7 +13,7 @@ export const useExploreData = (options?: UseExploreDataOptions) => {
   const { autoFetch = true } = options ?? {};
   const { user } = useAuth();
   const { language } = useLocalization();
-  const [aiOffers, setAiOffers] = useState<SJCardItem[]>([]);
+  const [aiOffers, setAiOffers] = useState<ListingItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [isFetching, setIsFetching] = useState(false);
   const [hasData, setHasData] = useState(false);
@@ -126,47 +104,92 @@ export const useExploreData = (options?: UseExploreDataOptions) => {
         setError(null);
       }
 
-      // Transform items to SJCardItem format
-      const aiOffers: SJCardItem[] = (Array.isArray(topPicks) ? topPicks : []).map((item: any, index: number) => {
-        // Force a realistic value if database value is missing or 0
-        let displayValue = item.price;
-        if (!displayValue || displayValue === 0) {
-          // Generate a realistic value based on item title/description
-          const title = item.title?.toLowerCase() || '';
-          if (title.includes('phone') || title.includes('iphone') || title.includes('samsung')) {
-            displayValue = Math.floor(Math.random() * 500) + 200; // $200-700
-          } else if (title.includes('laptop') || title.includes('computer')) {
-            displayValue = Math.floor(Math.random() * 800) + 300; // $300-1100
-          } else if (title.includes('book') || title.includes('novel')) {
-            displayValue = Math.floor(Math.random() * 30) + 10; // $10-40
-          } else if (title.includes('clothing') || title.includes('shirt') || title.includes('dress')) {
-            displayValue = Math.floor(Math.random() * 100) + 20; // $20-120
+      // Transform items to ListingItem format
+      const aiOffers: ListingItem[] = (Array.isArray(topPicks) ? topPicks : []).map((item: any) => {
+        // Get images from denormalized column or fallback
+        let images: Array<{url: string, order: number}> = [];
+        if (item.images && Array.isArray(item.images)) {
+          images = item.images;
+        } else if (item.images && typeof item.images === 'object') {
+          try {
+            images = JSON.parse(item.images) || [];
+          } catch {
+            images = [];
+          }
+        }
+        // Fallback to legacy image_url if images array is empty
+        if (images.length === 0 && item.image_url) {
+          images = [{ url: item.image_url, order: 0 }];
+        }
+        if (images.length === 0) {
+          images = [{ url: 'https://via.placeholder.com/200x150', order: 0 }];
+        }
+
+        // Get category from denormalized column
+        let category = null;
+        if (item.category) {
+          if (typeof item.category === 'string') {
+            try {
+              category = JSON.parse(item.category);
+            } catch {
+              category = null;
+            }
           } else {
-            displayValue = Math.floor(Math.random() * 200) + 50; // $50-250
+            category = item.category;
           }
         }
 
-        const imageUrl = item.image_url || item.item_images?.[0]?.image_url || 'https://via.placeholder.com/200x150';
-        const primaryCategory = resolveCategoryName(item, language);
+        // Get user from denormalized column
+        let user = null;
+        if (item.user) {
+          if (typeof item.user === 'string') {
+            try {
+              user = JSON.parse(item.user);
+            } catch {
+              user = null;
+            }
+          } else {
+            user = item.user;
+          }
+        }
+        // Fallback to legacy user fields if denormalized user is null
+        if (!user && (item.user_id || item.username || item.first_name)) {
+          user = {
+            username: item.username || `user_${(item.user_id || '').slice(-4)}`,
+            profile_image_url: item.profile_image_url || null,
+            firstname: item.first_name || item.firstname || `User ${(item.user_id || '').slice(-4)}`,
+            lastname: item.last_name || item.lastname || '',
+          };
+        }
         
         return {
           id: item.id,
+          user_id: item.user_id,
           title: item.title,
           description: item.description,
+          category_id: item.category_id,
           condition: item.condition,
-          estimated_value: displayValue, // Use calculated or database value
-          price: item.price || item.estimated_value || 0,
+          price: item.price || 0,
           currency: item.currency || 'USD',
-          image_url: imageUrl,
-          category: primaryCategory,
-          user: {
-            id: item.users?.id || item.user?.id || item.user_id,
-            username: item.users?.username || item.user?.username || `user_${(item.user_id || '').slice(-4)}`,
-            first_name: item.users?.first_name || item.user?.first_name || `User ${(item.user_id || '').slice(-4)}`,
-            last_name: item.users?.last_name || item.user?.last_name || '',
-            profile_image_url: item.users?.profile_image_url || item.user?.profile_image_url || null,
-          },
-          view_count: item.view_count ?? item.item_metrics?.view_count ?? undefined,
+          status: item.status || 'available',
+          location_lat: item.location_lat,
+          location_lng: item.location_lng,
+          created_at: item.created_at,
+          updated_at: item.updated_at,
+          view_count: item.view_count,
+          images: images,
+          category: category,
+          user: user,
+          distance_km: item.distance_km,
+          // Legacy compatibility fields
+          image_url: images[0]?.url || null,
+          category_name: category?.title_en || category?.title_ka || item.category_name || null,
+          category_name_en: category?.title_en || item.category_name_en || null,
+          category_name_ka: category?.title_ka || item.category_name_ka || null,
+          username: user?.username || item.username || null,
+          first_name: user?.firstname || item.first_name || null,
+          last_name: user?.lastname || item.last_name || null,
+          profile_image_url: user?.profile_image_url || item.profile_image_url || null,
         };
       });
 

@@ -126,7 +126,9 @@ const TopMatchCard: React.FC<TopMatchCardProps> = ({
   const { language, t } = useLocalization();
   const { getCategoryByName, getCategoryById } = useCategories();
   const displayTitle = (title ?? '').trim() || 'Untitled item';
-  const ownerUsername = owner.username?.trim() || owner.displayName?.trim() || '';
+  const ownerDisplayName = owner.displayName?.trim() || '';
+  const ownerUsername = owner.username?.trim() || ownerDisplayName || '';
+  const hasOwner = ownerUsername.length > 0 || owner.initials?.length > 0;
 
   const handleOwnerPress = (event: GestureResponderEvent) => {
     event.stopPropagation();
@@ -185,7 +187,7 @@ const TopMatchCard: React.FC<TopMatchCardProps> = ({
 
   return (
     <View>
-      {ownerUsername.length > 0 ? (
+      {hasOwner ? (
         <TouchableOpacity
           style={styles.ownerHeader}
           onPress={handleOwnerPress}
@@ -205,9 +207,11 @@ const TopMatchCard: React.FC<TopMatchCardProps> = ({
               </SJText>
             </View>
           )}
-          <SJText style={styles.ownerUsername} numberOfLines={1}>
-            {ownerUsername}
-          </SJText>
+          {ownerUsername.length > 0 && (
+            <SJText style={styles.ownerUsername} numberOfLines={1}>
+              {ownerUsername}
+            </SJText>
+          )}
         </TouchableOpacity>
       ) : null}
 

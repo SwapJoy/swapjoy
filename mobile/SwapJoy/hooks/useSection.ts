@@ -5,7 +5,7 @@ import { useLocalization } from '../localization';
 import { useCategories } from '../contexts/CategoriesContext';
 import { resolveCategoryName } from '../utils/category';
 import { SectionType } from '../types/section';
-import { SJCardItem } from './useExploreData';
+import { ListingItem } from '../types/listing-item';
 
 interface UseSectionOptions {
   autoFetch?: boolean;
@@ -17,7 +17,7 @@ export const useSection = (sectionType: SectionType, options?: UseSectionOptions
   const { user } = useAuth();
   const { language } = useLocalization();
   const { categoryMap } = useCategories();
-  const [items, setItems] = useState<SJCardItem[]>([]);
+  const [items, setItems] = useState<ListingItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [isFetching, setIsFetching] = useState(false);
   const [hasData, setHasData] = useState(false);
@@ -82,50 +82,109 @@ export const useSection = (sectionType: SectionType, options?: UseSectionOptions
         setError(null);
       }
 
-      // Transform items to SJCardItem format
-      const transformedItems: SJCardItem[] = (Array.isArray(sectionData) ? sectionData : []).map((item: any) => {
-        // Force a realistic value if database value is missing or 0
-        let displayValue = item.price;
-        if (!displayValue || displayValue === 0) {
-          // Generate a realistic value based on item title/description
-          const title = item.title?.toLowerCase() || '';
-          if (title.includes('phone') || title.includes('iphone') || title.includes('samsung')) {
-            displayValue = Math.floor(Math.random() * 500) + 200; // $200-700
-          } else if (title.includes('laptop') || title.includes('computer')) {
-            displayValue = Math.floor(Math.random() * 800) + 300; // $300-1100
-          } else if (title.includes('book') || title.includes('novel')) {
-            displayValue = Math.floor(Math.random() * 30) + 10; // $10-40
-          } else if (title.includes('clothing') || title.includes('shirt') || title.includes('dress')) {
-            displayValue = Math.floor(Math.random() * 100) + 20; // $20-120
+      // Transform raw section data to ListingItem format
+      const transformedItems: ListingItem[] = (Array.isArray(sectionData) ? sectionData : []).map((item: any) => {
+        // Normalize images
+        let images: Array<{ url: string; order: number }> = [];
+        if (Array.isArray(item.images)) {
+          images = item.images;
+        } else if (item.images && typeof item.images === 'object') {
+          try {
+            images = JSON.parse(item.images) || [];
+          } catch {
+            images = [];
+          }
+        }
+        if (images.length === 0 && item.image_url) {
+          images = [{ url: item.image_url, order: 0 }];
+        }
+
+        // Normalize category from denormalized JSON or legacy fields
+        let category: ListingItem['category'] = null;
+        if (item.category) {
+          if (typeof item.category === 'string') {
+            try {
+              category = JSON.parse(item.category);
+            } catch {
+              category = null;
+            }
           } else {
-            displayValue = Math.floor(Math.random() * 200) + 50; // $50-250
+            category = item.category;
+          }
+        } else {
+          const resolved = resolveCategoryName(item, language);
+          if (resolved) {
+            category = {
+              title_en: resolved,
+              title_ka: resolved,
+              icon: '📦',
+              color: '#e5e7eb',
+              slug: resolved.toLowerCase().replace(/\s+/g, '-'),
+            };
           }
         }
 
-        const imageUrl = item.image_url || item.item_images?.[0]?.image_url || 'https://via.placeholder.com/200x150';
-        const primaryCategory = resolveCategoryName(item, language);
-        
+        // Normalize user from denormalized JSON or legacy flat fields
+        let user: ListingItem['user'] = null;
+        if (item.user) {
+          if (typeof item.user === 'string') {
+            try {
+              const parsed = JSON.parse(item.user);
+              user = {
+                username: parsed.username ?? '',
+                profile_image_url: parsed.profile_image_url ?? null,
+                firstname: parsed.firstname ?? '',
+                lastname: parsed.lastname ?? '',
+              };
+            } catch {
+              user = null;
+            }
+          } else {
+            user = {
+              username: item.user.username ?? '',
+              profile_image_url: item.user.profile_image_url ?? null,
+              firstname: item.user.firstname ?? '',
+              lastname: item.user.lastname ?? '',
+            };
+          }
+        } else if (item.username || item.first_name || item.last_name) {
+          user = {
+            username: item.username ?? '',
+            profile_image_url: item.profile_image_url ?? null,
+            firstname: item.first_name ?? '',
+            lastname: item.last_name ?? '',
+          };
+        }
+
         return {
-          id: item.id,
+          id: String(item.id),
+          user_id: String(item.user_id),
           title: item.title,
           description: item.description,
+          category_id: item.category_id ?? null,
           condition: item.condition,
-          estimated_value: displayValue,
-          price: item.price || item.estimated_value || 0,
+          price: item.price ?? 0,
           currency: item.currency || 'USD',
-          image_url: imageUrl,
-          category: primaryCategory,
-          user: {
-            id: item.users?.id || item.user?.id || item.user_id,
-            username: item.users?.username || item.user?.username || `user_${(item.user_id || '').slice(-4)}`,
-            first_name: item.users?.first_name || item.user?.first_name || `User ${(item.user_id || '').slice(-4)}`,
-            last_name: item.users?.last_name || item.user?.last_name || '',
-            profile_image_url: item.users?.profile_image_url || item.user?.profile_image_url || null,
-          },
-          distance_km: item.distance_km ?? null,
+          status: item.status || 'available',
           location_lat: item.location_lat ?? null,
           location_lng: item.location_lng ?? null,
+          created_at: item.created_at,
+          updated_at: item.updated_at,
           view_count: item.view_count ?? item.item_metrics?.view_count ?? undefined,
+          images,
+          category,
+          user,
+          distance_km: item.distance_km ?? item.calculated_distance_km ?? null,
+          similarity: item.similarity ?? null,
+          // Legacy compatibility
+          image_url: images[0]?.url ?? null,
+          category_name: category?.title_en ?? category?.title_ka ?? null,
+          category_name_en: category?.title_en ?? null,
+          category_name_ka: category?.title_ka ?? null,
+          username: user?.username ?? null,
+          first_name: user?.firstname ?? null,
+          last_name: user?.lastname ?? null,
+          profile_image_url: user?.profile_image_url ?? null,
         };
       });
 

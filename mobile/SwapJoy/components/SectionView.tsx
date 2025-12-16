@@ -7,7 +7,7 @@ import { useSection } from '../hooks/useSection';
 import { useAuth } from '../contexts/AuthContext';
 import { useLocalization } from '../localization';
 import { useFavorites } from '../contexts/FavoritesContext';
-import { SJCardItem } from '../hooks/useExploreData';
+import { ListingItem } from '../types/listing-item';
 import TopMatchCard, { TopMatchCardSkeleton } from './TopMatchCard';
 import { ExploreScreenProps } from '../types/navigation';
 import { useLocation } from '../contexts/LocationContext';
@@ -21,7 +21,7 @@ interface SectionViewProps {
 }
 
 interface SectionItemCardProps {
-  item: SJCardItem;
+  item: ListingItem;
   navigation: ExploreScreenProps['navigation'];
   toggleFavorite: (id: string, data: any) => void;
   isFavorite: (id: string) => boolean;
@@ -31,13 +31,31 @@ interface SectionItemCardProps {
 
 const SectionItemCard: React.FC<SectionItemCardProps> = memo(
   ({ item, navigation, toggleFavorite, isFavorite, swapSuggestionsLabel, cardWidth }) => {
+    // Normalize user data from ListingItem (new fields) and legacy flat fields
+    const firstName =
+      item.user?.firstname ??
+      item.user?.first_name ??
+      item.first_name ??
+      '';
+    const lastName =
+      item.user?.lastname ??
+      item.user?.last_name ??
+      item.last_name ??
+      '';
+    const ownerDisplayName = `${firstName} ${lastName}`.trim();
+    const ownerUsername =
+      item.user?.username ??
+      item.username ??
+      ownerDisplayName;
+
+    const initialsSource = ownerDisplayName || ownerUsername || '';
     const ownerInitials =
-      `${item.user?.first_name?.[0] ?? ''}${item.user?.last_name?.[0] ?? ''}`.trim() ||
-      item.user?.username?.[0]?.toUpperCase() ||
-      '?';
-    const ownerDisplayName =
-      `${item.user?.first_name ?? ''} ${item.user?.last_name ?? ''}`.trim() || '';
-    const ownerUsername = item.user?.username || ownerDisplayName;
+      initialsSource
+        .split(' ')
+        .map((part) => part.charAt(0))
+        .join('')
+        .slice(0, 2)
+        .toUpperCase() || '?';
 
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { formatCurrency } = require('../utils');
@@ -47,7 +65,7 @@ const SectionItemCard: React.FC<SectionItemCardProps> = memo(
       <TopMatchCard
         title={item.title}
         price={displayedPrice}
-        imageUrl={item.image_url}
+        imageUrl={item.image_url || item.images?.[0]?.url}
         description={item.description}
         category={item.category}
         condition={item.condition}
@@ -55,8 +73,11 @@ const SectionItemCard: React.FC<SectionItemCardProps> = memo(
           username: ownerUsername,
           displayName: ownerDisplayName,
           initials: ownerInitials,
-          userId: item.user?.id,
-          profileImageUrl: item.user?.profile_image_url ?? undefined,
+          userId: item.user_id,
+          profileImageUrl:
+            item.user?.profile_image_url ??
+            item.profile_image_url ??
+            undefined,
         }}
         onPress={() => (navigation as any).navigate('ItemDetails', { itemId: item.id })}
         onOwnerPress={() => {
@@ -184,7 +205,7 @@ export const SectionView: React.FC<SectionViewProps> = memo(({
   }, [items, sectionTitle, isInitialized, loading, currentLocation]);
 
   const renderItem = useCallback(
-    ({ item, index }: { item: SJCardItem; index: number }) => {
+    ({ item, index }: { item: ListingItem; index: number }) => {
       const total = items?.length ?? 0;
       const isFirst = index === 0;
       const isLast = index === total - 1;
