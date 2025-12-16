@@ -92,7 +92,7 @@ export type RootStackParamList = {
   // Offer flow
   OfferCreate: {
     receiverId: string;
-    requestedItems: Array<{ id: string; title?: string; price?: number; image_url?: string; item_images?: Array<{ image_url: string }>; condition?: string }>;
+    requestedItems: Array<{ id: string; title?: string; price?: number; image_url?: string; images?: Array<{ url: string; image_url?: string }>; condition?: string }>;
     contextTitle?: string; // e.g., bundle title or item title
   };
   OfferPreview: {
@@ -102,8 +102,8 @@ export type RootStackParamList = {
     topUpAmount: number; // signed (+ add money, - request money)
     message?: string;
     summary: {
-      offered: Array<{ id: string; title?: string; price?: number; image_url?: string; item_images?: Array<{ image_url: string }> }>;
-      requested: Array<{ id: string; title?: string; price?: number; image_url?: string; item_images?: Array<{ image_url: string }> }>;
+      offered: Array<{ id: string; title?: string; price?: number; image_url?: string; images?: Array<{ url: string; image_url?: string }> }>;
+      requested: Array<{ id: string; title?: string; price?: number; image_url?: string; images?: Array<{ url: string; image_url?: string }> }>;
     };
   };
   SuggestionDetails: {

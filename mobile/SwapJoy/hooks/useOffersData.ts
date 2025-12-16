@@ -11,7 +11,7 @@ export interface Offer {
   created_at: string;
   sender: { username: string; profile_image_url?: string };
   receiver: { username: string; profile_image_url?: string };
-  offer_items: Array<{ item: { title: string; item_images: Array<{ image_url: string }> } }>;
+  offer_items: Array<{ item: { title: string; image_url?: string; images?: Array<{ url: string; image_url?: string }> } }>;
 }
 
 export const useOffersData = () => {

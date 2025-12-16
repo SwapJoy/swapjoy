@@ -84,23 +84,12 @@ serve(async (req) => {
       }
     }
 
-    // Get item images with meta data
-    const { data: itemImages, error: imagesError } = await supabaseClient
-      .from('item_images')
-      .select('meta')
-      .eq('item_id', itemId)
-      .order('sort_order', { ascending: true });
-
-    if (imagesError) {
-      console.warn('Warning: Failed to fetch item images:', imagesError);
-    }
-
-    // Extract image analysis information from meta
+    // Extract image analysis information from denormalized images meta
     const imageInfo: string[] = [];
     const detectedObjectsSet = new Set<string>();
 
-    if (itemImages && itemImages.length > 0) {
-      itemImages.forEach((img) => {
+    if (Array.isArray(item.images) && item.images.length > 0) {
+      item.images.forEach((img: any) => {
         if (img.meta) {
           // Add detected objects
           if (Array.isArray(img.meta.detectedObjects)) {

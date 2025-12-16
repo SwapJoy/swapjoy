@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { ApiService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -32,43 +32,94 @@ export const useNotificationsData = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [offset, setOffset] = useState(0);
+  const loadingMoreRef = useRef(false);
 
-  const fetchNotifications = useCallback(async () => {
+  const fetchNotifications = useCallback(async (options?: { offset?: number; append?: boolean }) => {
+    const { offset: fetchOffset, append = false } = options || {};
+
     if (!user) {
       console.log('[useNotificationsData] No user, skipping fetch');
       return;
     }
 
+    const isInitialLoad = !append && (fetchOffset === undefined || fetchOffset === 0);
+
     try {
-      setLoading(true);
+      if (isInitialLoad) {
+        setLoading(true);
+      }
+
       console.log('[useNotificationsData] Fetching notifications for user:', user.id);
-      const { data, error } = await ApiService.getNotifications();
+      const effectiveOffset = fetchOffset ?? 0;
+      const pageSize = 10;
+      const { data, error } = await ApiService.getNotifications({
+        limit: pageSize,
+        offset: effectiveOffset,
+      });
 
       if (error) {
         console.error('[useNotificationsData] Error fetching notifications:', error);
-        setNotifications([]);
-        setUnreadCount(0);
+        if (!append) {
+          setNotifications([]);
+          setUnreadCount(0);
+        }
+        setHasMore(false);
         return;
       }
 
-      const notificationsData = data || [];
-      console.log(`[useNotificationsData] Received ${notificationsData.length} notifications`);
-      setNotifications(notificationsData);
-      setUnreadCount(notificationsData.filter((n: Notification) => !n.is_read).length);
+      const notificationsData = (data || []) as Notification[];
+      console.log(`[useNotificationsData] Received ${notificationsData.length} notifications (append=${append}, offset=${effectiveOffset})`);
+
+      setNotifications((prev) => {
+        let next: Notification[];
+
+        if (append) {
+          const existingIds = new Set(prev.map((n) => n.id));
+          const newItems = notificationsData.filter((n) => !existingIds.has(n.id));
+          next = [...prev, ...newItems];
+          setOffset((prevOffset) => prevOffset + newItems.length);
+          setHasMore(newItems.length === pageSize);
+        } else {
+          next = notificationsData;
+          setOffset(next.length);
+          setHasMore(notificationsData.length === pageSize);
+        }
+
+        setUnreadCount(next.filter((n: Notification) => !n.is_read).length);
+        return next;
+      });
     } catch (error) {
       console.error('[useNotificationsData] Exception fetching notifications:', error);
-      setNotifications([]);
-      setUnreadCount(0);
+      if (!append) {
+        setNotifications([]);
+        setUnreadCount(0);
+      }
+      setHasMore(false);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
+      loadingMoreRef.current = false;
     }
   }, [user]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await fetchNotifications();
+    setHasMore(true);
+    setOffset(0);
+    await fetchNotifications({ offset: 0, append: false });
     setRefreshing(false);
   }, [fetchNotifications]);
+
+  const loadMore = useCallback(async () => {
+    if (loadingMoreRef.current || loadingMore || !hasMore || loading) {
+      return;
+    }
+    loadingMoreRef.current = true;
+    await fetchNotifications({ offset, append: true });
+  }, [fetchNotifications, hasMore, loadingMore, loading, offset]);
 
   const markAsRead = useCallback(async (notificationId: string) => {
     // Optimistically update UI first
@@ -200,7 +251,7 @@ export const useNotificationsData = () => {
   }, []);
 
   useEffect(() => {
-    fetchNotifications();
+    fetchNotifications({ offset: 0, append: false });
   }, [fetchNotifications]);
 
   return {
@@ -208,7 +259,10 @@ export const useNotificationsData = () => {
     loading,
     refreshing,
     unreadCount,
+    loadingMore,
+    hasMore,
     onRefresh,
+    loadMore,
     markAsRead,
     markAllAsRead,
     getNotificationIcon,

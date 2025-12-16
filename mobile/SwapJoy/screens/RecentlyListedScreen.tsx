@@ -51,7 +51,11 @@ const RecentlyListedScreen: React.FC = () => {
       condition: item.condition,
       price: item.price || item.estimated_value || 0,
       currency: item.currency || 'USD',
-      image_url: item.image_url || item.item_images?.[0]?.image_url || 'https://via.placeholder.com/200x150',
+      image_url:
+        item.image_url ||
+        item.images?.[0]?.image_url ||
+        item.images?.[0]?.url ||
+        'https://via.placeholder.com/200x150',
       category: resolveCategoryName(item, language),
     }),
     [language]

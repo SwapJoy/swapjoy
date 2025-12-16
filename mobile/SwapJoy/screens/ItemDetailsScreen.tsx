@@ -38,7 +38,7 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
     const primaryImage =
       item.image_url ||
       item.images?.[0]?.image_url ||
-      item.item_images?.[0]?.image_url ||
+      item.images?.[0]?.url ||
       null;
     return {
       id: item.id,
@@ -210,8 +210,7 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
                     id: item.id,
                     title: item.title,
                     price: item.price || item.estimated_value,
-                    image_url: item.image_url,
-                    item_images: item.images || item.item_images || [],
+                    image_url: item.image_url || item.images?.[0]?.url || null,
                     condition: item.condition,
                   },
                 ],

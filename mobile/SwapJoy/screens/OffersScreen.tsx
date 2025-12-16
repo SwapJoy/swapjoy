@@ -69,8 +69,9 @@ const OffersScreen: React.FC<OffersScreenProps> = memo(({ route, navigation }) =
       const primaryItem = primaryCollection[0]?.item || fallbackCollection[0]?.item || undefined;
 
       const imageUrl =
-        primaryItem?.item_images?.[0]?.image_url ||
         primaryItem?.image_url ||
+        primaryItem?.images?.[0]?.image_url ||
+        primaryItem?.images?.[0]?.url ||
         undefined;
 
       const category =

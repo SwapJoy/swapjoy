@@ -103,7 +103,12 @@ const OfferCreateScreen: React.FC<OfferCreateScreenProps> = ({ navigation, route
   const renderRequestedItem = ({ item }: { item: any }) => (
     <View style={styles.reqCard}>
       <CachedImage
-        uri={item.item_images?.[0]?.image_url || item.image_url || 'https://via.placeholder.com/200x150'}
+        uri={
+          item.image_url ||
+          item.images?.[0]?.image_url ||
+          item.images?.[0]?.url ||
+          'https://via.placeholder.com/200x150'
+        }
         style={styles.reqImage}
         resizeMode="cover"
         fallbackUri="https://picsum.photos/200/150?random=6"
@@ -125,7 +130,12 @@ const OfferCreateScreen: React.FC<OfferCreateScreenProps> = ({ navigation, route
       return (
         <TouchableOpacity style={[styles.myItemCard, selected && styles.selectedCard]} onPress={() => onToggle(item.id)} activeOpacity={0.8}>
           <CachedImage
-            uri={item.item_images?.[0]?.image_url || item.image_url || 'https://via.placeholder.com/140x100'}
+            uri={
+              item.image_url ||
+              item.images?.[0]?.image_url ||
+              item.images?.[0]?.url ||
+              'https://via.placeholder.com/140x100'
+            }
             style={styles.myItemImage}
             resizeMode="cover"
             fallbackUri="https://picsum.photos/140/100?random=7"
@@ -144,8 +154,14 @@ const OfferCreateScreen: React.FC<OfferCreateScreenProps> = ({ navigation, route
     },
     (prev, next) => {
       if (prev.selected !== next.selected) return false;
-      const prevUri = prev.item?.item_images?.[0]?.image_url || prev.item?.image_url;
-      const nextUri = next.item?.item_images?.[0]?.image_url || next.item?.image_url;
+      const prevUri =
+        prev.item?.image_url ||
+        prev.item?.images?.[0]?.image_url ||
+        prev.item?.images?.[0]?.url;
+      const nextUri =
+        next.item?.image_url ||
+        next.item?.images?.[0]?.image_url ||
+        next.item?.images?.[0]?.url;
       if (prevUri !== nextUri) return false;
       // avoid re-render if nothing critical changed
       return true;

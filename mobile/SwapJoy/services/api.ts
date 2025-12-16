@@ -854,15 +854,6 @@ export class ApiService {
                 category_name_ka: categoryData?.title_ka || null,
                 category_name: categoryData?.title_en || categoryData?.title_ka || null,
                 image_url: imageUrl,
-                // Legacy item_images shape for backward compatibility
-                item_images: Array.isArray(images)
-                  ? images.map((img: any, index: number) => ({
-                      id: img.id ?? `${item.id}-${index}`,
-                      image_url: img.url,
-                      is_primary: img.is_primary ?? (index === 0),
-                      created_at: img.created_at ?? item.created_at,
-                    }))
-                  : [],
                 user: {
                   id: item.user_id,
                   username: normalizedUsername || undefined,
@@ -1596,6 +1587,7 @@ export class ApiService {
     currency?: string;
     location_lat?: number;
     location_lng?: number;
+    images?: { url: string; order: number }[];
   }) {
     return this.authenticatedCall(async (client) => {
       // Get current user
@@ -1608,7 +1600,15 @@ export class ApiService {
         .from('items')
         .insert({
           user_id: user.id,
-          ...itemData,
+          title: itemData.title,
+          description: itemData.description,
+          category_id: itemData.category_id ?? null,
+          condition: itemData.condition,
+          price: itemData.price,
+          currency: itemData.currency,
+          location_lat: itemData.location_lat ?? null,
+          location_lng: itemData.location_lng ?? null,
+          images: itemData.images ?? [],
           status: 'available',
         })
         .select()
@@ -1779,7 +1779,9 @@ export class ApiService {
     });
   }
 
-  static async getNotifications() {
+  static async getNotifications(params?: { limit?: number; offset?: number }) {
+    const { limit = 10, offset = 0 } = params || {};
+
     return this.authenticatedCall(async (client) => {
       // Get current user for logging
       const currentUser = await AuthService.getCurrentUser();
@@ -1818,12 +1820,12 @@ export class ApiService {
       
       // RLS policy automatically filters by auth.uid() = user_id
       // So we don't need to explicitly filter - RLS handles it
-      // CRITICAL FIX: Add LIMIT to prevent fetching all notifications (can be thousands)
+      // Use range for offset-based pagination, defaulting to 10 items per page
       const { data, error } = await client
         .from('notifications')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(20); // Limit to most recent 20 notifications to prevent timeout
+        .range(offset, offset + limit - 1);
       
       // #region agent log
       const duration = Date.now() - startTime;

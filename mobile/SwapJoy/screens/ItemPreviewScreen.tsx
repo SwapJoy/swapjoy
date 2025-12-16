@@ -99,7 +99,16 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
     setSubmitting(true);
 
     try {
-      // Create item
+      // Prepare denormalized images payload
+      const images =
+        itemData.images && itemData.images.length > 0
+          ? itemData.images.map((img, index) => ({
+              url: img.supabaseUrl,
+              order: index,
+            }))
+          : [];
+
+      // Create item with denormalized images
       const { data: item, error: itemError } = await ApiService.createItem({
         title: itemData.title,
         description: itemData.description,
@@ -109,6 +118,7 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
         currency: itemData.currency,
         location_lat: itemData.location_lat ?? undefined,
         location_lng: itemData.location_lng ?? undefined,
+        images,
       });
 
       if (itemError || !item) {
@@ -116,23 +126,6 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
       }
 
       const itemId = (item as any).id;
-
-      // Upload images
-      if (itemData.images && itemData.images.length > 0) {
-        const imageData = itemData.images.map((img, index) => ({
-          item_id: itemId,
-          image_url: img.supabaseUrl,
-          sort_order: index,
-          is_primary: index === 0,
-        }));
-
-        const { error: imagesError } = await ApiService.createItemImages(imageData);
-        if (imagesError) {
-          console.error('Error creating item images:', imagesError);
-          // Don't fail the whole operation, but log the error
-        }
-      }
-
       // Show success and navigate
       Alert.alert(
         strings.alerts.successTitle,

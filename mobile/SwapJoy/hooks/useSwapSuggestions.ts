@@ -170,7 +170,7 @@ export function useSwapSuggestions({
         ApiService.getRateMap(),
       ]);
 
-      const rawItems = (myItemsRes?.data || []) as Array<{ id: string; price: number; currency: string; title?: string; item_images?: { image_url: string }[] }>;
+      const rawItems = (myItemsRes?.data || []) as Array<{ id: string; price: number; currency: string; title?: string; images?: { url: string; image_url?: string }[]; image_url?: string }>;
       const seenItems = new Set<string>();
       const myItems = rawItems.filter(it => {
         if (!it?.id) return false;
@@ -278,9 +278,11 @@ export function useSwapSuggestions({
                 title: match.title,
                 price,
                 currency,
-                image_url: Array.isArray(match.item_images) && match.item_images.length > 0
-                  ? match.item_images[0]?.image_url
-                  : null,
+                image_url:
+                  match.image_url ||
+                  (Array.isArray((match as any).images) && (match as any).images.length > 0
+                    ? ((match as any).images[0]?.image_url || (match as any).images[0]?.url)
+                    : null),
                 condition: (match as any).condition,
               },
             ],
@@ -304,7 +306,11 @@ export function useSwapSuggestions({
           title: it.title,
           price: it.price,
           currency: it.currency,
-          image_url: Array.isArray(it.item_images) && it.item_images.length > 0 ? it.item_images[0]?.image_url : null,
+          image_url:
+            it.image_url ||
+            (Array.isArray(it.images) && it.images.length > 0
+              ? it.images[0]?.image_url || it.images[0]?.url
+              : null),
           condition: (it as any).condition,
         }));
 

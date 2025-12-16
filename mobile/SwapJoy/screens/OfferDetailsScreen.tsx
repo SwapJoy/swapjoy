@@ -59,8 +59,9 @@ const OfferDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const primaryItem = primaryCollection[0]?.item || fallbackCollection[0]?.item || undefined;
 
   const primaryImage =
-    primaryItem?.item_images?.[0]?.image_url ||
     primaryItem?.image_url ||
+    primaryItem?.images?.[0]?.image_url ||
+    primaryItem?.images?.[0]?.url ||
     null;
 
   const category =

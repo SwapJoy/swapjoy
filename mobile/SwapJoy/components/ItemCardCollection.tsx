@@ -127,8 +127,8 @@ const ItemCardCollection: React.FC<ItemCardCollectionProps> = ({
 
       const imageUrl =
         item?.image_url ||
-        item?.item_images?.[0]?.image_url ||
         item?.images?.[0]?.image_url ||
+        item?.images?.[0]?.url ||
         null;
 
       const ownerHandle = item?.user?.username || item?.user?.first_name || undefined;

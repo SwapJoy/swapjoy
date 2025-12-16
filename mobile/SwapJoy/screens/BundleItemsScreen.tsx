@@ -25,7 +25,12 @@ const BundleItemsScreen: React.FC<BundleItemsScreenProps> = ({ navigation, route
       onPress={() => (navigation as any).navigate('ItemDetails', { itemId: item.id })}
     >
       <CachedImage
-        uri={item.item_images?.[0]?.image_url || item.image_url || 'https://via.placeholder.com/200x150'}
+        uri={
+          item.image_url ||
+          item.images?.[0]?.image_url ||
+          item.images?.[0]?.url ||
+          'https://via.placeholder.com/200x150'
+        }
         style={styles.image}
         resizeMode="cover"
         fallbackUri="https://picsum.photos/200/150?random=4"

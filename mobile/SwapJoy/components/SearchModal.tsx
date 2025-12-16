@@ -124,7 +124,6 @@ const SearchModal: React.FC<SearchModalProps> = ({
       const imageUrl =
         item?.image_url ||
         item?.images?.[0]?.url ||
-        item?.item_images?.[0]?.image_url ||
         item?.images?.[0]?.image_url ||
         null;
 

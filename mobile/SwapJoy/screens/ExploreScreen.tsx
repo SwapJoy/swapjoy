@@ -146,11 +146,11 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
         onClearSearch={handleClearSearch}
         onItemPress={(item: any) => (navigation as any).navigate('ItemDetails', { itemId: item.id })}
         renderFavoriteButton={(item: any) => {
-          const imageUrl =
-            item?.image_url ||
-            item?.item_images?.[0]?.image_url ||
-            item?.images?.[0]?.image_url ||
-            null;
+      const imageUrl =
+        item?.image_url ||
+        item?.images?.[0]?.image_url ||
+        item?.images?.[0]?.url ||
+        null;
           const favoriteData = {
             id: item?.id,
             title: item?.title,

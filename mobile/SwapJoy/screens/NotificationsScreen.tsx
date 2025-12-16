@@ -18,11 +18,14 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = memo(() => {
     loading,
     refreshing,
     onRefresh,
+    loadingMore,
+    hasMore,
     markAsRead,
     markAllAsRead,
     getNotificationIcon,
     getNotificationColor,
     formatTimeAgo,
+    loadMore,
   } = useNotifications();
   const [popoverVisible, setPopoverVisible] = useState(false);
 
@@ -262,6 +265,19 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = memo(() => {
             tintColor="#007AFF"
           />
         }
+        onEndReachedThreshold={0.1}
+        onEndReached={() => {
+          if (hasMore && !loadingMore && !loading) {
+            loadMore();
+          }
+        }}
+        ListFooterComponent={
+          loadingMore ? (
+            <View style={styles.footerContainer}>
+              <SJText style={styles.footerText}>Loading more...</SJText>
+            </View>
+          ) : null
+        }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <SJText style={styles.emptyTitle}>No notifications</SJText>
@@ -324,67 +340,68 @@ const styles = StyleSheet.create({
     color: '#555',
   },
   listContainer: {
-    padding: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
   },
   notificationCard: {
     backgroundColor: '#fff',
-    borderRadius: 15,
-    marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    borderRadius: 10,
+    marginBottom: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#e5e7eb',
   },
   unreadNotification: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#007AFF',
+    backgroundColor: '#e7f3ff',
   },
   notificationContent: {
-    padding: 15,
+    paddingVertical: 10,
   },
   notificationHeader: {
     flexDirection: 'row',
     alignItems: 'flex-start',
   },
   iconContainer: {
-    width: 40,
-    height: 40,
+    width: 48,
+    height: 48,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
+    borderRadius: 24,
+    backgroundColor: '#e4e6eb',
   },
   notificationIcon: {
     fontSize: 24,
   },
   profileImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     marginRight: 12,
-    backgroundColor: '#e0e0e0',
+    backgroundColor: '#e4e6eb',
   },
   notificationText: {
     flex: 1,
     marginRight: 8,
   },
   notificationTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4,
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#050505',
+    marginBottom: 2,
   },
   notificationMessage: {
     fontSize: 14,
-    color: '#666',
-    lineHeight: 20,
+    color: '#4b5563',
+    lineHeight: 18,
   },
   notificationMeta: {
     alignItems: 'flex-end',
   },
   notificationTime: {
     fontSize: 12,
-    color: '#999',
+    color: '#6b7280',
     marginBottom: 4,
   },
   unreadDot: {
@@ -408,6 +425,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     textAlign: 'center',
+  },
+  footerContainer: {
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  footerText: {
+    fontSize: 14,
+    color: '#666',
   },
   headerButton: {
     padding: 8,
