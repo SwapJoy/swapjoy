@@ -44,7 +44,7 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = memo(() => {
           style={styles.headerButton}
           onPress={() => setPopoverVisible(true)}
         >
-          <Ionicons name="ellipsis-vertical" size={24} color="#007AFF" />
+          <Ionicons name="ellipsis-vertical" size={20} color="#007AFF" />
         </TouchableOpacity>
       ),
     });
@@ -294,7 +294,7 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = memo(() => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#161200',
   },
   header: {
     flexDirection: 'row',
@@ -302,7 +302,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     paddingBottom: 10,
-    backgroundColor: '#fff',
+    backgroundColor: '#161200',
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
     marginBottom: 10,
@@ -314,8 +314,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: 'bold'
   },
   badge: {
     backgroundColor: '#FF3B30',
@@ -326,7 +325,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   badgeText: {
-    color: '#fff',
     fontSize: 12,
     fontWeight: 'bold',
   },
@@ -336,15 +334,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    fontSize: 16,
-    color: '#555',
+    fontSize: 16
   },
   listContainer: {
     paddingVertical: 8,
     paddingHorizontal: 12,
   },
   notificationCard: {
-    backgroundColor: '#fff',
+    backgroundColor: '#161200',
     borderRadius: 10,
     marginBottom: 4,
     paddingHorizontal: 8,
@@ -388,12 +385,10 @@ const styles = StyleSheet.create({
   notificationTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#050505',
     marginBottom: 2,
   },
   notificationMessage: {
     fontSize: 14,
-    color: '#4b5563',
     lineHeight: 18,
   },
   notificationMeta: {
@@ -436,8 +431,8 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   headerButton: {
-    padding: 8,
     marginRight: 8,
+    marginBottom: 4,
   },
   modalOverlay: {
     flex: 1,
@@ -448,7 +443,7 @@ const styles = StyleSheet.create({
     paddingRight: 16,
   },
   popoverContainer: {
-    backgroundColor: '#fff',
+    backgroundColor: '#161200',
     borderRadius: 12,
     minWidth: 200,
     shadowColor: '#000',

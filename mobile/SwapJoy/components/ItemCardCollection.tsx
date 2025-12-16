@@ -160,7 +160,6 @@ const ItemCardCollection: React.FC<ItemCardCollectionProps> = ({
           onPress={handlePress}
           variant="grid"
           style={[
-            styles.card,
             {
               width: cardWidth,
               marginRight: (index % numColumns) === numColumns - 1 ? 0 : columnSpacing,
@@ -229,10 +228,7 @@ const styles = StyleSheet.create({
   },
   columnWrapper: {
     width: '100%',
-  },
-  card: {
-    borderRadius: 4,
-  },
+  }
 });
 
 export default memo(ItemCardCollection);

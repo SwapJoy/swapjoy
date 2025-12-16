@@ -47,7 +47,7 @@ const SuggestionDetailsScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: '#161200' },
   header: { padding: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#eee' },
   title: { fontSize: 18, fontWeight: '700', color: '#1a1a1a' },
   subtitle: { fontSize: 12, color: '#707070', marginTop: 4 },
@@ -60,7 +60,7 @@ const styles = StyleSheet.create({
   itemId: { fontSize: 11, color: '#707070', marginTop: 2 },
   itemPrice: { fontSize: 14, color: '#007AFF', fontWeight: '700' },
   closeBtn: { position: 'absolute', bottom: 24, right: 24, backgroundColor: '#1f7ae0', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10 },
-  closeText: { color: '#fff', fontWeight: '700' },
+  closeText: { color: '#161200', fontWeight: '700' },
 });
 
 export default SuggestionDetailsScreen;

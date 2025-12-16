@@ -41,7 +41,7 @@ const ChatListScreen: React.FC = () => {
         }}
       >
         <View style={styles.avatar}>
-          <Ionicons name="chatbubbles" size={22} color="#fff" />
+          <Ionicons name="chatbubbles" size={22} color="#161200" />
         </View>
         <View style={styles.content}>
           <View style={styles.titleRow}>
@@ -91,14 +91,14 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: '#161200',
   },
   emptyContainer: {
     flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
-    backgroundColor: '#fff',
+    backgroundColor: '#161200',
   },
   emptyTitle: {
     fontSize: 18,
@@ -117,7 +117,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#E0E0E0',
-    backgroundColor: '#fff',
+    backgroundColor: '#161200',
   },
   avatar: {
     width: 40,

@@ -19,6 +19,7 @@ import { useCategories } from '../hooks/useCategories';
 import { useLocation, City } from '../hooks/useLocation';
 import { useFilters, FilterState } from '../contexts/FiltersContext';
 import { formatCurrency } from '../utils';
+import { colors } from '@navigation/MainTabNavigator.styles';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const PRICE_MAX = 10000;
@@ -51,7 +52,7 @@ const FilterPopoverHeader: React.FC<FilterPopoverHeaderProps> = ({ onClose, t })
       {t('search.filters', { defaultValue: 'Filters' })}
     </SJText>
     <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-      <Ionicons name="close" size={24} color="#0f172a" />
+      <Ionicons name="close" size={24} color="#fff" />
     </TouchableOpacity>
   </View>
 );
@@ -820,7 +821,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   popoverContainer: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.primary,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     shadowColor: '#000',
@@ -846,7 +847,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#0f172a',
   },
   closeButton: {
     width: 32,
@@ -877,7 +877,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#0f172a',
     marginBottom: 12,
   },
   sectionActions: {
@@ -887,7 +886,6 @@ const styles = StyleSheet.create({
   },
   actionText: {
     fontSize: 14,
-    color: '#0ea5e9',
     fontWeight: '500',
   },
   actionDivider: {
@@ -901,7 +899,6 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 14,
-    color: '#64748b',
   },
   categoryChipsContainer: {
     flexDirection: 'row',
@@ -941,7 +938,6 @@ const styles = StyleSheet.create({
   },
   seeMoreText: {
     fontSize: 14,
-    color: '#0ea5e9',
     fontWeight: '500',
   },
   distanceOptionsContainer: {
@@ -965,6 +961,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#0f172a',
   },
+
   distanceOptionTextSelected: {
     color: '#0ea5e9',
     fontWeight: '600',
@@ -1072,7 +1069,7 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#e2e8f0',
     gap: 12,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.primary,
     flexShrink: 0,
   },
   clearButton: {
@@ -1096,12 +1093,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 12,
-    backgroundColor: '#0ea5e9',
+    backgroundColor: colors.primaryYellow,
   },
   applyButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#ffffff',
+    color: colors.primary,
   },
   priceSliderContainer: {
     marginTop: 8,
@@ -1122,7 +1119,6 @@ const styles = StyleSheet.create({
   priceValue: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#0f172a',
   },
   sliderTrackContainer: {
     marginTop: 8,

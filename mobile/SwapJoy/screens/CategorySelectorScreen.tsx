@@ -8,6 +8,7 @@ import { useCategorySelector } from '../hooks/useCategorySelector';
 import { useLocalization } from '../localization';
 import { CategorySelectorScreenProps } from '../types/navigation';
 import { UserService } from '../services/userService';
+import { colors } from '@navigation/MainTabNavigator.styles';
 
 interface CategorySelectorScreenParams {
   multiselect?: boolean;
@@ -124,7 +125,7 @@ const CategorySelectorScreen: React.FC<CategorySelectorScreenProps> = ({ route, 
                   <Ionicons
                     name={isExpanded ? 'chevron-down' : 'chevron-forward'}
                     size={16}
-                    color={isExpanded ? '#2563eb' : '#9ca3af'}
+                    color={isExpanded ? colors.primaryYellow : '#9ca3af'}
                   />
                 </View>
               )}
@@ -146,7 +147,7 @@ const CategorySelectorScreen: React.FC<CategorySelectorScreenProps> = ({ route, 
                   <View style={styles.checkboxWrapper}>
                     {isSelected ? (
                       <View style={styles.checkboxChecked}>
-                        <Ionicons name="checkmark" size={16} color="#fff" />
+                        <Ionicons name="checkmark" size={16} color="#161200" />
                       </View>
                     ) : (
                       <View style={styles.checkboxUnchecked} />
@@ -258,7 +259,7 @@ const CategorySelectorScreen: React.FC<CategorySelectorScreenProps> = ({ route, 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.primary,
   },
   header: {
     flexDirection: 'row',
@@ -267,21 +268,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 20,
     paddingBottom: 16,
-    backgroundColor: '#ffffff',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#e5e7eb',
+    backgroundColor: colors.primaryYellow,
   },
   headerTitle: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#111827',
     letterSpacing: -0.5,
   },
   headerBadge: {
     minWidth: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#2563eb',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 8,
@@ -289,7 +286,6 @@ const styles = StyleSheet.create({
   headerBadgeText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#ffffff',
   },
   centerContainer: {
     flex: 1,
@@ -314,17 +310,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 16,
     paddingRight: 20,
-    backgroundColor: '#ffffff',
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#f3f4f6',
   },
   categoryItemSelected: {
-    backgroundColor: '#eff6ff',
   },
   categoryItemHasSelectedChildren: {
-    backgroundColor: '#f0f9ff',
     borderLeftWidth: 3,
-    borderLeftColor: '#2563eb',
+    borderLeftColor: colors.primaryYellow,
   },
   categoryItemLeft: {
     flexDirection: 'row',
@@ -338,16 +331,13 @@ const styles = StyleSheet.create({
   },
   categoryName: {
     fontSize: 17,
-    color: '#111827',
     fontWeight: '500',
     flex: 1,
   },
   categoryNameSelected: {
-    color: '#2563eb',
     fontWeight: '600',
   },
   categoryNameHasSelectedChildren: {
-    color: '#1e40af',
     fontWeight: '600',
   },
   checkboxWrapper: {
@@ -359,13 +349,12 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     borderWidth: 2,
     borderColor: '#d1d5db',
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.primaryYellow,
   },
   checkboxChecked: {
     width: 24,
     height: 24,
     borderRadius: 6,
-    backgroundColor: '#2563eb',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -383,7 +372,7 @@ const styles = StyleSheet.create({
     minWidth: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#2563eb',
+    backgroundColor: colors.primaryYellow,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 8,
@@ -391,17 +380,15 @@ const styles = StyleSheet.create({
   selectionBadgeText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#ffffff',
   },
   childCount: {
     fontSize: 14,
-    color: '#9ca3af',
     fontWeight: '500',
     minWidth: 24,
     textAlign: 'right',
   },
   childrenWrapper: {
-    backgroundColor: '#f9fafb',
+    
   },
   footer: {
     flexDirection: 'row',
@@ -409,7 +396,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: '#ffffff',
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#e5e7eb',
     shadowColor: '#000',
@@ -420,14 +406,13 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: 15,
-    color: '#6b7280',
     fontWeight: '500',
   },
   doneButton: {
     paddingHorizontal: 28,
     paddingVertical: 12,
     borderRadius: 10,
-    backgroundColor: '#e5e7eb',
+    backgroundColor: colors.primaryYellow,
     minWidth: 90,
     alignItems: 'center',
   },
@@ -440,7 +425,7 @@ const styles = StyleSheet.create({
   doneButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#ffffff',
+    color: '#161200f',
   },
   doneButtonTextDisabled: {
     color: '#9ca3af',

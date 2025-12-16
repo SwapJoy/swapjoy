@@ -12,13 +12,13 @@ const AddItemScreen: React.FC<AddItemScreenProps> = ({ navigation }) => {
           style={styles.closeButton}
           onPress={() => navigation.goBack()}
         >
-          <Ionicons name="close" size={24} color="#fff" />
+          <Ionicons name="close" size={24} color="#161200" />
         </TouchableOpacity>
       </View>
       
       <View style={styles.content}>
         <View style={styles.iconContainer}>
-          <Ionicons name="add-circle" size={80} color="#fff" />
+          <Ionicons name="add-circle" size={80} color="#161200" />
         </View>
         
         <SJText style={styles.title}>Add New Item</SJText>
@@ -28,19 +28,19 @@ const AddItemScreen: React.FC<AddItemScreenProps> = ({ navigation }) => {
         
         <View style={styles.featureList}>
           <View style={styles.featureItem}>
-            <Ionicons name="camera" size={20} color="#fff" />
+            <Ionicons name="camera" size={20} color="#161200" />
             <SJText style={styles.featureText}>Take photos of your item</SJText>
           </View>
           <View style={styles.featureItem}>
-            <Ionicons name="text" size={20} color="#fff" />
+            <Ionicons name="text" size={20} color="#161200" />
             <SJText style={styles.featureText}>Add description and details</SJText>
           </View>
           <View style={styles.featureItem}>
-            <Ionicons name="location" size={20} color="#fff" />
+            <Ionicons name="location" size={20} color="#161200" />
             <SJText style={styles.featureText}>Set your location</SJText>
           </View>
           <View style={styles.featureItem}>
-            <Ionicons name="swap-horizontal" size={20} color="#fff" />
+            <Ionicons name="swap-horizontal" size={20} color="#161200" />
             <SJText style={styles.featureText}>Choose what you want to swap for</SJText>
           </View>
         </View>
@@ -89,7 +89,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#161200',
     marginBottom: 15,
     textAlign: 'center',
   },
@@ -111,13 +111,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   featureText: {
-    color: '#fff',
+    color: '#161200',
     fontSize: 16,
     marginLeft: 15,
     flex: 1,
   },
   startButton: {
-    backgroundColor: '#fff',
+    backgroundColor: '#161200',
     paddingHorizontal: 40,
     paddingVertical: 15,
     borderRadius: 25,

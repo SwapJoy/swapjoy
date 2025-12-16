@@ -120,7 +120,6 @@ const styles = StyleSheet.create({
   selectorText: {
     flex: 1,
     fontSize: 16,
-    color: '#1a1a1a',
     marginRight: 8,
   },
   selectorTextPlaceholder: {

@@ -95,7 +95,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8f9fa',
   },
   infoSection: {
-    backgroundColor: '#fff',
+    backgroundColor: '#161200',
     paddingHorizontal: 20,
     paddingVertical: 16,
     marginHorizontal: 16,
@@ -122,7 +122,7 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   itemCard: {
-    backgroundColor: '#fff',
+    backgroundColor: '#161200',
     borderRadius: 12,
     overflow: 'hidden',
     marginBottom: 12,
@@ -173,7 +173,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   offerText: {
-    color: '#fff',
+    color: '#161200',
     fontSize: 16,
     fontWeight: '700',
   },

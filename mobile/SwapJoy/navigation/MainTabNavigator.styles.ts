@@ -2,14 +2,12 @@ import { Platform, StyleSheet } from 'react-native';
 
 export const styles = StyleSheet.create({
   headerButtonContainer: {
-    width: 32,
-    height: 32,
+    width: 40,
+    height: 40,
+    paddingLeft: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 8,
-    marginBottom: 8,
-    borderRadius: 16,
-    backgroundColor: 'rgba(0,122,255,0.08)',
+    marginBottom: 8
   },
   headerRightButtonContainer: {
     width: 32,
@@ -17,40 +15,23 @@ export const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 8,
-    marginBottom: 4,
-    borderRadius: 16,
-    backgroundColor: 'rgba(0,122,255,0.08)',
+    marginBottom: 4
   },
   headerStyle: {
-    backgroundColor: '#F7F8FF',
-    borderBottomWidth: 0,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 14,
-    elevation: Platform.OS === 'android' ? 6 : 0,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+    backgroundColor: '#ffde21', // Same as colors.primaryYellow
   },
   headerTitleStyle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#111827',
+    color: '#000',
     letterSpacing: 0.3,
     fontFamily: 'Noto Sans Georgian',
   },
   tabBarStyle: {
-    backgroundColor: '#fff',
-    borderTopWidth: Platform.OS === 'ios' ? 0.5 : 1,
-    borderTopColor: Platform.OS === 'ios' ? '#C6C6C8' : '#E0E0E0',
+    backgroundColor: '#161200',
     paddingBottom: Platform.OS === 'ios' ? 20 : 8,
     paddingTop: Platform.OS === 'ios' ? 8 : 8,
     height: Platform.OS === 'ios' ? 83 : 60,
-    shadowColor: '#000',
-    shadowOffset: Platform.OS === 'ios' ? { width: 0, height: -0.5 } : { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: Platform.OS === 'ios' ? 0 : 2,
-    elevation: Platform.OS === 'android' ? 8 : 0,
   },
   tabBarLabelStyle: {
     fontSize: Platform.OS === 'ios' ? 10 : 12,
@@ -64,7 +45,8 @@ export const styles = StyleSheet.create({
 });
 
 export const colors = {
-  primary: '#007AFF',
+  primary: '#000',
+  primaryYellow: '#ffde21',
   inactive: '#8E8E93',
   border: Platform.OS === 'ios' ? '#C6C6C8' : '#E0E0E0',
   white: '#fff',

@@ -132,7 +132,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 12,
     paddingHorizontal: 16,
-    backgroundColor: '#fff',
+    backgroundColor: '#161200',
   },
   triggerCompact: {
     minWidth: 160,
@@ -142,13 +142,11 @@ const styles = StyleSheet.create({
   },
   triggerLabel: {
     fontSize: 12,
-    color: '#64748b',
     fontWeight: '500',
     marginBottom: 2,
   },
   triggerValue: {
     fontSize: 15,
-    color: '#0f172a',
     fontWeight: '600',
   },
   modalOverlay: {
@@ -157,7 +155,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalCard: {
-    backgroundColor: '#fff',
+    backgroundColor: '#161200',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingTop: 18,

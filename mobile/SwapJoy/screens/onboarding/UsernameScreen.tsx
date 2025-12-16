@@ -243,7 +243,7 @@ const UsernameScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#161200',
   },
   keyboardView: {
     flex: 1,
@@ -356,7 +356,7 @@ const styles = StyleSheet.create({
   nextButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#fff',
+    color: '#161200',
   },
   nextButtonTextDisabled: {
     color: '#8E8E93',

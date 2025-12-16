@@ -38,7 +38,7 @@ const MainScreen: React.FC<MainTabsScreenProps> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#161200',
   },
   content: {
     flex: 1,

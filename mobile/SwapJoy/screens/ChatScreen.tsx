@@ -209,7 +209,7 @@ const styles = StyleSheet.create({
   offerHeader: {
     flexDirection: 'row',
     padding: 12,
-    backgroundColor: '#fff',
+    backgroundColor: '#161200',
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#E0E0E0',
   },
@@ -269,7 +269,7 @@ const styles = StyleSheet.create({
   },
   messageTextOwn: {
     fontSize: 15,
-    color: '#fff',
+    color: '#161200',
   },
   messageTextOther: {
     fontSize: 15,
@@ -301,7 +301,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     paddingHorizontal: 8,
     paddingVertical: 8,
-    backgroundColor: '#fff',
+    backgroundColor: '#161200',
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#E0E0E0',
   },
@@ -335,7 +335,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#9CA3AF',
   },
   sendText: {
-    color: '#fff',
+    color: '#161200',
     fontSize: 15,
     fontWeight: '600',
   },

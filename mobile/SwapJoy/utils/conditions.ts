@@ -9,13 +9,13 @@ type ConditionStyle = {
 };
 
 const CONDITION_STYLES: Record<ConditionKey, ConditionStyle & { emoji: string }> = {
-  mint: { backgroundColor: '#0BDA51', textColor: '#fff', emoji: '✨' },
-  new: { backgroundColor: '#5CE65C', textColor: '#fff', emoji: '🆕' },
-  like_new: { backgroundColor: '#0BDA51', textColor: '#fff', emoji: '🌿' },
-  excellent: { backgroundColor: '#B163FF', textColor: '#fff', emoji: '⭐' },
-  good: { backgroundColor: '#E4C80A', textColor: '#fff', emoji: '👍' },
-  fair: { backgroundColor: '#6D8196', textColor: '#fff', emoji: '⚠️' },
-  poor: { backgroundColor: '#FA5053', textColor: '#fff', emoji: '🔧' },
+  mint: { backgroundColor: '#0BDA51', textColor: '#161200', emoji: '✨' },
+  new: { backgroundColor: '#5CE65C', textColor: '#161200', emoji: '🆕' },
+  like_new: { backgroundColor: '#0BDA51', textColor: '#161200', emoji: '🌿' },
+  excellent: { backgroundColor: '#B163FF', textColor: '#161200', emoji: '⭐' },
+  good: { backgroundColor: '#E4C80A', textColor: '#161200', emoji: '👍' },
+  fair: { backgroundColor: '#6D8196', textColor: '#161200', emoji: '⚠️' },
+  poor: { backgroundColor: '#FA5053', textColor: '#161200', emoji: '🔧' },
 };
 
 const normalizeConditionKey = (condition?: string): ConditionKey | null => {

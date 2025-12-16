@@ -10,6 +10,7 @@ import { formatCurrency } from '../utils';
 import { useLocalization } from '../localization';
 import FavoriteToggleButton from '../components/FavoriteToggleButton';
 import { Ionicons } from '@expo/vector-icons';
+import { colors } from '@navigation/MainTabNavigator.styles';
 
 const { width } = Dimensions.get('window');
 
@@ -94,7 +95,7 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
   if (loading) {
     return (
       <SafeAreaView style={styles.centered}>
-        <ActivityIndicator size="large" color="#007AFF" />
+        <ActivityIndicator size="large" color={colors.primaryYellow} />
       </SafeAreaView>
     );
   }
@@ -229,34 +230,30 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: colors.primary,
   },
   centered: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f8f9fa',
+    backgroundColor: colors.primary
   },
   errorText: {
     fontSize: 16,
-    color: '#d00',
     marginBottom: 12,
   },
   retry: {
-    backgroundColor: '#007AFF',
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 8,
   },
   retryText: {
-    color: '#fff',
     fontSize: 14,
     fontWeight: '600',
   },
   heroImage: {
     width,
-    height: Math.min(300, Math.round(width * 0.75)),
-    backgroundColor: '#eee',
+    height: Math.min(300, Math.round(width * 0.75))
   },
   heroSection: {
     position: 'relative',
@@ -266,40 +263,35 @@ const styles = StyleSheet.create({
     top: 20,
     right: 20,
     zIndex: 5,
+    backgroundColor: '#fff'
   },
   details: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.primary,
     paddingHorizontal: 16,
     paddingVertical: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
   },
   itemTitle: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#111',
+    
   },
   price: {
     marginTop: 6,
     fontSize: 20,
-    color: '#007AFF',
     fontWeight: '700',
   },
   meta: {
     marginTop: 6,
-    fontSize: 13,
-    color: '#666',
+    fontSize: 13
   },
   description: {
     marginTop: 12,
     fontSize: 15,
-    color: '#333',
     lineHeight: 21,
   },
   sellerBox: {
     marginTop: 16,
     padding: 12,
-    backgroundColor: '#f6faff',
     borderRadius: 10,
   },
   sellerTitle: {
@@ -309,27 +301,24 @@ const styles = StyleSheet.create({
   },
   sellerName: {
     fontSize: 15,
-    fontWeight: '600',
-    color: '#111',
+    fontWeight: '600'
   },
   offerBar: {
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: 0,
-    padding: 16,
-    backgroundColor: 'rgba(255,255,255,0.98)',
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
+    bottom: 12,
+    paddingHorizontal: 64,
+    paddingBottom: 16,
   },
   offerButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: colors.primaryYellow,
     borderRadius: 10,
     paddingVertical: 14,
     alignItems: 'center',
   },
   offerText: {
-    color: '#fff',
+    color: '#000',
     fontSize: 16,
     fontWeight: '700',
   },
@@ -340,8 +329,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   viewCountText: {
-    fontSize: 13,
-    color: '#666',
+    fontSize: 13
   },
 });
 

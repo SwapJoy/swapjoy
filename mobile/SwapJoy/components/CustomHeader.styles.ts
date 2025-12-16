@@ -2,7 +2,7 @@ import { Platform, StyleSheet } from 'react-native';
 
 export const styles = StyleSheet.create({
   safeArea: {
-    backgroundColor: '#fff',
+    backgroundColor: '#161200',
     borderBottomWidth: Platform.OS === 'ios' ? 0.5 : 1,
     borderBottomColor: Platform.OS === 'ios' ? '#C6C6C8' : '#E0E0E0',
     shadowColor: '#000',
@@ -52,6 +52,6 @@ export const colors = {
   primary: '#007AFF',
   inactive: '#8E8E93',
   border: Platform.OS === 'ios' ? '#C6C6C8' : '#E0E0E0',
-  white: '#fff',
+  white: '#161200',
   black: '#000',
 };

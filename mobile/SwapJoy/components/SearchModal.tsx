@@ -10,6 +10,7 @@ import { formatCurrency } from '../utils';
 import { useFavorites } from '../contexts/FavoritesContext';
 import { useFilters } from '../contexts/FiltersContext';
 import FilterPopover from './FilterPopover';
+import { colors } from '@navigation/MainTabNavigator.styles';
 
 interface SearchModalProps {
   visible: boolean;
@@ -256,7 +257,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
               onSubmitEditing={() => handleSubmit(searchQuery)}
             />
             {searchLoading && (
-              <ActivityIndicator size="small" color="#0ea5e9" style={styles.navSearchSpinner} />
+              <ActivityIndicator size="small" color="#fff" style={styles.navSearchSpinner} />
             )}
             {!!searchQuery && !searchLoading ? (
               <TouchableOpacity
@@ -269,14 +270,14 @@ const SearchModal: React.FC<SearchModalProps> = ({
             ) : null}
           </View>
           <TouchableOpacity 
-            style={[styles.searchModalFilterButton, hasActiveFilters && styles.searchModalFilterButtonActive]}
+            style={[styles.searchModalFilterButton]}
             onPress={() => setFilterPopoverVisible(true)}
             accessibilityLabel={t('search.filters', { defaultValue: 'Filters' })}
           >
             <Ionicons 
               name="filter-outline" 
               size={20} 
-              color={hasActiveFilters ? "#0ea5e9" : "#64748b"} 
+              color={hasActiveFilters ? colors.primaryYellow : "#64748b"} 
             />
             {hasActiveFilters && <View style={styles.filterBadge} />}
           </TouchableOpacity>
@@ -334,7 +335,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
 
 const styles = StyleSheet.create({
   overlayContainer: {
-    zIndex: 20,
+    zIndex: 20
   },
   searchResultsContainer: {
     flex: 1,
@@ -347,14 +348,13 @@ const styles = StyleSheet.create({
   resultsSummaryHeader: {
     paddingHorizontal: 16,
     paddingBottom: 8,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#161200f',
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#e2e8f0',
   },
   resultsSummaryText: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#64748b',
   },
   searchResultItem: {
     marginBottom: 16,
@@ -368,23 +368,20 @@ const styles = StyleSheet.create({
   searchStatusTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#0f172a',
   },
   searchStatusSubtitle: {
     fontSize: 13,
-    color: '#64748b',
     marginTop: 4,
     textAlign: 'center',
   },
   searchErrorText: {
     marginTop: 12,
     fontSize: 13,
-    color: '#b91c1c',
     textAlign: 'center',
   },
   searchModalSafeArea: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#161200',
   },
   searchModalHeader: {
     flexDirection: 'row',
@@ -395,7 +392,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: '#161200f',
     borderRadius: 999,
     paddingHorizontal: 12,
     height: 40,
@@ -406,7 +403,7 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 8,
     fontSize: 14,
-    color: '#0f172a',
+    color: '#fff',
   },
   searchModalFilterButton: {
     marginLeft: 12,
@@ -417,9 +414,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     position: 'relative',
   },
-  searchModalFilterButtonActive: {
-    backgroundColor: '#eff6ff',
-  },
   filterBadge: {
     position: 'absolute',
     top: 6,
@@ -427,14 +421,13 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#0ea5e9',
+    backgroundColor: colors.primaryYellow,
   },
   searchModalCancelButton: {
     marginLeft: 12,
   },
   searchModalCancelText: {
     fontSize: 16,
-    color: '#0f172a',
     fontWeight: '500',
   },
   navSearchSpinner: {

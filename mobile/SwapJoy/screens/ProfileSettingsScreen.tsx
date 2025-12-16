@@ -10,6 +10,7 @@ import { UserService } from '../services/userService';
 import { useLocalization } from '../localization';
 import { LanguageSelector } from '../components/LanguageSelector';
 import { useCategories } from '../hooks/useCategories';
+import { colors } from '@navigation/MainTabNavigator.styles';
 
 const RADIUS_OPTIONS = [1, 2, 3, 5, 10, 15, 20, 30, 40, 50] as const;
 const DEFAULT_RADIUS_KM = 50;
@@ -538,19 +539,18 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigatio
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: colors.primary,
   },
   scrollContainer: {
     padding: 16,
+    backgroundColor: colors.primary,
   },
   title: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#1a1a1a',
     marginBottom: 12,
   },
   card: {
-    backgroundColor: '#fff',
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 16,
@@ -584,18 +584,16 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   itemTextWrap: { flex: 1 },
-  itemTitle: { fontSize: 16, color: '#1a1a1a', fontWeight: '500' },
-  itemSubtitle: { fontSize: 13, color: '#707070', marginTop: 2 },
+  itemTitle: { fontSize: 16, fontWeight: '500' },
+  itemSubtitle: { fontSize: 13, marginTop: 2 },
   itemArrow: { fontSize: 20, color: '#c2c2c2' },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1a1a1a',
     marginBottom: 6,
   },
   sectionSubtitle: {
     fontSize: 13,
-    color: '#707070',
     marginBottom: 14,
   },
   languageSelectorWrapper: {
@@ -613,12 +611,11 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     borderWidth: 1,
     borderColor: '#1f7ae0',
-    backgroundColor: '#fff',
+    backgroundColor: '#161200',
   },
   manageCategoriesText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#1f7ae0',
   },
   categoriesLoading: {
     paddingVertical: 12,
@@ -627,7 +624,6 @@ const styles = StyleSheet.create({
   },
   categoriesEmptyText: {
     fontSize: 13,
-    color: '#94a3b8',
   },
   selectedCategoriesWrap: {
     flexDirection: 'row',
@@ -642,7 +638,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   selectedCategoryChipText: {
-    color: '#fff',
+    color: '#161200',
     fontSize: 12,
     fontWeight: '600',
   },
@@ -683,15 +679,15 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   categoryBubbleLabelSelected: {
-    color: '#fff',
+    color: '#161200',
   },
-  dangerCard: { backgroundColor: '#fff', borderRadius: 12, padding: 12 },
+  dangerCard: { backgroundColor: '#161200', borderRadius: 12, padding: 12 },
   dangerButton: { backgroundColor: '#FF3B30', borderRadius: 10, alignItems: 'center', paddingVertical: 14 },
-  dangerText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  dangerText: { fontSize: 16, fontWeight: '700' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  modalCard: { backgroundColor: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 16, maxHeight: '80%' },
+  modalCard: { backgroundColor: '#161200', borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 16, maxHeight: '80%' },
   choiceModalCard: {
-    backgroundColor: '#fff',
+    backgroundColor: '#161200',
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     paddingHorizontal: 20,
@@ -739,8 +735,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   modalScroll: { paddingBottom: 24 },
-  modalTitle: { fontSize: 18, fontWeight: '700', color: '#1a1a1a' },
-  modalSubtitle: { fontSize: 13, color: '#707070', marginTop: 6, marginBottom: 12 },
+  modalTitle: { fontSize: 18, fontWeight: '700' },
+  modalSubtitle: { fontSize: 13, marginTop: 6, marginBottom: 12 },
   textInput: { minHeight: 120, maxHeight: 280, borderWidth: 1, borderColor: '#e5e5e5', borderRadius: 10, padding: 12, fontSize: 15, color: '#1a1a1a', backgroundColor: '#fafafa' },
   modalFooter: { marginTop: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   charCount: { color: '#909090', fontSize: 12 },
@@ -749,7 +745,7 @@ const styles = StyleSheet.create({
   cancelBtn: { backgroundColor: '#f2f2f2' },
   saveBtn: { backgroundColor: '#1f7ae0' },
   cancelText: { color: '#1a1a1a', fontWeight: '600' },
-  saveText: { color: '#fff', fontWeight: '700' },
+  saveText: { color: '#161200', fontWeight: '700' },
 });
 
 export default ProfileSettingsScreen;

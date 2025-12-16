@@ -465,7 +465,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   section: {
-    backgroundColor: '#fff',
+    backgroundColor: '#161200',
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
@@ -546,7 +546,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
     borderWidth: 2,
-    borderColor: '#fff',
+    borderColor: '#161200',
   },
   quickButtons: {
     flexDirection: 'row',
@@ -620,7 +620,7 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     backgroundColor: '#007AFF',
-    color: '#fff',
+    color: '#161200',
     fontSize: 16,
     fontWeight: '700',
     textAlign: 'center',
@@ -652,7 +652,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   testButtonText: {
-    color: '#fff',
+    color: '#161200',
     fontSize: 14,
     fontWeight: '600',
   },

@@ -289,7 +289,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#161200f',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#0f172a',
@@ -317,7 +317,7 @@ const styles = StyleSheet.create({
   },
   gridItem: {
     width: GRID_ITEM_WIDTH,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#161200f',
     borderRadius: 20,
     overflow: 'hidden',
     marginBottom: 18,

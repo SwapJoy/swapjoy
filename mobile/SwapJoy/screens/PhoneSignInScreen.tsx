@@ -118,7 +118,7 @@ const PhoneSignInScreen: React.FC<PhoneSignInScreenProps> = ({ navigation }) => 
               <ActivityIndicator color="white" />
             ) : (
               <>
-                <Ionicons name="logo-google" size={20} color="#fff" style={styles.googleIcon} />
+                <Ionicons name="logo-google" size={20} color="#161200" style={styles.googleIcon} />
                 <SJText style={styles.googleButtonText}>Continue with Google</SJText>
               </>
             )}
@@ -132,7 +132,7 @@ const PhoneSignInScreen: React.FC<PhoneSignInScreenProps> = ({ navigation }) => 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#161200f',
   },
   keyboardView: {
     flex: 1,
@@ -236,7 +236,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: '#007AFF',
-    backgroundColor: '#fff',
+    backgroundColor: '#161200',
     paddingVertical: 15,
     borderRadius: 12,
     marginBottom: 15,

@@ -5,6 +5,7 @@ import { BlurView } from 'expo-blur';
 import { Camera } from 'react-native-vision-camera';
 import { Ionicons } from '@expo/vector-icons';
 import { useCamera, MAX_PHOTOS } from '../hooks/useCamera';
+import { colors } from '@navigation/MainTabNavigator.styles';
 
 type CameraScreenOwnProps = {
   onNavigateToMain?: () => void;
@@ -288,7 +289,7 @@ const styles = StyleSheet.create({
   permissionOverlayTitle: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#161200',
     marginTop: 20,
     marginBottom: 12,
     textAlign: 'center',
@@ -307,7 +308,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   permissionOverlayButtonText: {
-    color: '#fff',
+    color: '#161200',
     fontSize: 16,
     fontWeight: 'bold',
   },
@@ -331,17 +332,16 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 26,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   nextButton: {
     width: 'auto',
     paddingHorizontal: 20,
-    backgroundColor: '#007AFF',
+    backgroundColor: colors.primaryYellow,
   },
   nextButtonText: {
-    color: '#fff',
+    color: colors.primary,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -416,7 +416,6 @@ const styles = StyleSheet.create({
     width: 52,
     height: 52,
     borderRadius: 26,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',

@@ -245,7 +245,7 @@ ItemCard.displayName = 'ItemCard';
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#161200f',
     overflow: 'hidden',
     shadowColor: '#0f172a',
     shadowOffset: { width: 0, height: 4 },
@@ -265,8 +265,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   imagePlaceholderText: {
-    fontSize: 12,
-    color: '#94a3b8',
+    fontSize: 12
   },
   metadataOverlay: {
     position: 'absolute',
@@ -281,7 +280,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   priceBadge: {
-    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+    backgroundColor: 'rgba(206, 212, 227, 0.85)',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 999,
@@ -289,7 +288,7 @@ const styles = StyleSheet.create({
   priceBadgeText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#ffffff',
+    color: '#161200f',
   },
   favoriteButtonWrapper: {
     position: 'absolute',
@@ -306,7 +305,7 @@ const styles = StyleSheet.create({
   metaBadgeText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#ffffff',
+    color: '#161200f',
     textTransform: 'capitalize',
   },
   content: {
@@ -315,17 +314,14 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 15,
-    fontWeight: '600',
-    color: '#0f172a',
+    fontWeight: '600'
   },
   ownerHandle: {
     fontSize: 12,
-    color: '#64748b',
     fontWeight: '600',
   },
   description: {
     fontSize: 12,
-    color: '#475569',
     lineHeight: 16,
   },
   metaRow: {
@@ -335,7 +331,6 @@ const styles = StyleSheet.create({
   },
   metaRight: {
     fontSize: 12,
-    color: '#64748b',
     fontWeight: '600',
   },
   chipsRow: {
@@ -367,7 +362,7 @@ const styles = StyleSheet.create({
   conditionBadgeText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#ffffff',
+    color: '#161200f',
     textTransform: 'capitalize',
   },
   skeletonCard: {

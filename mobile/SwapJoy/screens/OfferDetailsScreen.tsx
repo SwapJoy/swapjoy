@@ -318,7 +318,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     padding: 16,
-    backgroundColor: '#fff',
+    backgroundColor: '#161200',
     borderTopWidth: 1,
     borderTopColor: '#eee',
   },
@@ -329,7 +329,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   chatButtonText: {
-    color: '#fff',
+    color: '#161200',
     fontSize: 16,
     fontWeight: '700',
   },

@@ -7,6 +7,7 @@ import { RootStackParamList } from '../types/navigation';
 import { useAuth } from '../contexts/AuthContext';
 import { ApiService } from '../services/api';
 import { hasCompletedIntro } from '../utils/introStorage';
+import { colors } from './MainTabNavigator.styles';
 import IntroScreen from '../screens/IntroScreen';
 import PhoneSignInScreen from '../screens/PhoneSignInScreen';
 import EmailSignInScreen from '../screens/EmailSignInScreen';
@@ -38,10 +39,6 @@ import ChatScreen from '../screens/ChatScreen';
 import OfferDetailsScreen from '../screens/OfferDetailsScreen';
 
 const Stack = createStackNavigator<RootStackParamList>();
-
-interface AppNavigatorProps {
-  ref?: React.Ref<NavigationContainerRef<RootStackParamList>>;
-}
 
 const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((props, ref) => {
   const { isAuthenticated, isLoading, user, isAnonymous } = useAuth();
@@ -156,7 +153,7 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
   // Show loading screen while checking authentication, intro status, or username
   if (isLoading || introCompleted === null || (isAuthenticated && !isAnonymous && checkingUsername)) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff' }}>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFDE21' }}>
         <ActivityIndicator size="large" color="#007AFF" />
       </View>
     );
@@ -197,22 +194,13 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
       <Stack.Navigator
         initialRouteName={getInitialRoute()}
         screenOptions={{
-          headerShown: true,
           headerStyle: {
-            backgroundColor: '#F7F8FF',
-            borderBottomWidth: 0,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.08,
-            shadowRadius: 14,
-            elevation: Platform.OS === 'android' ? 6 : 0,
-            borderBottomLeftRadius: 20,
-            borderBottomRightRadius: 20,
+            backgroundColor: colors.primaryYellow,
           },
           headerTitleStyle: {
             fontSize: 18,
             fontWeight: '700',
-            color: '#111827',
+            color: '#000',
             letterSpacing: 0.3,
           },
           headerTitleAlign: 'center',
@@ -238,7 +226,7 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
                 onPress={handlePress}
                 activeOpacity={0.7}
               >
-                <Ionicons name="arrow-back" size={24} color="#007AFF" />
+                <Ionicons name="arrow-back" size={24} color='#000' />
               </TouchableOpacity>
             );
           },
@@ -296,7 +284,7 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
           component={ItemDetailsScreen}
           options={{ 
             title: 'Item Details',
-            headerBackTitleVisible: false,
+            headerBackTitleVisible: false
           }}
         />
         

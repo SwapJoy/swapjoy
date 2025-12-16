@@ -17,6 +17,7 @@ import { useCategories } from '../contexts/CategoriesContext';
 import { resolveCategoryName } from '../utils/category';
 import type { AppLanguage } from '../types/language';
 import SJText from './SJText';
+import { colors } from '@navigation/MainTabNavigator.styles';
 
 const { height } = Dimensions.get('window');
 
@@ -289,10 +290,10 @@ const TopMatchCard: React.FC<TopMatchCardProps> = ({
             <View style={styles.metaSection}>
               <View style={styles.chipsRow}>
                 <View
-                  style={[styles.chip, { backgroundColor: '#e2e8f0' }]}
+                  style={[styles.chip, { backgroundColor: '#ffde21' }]}
                 >
                   <SJText style={styles.chipEmoji}>{categoryIcon}</SJText>
-                  <SJText style={[styles.chipText, { color: '#0f172a' }]}>
+                  <SJText style={[styles.chipText]}>
                     {normalizedCategory}
                   </SJText>
                 </View>
@@ -326,14 +327,13 @@ const styles = StyleSheet.create({
   card: {
     width: '100%',
     height: '100%',
-    backgroundColor: '#ffffff',
     overflow: 'hidden',
     flexDirection: 'column',
   },
   skeletonBackground: {
     width: '100%',
     height: '100%',
-    backgroundColor: '#ffffff',
+    backgroundColor: '#161200f',
     borderRadius: 2,
     flexDirection: 'column',
   },
@@ -362,12 +362,10 @@ const styles = StyleSheet.create({
   ownerProfileImageText: {
     fontSize: 14,
     fontWeight: '500', // or use '700' for numeric weight
-    color: '#0f172a',
   },
   ownerUsername: {
     fontSize: 14,
     fontWeight: '400',
-    color: '#0f172a',
     flex: 1,
   },
   mediaSection: {
@@ -394,7 +392,8 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#ffffffdd',
+    backgroundColor: '#ffffffee'
+
   },
   likeButtonActive: {
     backgroundColor: '#fee2e2',
@@ -432,7 +431,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   priceBadgeText: {
-    color: '#ffffff',
+    color: '#161200f',
     fontSize: 14,
     fontWeight: '700',
   },
@@ -446,7 +445,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 6,
     borderRadius: 12,
-    backgroundColor: '#ffffffee'
+    backgroundColor: '#161200fee'
   },
   ownerAvatar: {
     width: 20,
@@ -479,14 +478,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: '400',
-    color: '#0f172a',
     flex: 1,
   },
   description: {
     marginTop: 4,
     fontSize: 12,
     lineHeight: 18,
-    color: '#475569',
     maxHeight: 18, // 1 line max
   },
   chipsRow: {
@@ -509,7 +506,7 @@ const styles = StyleSheet.create({
   chipText: {
     fontSize: 11,
     fontWeight: '300',
-    color: '#0f172a',
+    color: '#000',
   },
   metaSection: {
     marginTop: 8,
@@ -543,7 +540,6 @@ const styles = StyleSheet.create({
   priceText: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#0f172a',
     marginTop: 8,
   },
   suggestionsSlot: {
@@ -607,7 +603,7 @@ const styles = StyleSheet.create({
   viewCountText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#666',
+    color: colors.primary,
   },
 });
 

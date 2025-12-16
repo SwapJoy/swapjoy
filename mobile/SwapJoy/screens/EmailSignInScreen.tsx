@@ -100,7 +100,7 @@ const EmailSignInScreen: React.FC<EmailSignInScreenProps> = ({ navigation }) => 
               <ActivityIndicator color="white" />
             ) : (
               <>
-                <Ionicons name="logo-google" size={20} color="#fff" style={styles.googleIcon} />
+                <Ionicons name="logo-google" size={20} color="#161200" style={styles.googleIcon} />
                 <SJText style={styles.googleButtonText}>{t('auth.common.continueWithGoogle')}</SJText>
               </>
             )}
@@ -184,7 +184,7 @@ const EmailSignInScreen: React.FC<EmailSignInScreenProps> = ({ navigation }) => 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#161200f',
   },
   keyboardView: {
     flex: 1,

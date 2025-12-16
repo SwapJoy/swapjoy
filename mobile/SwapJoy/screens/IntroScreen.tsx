@@ -129,7 +129,7 @@ const IntroScreen: React.FC<IntroScreenProps> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#161200f',
   },
   topBar: {
     flexDirection: 'row',

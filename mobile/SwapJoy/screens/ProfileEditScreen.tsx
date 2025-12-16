@@ -304,7 +304,7 @@ const ProfileEditScreen: React.FC<ProfileEditScreenProps> = ({ navigation, route
           activeOpacity={0.85}
         >
           {saving ? (
-            <ActivityIndicator size="small" color="#fff" />
+            <ActivityIndicator size="small" color="#161200" />
           ) : (
             <SJText style={styles.saveButtonText}>{t('common.save')}</SJText>
           )}
@@ -362,7 +362,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     borderWidth: 1,
     borderColor: '#1f7ae0',
-    backgroundColor: '#fff',
+    backgroundColor: '#161200',
   },
   changePhotoText: {
     fontSize: 14,
@@ -378,7 +378,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   form: {
-    backgroundColor: '#fff',
+    backgroundColor: '#161200',
     borderRadius: 16,
     padding: 20,
     gap: 18,
@@ -434,7 +434,7 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   saveButtonText: {
-    color: '#fff',
+    color: '#161200',
     fontSize: 16,
     fontWeight: '700',
   },

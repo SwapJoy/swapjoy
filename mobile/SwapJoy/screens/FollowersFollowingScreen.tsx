@@ -192,7 +192,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8f9fa',
   },
   tabsWrapper: {
-    backgroundColor: '#fff',
+    backgroundColor: '#161200',
     paddingHorizontal: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#E5E5EA',
@@ -253,7 +253,7 @@ const styles = StyleSheet.create({
   userItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: '#161200',
     padding: 12,
     marginBottom: 8,
     borderRadius: 12,

@@ -28,7 +28,7 @@ const FavoriteToggleButton: React.FC<FavoriteToggleButtonProps> = ({
   style,
   activeColor = '#ef4444',
   inactiveColor = '#1f2933',
-  backgroundColor = '#ffffffdd',
+  backgroundColor = '#161200fdd',
   activeBackgroundColor = '#fee2e2',
   onToggle,
 }) => {

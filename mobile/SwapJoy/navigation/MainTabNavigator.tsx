@@ -1,5 +1,5 @@
 import React from 'react';
-import { TouchableOpacity } from 'react-native';
+import { TouchableOpacity, Image } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
 import { MainTabParamList } from '../types/navigation';
@@ -29,8 +29,8 @@ const MainTabNavigator: React.FC<MainTabNavigatorProps> = ({ onNavigateToAdd }) 
   };
 
   const handleTabPress = (tabName: string) => {
-    // Allow access to Explore tab (SwapJoy) for everyone
-    if (tabName === 'SwapJoy') {
+    // Allow access to Explore tab for everyone
+    if (tabName === 'Explore') {
       return true;
     }
 
@@ -72,21 +72,29 @@ const MainTabNavigator: React.FC<MainTabNavigatorProps> = ({ onNavigateToAdd }) 
               style={styles.headerRightButtonContainer}
               onPress={() => (navigation as any).navigate('ProfileSettings')}
             >
-              <Ionicons name="settings-outline" size={24} color={colors.primary} />
+              <Ionicons name="settings-outline" size={20} color={colors.primary} />
             </TouchableOpacity>
           );
         },
         tabBarStyle: styles.tabBarStyle,
-        tabBarActiveTintColor: colors.primary,
+        tabBarActiveTintColor: colors.primaryYellow,
         tabBarInactiveTintColor: colors.inactive,
         tabBarLabelStyle: styles.tabBarLabelStyle,
         tabBarIconStyle: styles.tabBarIconStyle,
       })}
     >
       <Tab.Screen
-        name='SwapJoy'
+        name="Explore"
         component={ExploreScreen}
         options={{
+          tabBarLabel: 'SwapJoy',
+          headerTitle: () => (
+            <Image
+              source={require('../assets/swapjoy-logo.png')}
+              style={{ width: 140, height: 32 }}
+              resizeMode="contain"
+            />
+          ),
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons 
               name={focused ? "compass" : "compass-outline"} 

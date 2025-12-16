@@ -174,7 +174,7 @@ const CategoriesScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#161200',
   },
   loadingContainer: {
     flex: 1,
@@ -306,7 +306,7 @@ const styles = StyleSheet.create({
   nextButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#fff',
+    color: '#161200',
   },
 });
 

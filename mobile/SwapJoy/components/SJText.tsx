@@ -26,6 +26,7 @@ const SJText: React.FC<SJTextProps> = (props) => {
     
     // Merge: defaultFont provides fontFamily, custom style overrides everything else
     return {
+      color: '#fff',
       ...defaultFontFlattened,
       ...customStyleFlattened,
       fontFamily, // Override with appropriate font family based on weight

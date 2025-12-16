@@ -223,7 +223,7 @@ const styles = StyleSheet.create({
   textInput: {
     flex: 1,
     fontSize: 16,
-    color: '#1a1a1a',
+    color: '#fff',
     paddingVertical: 8,
     paddingHorizontal: 0,
     minHeight: 24,

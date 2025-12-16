@@ -8,6 +8,7 @@ import { ApiService } from '../services/api';
 import { Category, ItemCondition } from '../types/item';
 import { formatCurrency } from '../utils';
 import { useLocalization } from '../localization';
+import { colors } from '@navigation/MainTabNavigator.styles';
 
 const { width } = Dimensions.get('window');
 
@@ -174,7 +175,7 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={handleEdit}>
-          <Ionicons name="arrow-back" size={24} color="#007AFF" />
+          <Ionicons name="arrow-back" size={24} color={colors.primary} />
         </TouchableOpacity>
         <SJText style={styles.headerTitle}>{strings.headerTitle}</SJText>
         <View style={{ width: 40 }} />
@@ -306,13 +307,13 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
         >
           {submitting ? (
             <>
-              <ActivityIndicator size="small" color="#fff" />
+              <ActivityIndicator size="small" color="#161200" />
               <SJText style={styles.submitButtonText}>{strings.buttons.submitting}</SJText>
             </>
           ) : (
             <>
               <SJText style={styles.submitButtonText}>{strings.buttons.submit}</SJText>
-              <Ionicons name="checkmark" size={20} color="#fff" />
+              <Ionicons name="checkmark" size={20} color="#161200" />
             </>
           )}
         </TouchableOpacity>
@@ -324,7 +325,7 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: colors.primary,
   },
   loadingContainer: {
     flex: 1,
@@ -334,7 +335,6 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 10,
     fontSize: 16,
-    color: '#666',
   },
   header: {
     flexDirection: 'row',
@@ -342,7 +342,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#fff',
+    backgroundColor: colors.primaryYellow,
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
   },
@@ -351,8 +351,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#1a1a1a',
+    fontWeight: '600'
   },
   scrollView: {
     flex: 1,
@@ -383,11 +382,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.5)',
   },
   imageIndicatorActive: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.primaryYellow,
     width: 20,
   },
   detailsContainer: {
-    backgroundColor: '#fff',
+    backgroundColor:colors.primary,
     padding: 16,
   },
   titleSection: {
@@ -396,13 +395,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#1a1a1a',
     marginBottom: 8,
   },
   price: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#007AFF',
   },
   tagsContainer: {
     flexDirection: 'row',
@@ -421,7 +418,6 @@ const styles = StyleSheet.create({
   },
   tagText: {
     fontSize: 14,
-    color: '#1a1a1a',
     fontWeight: '500',
   },
   divider: {
@@ -435,13 +431,11 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1a1a1a',
     marginBottom: 12,
   },
   description: {
     fontSize: 16,
     lineHeight: 24,
-    color: '#666',
   },
   infoRow: {
     flexDirection: 'row',
@@ -452,33 +446,28 @@ const styles = StyleSheet.create({
     borderBottomColor: '#f0f0f0',
   },
   infoLabel: {
-    fontSize: 16,
-    color: '#666',
+    fontSize: 16
   },
   infoValue: {
     fontSize: 16,
-    fontWeight: '500',
-    color: '#1a1a1a',
+    fontWeight: '500'
   },
   noteContainer: {
     flexDirection: 'row',
     gap: 8,
     padding: 12,
-    backgroundColor: '#f0f7ff',
     borderRadius: 8,
     marginTop: 8,
   },
   noteText: {
     flex: 1,
     fontSize: 14,
-    lineHeight: 20,
-    color: '#666',
+    lineHeight: 20
   },
   footer: {
     flexDirection: 'row',
     gap: 12,
     padding: 16,
-    backgroundColor: '#fff',
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
   },
@@ -487,14 +476,12 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: '#007AFF',
     alignItems: 'center',
     justifyContent: 'center',
   },
   editButtonText: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#007AFF',
+    fontWeight: '600'
   },
   submitButton: {
     flex: 2,
@@ -502,7 +489,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#007AFF',
+    backgroundColor: colors.primaryYellow,
     paddingVertical: 16,
     borderRadius: 12,
   },
@@ -512,7 +499,7 @@ const styles = StyleSheet.create({
   submitButtonText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#fff',
+    color: '#000',
   },
 });
 

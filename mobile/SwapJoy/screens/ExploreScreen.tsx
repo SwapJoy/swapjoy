@@ -1,9 +1,8 @@
 import React, { memo, useEffect, useLayoutEffect } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Platform, Dimensions } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Platform, Dimensions, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ExploreScreenProps } from '../types/navigation';
 import { SectionView } from '../components/SectionView';
-import LocationSelector from '../components/LocationSelector';
 import { useExploreScreenState } from '../hooks/useExploreScreenState';
 import { DeviceService } from '../services/deviceService';
 import SearchModal from '../components/SearchModal';
@@ -42,25 +41,21 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
     searchLoading,
     searchError,
     handleClearSearch,
-    performSearch,
     hasSearchQuery,
-    locationModalVisible,
-    handleOpenLocationSelector,
-    handleLocationModalClose,
-    handleLocationSelect,
-    loadingLocation,
-    updatingLocation,
-    locationCityId,
     sections,
-    isFavorite,
-    toggleFavorite,
     searchModalVisible,
     setSearchModalVisible,
   } = useExploreScreenState();
 
   useLayoutEffect(() => {
     navigation.setOptions({
-      headerTitle: undefined,
+      headerTitle: () => (
+        <Image
+          source={require('../assets/swapjoy-logo.png')}
+          style={{ width: 100, height: 24 }}
+          resizeMode='contain'
+        />
+      ),
       headerShown: !searchModalVisible,
       headerRight: () =>
         !searchModalVisible ? (
@@ -70,24 +65,14 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
               onPress={() => setSearchModalVisible(true)}
               activeOpacity={0.8}
             >
-              <Ionicons name="search-outline" size={18} color="#0369a1" />
+              <Ionicons name="search-outline" size={18} color="#000" />
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.navIconButton, styles.navLocationButton]}
-              onPress={handleOpenLocationSelector}
-              disabled={updatingLocation || loadingLocation}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="location-outline" size={18} color="#0369a1" />
-            </TouchableOpacity>
+            
           </View>
         ) : null,
     });
   }, [
     navigation,
-    handleOpenLocationSelector,
-    loadingLocation,
-    updatingLocation,
     searchModalVisible,
   ]);
 
@@ -174,13 +159,6 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
           typeof item?.similarity === 'number' ? `${Math.round((item.similarity || 0) * 100)}%` : null
         }
       />
-
-      <LocationSelector
-        visible={locationModalVisible}
-        onClose={handleLocationModalClose}
-        onSelectLocation={handleLocationSelect}
-        initialCityId={locationCityId}
-      />
     </View>
   );
 });
@@ -190,7 +168,7 @@ ExploreScreen.displayName = 'ExploreScreen';
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#161200',
   },
   scrollView: {
     flex: 1,
@@ -210,13 +188,10 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   navIconButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#f1f5f9',
+    width: 40,
+    height: 40,
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 8,
   },
   navLocationButton: {
     marginLeft: 8,

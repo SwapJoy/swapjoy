@@ -1,15 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { useLocalization } from '../localization';
-import { useExploreData, SJCardItem } from './useExploreData';
+import { useExploreData } from './useExploreData';
 import { useRecentlyListed } from './useRecentlyListed';
 import { useOtherItems } from './useOtherItems';
 import { useFavorites } from '../contexts/FavoritesContext';
-import { useFilters } from '../contexts/FiltersContext';
 import { ApiService } from '../services/api';
 import type { LocationSelection } from '../types/location';
 import { useLocation } from '../contexts/LocationContext';
 import { SectionType } from '../types/section';
+import { ListingItem } from '../types/listing-item';
 
 const DEFAULT_RADIUS = 50;
 
@@ -35,7 +35,7 @@ export interface ExploreScreenState {
   hasSearchQuery: boolean;
   refreshing: boolean;
   onRefresh: () => Promise<void>;
-  aiOffers: SJCardItem[];
+  aiOffers: ListingItem[];
   topPicksLoading: boolean;
   topPicksError: Error | null;
   isInitialized: boolean;
@@ -176,7 +176,6 @@ export const useExploreScreenState = (): ExploreScreenState => {
     refresh: refreshOthers,
   } = useOtherItems(10, { autoFetch: false });
   const { isFavorite, toggleFavorite } = useFavorites();
-  const { filters, hasActiveFilters } = useFilters();
   const { currentLocation, locationLoading: locationContextLoading, setCurrentLocationFromIP, ensureLocationDetected } = useLocation();
 
   const [refreshing, setRefreshing] = useState(false);
@@ -414,7 +413,7 @@ export const useExploreScreenState = (): ExploreScreenState => {
     // Don't create sections until we have user ID and location params are loaded
     // Also wait for location coordinates to be available before fetching listings
     if (!user?.id || !userLocationParams.p_user_id) return [];
-    
+
     // Wait for location coordinates to be available (lat and lng should not both be null)
     if (userLocationParams.p_user_lat === null && userLocationParams.p_user_lng === null) {
       return [];
@@ -450,21 +449,7 @@ export const useExploreScreenState = (): ExploreScreenState => {
         },
       },
       {
-        type: SectionType.FavouriteCategories,
-        functionParams: {
-          ...baseParams,
-          p_radius_km: userLocationParams.p_radius_km ?? 50
-        },
-      },
-      {
         type: SectionType.BestDeals,
-        functionParams: {
-          ...baseParams,
-          p_radius_km: userLocationParams.p_radius_km ?? 50
-        },
-      },
-      {
-        type: SectionType.TopPicksForYou,
         functionParams: {
           ...baseParams,
           p_radius_km: userLocationParams.p_radius_km ?? 50
@@ -496,8 +481,7 @@ export const useExploreScreenState = (): ExploreScreenState => {
     async (rawQuery: string) => {
       const query = (rawQuery || '').trim();
 
-      // If no query and no active filters, clear results
-      if (!query && !hasActiveFilters) {
+      if (!query) {
         setSearchResults([]);
         setSearchError(null);
         setSearchLoading(false);
@@ -527,40 +511,9 @@ export const useExploreScreenState = (): ExploreScreenState => {
         });
 
       try {
-        // Extract filter values from FiltersContext
-        const locationLat = filters.locationLat ?? null;
-        const locationLng = filters.locationLng ?? null;
-        const filterParams = {
-          minPrice: filters.priceMin ?? 0,
-          maxPrice: filters.priceMax ?? null,
-          categories: filters.categories ?? [],
-          distance: filters.distance ?? null,
-          currency: filters.currency ?? 'USD',  // Pass currency for price conversion
-          coordinates: 
-            locationLat !== null && locationLng !== null
-              ? { lat: locationLat, lng: locationLng }
-              : null,
-        };
-
-        console.log('[useExploreScreenState] performSearch - Query:', query || '(empty)', 'Filters:', {
-          minPrice: filterParams.minPrice,
-          maxPrice: filterParams.maxPrice,
-          currency: filterParams.currency,
-          categories: filterParams.categories,
-          categoriesCount: filterParams.categories.length,
-          distance: filterParams.distance,
-          coordinates: filterParams.coordinates,
-        });
-
-        // semanticSearch Edge Function now supports:
-        // 1. Semantic search via match_items (when query provided)
-        // 2. Filter-only search (when query is null/empty but filters are active)
-        // 3. Fuzzy text search fallback when semantic results are sparse
-        const { data: searchData, error: apiError } = await ApiService.semanticSearch(
-          query || null,  // Pass null if empty to enable filter-only search
-          30,
-          filterParams
-        );
+        // semanticSearch Edge Function already uses match_items for semantic search
+        // and includes fuzzy text search fallback when semantic results are sparse
+        const { data: searchData, error: apiError } = await ApiService.semanticSearch(query, 30);
         
         if (currentRequestId !== searchRequestIdRef.current) {
           return;
@@ -570,7 +523,7 @@ export const useExploreScreenState = (): ExploreScreenState => {
           setSearchError(apiError.message || searchStrings.error);
           setSearchResults([]);
         } else if (Array.isArray(searchData)) {
-          // Results from Edge Function are already sorted by similarity (if query) or created_at DESC (if filter-only)
+          // Results from Edge Function are already sorted by similarity
           // and include both semantic matches (from match_items) and fuzzy text matches
           setSearchResults(normalizeSearchItems(searchData));
         } else {
@@ -587,25 +540,16 @@ export const useExploreScreenState = (): ExploreScreenState => {
         }
       }
     },
-    [searchStrings.error, filters, hasActiveFilters]
+    [searchStrings.error]
   );
 
-  // Trigger search when query changes (debounced)
   useEffect(() => {
     if (searchDebounceRef.current) {
       clearTimeout(searchDebounceRef.current);
     }
 
     if (trimmedSearchQuery.length === 0) {
-      // If no query but filters are active, trigger filter-only search
-      if (hasActiveFilters) {
-        performSearch('');
-      } else {
-        // No query and no filters - clear results
-        setSearchResults([]);
-        setSearchError(null);
-        setSearchLoading(false);
-      }
+      performSearch('');
       return;
     }
 
@@ -618,28 +562,7 @@ export const useExploreScreenState = (): ExploreScreenState => {
         clearTimeout(searchDebounceRef.current);
       }
     };
-  }, [performSearch, trimmedSearchQuery, hasActiveFilters]);
-
-  // Trigger search when filters change (if there's an active search query or active filters)
-  useEffect(() => {
-    // Only trigger if we have a search query or active filters
-    if (trimmedSearchQuery.length > 0 || hasActiveFilters) {
-      // Debounce filter changes to avoid too many requests
-      if (searchDebounceRef.current) {
-        clearTimeout(searchDebounceRef.current);
-      }
-      
-      searchDebounceRef.current = setTimeout(() => {
-        performSearch(trimmedSearchQuery);
-      }, 350);
-
-      return () => {
-        if (searchDebounceRef.current) {
-          clearTimeout(searchDebounceRef.current);
-        }
-      };
-    }
-  }, [filters.priceMin, filters.priceMax, filters.categories, filters.distance, filters.locationLat, filters.locationLng, performSearch, trimmedSearchQuery, hasActiveFilters]);
+  }, [performSearch, trimmedSearchQuery]);
 
   useEffect(() => {
     return () => {

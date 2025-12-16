@@ -15,6 +15,7 @@ import { ApiService } from '../services/api';
 import { useLocalization } from '../localization';
 import type { AppLanguage } from '../types/language';
 import { DEFAULT_LANGUAGE } from '../types/language';
+import { colors } from '@navigation/MainTabNavigator.styles';
 
 const FollowButton: React.FC<{ targetUserId: string }> = ({ targetUserId }) => {
   const { t, language } = useLocalization();
@@ -522,7 +523,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: colors.primary,
   },
   scrollView: {
     flex: 1,
@@ -537,7 +538,7 @@ const styles = StyleSheet.create({
     color: '#555',
   },
   profileSection: {
-    backgroundColor: '#fff',
+    backgroundColor: '#161200',
     paddingTop: 16,
     paddingBottom: 20,
     paddingHorizontal: 20,
@@ -558,7 +559,7 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: 50,
     borderWidth: 3,
-    borderColor: '#fff',
+    borderColor: '#161200',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -606,19 +607,16 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#000',
     marginBottom: 0,
     textAlign: 'left',
   },
   username: {
     fontSize: 15,
-    color: '#737373',
     marginBottom: 0,
     textAlign: 'left',
   },
   emailText: {
     fontSize: 14,
-    color: '#4a4a4a',
     marginBottom: 8,
     textAlign: 'center',
   },
@@ -629,37 +627,31 @@ const styles = StyleSheet.create({
   },
   bio: {
     fontSize: 14,
-    color: '#262626',
     lineHeight: 20,
     textAlign: 'left',
   },
   statItem: {
     flex: 1,
     alignItems: 'center',
-    backgroundColor: '#FAFAFA',
     borderRadius: 10,
     paddingHorizontal: 8,
   },
   statValue: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#000',
     marginBottom: 4,
   },
   statTitle: {
     fontSize: 12,
-    color: '#737373',
     fontWeight: '500',
   },
   statSubtitle: {
     fontSize: 12,
-    color: '#999',
     marginTop: 2,
   },
   socialStatItem: {
     flex: 1,
     alignItems: 'center',
-    backgroundColor: '#FAFAFA',
     borderRadius: 10,
     paddingVertical: 8,
     paddingHorizontal: 8,
@@ -668,16 +660,13 @@ const styles = StyleSheet.create({
   socialStatValue: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#000',
     marginBottom: 4,
   },
   socialStatLabel: {
     fontSize: 12,
-    color: '#737373',
     fontWeight: '500',
   },
   ratingContainer: {
-    backgroundColor: '#fff',
     marginBottom: 10,
     padding: 20,
     shadowColor: '#000',
@@ -689,7 +678,6 @@ const styles = StyleSheet.create({
   ratingTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 10,
   },
   ratingContent: {
@@ -712,7 +700,7 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   profileOptions: {
-    backgroundColor: '#fff',
+    backgroundColor: '#161200',
     marginBottom: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -758,7 +746,7 @@ const styles = StyleSheet.create({
   },
   itemCard: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
+    backgroundColor: '#161200',
     padding: 12,
     marginBottom: 10,
     elevation: 2,
@@ -832,7 +820,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   addItemsButtonText: {
-    color: '#fff',
+    color: '#161200',
     fontSize: 16,
     fontWeight: 'bold',
   },
@@ -847,7 +835,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     borderBottomWidth: 0,
-    borderBottomColor: '#E5E5EA',
+    borderBottomColor: colors.primaryYellow,
   },
   tabButton: {
     flex: 1,
@@ -858,7 +846,7 @@ const styles = StyleSheet.create({
     borderBottomColor: 'transparent',
   },
   tabButtonActive: {
-    borderBottomColor: '#007AFF',
+    borderBottomColor: colors.primaryYellow,
   },
   tabText: {
     color: '#8E8E93',
@@ -866,7 +854,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   tabTextActive: {
-    color: '#007AFF',
+    color: colors.primaryYellow,
     fontWeight: '700',
   },
   gridListContent: {
@@ -898,7 +886,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#007AFF',
   },
   followButtonFollowing: {
-    backgroundColor: '#F2F2F7',
     borderWidth: 1,
     borderColor: '#E5E5EA',
   },
@@ -907,7 +894,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   followButtonTextPrimary: {
-    color: '#fff',
+    color: '#161200',
   },
   followButtonTextFollowing: {
     color: '#111',
@@ -941,7 +928,7 @@ const styles = StyleSheet.create({
   },
   followCountsContainer: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
+    backgroundColor: '#161200',
     marginBottom: 10,
     paddingVertical: 20,
     paddingHorizontal: 20,

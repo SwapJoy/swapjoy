@@ -9,6 +9,7 @@ import LocationSelector from '../components/LocationSelector';
 import SWInputField from '../components/SWInputField';
 import SWCategorySelector from '../components/SWCategorySelector';
 import { useItemDetails } from '../hooks/useItemDetails';
+import { colors } from '@navigation/MainTabNavigator.styles';
 
 const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
   navigation,
@@ -62,35 +63,39 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
 
   if (loadingCategories) {
     return (
-      <SafeAreaView style={styles.container}>
+      <View style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#007AFF" />
           <SJText style={styles.loadingText}>{strings.loading}</SJText>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
+      <SafeAreaView edges={['top']} style={styles.header}>
+        <View style={styles.headerContent}>
+          <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+            <Ionicons name="arrow-back" size={24} color={colors.primary} />
+          </TouchableOpacity>
+          <View style={styles.headerTitleContainer}>
+            <SJText style={styles.headerTitle}>{strings.headerTitle}</SJText>
+          </View>
+          <View style={styles.headerSpacer} />
+        </View>
+      </SafeAreaView>
+
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.container}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-            <Ionicons name="arrow-back" size={24} color="#007AFF" />
-          </TouchableOpacity>
-          <SJText style={styles.headerTitle}>{strings.headerTitle}</SJText>
-        </View>
-
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
           {/* Upload Progress */}
           {uploading && (
             <View style={styles.uploadProgressContainer}>
               <View style={styles.progressHeader}>
-                <Ionicons name="cloud-upload" size={20} color="#007AFF" />
+                <Ionicons name="cloud-upload" size={20} color="#fff" />
                 <SJText style={styles.uploadProgressText}>
                   {uploadingText(getOverallProgress())}
                 </SJText>
@@ -119,12 +124,12 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
                     hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
                   >
                     <View style={styles.imageRemoveCircle}>
-                      <Ionicons name="close" size={12} color="#fff" />
+                      <Ionicons name="close" size={12} color="#161200" />
                     </View>
                   </TouchableOpacity>
                   {!img.uploaded && (
                     <View style={styles.imageUploadingOverlay}>
-                      <ActivityIndicator size="small" color="#fff" />
+                      <ActivityIndicator size="small" color="#161200" />
                     </View>
                   )}
                   {img.uploaded && (
@@ -277,7 +282,7 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
             <Ionicons 
               name="arrow-forward" 
               size={20} 
-              color={(uploading || images.length === 0) ? '#999' : '#fff'} 
+              color={(uploading || images.length === 0) ? '#999' : '#161200'} 
             />
           </TouchableOpacity>
         </View>
@@ -324,16 +329,15 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
             </View>
           </View>
         </Modal>
-
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: colors.primary,
   },
   loadingContainer: {
     flex: 1,
@@ -346,22 +350,40 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   header: {
+    backgroundColor: colors.primaryYellow,
+    borderBottomWidth: 1,
+  },
+  headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    height: 44,
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
   },
   backButton: {
-    padding: 8,
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: Platform.OS === 'ios' ? -4 : 0,
+  },
+  headerTitleContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 44,
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#1a1a1a',
+    fontWeight: '700',
+    color: colors.primary,
+    letterSpacing: 0.3,
+  },
+  headerSpacer: {
+    width: 44,
+    height: 44,
   },
   savingIndicator: {
     flexDirection: 'row',
@@ -371,14 +393,13 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   savingText: {
-    fontSize: 12,
-    color: '#007AFF',
+    fontSize: 12
   },
   scrollView: {
     flex: 1,
   },
   uploadProgressContainer: {
-    backgroundColor: '#fff',
+    backgroundColor: '#161200',
     padding: 16,
     marginBottom: 8,
   },
@@ -390,21 +411,20 @@ const styles = StyleSheet.create({
   },
   uploadProgressText: {
     fontSize: 14,
-    color: '#007AFF',
     fontWeight: '500',
   },
   progressBar: {
     height: 4,
-    backgroundColor: '#e0e0e0',
+    backgroundColor: '#fff',
     borderRadius: 2,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#007AFF',
+    backgroundColor: colors.primaryYellow,
   },
   imagePreviewContainer: {
-    backgroundColor: '#fff',
+    backgroundColor: '#161200',
     paddingVertical: 16,
     paddingLeft: 16,
     marginBottom: 8,
@@ -426,7 +446,7 @@ const styles = StyleSheet.create({
   },
   imageUploadingOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: '#ff',
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
@@ -440,7 +460,7 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    backgroundColor: '#fff',
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'visible',
@@ -451,7 +471,7 @@ const styles = StyleSheet.create({
     right: 4,
   },
   formContainer: {
-    backgroundColor: '#fff',
+    backgroundColor: '#161200',
     padding: 16,
   },
   fieldContainer: {
@@ -481,7 +501,7 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 16,
     color: '#1a1a1a',
-    backgroundColor: '#fff',
+    backgroundColor: '#161200',
   },
   textInputDisabled: {
     backgroundColor: '#f5f5f5',
@@ -505,7 +525,7 @@ const styles = StyleSheet.create({
     borderColor: '#d1d1d6',
     borderRadius: 8,
     padding: 12,
-    backgroundColor: '#fff',
+    backgroundColor: '#161200',
   },
   pickerButtonDisabled: {
     backgroundColor: '#f5f5f5',
@@ -543,7 +563,7 @@ const styles = StyleSheet.create({
   },
   footer: {
     padding: 16,
-    backgroundColor: '#fff',
+    backgroundColor: '#161200',
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
   },
@@ -552,7 +572,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#007AFF',
+    backgroundColor: colors.primaryYellow,
     paddingVertical: 16,
     borderRadius: 12,
   },
@@ -562,7 +582,7 @@ const styles = StyleSheet.create({
   nextButtonText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#fff',
+    color: '#000',
   },
   nextButtonTextDisabled: {
     color: '#999',
@@ -573,7 +593,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#fff',
+    backgroundColor: '#161200',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     maxHeight: '70%',
@@ -606,11 +626,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#1a1a1a',
   },
-  conditionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
   inlineSelectionContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -626,7 +641,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     borderColor: '#d1d1d6',
-    backgroundColor: '#fff',
+    backgroundColor: colors.primaryYellow,
   },
   inlineSelectionButtonSelected: {
     backgroundColor: '#007AFF',
@@ -641,7 +656,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   inlineSelectionTextSelected: {
-    color: '#fff',
+    color: '#161200',
   },
   fieldContainerWithLabel: {
     marginBottom: 24,
@@ -657,8 +672,7 @@ const styles = StyleSheet.create({
   },
   floatingLabelText: {
     fontSize: 12,
-    fontWeight: '600',
-    color: '#8e8e93',
+    fontWeight: '600'
   },
   bottomBorderInline: {
     position: 'absolute',
@@ -672,7 +686,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
@@ -683,7 +697,6 @@ const styles = StyleSheet.create({
   currencySwitcherText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1a1a1a',
   },
 });
 

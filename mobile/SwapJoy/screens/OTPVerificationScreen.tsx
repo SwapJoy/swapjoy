@@ -119,7 +119,7 @@ const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#161200f',
   },
   keyboardView: {
     flex: 1,

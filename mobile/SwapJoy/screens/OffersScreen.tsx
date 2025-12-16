@@ -304,7 +304,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8f9fa',
   },
   tabsWrapper: {
-    backgroundColor: '#fff',
+    backgroundColor: '#161200',
     paddingHorizontal: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#E5E5EA',
@@ -359,7 +359,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   statusText: {
-    color: '#fff',
+    color: '#161200',
     fontSize: 12,
   },
   offerMetaSection: {
