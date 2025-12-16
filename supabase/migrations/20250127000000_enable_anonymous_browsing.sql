@@ -43,3 +43,4 @@ END $$;
 -- Note: Anonymous users can only READ data
 -- INSERT, UPDATE, DELETE operations still require authentication
 -- This is enforced by the existing policies that check auth.uid()
+

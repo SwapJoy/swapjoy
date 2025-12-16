@@ -67,6 +67,24 @@ const customFetch = async (url: RequestInfo | URL, options?: RequestInit) => {
   });
   
   try {
+    // #region agent log
+    const startTime = Date.now();
+    const logEndpoint = 'http://127.0.0.1:7242/ingest/74390992-77b6-4e43-850c-a1410a0ce07a';
+    fetch(logEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        location: 'supabase.ts:70',
+        message: 'Query start',
+        data: { url: urlString.substring(0, 200), method: options?.method || 'GET', hasApikey: headers.has('apikey') },
+        timestamp: startTime,
+        sessionId: 'debug-session',
+        runId: 'run1',
+        hypothesisId: 'A'
+      })
+    }).catch(() => {});
+    // #endregion
+    
     console.log('[Supabase] Fetching:', urlString.substring(0, 100), 'hasApikey:', headers.has('apikey'));
     const fetchPromise = fetch(url, {
       ...options,
@@ -74,6 +92,23 @@ const customFetch = async (url: RequestInfo | URL, options?: RequestInit) => {
     });
     
     const response = await Promise.race([fetchPromise, timeoutPromise]);
+    
+    // #region agent log
+    const duration = Date.now() - startTime;
+    fetch(logEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        location: 'supabase.ts:76',
+        message: 'Query complete',
+        data: { url: urlString.substring(0, 200), duration, status: response?.status, ok: response?.ok },
+        timestamp: Date.now(),
+        sessionId: 'debug-session',
+        runId: 'run1',
+        hypothesisId: 'A'
+      })
+    }).catch(() => {});
+    // #endregion
     
     if (!response.ok) {
       let errorText = '';
@@ -101,6 +136,29 @@ const customFetch = async (url: RequestInfo | URL, options?: RequestInit) => {
     }
     return response;
   } catch (error: any) {
+    // #region agent log
+    const logEndpoint = 'http://127.0.0.1:7242/ingest/74390992-77b6-4e43-850c-a1410a0ce07a';
+    const urlString = typeof url === 'string' ? url : url.toString();
+    fetch(logEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        location: 'supabase.ts:103',
+        message: 'Query error',
+        data: { 
+          url: urlString.substring(0, 200), 
+          error: error?.message || String(error),
+          errorName: error?.name,
+          isTimeout: error?.message?.includes('timeout') || false
+        },
+        timestamp: Date.now(),
+        sessionId: 'debug-session',
+        runId: 'run1',
+        hypothesisId: 'A'
+      })
+    }).catch(() => {});
+    // #endregion
+    
     const errorMsg = error?.message || String(error);
     const isNetworkError = errorMsg.includes('Network request failed') || 
                           errorMsg.includes('network') || 
@@ -108,7 +166,6 @@ const customFetch = async (url: RequestInfo | URL, options?: RequestInit) => {
                           errorMsg.includes('ECONNREFUSED') ||
                           errorMsg.includes('aborted') ||
                           error?.name === 'AbortError';
-    const urlString = typeof url === 'string' ? url : url.toString();
     const isTimeoutError = errorMsg.includes('timeout') || errorMsg.includes('Request timeout') || error?.name === 'AbortError';
     const isRedisInvalidatePattern = urlString.includes('redis-invalidate-pattern');
     

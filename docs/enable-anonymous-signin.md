@@ -67,3 +67,4 @@ Anonymous sign-ins have rate limits configured:
 - **30 anonymous sign-ins per hour per IP address** (as configured in your `config.toml`)
 
 This should be sufficient for normal usage.
+

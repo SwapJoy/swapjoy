@@ -53,3 +53,4 @@ If you get results, the function is working!
 - Check that the function exists: `SELECT * FROM pg_proc WHERE proname = 'fn_mostly_viewed';`
 - Verify permissions: The function should be accessible to `authenticated` and `anon` roles
 
+

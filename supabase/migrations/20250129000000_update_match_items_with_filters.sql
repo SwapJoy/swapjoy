@@ -92,3 +92,4 @@ GRANT EXECUTE ON FUNCTION match_items(vector, float, int, float, uuid, float, uu
 
 -- Update comment
 COMMENT ON FUNCTION match_items IS 'Performs semantic similarity search on items using vector embeddings with optional filter criteria (price, categories, distance, location). Returns items sorted by similarity score when query_embedding is provided, or by created_at DESC for filter-only searches.';
+

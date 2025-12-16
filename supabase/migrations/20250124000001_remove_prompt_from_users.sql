@@ -15,3 +15,4 @@ COMMENT ON TABLE users IS 'User profiles - prompt and prompt_embedding columns r
 
 
 
+

@@ -255,3 +255,4 @@ $$;
 -- and add LEFT JOIN item_metrics im ON im.item_id = iwd.id in the SELECT, then add
 -- COALESCE(im.view_count, 0)::integer AS view_count to the SELECT list.
 
+

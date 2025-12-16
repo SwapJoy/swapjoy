@@ -696,6 +696,7 @@ export class ApiService {
 
   // AI-Powered Vector-Based Recommendations
   // Uses single database function that combines all queries
+  // #region agent log
   static async fetchSection(
     functionName: string,
     options: {
@@ -716,8 +717,43 @@ export class ApiService {
       try {
         const result = await this.authenticatedCall(async (client) => {
           try {
+            // #region agent log
+            const logEndpoint = 'http://127.0.0.1:7242/ingest/74390992-77b6-4e43-850c-a1410a0ce07a';
+            const rpcStartTime = Date.now();
+            fetch(logEndpoint, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                location: 'api.ts:721',
+                message: 'RPC call start',
+                data: { functionName, params: JSON.stringify(functionParams).substring(0, 200) },
+                timestamp: rpcStartTime,
+                sessionId: 'debug-session',
+                runId: 'run1',
+                hypothesisId: 'C'
+              })
+            }).catch(() => {});
+            // #endregion
+            
             // Call the database function with provided parameters
             const { data, error } = await client.rpc(functionName, functionParams);
+            
+            // #region agent log
+            const rpcDuration = Date.now() - rpcStartTime;
+            fetch(logEndpoint, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                location: 'api.ts:721',
+                message: 'RPC call complete',
+                data: { functionName, duration: rpcDuration, resultCount: Array.isArray(data) ? data.length : 0, hasError: !!error, errorMessage: error?.message },
+                timestamp: Date.now(),
+                sessionId: 'debug-session',
+                runId: 'run1',
+                hypothesisId: 'C'
+              })
+            }).catch(() => {});
+            // #endregion
 
             if (error) {
               console.error(`[fetchSection:${functionName}] RPC error:`, error);
@@ -1546,7 +1582,8 @@ export class ApiService {
             item:items(*)
           )
         `)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(100); // CRITICAL FIX: Add limit to prevent fetching all offers (nested JOINs are expensive)
 
       if (userId && type === 'sent') {
         query = query.eq('sender_id', userId);
@@ -1684,12 +1721,49 @@ export class ApiService {
         console.warn('[ApiService.getNotifications] Could not get session:', sessionError);
       }
 
+      // #region agent log
+      const logEndpoint = 'http://127.0.0.1:7242/ingest/74390992-77b6-4e43-850c-a1410a0ce07a';
+      const startTime = Date.now();
+      fetch(logEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          location: 'api.ts:1689',
+          message: 'getNotifications query start',
+          data: { userId: currentUser.id },
+          timestamp: startTime,
+          sessionId: 'debug-session',
+          runId: 'run1',
+          hypothesisId: 'B'
+        })
+      }).catch(() => {});
+      // #endregion
+      
       // RLS policy automatically filters by auth.uid() = user_id
       // So we don't need to explicitly filter - RLS handles it
+      // CRITICAL FIX: Add LIMIT to prevent fetching all notifications (can be thousands)
       const { data, error } = await client
         .from('notifications')
         .select('*')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(100); // Limit to most recent 100 notifications to prevent timeout
+      
+      // #region agent log
+      const duration = Date.now() - startTime;
+      fetch(logEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          location: 'api.ts:1693',
+          message: 'getNotifications query complete',
+          data: { duration, resultCount: data?.length || 0, hasError: !!error, errorMessage: error?.message },
+          timestamp: Date.now(),
+          sessionId: 'debug-session',
+          runId: 'run1',
+          hypothesisId: 'B'
+        })
+      }).catch(() => {});
+      // #endregion
 
       if (error) {
         console.error('[ApiService.getNotifications] Error details:', JSON.stringify(error, null, 2));
@@ -1839,10 +1913,11 @@ export class ApiService {
             content_text,
             is_read,
             created_at
-          )
+          ).order(created_at.desc).limit(10)
         `)
         .or(`buyer_id.eq.${userId},seller_id.eq.${userId}`)
-        .order('last_message_at', { ascending: false });
+        .order('last_message_at', { ascending: false })
+        .limit(50); // CRITICAL FIX: Limit chats to prevent timeout with large message JOINs
 
       if (error) {
         console.error('[ApiService.getChats] Error:', error);
@@ -3179,16 +3254,18 @@ export class ApiService {
         };
       }
 
-      const prefetchMultiplier = Math.max(page + 1, 3);
-      const fetchCount = limit * prefetchMultiplier;
-
+      // CRITICAL FIX: Cap prefetch to prevent fetching too many items (which causes timeouts)
+      // For location filtering, we fetch more to account for filtering, but cap at reasonable limit
+      const prefetchMultiplier = Math.min(Math.max(page + 1, 2), 3); // Cap at 3x to prevent excessive fetching
+      const fetchCount = Math.min(limit * prefetchMultiplier, 100); // Absolute max of 100 items to prevent timeout
+      
       const { data: rawItems, error } = await client
         .from('items')
         .select('*, category:categories!items_category_id_fkey(title_en, title_ka), item_images(image_url), users!items_user_id_fkey(username, first_name, last_name)')
         .eq('status', 'available')
         .neq('user_id', userId)
         .order('created_at', { ascending: false })
-        .range(0, Math.max(fetchCount - 1, limit - 1));
+        .range(0, fetchCount - 1); // Use capped fetchCount
 
       if (error) {
         return { data: null, error };
