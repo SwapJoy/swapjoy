@@ -1596,6 +1596,46 @@ export class ApiService {
         throw new Error('User not authenticated');
       }
 
+      // Load denormalized user JSON from users table (for items.user column)
+      let denormalizedUser: any = null;
+      try {
+        const { data: userRow } = await client
+          .from('users')
+          .select('id, username, first_name, last_name, profile_image_url')
+          .eq('id', user.id)
+          .maybeSingle();
+
+        if (userRow) {
+          denormalizedUser = userRow;
+        } else {
+          denormalizedUser = {
+            id: user.id,
+          };
+        }
+      } catch {
+        denormalizedUser = {
+          id: user.id,
+        };
+      }
+
+      // Load denormalized category JSON from categories table (for items.category column)
+      let denormalizedCategory: any = null;
+      if (itemData.category_id) {
+        try {
+          const { data: categoryRow } = await client
+            .from('categories')
+            .select('id, title_en, title_ka, slug, description, icon, color')
+            .eq('id', itemData.category_id)
+            .maybeSingle();
+
+          if (categoryRow) {
+            denormalizedCategory = categoryRow;
+          }
+        } catch {
+          // Leave denormalizedCategory as null on error
+        }
+      }
+
       return await client
         .from('items')
         .insert({
@@ -1609,6 +1649,8 @@ export class ApiService {
           location_lat: itemData.location_lat ?? null,
           location_lng: itemData.location_lng ?? null,
           images: itemData.images ?? [],
+          category: denormalizedCategory,
+          user: denormalizedUser,
           status: 'available',
         })
         .select()
