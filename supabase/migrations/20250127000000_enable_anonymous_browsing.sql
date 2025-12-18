@@ -44,3 +44,5 @@ END $$;
 -- INSERT, UPDATE, DELETE operations still require authentication
 -- This is enforced by the existing policies that check auth.uid()
 
+
+

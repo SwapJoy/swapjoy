@@ -286,7 +286,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const signInWithGoogle = async () => {
     // Track if user was signed in before starting Google sign-in
-    const wasSignedInBefore = !!user;
+    const wasSignedInBefore = !!user && !isAnonymous;
     console.log('[AuthContext] Starting Google sign-in, wasSignedInBefore:', wasSignedInBefore);
     
     try {
