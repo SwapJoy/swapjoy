@@ -17,7 +17,7 @@ import type { AppLanguage } from '../types/language';
 import { DEFAULT_LANGUAGE } from '../types/language';
 import { colors } from '@navigation/MainTabNavigator.styles';
 
-const FollowButton: React.FC<{ targetUserId: string }> = ({ targetUserId }) => {
+const FollowButton: React.FC<{ targetUserId: string | undefined }> = ({ targetUserId }) => {
   const { t, language } = useLocalization();
   const [loading, setLoading] = useState(false);
   const [isFollowing, setIsFollowing] = useState<boolean>(false);
@@ -25,7 +25,23 @@ const FollowButton: React.FC<{ targetUserId: string }> = ({ targetUserId }) => {
   useEffect(() => {
     let mounted = true;
     (async () => {
-      const { data } = await ApiService.isFollowing(targetUserId);
+      // Strict validation before making API call
+      if (!targetUserId || typeof targetUserId !== 'string' || targetUserId.trim() === '') {
+        console.warn('[FollowButton] Invalid targetUserId, skipping isFollowing check:', targetUserId);
+        if (mounted) setIsFollowing(false);
+        return;
+      }
+      // UUID format validation
+      const trimmed = targetUserId.trim();
+      if (trimmed.length < 36 || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmed)) {
+        console.warn('[FollowButton] targetUserId is not a valid UUID, skipping:', trimmed);
+        if (mounted) setIsFollowing(false);
+        return;
+      }
+      const { data, error } = await ApiService.isFollowing(targetUserId);
+      if (error) {
+        console.error('[FollowButton] Error checking follow status:', error);
+      }
       if (mounted) setIsFollowing(Boolean(data));
     })();
     return () => {
@@ -35,10 +51,20 @@ const FollowButton: React.FC<{ targetUserId: string }> = ({ targetUserId }) => {
 
   const toggleFollow = async () => {
     if (loading) return;
+    // Validate targetUserId before proceeding
+    if (!targetUserId || typeof targetUserId !== 'string' || targetUserId.trim() === '') {
+      console.warn('[FollowButton] Cannot toggle follow: invalid targetUserId:', targetUserId);
+      return;
+    }
+    const trimmed = targetUserId.trim();
+    if (trimmed.length < 36 || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmed)) {
+      console.warn('[FollowButton] Cannot toggle follow: targetUserId is not a valid UUID:', trimmed);
+      return;
+    }
     setLoading(true);
     try {
       if (isFollowing) {
-        const { error } = await ApiService.unfollowUser(targetUserId);
+        const { error } = await ApiService.unfollowUser(trimmed);
         if (error) {
           Alert.alert(
             t('profileScreen.alerts.errorTitle'),
@@ -48,7 +74,7 @@ const FollowButton: React.FC<{ targetUserId: string }> = ({ targetUserId }) => {
           setIsFollowing(false);
         }
       } else {
-        const { error } = await ApiService.followUser(targetUserId);
+        const { error } = await ApiService.followUser(trimmed);
         if (error) {
           Alert.alert(
             t('profileScreen.alerts.errorTitle'),
@@ -58,6 +84,8 @@ const FollowButton: React.FC<{ targetUserId: string }> = ({ targetUserId }) => {
           setIsFollowing(true);
         }
       }
+    } catch (error) {
+      console.error('[FollowButton] Error toggling follow:', error);
     } finally {
       setLoading(false);
     }
@@ -309,7 +337,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
 
   // removed unused renderProfileItem helper
   const handleItemPress = useCallback(
-    (item: any) => navigation.navigate('ItemDetails', { itemId: item.id }),
+    (item: any) => navigation.navigate('ItemDetails', { itemId: item.id, item }),
     [navigation]
   );
 
@@ -434,9 +462,9 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
           )}
 
           {/* Follow button (other users only) */}
-          {isViewingOtherUser && (
+          {isViewingOtherUser && viewedUserId && typeof viewedUserId === 'string' && viewedUserId.trim() !== '' && (
             <View style={styles.followButtonContainer}>
-              <FollowButton targetUserId={viewedUserId!} />
+              <FollowButton targetUserId={viewedUserId} />
             </View>
           )}
         </View>
@@ -523,7 +551,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primaryDark,
   },
   scrollView: {
     flex: 1,
@@ -538,7 +566,7 @@ const styles = StyleSheet.create({
     color: '#555',
   },
   profileSection: {
-    backgroundColor: '#161200',
+    backgroundColor: colors.primaryDark,
     paddingTop: 16,
     paddingBottom: 20,
     paddingHorizontal: 20,
@@ -559,7 +587,7 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: 50,
     borderWidth: 3,
-    borderColor: '#161200',
+    borderColor: colors.primaryDark,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -700,7 +728,7 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   profileOptions: {
-    backgroundColor: '#161200',
+    backgroundColor: colors.primaryDark,
     marginBottom: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -746,7 +774,7 @@ const styles = StyleSheet.create({
   },
   itemCard: {
     flexDirection: 'row',
-    backgroundColor: '#161200',
+    backgroundColor: colors.primaryDark,
     padding: 12,
     marginBottom: 10,
     elevation: 2,
@@ -786,7 +814,7 @@ const styles = StyleSheet.create({
   emptyItemsContainer: {
     alignItems: 'center',
     padding: 20,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: colors.primaryDark,
     borderRadius: 10,
     marginTop: 10,
   },
@@ -802,7 +830,7 @@ const styles = StyleSheet.create({
   loadingItemsContainer: {
     alignItems: 'center',
     padding: 40,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: colors.primaryDark,
     borderRadius: 10,
     marginTop: 10,
   },
@@ -820,7 +848,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   addItemsButtonText: {
-    color: '#161200',
+    color: colors.primaryDark,
     fontSize: 16,
     fontWeight: 'bold',
   },
@@ -894,7 +922,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   followButtonTextPrimary: {
-    color: '#161200',
+    color: colors.primaryDark,
   },
   followButtonTextFollowing: {
     color: '#111',
@@ -928,7 +956,7 @@ const styles = StyleSheet.create({
   },
   followCountsContainer: {
     flexDirection: 'row',
-    backgroundColor: '#161200',
+    backgroundColor: colors.primaryDark,
     marginBottom: 10,
     paddingVertical: 20,
     paddingHorizontal: 20,

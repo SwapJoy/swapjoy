@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {View, StyleSheet, ScrollView, Alert, ActivityIndicator, TextInput, TouchableOpacity, PanResponder, } from 'react-native';
+import { colors } from '@navigation/MainTabNavigator.styles';
 import SJText from '../components/SJText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ApiService } from '../services/api';
@@ -432,7 +433,7 @@ const DevRecommendationSettingsScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: colors.primaryDark,
   },
   scrollView: {
     flex: 1,
@@ -465,7 +466,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   section: {
-    backgroundColor: '#161200',
+    backgroundColor: colors.primaryDark,
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
@@ -546,7 +547,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
     borderWidth: 2,
-    borderColor: '#161200',
+    borderColor: colors.primaryDark,
   },
   quickButtons: {
     flexDirection: 'row',
@@ -620,7 +621,7 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     backgroundColor: '#007AFF',
-    color: '#161200',
+    color: colors.primaryDark,
     fontSize: 16,
     fontWeight: '700',
     textAlign: 'center',
@@ -652,7 +653,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   testButtonText: {
-    color: '#161200',
+    color: colors.primaryDark,
     fontSize: 14,
     fontWeight: '600',
   },

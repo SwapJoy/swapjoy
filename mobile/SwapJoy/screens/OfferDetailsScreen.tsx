@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import {View, StyleSheet, TouchableOpacity, ScrollView, FlatList, Dimensions} from 'react-native';
+import { colors } from '@navigation/MainTabNavigator.styles';
 import SJText from '../components/SJText';
 import { NavigationProp, RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../types/navigation';
@@ -223,7 +224,7 @@ const OfferDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: colors.primaryDark,
   },
   content: {
     padding: 16,
@@ -318,7 +319,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     padding: 16,
-    backgroundColor: '#161200',
+    backgroundColor: colors.primaryDark,
     borderTopWidth: 1,
     borderTopColor: '#eee',
   },
@@ -329,7 +330,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   chatButtonText: {
-    color: '#161200',
+    color: colors.primaryDark,
     fontSize: 16,
     fontWeight: '700',
   },

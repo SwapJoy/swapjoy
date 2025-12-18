@@ -1,5 +1,6 @@
 import React, { useMemo, useRef, useState } from 'react';
 import {View, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Alert, Modal, } from 'react-native';
+import { colors } from '@navigation/MainTabNavigator.styles';
 import SJText from '../components/SJText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
@@ -200,16 +201,16 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route }) => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#f5f5f7',
+    backgroundColor: colors.primaryDark,
   },
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f7',
+    backgroundColor: colors.primaryDark,
   },
   offerHeader: {
     flexDirection: 'row',
     padding: 12,
-    backgroundColor: '#161200',
+    backgroundColor: colors.primaryDark,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#E0E0E0',
   },
@@ -269,7 +270,7 @@ const styles = StyleSheet.create({
   },
   messageTextOwn: {
     fontSize: 15,
-    color: '#161200',
+    color: colors.primaryDark,
   },
   messageTextOther: {
     fontSize: 15,
@@ -301,7 +302,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     paddingHorizontal: 8,
     paddingVertical: 8,
-    backgroundColor: '#161200',
+    backgroundColor: colors.primaryDark,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#E0E0E0',
   },
@@ -335,7 +336,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#9CA3AF',
   },
   sendText: {
-    color: '#161200',
+    color: colors.primaryDark,
     fontSize: 15,
     fontWeight: '600',
   },

@@ -168,7 +168,7 @@ const RecentlyListedScreen: React.FC = () => {
         <TouchableOpacity
           style={[styles.gridItem, index % 2 === 0 ? styles.gridItemLeft : styles.gridItemRight]}
           activeOpacity={0.85}
-          onPress={() => rootNavigation.navigate('ItemDetails', { itemId: item.id })}
+          onPress={() => rootNavigation.navigate('ItemDetails', { itemId: item.id, item })}
         >
           <CachedImage
             uri={item.image_url}

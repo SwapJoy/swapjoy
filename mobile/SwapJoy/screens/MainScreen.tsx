@@ -1,5 +1,6 @@
 import React from 'react';
 import {View, StyleSheet, TouchableOpacity, SafeAreaView} from 'react-native';
+import { colors } from '@navigation/MainTabNavigator.styles';
 import SJText from '../components/SJText';
 import { MainTabsScreenProps } from '../types/navigation';
 import { useAuth } from '../contexts/AuthContext';
@@ -38,7 +39,7 @@ const MainScreen: React.FC<MainTabsScreenProps> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#161200',
+    backgroundColor: colors.primaryDark,
   },
   content: {
     flex: 1,

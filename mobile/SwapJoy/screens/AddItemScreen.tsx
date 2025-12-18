@@ -3,6 +3,7 @@ import {View, StyleSheet, TouchableOpacity, SafeAreaView} from 'react-native';
 import SJText from '../components/SJText';
 import { Ionicons } from '@expo/vector-icons';
 import { AddItemScreenProps } from '../types/navigation';
+import { colors } from '@navigation/MainTabNavigator.styles';
 
 const AddItemScreen: React.FC<AddItemScreenProps> = ({ navigation }) => {
   return (
@@ -12,13 +13,13 @@ const AddItemScreen: React.FC<AddItemScreenProps> = ({ navigation }) => {
           style={styles.closeButton}
           onPress={() => navigation.goBack()}
         >
-          <Ionicons name="close" size={24} color="#161200" />
+          <Ionicons name="close" size={24} color={colors.primaryDark} />
         </TouchableOpacity>
       </View>
       
       <View style={styles.content}>
         <View style={styles.iconContainer}>
-          <Ionicons name="add-circle" size={80} color="#161200" />
+          <Ionicons name="add-circle" size={80} color={colors.primaryDark} />
         </View>
         
         <SJText style={styles.title}>Add New Item</SJText>
@@ -28,19 +29,19 @@ const AddItemScreen: React.FC<AddItemScreenProps> = ({ navigation }) => {
         
         <View style={styles.featureList}>
           <View style={styles.featureItem}>
-            <Ionicons name="camera" size={20} color="#161200" />
+            <Ionicons name="camera" size={20} color={colors.primaryDark} />
             <SJText style={styles.featureText}>Take photos of your item</SJText>
           </View>
           <View style={styles.featureItem}>
-            <Ionicons name="text" size={20} color="#161200" />
+            <Ionicons name="text" size={20} color={colors.primaryDark} />
             <SJText style={styles.featureText}>Add description and details</SJText>
           </View>
           <View style={styles.featureItem}>
-            <Ionicons name="location" size={20} color="#161200" />
+            <Ionicons name="location" size={20} color={colors.primaryDark} />
             <SJText style={styles.featureText}>Set your location</SJText>
           </View>
           <View style={styles.featureItem}>
-            <Ionicons name="swap-horizontal" size={20} color="#161200" />
+            <Ionicons name="swap-horizontal" size={20} color={colors.primaryDark} />
             <SJText style={styles.featureText}>Choose what you want to swap for</SJText>
           </View>
         </View>
@@ -89,7 +90,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#161200',
+    color: colors.primaryDark,
     marginBottom: 15,
     textAlign: 'center',
   },
@@ -111,13 +112,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
   },
   featureText: {
-    color: '#161200',
+    color: colors.primaryDark,
     fontSize: 16,
     marginLeft: 15,
     flex: 1,
   },
   startButton: {
-    backgroundColor: '#161200',
+    backgroundColor: colors.primaryYellow,
     paddingHorizontal: 40,
     paddingVertical: 15,
     borderRadius: 25,

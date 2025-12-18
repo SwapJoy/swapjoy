@@ -821,7 +821,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   popoverContainer: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primaryDark,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     shadowColor: '#000',
@@ -1069,7 +1069,7 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#e2e8f0',
     gap: 12,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primaryDark,
     flexShrink: 0,
   },
   clearButton: {

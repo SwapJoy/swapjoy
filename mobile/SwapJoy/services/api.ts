@@ -775,14 +775,36 @@ export class ApiService {
             }
 
             // Transform database results to match expected format
+            // Log first item to debug user_id and images
+            if (data && data.length > 0) {
+              console.log(`[fetchSection:${functionName}] First item from RPC:`, {
+                id: data[0].id,
+                user_id: data[0].user_id,
+                has_user_id: 'user_id' in data[0],
+                images: data[0].images,
+                images_type: typeof data[0].images,
+                images_is_array: Array.isArray(data[0].images),
+                keys: Object.keys(data[0]),
+              });
+            }
             const transformed = data.map((item: any) => {
               // Extract images from denormalized images jsonb
-              let images: Array<any> = [];
+              // Normalize to ensure consistent format: { url: string, order: number }
+              let images: Array<{ url: string; order: number }> = [];
               if (Array.isArray(item.images)) {
-                images = item.images;
+                images = item.images.map((img: any) => ({
+                  url: img.url || img.image_url || '',
+                  order: img.order ?? img.sort_order ?? 0,
+                })).filter((img: any) => img.url); // Filter out images without URLs
               } else if (item.images && typeof item.images === 'object') {
                 try {
-                  images = JSON.parse(item.images) || [];
+                  const parsed = typeof item.images === 'string' ? JSON.parse(item.images) : item.images;
+                  if (Array.isArray(parsed)) {
+                    images = parsed.map((img: any) => ({
+                      url: img.url || img.image_url || '',
+                      order: img.order ?? img.sort_order ?? 0,
+                    })).filter((img: any) => img.url);
+                  }
                 } catch {
                   images = [];
                 }
@@ -837,6 +859,7 @@ export class ApiService {
 
               return {
                 id: item.id,
+                user_id: item.user_id || item.user?.id || null, // Include user_id at top level, fallback to user.id
                 title: item.title,
                 description: item.description,
                 price: item.price,
@@ -853,6 +876,7 @@ export class ApiService {
                 view_count: item.view_count ?? undefined,
                 category_name_ka: categoryData?.title_ka || null,
                 category_name: categoryData?.title_en || categoryData?.title_ka || null,
+                images: images, // Include images array for ListingItem compatibility
                 image_url: imageUrl,
                 user: {
                   id: item.user_id,
@@ -2771,19 +2795,59 @@ export class ApiService {
   }
 
   // ==================== FOLLOWS ====================
-  static async isFollowing(targetUserId: string) {
+  static async isFollowing(targetUserId: string | undefined) {
+    // Strict validation before making any API call
+    if (!targetUserId) {
+      console.warn('[ApiService.isFollowing] targetUserId is undefined or null');
+      return { data: false as any, error: { message: 'Target user ID is required' } as any } as any;
+    }
+    if (typeof targetUserId !== 'string') {
+      console.warn('[ApiService.isFollowing] targetUserId is not a string:', typeof targetUserId, targetUserId);
+      return { data: false as any, error: { message: 'Target user ID must be a string' } as any } as any;
+    }
+    const trimmedUserId = targetUserId.trim();
+    if (trimmedUserId === '') {
+      console.warn('[ApiService.isFollowing] targetUserId is empty string');
+      return { data: false as any, error: { message: 'Target user ID cannot be empty' } as any } as any;
+    }
+    // Basic UUID format validation (36 characters with dashes)
+    if (trimmedUserId.length < 36 || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmedUserId)) {
+      console.warn('[ApiService.isFollowing] targetUserId is not a valid UUID format:', trimmedUserId);
+      return { data: false as any, error: { message: 'Target user ID is not a valid UUID' } as any } as any;
+    }
+
     return this.authenticatedCall(async (client) => {
       const me = await AuthService.getCurrentUser();
       if (!me?.id) {
         return { data: false as any, error: { message: 'Not authenticated' } } as any;
       }
+      // Validate current user ID
+      if (!me.id || typeof me.id !== 'string' || me.id.trim() === '') {
+        console.warn('[ApiService.isFollowing] Invalid current user ID:', me.id);
+        return { data: false as any, error: { message: 'Invalid current user ID' } as any } as any;
+      }
+      const trimmedMeId = me.id.trim();
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmedMeId)) {
+        console.warn('[ApiService.isFollowing] Current user ID is not a valid UUID format:', trimmedMeId);
+        return { data: false as any, error: { message: 'Current user ID is not a valid UUID' } as any } as any;
+      }
+
+      // Double-check before query
+      if (!trimmedUserId || trimmedUserId === 'undefined' || trimmedUserId === 'null') {
+        console.error('[ApiService.isFollowing] CRITICAL: targetUserId is invalid after validation:', trimmedUserId);
+        return { data: false as any, error: { message: 'Invalid target user ID' } as any } as any;
+      }
+
       const { data, error } = await client
         .from('user_follows')
         .select('id')
-        .eq('follower_id', me.id)
-        .eq('following_id', targetUserId)
+        .eq('follower_id', trimmedMeId)
+        .eq('following_id', trimmedUserId)
         .maybeSingle();
-      if (error) return { data: false as any, error } as any;
+      if (error) {
+        console.error('[ApiService.isFollowing] Query error:', error, { follower_id: trimmedMeId, following_id: trimmedUserId });
+        return { data: false as any, error } as any;
+      }
       return { data: Boolean(data), error: null } as any;
     });
   }

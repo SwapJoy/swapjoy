@@ -1,5 +1,6 @@
 import React from 'react';
 import {View, StyleSheet, TouchableOpacity} from 'react-native';
+import { colors } from '@navigation/MainTabNavigator.styles';
 import SJText from '../components/SJText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CreateListingScreenProps } from '../types/navigation';
@@ -24,7 +25,7 @@ const CreateListingScreen: React.FC<CreateListingScreenProps> = ({ navigation })
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: colors.primaryDark,
   },
   content: {
     flex: 1,
@@ -50,7 +51,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   buttonText: {
-    color: '#161200',
+    color: colors.primaryDark,
     fontSize: 16,
     fontWeight: 'bold',
   },

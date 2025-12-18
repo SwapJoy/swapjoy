@@ -1,5 +1,6 @@
 import React, { memo, useEffect, useLayoutEffect } from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Platform, Dimensions, Image } from 'react-native';
+import { colors } from '@navigation/MainTabNavigator.styles';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ExploreScreenProps } from '../types/navigation';
 import { SectionView } from '../components/SectionView';
@@ -129,7 +130,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
         searchError={searchError}
         hasSearchQuery={hasSearchQuery}
         onClearSearch={handleClearSearch}
-        onItemPress={(item: any) => (navigation as any).navigate('ItemDetails', { itemId: item.id })}
+        onItemPress={(item: any) => (navigation as any).navigate('ItemDetails', { itemId: item.id, item })}
         renderFavoriteButton={(item: any) => {
       const imageUrl =
         item?.image_url ||
@@ -168,7 +169,7 @@ ExploreScreen.displayName = 'ExploreScreen';
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#161200',
+    backgroundColor: colors.primaryDark,
   },
   scrollView: {
     flex: 1,

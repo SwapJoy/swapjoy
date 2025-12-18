@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import {View, TouchableOpacity, StyleSheet, Modal, FlatList, Pressable, } from 'react-native';
+import { colors } from '@navigation/MainTabNavigator.styles';
 import SJText from '../components/SJText';
 import { Ionicons } from '@expo/vector-icons';
 import { AppLanguage, LANGUAGE_LABELS, SUPPORTED_LANGUAGES } from '../types/language';
@@ -132,7 +133,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 12,
     paddingHorizontal: 16,
-    backgroundColor: '#161200',
+    backgroundColor: colors.primaryDark,
   },
   triggerCompact: {
     minWidth: 160,
@@ -155,7 +156,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalCard: {
-    backgroundColor: '#161200',
+    backgroundColor: colors.primaryDark,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingTop: 18,

@@ -3,6 +3,7 @@ import {View, StyleSheet, TouchableOpacity, TextInput, ScrollView, Image, Alert,
 import SJText from '../components/SJText';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
+import { colors } from '@navigation/MainTabNavigator.styles';
 
 import { ProfileEditScreenProps } from '../types/navigation';
 import { useLocalization } from '../localization';
@@ -302,12 +303,12 @@ const ProfileEditScreen: React.FC<ProfileEditScreenProps> = ({ navigation, route
           onPress={handleSave}
           disabled={saving || uploadingPhoto}
           activeOpacity={0.85}
-        >
-          {saving ? (
-            <ActivityIndicator size="small" color="#161200" />
-          ) : (
-            <SJText style={styles.saveButtonText}>{t('common.save')}</SJText>
-          )}
+          >
+            {saving ? (
+              <ActivityIndicator size="small" color={colors.primaryDark} />
+            ) : (
+              <SJText style={styles.saveButtonText}>{t('common.save')}</SJText>
+            )}
         </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -362,7 +363,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     borderWidth: 1,
     borderColor: '#1f7ae0',
-    backgroundColor: '#161200',
+    backgroundColor: colors.primaryYellow,
   },
   changePhotoText: {
     fontSize: 14,
@@ -378,7 +379,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   form: {
-    backgroundColor: '#161200',
+    backgroundColor: colors.primaryDark,
     borderRadius: 16,
     padding: 20,
     gap: 18,
@@ -434,7 +435,7 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   saveButtonText: {
-    color: '#161200',
+    color: colors.primaryDark,
     fontSize: 16,
     fontWeight: '700',
   },

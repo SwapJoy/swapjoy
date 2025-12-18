@@ -77,7 +77,6 @@ const toastConfig = {
 
 function AppContent() {
   const { isLoading: authIsLoading } = useAuth();
-  const { isLoading: localizationIsLoading, t } = useLocalization();
   const navigationRef = useRef<NavigationContainerRef<RootStackParamList>>(null);
   
   // Load custom fonts
@@ -123,16 +122,6 @@ function AppContent() {
     }
   }, [authIsLoading]);
 
-  if (authIsLoading || localizationIsLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
-        <SJText style={styles.loadingText}>{t('common.loading')}</SJText>
-        <StatusBar style="auto" />
-      </View>
-    );
-  }
-
   return (
     <>
       <AppNavigator ref={navigationRef} />
@@ -165,17 +154,3 @@ export default function App() {
     </LocalizationProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  loadingContainer: {
-    flex: 1,
-    backgroundColor: '#FFDE21',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: '#666',
-  },
-});

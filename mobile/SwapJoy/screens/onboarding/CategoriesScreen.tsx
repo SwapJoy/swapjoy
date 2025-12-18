@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {View, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, } from 'react-native';
 import SJText from '../../components/SJText';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { colors } from '@navigation/MainTabNavigator.styles';
 import { Ionicons } from '@expo/vector-icons';
 import { useOnboarding } from '../../hooks/useOnboarding';
 import { ApiService } from '../../services/api';
@@ -174,7 +175,7 @@ const CategoriesScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#161200',
+    backgroundColor: colors.primaryDark,
   },
   loadingContainer: {
     flex: 1,
@@ -306,7 +307,7 @@ const styles = StyleSheet.create({
   nextButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#161200',
+    color: colors.primaryDark,
   },
 });
 

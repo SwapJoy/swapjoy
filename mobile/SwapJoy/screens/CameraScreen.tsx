@@ -289,7 +289,7 @@ const styles = StyleSheet.create({
   permissionOverlayTitle: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#161200',
+    color: colors.primaryDark,
     marginTop: 20,
     marginBottom: 12,
     textAlign: 'center',
@@ -308,7 +308,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   permissionOverlayButtonText: {
-    color: '#161200',
+    color: colors.primaryDark,
     fontSize: 16,
     fontWeight: 'bold',
   },

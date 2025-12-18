@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {View, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, SafeAreaView, KeyboardAvoidingView, Platform, } from 'react-native';
+import { colors } from '@navigation/MainTabNavigator.styles';
 import SJText from '../components/SJText';
 import { Ionicons } from '@expo/vector-icons';
 import { usePhoneSignIn } from '../hooks/usePhoneSignIn';
@@ -118,7 +119,7 @@ const PhoneSignInScreen: React.FC<PhoneSignInScreenProps> = ({ navigation }) => 
               <ActivityIndicator color="white" />
             ) : (
               <>
-                <Ionicons name="logo-google" size={20} color="#161200" style={styles.googleIcon} />
+                <Ionicons name="logo-google" size={20} color={colors.primaryDark} style={styles.googleIcon} />
                 <SJText style={styles.googleButtonText}>Continue with Google</SJText>
               </>
             )}
@@ -132,7 +133,7 @@ const PhoneSignInScreen: React.FC<PhoneSignInScreenProps> = ({ navigation }) => 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#161200f',
+    backgroundColor: colors.primaryDark,
   },
   keyboardView: {
     flex: 1,
@@ -236,7 +237,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: '#007AFF',
-    backgroundColor: '#161200',
+    backgroundColor: colors.primaryYellow,
     paddingVertical: 15,
     borderRadius: 12,
     marginBottom: 15,

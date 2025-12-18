@@ -1,7 +1,7 @@
 import React, { forwardRef, useState, useEffect, useCallback, useRef } from 'react';
 import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { Platform, TouchableOpacity, ActivityIndicator, View } from 'react-native';
+import { Platform, TouchableOpacity, ActivityIndicator, View, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../types/navigation';
 import { useAuth } from '../contexts/AuthContext';
@@ -37,8 +37,43 @@ import OffersScreen from '../screens/OffersScreen';
 import RecentlyListedScreen from '../screens/RecentlyListedScreen';
 import ChatScreen from '../screens/ChatScreen';
 import OfferDetailsScreen from '../screens/OfferDetailsScreen';
+import SJText from '@components/SJText';
 
 const Stack = createStackNavigator<RootStackParamList>();
+
+// Loading screen component with animation
+const LoadingScreen = () => {
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+  const translateYAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(translateYAnim, {
+        toValue: -100,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [fadeAnim, translateYAnim]);
+
+  return (
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.primaryDark }}>
+      <Animated.View
+        style={{
+          opacity: fadeAnim,
+          transform: [{ translateY: translateYAnim }],
+        }}
+      >
+        <SJText style={{ color: colors.primaryYellow, fontSize: 24, fontWeight: 'bold' }}>SwapJoy</SJText>
+      </Animated.View>
+    </View>
+  );
+};
 
 const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((props, ref) => {
   const { isAuthenticated, isLoading, user, isAnonymous } = useAuth();
@@ -152,11 +187,7 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
 
   // Show loading screen while checking authentication, intro status, or username
   if (isLoading || introCompleted === null || (isAuthenticated && !isAnonymous && checkingUsername)) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFDE21' }}>
-        <ActivityIndicator size="large" color="#007AFF" />
-      </View>
-    );
+    return <LoadingScreen />;
   }
 
   // Determine initial route

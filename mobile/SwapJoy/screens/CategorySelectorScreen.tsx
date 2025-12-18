@@ -147,7 +147,7 @@ const CategorySelectorScreen: React.FC<CategorySelectorScreenProps> = ({ route, 
                   <View style={styles.checkboxWrapper}>
                     {isSelected ? (
                       <View style={styles.checkboxChecked}>
-                        <Ionicons name="checkmark" size={16} color="#161200" />
+                        <Ionicons name="checkmark" size={16} color={colors.primaryDark} />
                       </View>
                     ) : (
                       <View style={styles.checkboxUnchecked} />
@@ -259,7 +259,7 @@ const CategorySelectorScreen: React.FC<CategorySelectorScreenProps> = ({ route, 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primaryDark,
   },
   header: {
     flexDirection: 'row',

@@ -61,7 +61,7 @@ const MainTabNavigator: React.FC<MainTabNavigatorProps> = ({ onNavigateToAdd }) 
                 }
               }}
             >
-              <Ionicons name="add" size={24} color={colors.primary} />
+              <Ionicons name="add" size={24} color={colors.primaryYellow} />
             </TouchableOpacity>
           ),
         headerRight: () => {
@@ -72,7 +72,7 @@ const MainTabNavigator: React.FC<MainTabNavigatorProps> = ({ onNavigateToAdd }) 
               style={styles.headerRightButtonContainer}
               onPress={() => (navigation as any).navigate('ProfileSettings')}
             >
-              <Ionicons name="settings-outline" size={20} color={colors.primary} />
+              <Ionicons name="settings-outline" size={20} color={colors.primaryYellow} />
             </TouchableOpacity>
           );
         },

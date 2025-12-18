@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, TouchableOpacity, FlatList, Alert } from 'react-native';
+import { colors } from '@navigation/MainTabNavigator.styles';
 import { ApiService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import SJText from '../components/SJText';
@@ -147,7 +148,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
-    backgroundColor: '#161200',
+    backgroundColor: colors.primaryDark,
   },
   title: {
     fontSize: 24,
@@ -174,7 +175,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   buttonText: {
-    color: '#161200',
+    color: colors.primaryDark,
     textAlign: 'center',
     fontWeight: 'bold',
   },

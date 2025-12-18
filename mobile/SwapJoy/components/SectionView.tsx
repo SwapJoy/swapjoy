@@ -1,5 +1,6 @@
 import React, { memo, useCallback, useEffect } from 'react';
 import {View, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator} from 'react-native';
+import { colors } from '@navigation/MainTabNavigator.styles';
 import SJText from '../components/SJText';
 import { useNavigation } from '@react-navigation/native';
 import { SectionType } from '../types/section';
@@ -79,7 +80,16 @@ const SectionItemCard: React.FC<SectionItemCardProps> = memo(
             item.profile_image_url ??
             undefined,
         }}
-        onPress={() => (navigation as any).navigate('ItemDetails', { itemId: item.id })}
+        onPress={() => {
+          console.log('[SectionView] Navigating with item:', { 
+            id: item.id, 
+            user_id: item.user_id, 
+            has_user_id: 'user_id' in item,
+            images: item.images,
+            images_length: Array.isArray(item.images) ? item.images.length : 'N/A',
+          });
+          (navigation as any).navigate('ItemDetails', { itemId: item.id, item });
+        }}
         onOwnerPress={() => {
           if (item.user?.id) {
             (navigation as any).navigate('UserProfile', { userId: item.user.id });
@@ -349,13 +359,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   retryButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: colors.primaryYellow,
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
   },
   retryButtonText: {
-    color: '#161200',
+    color: colors.primaryDark,
     fontSize: 16,
     fontWeight: '600',
   },

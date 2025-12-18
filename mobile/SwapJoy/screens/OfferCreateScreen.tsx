@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import {View, StyleSheet, FlatList, TouchableOpacity, TextInput, Switch, Dimensions, ActivityIndicator, Alert} from 'react-native';
+import { colors } from '@navigation/MainTabNavigator.styles';
 import SJText from '../components/SJText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import CachedImage from '../components/CachedImage';
@@ -252,18 +253,18 @@ const OfferCreateScreen: React.FC<OfferCreateScreenProps> = ({ navigation, route
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8f9fa' },
-  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f8f9fa' },
+  container: { flex: 1, backgroundColor: colors.primaryDark },
+  centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primaryDark },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: '#111', paddingHorizontal: 16, paddingVertical: 8 },
-  reqCard: { backgroundColor: '#161200', marginRight: 12, borderRadius: 10, overflow: 'hidden', width: Math.min(220, Math.round(width * 0.55)) },
+  reqCard: { backgroundColor: colors.primaryDark, marginRight: 12, borderRadius: 10, overflow: 'hidden', width: Math.min(220, Math.round(width * 0.55)) },
   reqImage: { width: '100%', height: 120, backgroundColor: '#eee' },
   reqTitle: { paddingHorizontal: 10, paddingTop: 8, fontSize: 14, fontWeight: '600', color: '#111' },
   reqPrice: { paddingHorizontal: 10, paddingBottom: 10, paddingTop: 4, fontSize: 13, color: '#007AFF', fontWeight: '600' },
-  moneyBox: { backgroundColor: '#161200', marginHorizontal: 16, marginVertical: 12, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: '#eee' },
+  moneyBox: { backgroundColor: colors.primaryDark, marginHorizontal: 16, marginVertical: 12, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: '#eee' },
   toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   toggleLabel: { fontSize: 14, color: '#111', fontWeight: '600' },
   amountInput: { marginTop: 8, borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 10, backgroundColor: '#fafafa' },
-  myItemCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#161200', marginHorizontal: 16, marginBottom: 10, borderRadius: 12, padding: 10, borderWidth: 1, borderColor: '#eee' },
+  myItemCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.primaryDark, marginHorizontal: 16, marginBottom: 10, borderRadius: 12, padding: 10, borderWidth: 1, borderColor: '#eee' },
   myItemImage: { width: 80, height: 60, marginRight: 10, backgroundColor: '#eee', borderRadius: 8 },
   myItemTitle: { fontSize: 14, fontWeight: '600', color: '#111' },
   myItemMeta: { fontSize: 12, color: '#666', marginTop: 2 },
@@ -271,9 +272,9 @@ const styles = StyleSheet.create({
   checkboxOn: { backgroundColor: '#007AFF', borderColor: '#007AFF' },
   selectedCard: { borderColor: '#007AFF' },
   footer: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: 16, backgroundColor: 'rgba(255,255,255,0.98)', borderTopWidth: 1, borderTopColor: '#eee' },
-  messageInput: { minHeight: 60, maxHeight: 120, borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 10, backgroundColor: '#161200', marginBottom: 12 },
+  messageInput: { minHeight: 60, maxHeight: 120, borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 10, backgroundColor: colors.primaryDark, marginBottom: 12 },
   nextBtn: { backgroundColor: '#007AFF', borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
-  nextText: { color: '#161200', fontSize: 16, fontWeight: '700' },
+  nextText: { color: colors.primaryDark, fontSize: 16, fontWeight: '700' },
 });
 
 export default OfferCreateScreen;

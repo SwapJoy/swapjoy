@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import {View, StyleSheet, FlatList, TouchableOpacity, Dimensions} from 'react-native';
+import { colors } from '@navigation/MainTabNavigator.styles';
 import SJText from '../components/SJText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BundleItemsScreenProps } from '../types/navigation';
@@ -22,7 +23,7 @@ const BundleItemsScreen: React.FC<BundleItemsScreenProps> = ({ navigation, route
   const renderItem = ({ item }: { item: any }) => (
     <TouchableOpacity
       style={styles.itemCard}
-      onPress={() => (navigation as any).navigate('ItemDetails', { itemId: item.id })}
+      onPress={() => (navigation as any).navigate('ItemDetails', { itemId: item.id, item })}
     >
       <CachedImage
         uri={
@@ -92,10 +93,10 @@ const BundleItemsScreen: React.FC<BundleItemsScreenProps> = ({ navigation, route
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: colors.primaryDark,
   },
   infoSection: {
-    backgroundColor: '#161200',
+    backgroundColor: colors.primaryDark,
     paddingHorizontal: 20,
     paddingVertical: 16,
     marginHorizontal: 16,
@@ -122,7 +123,7 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   itemCard: {
-    backgroundColor: '#161200',
+    backgroundColor: colors.primaryDark,
     borderRadius: 12,
     overflow: 'hidden',
     marginBottom: 12,
@@ -173,7 +174,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   offerText: {
-    color: '#161200',
+    color: colors.primaryDark,
     fontSize: 16,
     fontWeight: '700',
   },

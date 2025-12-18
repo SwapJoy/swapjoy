@@ -1,5 +1,6 @@
 import React, { memo, useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import {View, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator, } from 'react-native';
+import { colors } from '@navigation/MainTabNavigator.styles';
 import SJText from '../components/SJText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute, useNavigation } from '@react-navigation/native';
@@ -189,10 +190,10 @@ const FollowersFollowingScreen: React.FC = memo(() => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: colors.primaryDark,
   },
   tabsWrapper: {
-    backgroundColor: '#161200',
+    backgroundColor: colors.primaryDark,
     paddingHorizontal: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#E5E5EA',
@@ -253,7 +254,7 @@ const styles = StyleSheet.create({
   userItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#161200',
+    backgroundColor: colors.primaryDark,
     padding: 12,
     marginBottom: 8,
     borderRadius: 12,

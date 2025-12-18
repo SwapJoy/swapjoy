@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {View, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, } from 'react-native';
+import { colors } from '@navigation/MainTabNavigator.styles';
 import SJText from '../../components/SJText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -166,7 +167,7 @@ const NameScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#161200',
+    backgroundColor: colors.primaryDark,
   },
   keyboardView: {
     flex: 1,
@@ -276,7 +277,7 @@ const styles = StyleSheet.create({
   nextButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#161200',
+    color: colors.primaryDark,
   },
 });
 

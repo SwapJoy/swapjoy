@@ -319,13 +319,13 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
         >
           {submitting ? (
             <>
-              <ActivityIndicator size="small" color="#161200" />
+              <ActivityIndicator size="small" color={colors.primaryDark} />
               <SJText style={styles.submitButtonText}>{strings.buttons.submitting}</SJText>
             </>
           ) : (
             <>
               <SJText style={styles.submitButtonText}>{strings.buttons.submit}</SJText>
-              <Ionicons name="checkmark" size={20} color="#161200" />
+              <Ionicons name="checkmark" size={20} color={colors.primaryDark} />
             </>
           )}
         </TouchableOpacity>
@@ -337,7 +337,7 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primaryDark,
   },
   loadingContainer: {
     flex: 1,
@@ -417,7 +417,7 @@ const styles = StyleSheet.create({
     width: 20,
   },
   detailsContainer: {
-    backgroundColor:colors.primary,
+    backgroundColor: colors.primaryDark,
     padding: 16,
   },
   titleSection: {

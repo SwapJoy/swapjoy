@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {ActivityIndicator, Alert, FlatList, StyleSheet, TextInput, TouchableOpacity, View, KeyboardAvoidingView, Platform, ScrollView, } from 'react-native';
+import { colors } from '@navigation/MainTabNavigator.styles';
 import SJText from '../../components/SJText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ExpoLocation from 'expo-location';
@@ -355,7 +356,7 @@ const LocationScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#161200',
+    backgroundColor: colors.primaryDark,
   },
   keyboardView: {
     flex: 1,
@@ -531,7 +532,7 @@ const styles = StyleSheet.create({
   finishButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#161200',
+    color: colors.primaryDark,
   },
 });
 

@@ -381,7 +381,7 @@ const styles = StyleSheet.create({
   },
   searchModalSafeArea: {
     flex: 1,
-    backgroundColor: '#161200',
+    backgroundColor: colors.primaryDark,
   },
   searchModalHeader: {
     flexDirection: 'row',

@@ -83,14 +83,37 @@ export const useSection = (sectionType: SectionType, options?: UseSectionOptions
       }
 
       // Transform raw section data to ListingItem format
+      // Log first item to debug user_id and images
+      if (sectionData && sectionData.length > 0) {
+        console.log(`[useSection:${sectionType}] First item from fetchSection:`, {
+          id: sectionData[0].id,
+          user_id: sectionData[0].user_id,
+          has_user_id: 'user_id' in sectionData[0],
+          images: sectionData[0].images,
+          images_type: typeof sectionData[0].images,
+          images_is_array: Array.isArray(sectionData[0].images),
+          images_length: Array.isArray(sectionData[0].images) ? sectionData[0].images.length : 'N/A',
+          keys: Object.keys(sectionData[0]),
+        });
+      }
       const transformedItems: ListingItem[] = (Array.isArray(sectionData) ? sectionData : []).map((item: any) => {
-        // Normalize images
+        // Normalize images to ListingItemImage format { url: string, order: number }
         let images: Array<{ url: string; order: number }> = [];
         if (Array.isArray(item.images)) {
-          images = item.images;
+          // Normalize each image to ensure it has url and order fields
+          images = item.images.map((img: any) => ({
+            url: img.url || img.image_url || '',
+            order: img.order ?? img.sort_order ?? 0,
+          })).filter((img: any) => img.url); // Filter out images without URLs
         } else if (item.images && typeof item.images === 'object') {
           try {
-            images = JSON.parse(item.images) || [];
+            const parsed = JSON.parse(item.images);
+            if (Array.isArray(parsed)) {
+              images = parsed.map((img: any) => ({
+                url: img.url || img.image_url || '',
+                order: img.order ?? img.sort_order ?? 0,
+              })).filter((img: any) => img.url);
+            }
           } catch {
             images = [];
           }
@@ -158,7 +181,7 @@ export const useSection = (sectionType: SectionType, options?: UseSectionOptions
 
         return {
           id: String(item.id),
-          user_id: String(item.user_id),
+          user_id: String(item.user_id || item.user?.id || ''),
           title: item.title,
           description: item.description,
           category_id: item.category_id ?? null,

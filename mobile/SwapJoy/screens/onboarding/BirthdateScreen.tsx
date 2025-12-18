@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {View, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, ActivityIndicator, Modal, } from 'react-native';
+import { colors } from '@navigation/MainTabNavigator.styles';
 import SJText from '../../components/SJText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -225,7 +226,7 @@ const BirthdateScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#161200',
+    backgroundColor: colors.primaryDark,
   },
   keyboardView: {
     flex: 1,
@@ -303,7 +304,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#161200',
+    backgroundColor: colors.primaryDark,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingBottom: Platform.OS === 'ios' ? 34 : 20,
@@ -378,7 +379,7 @@ const styles = StyleSheet.create({
   nextButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#161200',
+    color: colors.primaryDark,
   },
 });
 

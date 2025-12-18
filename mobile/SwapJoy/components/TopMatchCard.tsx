@@ -290,7 +290,7 @@ const TopMatchCard: React.FC<TopMatchCardProps> = ({
             <View style={styles.metaSection}>
               <View style={styles.chipsRow}>
                 <View
-                  style={[styles.chip, { backgroundColor: '#ffde21' }]}
+                  style={[styles.chip, { backgroundColor: colors.primaryYellow }]}
                 >
                   <SJText style={styles.chipEmoji}>{categoryIcon}</SJText>
                   <SJText style={[styles.chipText]}>

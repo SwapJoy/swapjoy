@@ -1,5 +1,6 @@
 import React, { useCallback } from 'react';
 import {View, FlatList, TouchableOpacity, ActivityIndicator, StyleSheet} from 'react-native';
+import { colors } from '@navigation/MainTabNavigator.styles';
 import SJText from '../components/SJText';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { MainTabParamList, RootStackParamList } from '../types/navigation';
@@ -41,7 +42,7 @@ const ChatListScreen: React.FC = () => {
         }}
       >
         <View style={styles.avatar}>
-          <Ionicons name="chatbubbles" size={22} color="#161200" />
+          <Ionicons name="chatbubbles" size={22} color={colors.primaryDark} />
         </View>
         <View style={styles.content}>
           <View style={styles.titleRow}>
@@ -91,14 +92,14 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#161200',
+    backgroundColor: colors.primaryDark,
   },
   emptyContainer: {
     flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
-    backgroundColor: '#161200',
+    backgroundColor: colors.primaryDark,
   },
   emptyTitle: {
     fontSize: 18,
@@ -117,7 +118,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#E0E0E0',
-    backgroundColor: '#161200',
+    backgroundColor: colors.primaryDark,
   },
   avatar: {
     width: 40,

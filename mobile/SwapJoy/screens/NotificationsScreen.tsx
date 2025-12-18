@@ -10,6 +10,7 @@ import { Notification } from '../hooks/useNotificationsData';
 import { useNotifications } from '../contexts/NotificationsContext';
 import CachedImage from '../components/CachedImage';
 import { NotificationNavigation } from '../utils/notificationNavigation';
+import { colors } from '@navigation/MainTabNavigator.styles';
 
 const NotificationsScreen: React.FC<NotificationsScreenProps> = memo(() => {
   const navigation = useNavigation();
@@ -178,8 +179,7 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = memo(() => {
     return (
       <TouchableOpacity
         style={[
-          styles.notificationCard,
-          !item.is_read && styles.unreadNotification
+          styles.notificationCard
         ]}
         onPress={() => handleNotificationPress(item)}
       >
@@ -294,7 +294,7 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = memo(() => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#161200',
+    backgroundColor: colors.primaryDark,
   },
   header: {
     flexDirection: 'row',
@@ -302,7 +302,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     paddingBottom: 10,
-    backgroundColor: '#161200',
+    backgroundColor: colors.primaryDark,
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
     marginBottom: 10,
@@ -315,14 +315,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 24,
     fontWeight: 'bold'
-  },
-  badge: {
-    backgroundColor: '#FF3B30',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    minWidth: 24,
-    alignItems: 'center',
   },
   badgeText: {
     fontSize: 12,
@@ -341,16 +333,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   notificationCard: {
-    backgroundColor: '#161200',
+    backgroundColor: colors.primaryDark,
     borderRadius: 10,
     marginBottom: 4,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#e5e7eb',
-  },
-  unreadNotification: {
-    backgroundColor: '#e7f3ff',
   },
   notificationContent: {
     paddingVertical: 10,
@@ -365,8 +354,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
-    borderRadius: 24,
-    backgroundColor: '#e4e6eb',
+    borderRadius: 24
   },
   notificationIcon: {
     fontSize: 24,
@@ -443,7 +431,7 @@ const styles = StyleSheet.create({
     paddingRight: 16,
   },
   popoverContainer: {
-    backgroundColor: '#161200',
+    backgroundColor: colors.primaryDark,
     borderRadius: 12,
     minWidth: 200,
     shadowColor: '#000',

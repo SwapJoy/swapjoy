@@ -3,6 +3,7 @@ import {View, StyleSheet, TouchableOpacity, FlatList, Dimensions, ActivityIndica
 import SJText from '../components/SJText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ItemDetailsScreenProps } from '../types/navigation';
+import { ListingItem } from '../types/listing-item';
 import CachedImage from '../components/CachedImage';
 import { ApiService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -29,40 +30,42 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
     }),
     [t]
   );
-  const { itemId } = route.params;
-  const [loading, setLoading] = useState(true);
+  const { itemId, item: passedItem } = route.params;
+  const [loading, setLoading] = useState(!passedItem); // No loading if item is passed
   const [error, setError] = useState<string | null>(null);
-  const [item, setItem] = useState<any | null>(null);
+  const [item, setItem] = useState<ListingItem | null>(passedItem || null);
 
   const favoriteData = useMemo(() => {
     if (!item) return null;
-    const primaryImage =
-      item.image_url ||
-      item.images?.[0]?.image_url ||
-      item.images?.[0]?.url ||
-      null;
+    const primaryImage = item.images && item.images.length > 0 ? item.images[0].url : null;
+    const categoryName = item.category
+      ? (language === 'ka' ? item.category.title_ka : item.category.title_en)
+      : null;
     return {
       id: item.id,
       title: item.title,
       description: item.description,
-      price: item.price || item.estimated_value || 0,
+      price: item.price || 0,
       currency: item.currency || 'USD',
       condition: item.condition,
       image_url: primaryImage,
       created_at: item.created_at || item.updated_at || null,
-      category_name:
-        item.category_name ??
-        item.category?.title ??
-        item.category?.name ??
-        null,
-      category_name_en: item.category_name_en ?? null,
-      category_name_ka: item.category_name_ka ?? null,
-      category: item.category ?? null,
-      categories: item.categories ?? null,
+      category_name: categoryName,
+      category_name_en: item.category?.title_en ?? null,
+      category_name_ka: item.category?.title_ka ?? null,
+      category: item.category ? { ...item.category } as any : null,
+      categories: null,
     };
-  }, [item]);
+  }, [item, language]);
 
   useEffect(() => {
+    // If item was passed, skip fetching
+    if (passedItem) {
+      // Track view asynchronously (non-blocking)
+      ApiService.trackItemView(itemId, user?.id);
+      return;
+    }
+
     let mounted = true;
     (async () => {
       setLoading(true);
@@ -71,10 +74,11 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
       if (error) {
         setError(error.message || strings.loadFailed);
       } else {
-        setItem(data);
-        // Track view asynchronously (non-blocking)
         if (data) {
+          setItem(data);
           ApiService.trackItemView(itemId, user?.id);
+        } else {
+          setItem(null);
         }
       }
       setLoading(false);
@@ -82,15 +86,15 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
     return () => {
       mounted = false;
     };
-  }, [itemId, language, strings, user?.id]);
+  }, [itemId, language, strings, user?.id, passedItem]);
 
   const showOffer = useMemo(() => {
-    if (!item?.user?.id) return false;
+    if (!item?.user_id) return false;
     // Show offer button if user is authenticated and not the owner, or if anonymous user
     if (!isAuthenticated || isAnonymous) return true;
     if (!user?.id) return false;
-    return item.user.id !== user.id;
-  }, [item?.user?.id, user?.id, isAuthenticated, isAnonymous]);
+    return item.user_id !== user.id;
+  }, [item?.user_id, user?.id, isAuthenticated, isAnonymous]);
 
   if (loading) {
     return (
@@ -111,7 +115,36 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
     );
   }
 
-  const images = (item.images || []).sort((a: any, b: any) => (a.sort_order || 0) - (b.sort_order || 0));
+  const images = useMemo(() => {
+    console.log('[ItemDetailsScreen] Processing images:', {
+      has_item: !!item,
+      has_images: !!item?.images,
+      images_type: typeof item?.images,
+      images_is_array: Array.isArray(item?.images),
+      images_length: Array.isArray(item?.images) ? item?.images.length : 'N/A',
+      images_sample: Array.isArray(item?.images) && item.images.length > 0 ? item.images[0] : null,
+    });
+    
+    if (!item?.images || item.images.length === 0) {
+      console.log('[ItemDetailsScreen] No images found, returning empty array');
+      return [];
+    }
+    
+    const normalized = item.images
+      .map((img) => ({
+        image_url: img.url,
+        sort_order: img.order,
+      }))
+      .filter((img) => img.image_url) // Filter out images without URLs
+      .sort((a, b) => a.sort_order - b.sort_order);
+    
+    console.log('[ItemDetailsScreen] Normalized images:', {
+      count: normalized.length,
+      sample: normalized[0],
+    });
+    
+    return normalized;
+  }, [item]);
 
   return (
     <View style={styles.container}>
@@ -123,14 +156,14 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
             return (
               <View style={styles.heroSection}>
                 <FlatList
-                  data={images.length > 0 ? images : [{ image_url: item.image_url }]}
+                  data={images}
                   keyExtractor={(_, idx) => String(idx)}
                   horizontal
                   pagingEnabled
                   showsHorizontalScrollIndicator={false}
                   renderItem={({ item: img }) => (
                     <CachedImage
-                      uri={img?.image_url || 'https://via.placeholder.com/400x300'}
+                      uri={img.image_url}
                       style={styles.heroImage}
                       resizeMode="cover"
                       fallbackUri="https://picsum.photos/400/300?random=5"
@@ -152,7 +185,7 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
             return (
               <View style={styles.details}>
                 <SJText style={styles.itemTitle}>{item.title}</SJText>
-                <SJText style={styles.price}>{formatCurrency(item.price || item.estimated_value || 0, item.currency || 'USD')}</SJText>
+                <SJText style={styles.price}>{formatCurrency(item.price || 0, item.currency || 'USD')}</SJText>
                 {item.view_count !== undefined && item.view_count > 0 && (
                   <View style={styles.viewCountRow}>
                     <Ionicons name="eye-outline" size={14} color="#666" />
@@ -161,9 +194,13 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
                     </SJText>
                   </View>
                 )}
-                {item.category?.name ? (
+                {item.category ? (
                   <SJText style={styles.meta}>
-                    {strings.category}: {item.category.name}
+                    {strings.category}: {language === 'ka' ? item.category.title_ka : item.category.title_en}
+                  </SJText>
+                ) : item.category_name ? (
+                  <SJText style={styles.meta}>
+                    {strings.category}: {item.category_name}
                   </SJText>
                 ) : null}
                 {item.condition ? (
@@ -173,15 +210,17 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
                 ) : null}
                 <SJText style={styles.description}>{item.description}</SJText>
 
-                {item.user ? (
+                {item.user_id && item.user ? (
                   <TouchableOpacity
                     activeOpacity={0.8}
                     style={styles.sellerBox}
-                    onPress={() => (navigation as any).navigate('UserProfile', { userId: item.user.id })}
+                    onPress={() => {
+                      (navigation as any).navigate('UserProfile', { userId: item.user_id });
+                    }}
                   >
                     <SJText style={styles.sellerTitle}>{strings.seller}</SJText>
                     <SJText style={styles.sellerName}>
-                      {item.user.first_name} {item.user.last_name} @{item.user.username}
+                      {(item.user.firstname || (item.user as any).first_name || '').trim()} {(item.user.lastname || (item.user as any).last_name || '').trim()} @{item.user.username}
                     </SJText>
                   </TouchableOpacity>
                 ) : null}
@@ -205,13 +244,13 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
               }
               // Navigate to offer creation
               (navigation as any).navigate('OfferCreate', {
-                receiverId: item.user.id,
+                receiverId: item.user_id,
                 requestedItems: [
                   {
                     id: item.id,
                     title: item.title,
-                    price: item.price || item.estimated_value,
-                    image_url: item.image_url || item.images?.[0]?.url || null,
+                    price: item.price || 0,
+                    image_url: item.images && item.images.length > 0 ? item.images[0].url : null,
                     condition: item.condition,
                   },
                 ],
@@ -230,13 +269,13 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primaryDark,
   },
   centered: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.primary
+    backgroundColor: colors.primaryDark
   },
   errorText: {
     fontSize: 16,
@@ -266,7 +305,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff'
   },
   details: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primaryDark,
     paddingHorizontal: 16,
     paddingVertical: 16,
   },

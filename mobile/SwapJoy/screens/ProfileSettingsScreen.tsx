@@ -539,11 +539,11 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigatio
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primaryDark,
   },
   scrollContainer: {
     padding: 16,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primaryDark,
   },
   title: {
     fontSize: 22,
@@ -611,7 +611,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     borderWidth: 1,
     borderColor: '#1f7ae0',
-    backgroundColor: '#161200',
+    backgroundColor: colors.primaryYellow,
   },
   manageCategoriesText: {
     fontSize: 13,
@@ -638,7 +638,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   selectedCategoryChipText: {
-    color: '#161200',
+    color: colors.primaryDark,
     fontSize: 12,
     fontWeight: '600',
   },
@@ -679,15 +679,15 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   categoryBubbleLabelSelected: {
-    color: '#161200',
+    color: colors.primaryDark,
   },
-  dangerCard: { backgroundColor: '#161200', borderRadius: 12, padding: 12 },
+  dangerCard: { backgroundColor: colors.primaryDark, borderRadius: 12, padding: 12 },
   dangerButton: { backgroundColor: '#FF3B30', borderRadius: 10, alignItems: 'center', paddingVertical: 14 },
   dangerText: { fontSize: 16, fontWeight: '700' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  modalCard: { backgroundColor: '#161200', borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 16, maxHeight: '80%' },
+  modalCard: { backgroundColor: colors.primaryDark, borderTopLeftRadius: 16, borderTopRightRadius: 16, padding: 16, maxHeight: '80%' },
   choiceModalCard: {
-    backgroundColor: '#161200',
+    backgroundColor: colors.primaryDark,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     paddingHorizontal: 20,
@@ -745,7 +745,7 @@ const styles = StyleSheet.create({
   cancelBtn: { backgroundColor: '#f2f2f2' },
   saveBtn: { backgroundColor: '#1f7ae0' },
   cancelText: { color: '#1a1a1a', fontWeight: '600' },
-  saveText: { color: '#161200', fontWeight: '700' },
+  saveText: { color: colors.primaryDark, fontWeight: '700' },
 });
 
 export default ProfileSettingsScreen;

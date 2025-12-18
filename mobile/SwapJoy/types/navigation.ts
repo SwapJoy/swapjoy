@@ -1,5 +1,6 @@
 import { User } from './auth';
 import { ItemCondition } from './item';
+import { ListingItem } from './listing-item';
 import { NavigationProp } from '@react-navigation/native';
 import { RouteProp } from '@react-navigation/native';
 
@@ -50,6 +51,7 @@ export type RootStackParamList = {
   RecentlyListed: undefined;
   ItemDetails: {
     itemId: string;
+    item?: ListingItem; // Optional: pass full item data to avoid refetching
   };
   BundleItems: {
     bundleId: string;

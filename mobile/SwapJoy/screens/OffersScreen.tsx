@@ -1,5 +1,6 @@
 import React, { memo, useMemo, useState, useCallback } from 'react';
 import {View, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Dimensions, } from 'react-native';
+import { colors } from '@navigation/MainTabNavigator.styles';
 import SJText from '../components/SJText';
 import { OffersScreenProps } from '../types/navigation';
 import { useOffersData, Offer } from '../hooks/useOffersData';
@@ -301,10 +302,10 @@ const OffersScreen: React.FC<OffersScreenProps> = memo(({ route, navigation }) =
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: colors.primaryDark,
   },
   tabsWrapper: {
-    backgroundColor: '#161200',
+    backgroundColor: colors.primaryDark,
     paddingHorizontal: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#E5E5EA',
@@ -359,7 +360,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   statusText: {
-    color: '#161200',
+    color: colors.primaryDark,
     fontSize: 12,
   },
   offerMetaSection: {

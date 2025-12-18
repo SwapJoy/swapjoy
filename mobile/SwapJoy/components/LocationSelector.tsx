@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {ActivityIndicator, Alert, FlatList, Modal, StyleSheet, TextInput, TouchableOpacity, View, } from 'react-native';
+import { colors } from '@navigation/MainTabNavigator.styles';
 import SJText from '../components/SJText';
 import * as ExpoLocation from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
@@ -300,7 +301,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(15, 23, 42, 0.5)',
   },
   sheet: {
-    backgroundColor: '#161200',
+    backgroundColor: colors.primaryDark,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     paddingBottom: 32,

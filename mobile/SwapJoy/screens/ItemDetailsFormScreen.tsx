@@ -124,12 +124,12 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
                     hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
                   >
                     <View style={styles.imageRemoveCircle}>
-                      <Ionicons name="close" size={12} color="#161200" />
+                      <Ionicons name="close" size={12} color={colors.primaryDark} />
                     </View>
                   </TouchableOpacity>
                   {!img.uploaded && (
                     <View style={styles.imageUploadingOverlay}>
-                      <ActivityIndicator size="small" color="#161200" />
+                      <ActivityIndicator size="small" color={colors.primaryDark} />
                     </View>
                   )}
                   {img.uploaded && (
@@ -282,7 +282,7 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
             <Ionicons 
               name="arrow-forward" 
               size={20} 
-              color={(uploading || images.length === 0) ? '#999' : '#161200'} 
+              color={(uploading || images.length === 0) ? '#999' : colors.primaryDark} 
             />
           </TouchableOpacity>
         </View>
@@ -337,7 +337,7 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primaryDark,
   },
   loadingContainer: {
     flex: 1,
@@ -399,7 +399,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   uploadProgressContainer: {
-    backgroundColor: '#161200',
+    backgroundColor: colors.primaryDark,
     padding: 16,
     marginBottom: 8,
   },
@@ -424,7 +424,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primaryYellow,
   },
   imagePreviewContainer: {
-    backgroundColor: '#161200',
+    backgroundColor: colors.primaryDark,
     paddingVertical: 16,
     paddingLeft: 16,
     marginBottom: 8,
@@ -471,7 +471,7 @@ const styles = StyleSheet.create({
     right: 4,
   },
   formContainer: {
-    backgroundColor: '#161200',
+    backgroundColor: colors.primaryDark,
     padding: 16,
   },
   fieldContainer: {
@@ -501,7 +501,7 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 16,
     color: '#1a1a1a',
-    backgroundColor: '#161200',
+    backgroundColor: colors.primaryDark,
   },
   textInputDisabled: {
     backgroundColor: '#f5f5f5',
@@ -525,7 +525,7 @@ const styles = StyleSheet.create({
     borderColor: '#d1d1d6',
     borderRadius: 8,
     padding: 12,
-    backgroundColor: '#161200',
+    backgroundColor: colors.primaryYellow,
   },
   pickerButtonDisabled: {
     backgroundColor: '#f5f5f5',
@@ -563,7 +563,7 @@ const styles = StyleSheet.create({
   },
   footer: {
     padding: 16,
-    backgroundColor: '#161200',
+    backgroundColor: colors.primaryDark,
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
   },
@@ -593,7 +593,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#161200',
+    backgroundColor: colors.primaryDark,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     maxHeight: '70%',
@@ -656,7 +656,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   inlineSelectionTextSelected: {
-    color: '#161200',
+    color: colors.primaryDark,
   },
   fieldContainerWithLabel: {
     marginBottom: 24,
@@ -686,7 +686,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.primaryDark,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,

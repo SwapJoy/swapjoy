@@ -1,5 +1,20 @@
 import { Platform, StyleSheet } from 'react-native';
 
+export const colors = {
+  primaryDark: '#161200',
+  primaryYellow: '#ffde21',
+  inactive: '#8E8E93',
+  border: Platform.OS === 'ios' ? '#C6C6C8' : '#E0E0E0',
+  white: '#fff',
+  shadow: '#000',
+};
+
+export const iconSize = {
+  small: 20,
+  medium: 24,
+  large: 28,
+};
+
 export const styles = StyleSheet.create({
   headerButtonContainer: {
     width: 40,
@@ -18,7 +33,7 @@ export const styles = StyleSheet.create({
     marginBottom: 4
   },
   headerStyle: {
-    backgroundColor: '#ffde21', // Same as colors.primaryYellow
+    backgroundColor: colors.primaryYellow,
   },
   headerTitleStyle: {
     fontSize: 18,
@@ -28,7 +43,7 @@ export const styles = StyleSheet.create({
     fontFamily: 'Noto Sans Georgian',
   },
   tabBarStyle: {
-    backgroundColor: '#161200',
+    backgroundColor: colors.primaryDark,
     paddingBottom: Platform.OS === 'ios' ? 20 : 8,
     paddingTop: Platform.OS === 'ios' ? 8 : 8,
     height: Platform.OS === 'ios' ? 83 : 60,
@@ -43,18 +58,3 @@ export const styles = StyleSheet.create({
     marginTop: Platform.OS === 'ios' ? 2 : 0,
   },
 });
-
-export const colors = {
-  primary: '#000',
-  primaryYellow: '#ffde21',
-  inactive: '#8E8E93',
-  border: Platform.OS === 'ios' ? '#C6C6C8' : '#E0E0E0',
-  white: '#fff',
-  shadow: '#000',
-};
-
-export const iconSize = {
-  small: 20,
-  medium: 24,
-  large: 28,
-};
