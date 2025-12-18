@@ -91,8 +91,8 @@ const SectionItemCard: React.FC<SectionItemCardProps> = memo(
           (navigation as any).navigate('ItemDetails', { itemId: item.id, item });
         }}
         onOwnerPress={() => {
-          if (item.user?.id) {
-            (navigation as any).navigate('UserProfile', { userId: item.user.id });
+          if (item.user_id) {
+            (navigation as any).navigate('UserProfile', { userId: item.user_id });
           }
         }}
         onLikePress={(event) => {

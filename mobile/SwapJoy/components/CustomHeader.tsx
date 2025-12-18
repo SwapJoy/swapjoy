@@ -4,7 +4,8 @@ import SJText from '../components/SJText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { styles, colors } from './CustomHeader.styles';
+import { styles } from './CustomHeader.styles';
+import { colors } from '@navigation/MainTabNavigator.styles';
 
 interface CustomHeaderProps {
   showSearch?: boolean;
@@ -55,7 +56,7 @@ const CustomHeader: React.FC<CustomHeaderProps> = React.memo(({
           onPress={handleCreatePress}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Ionicons name="add" size={18} color={colors.primary} />
+          <Ionicons name="add" size={18} color={colors.primaryDark} />
         </TouchableOpacity>
 
         <View style={styles.titleContainer}>
@@ -70,7 +71,7 @@ const CustomHeader: React.FC<CustomHeaderProps> = React.memo(({
           <Ionicons 
             name={showGear ? "settings-outline" : "search-outline"} 
             size={18} 
-            color={colors.primary} 
+            color={colors.primaryDark} 
           />
         </TouchableOpacity>
       </View>

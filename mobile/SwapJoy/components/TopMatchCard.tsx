@@ -10,6 +10,7 @@ import {
   Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import CachedImage from './CachedImage';
 import { useLocalization } from '../localization';
 import { getConditionPresentation } from '../utils/conditions';
@@ -126,6 +127,7 @@ const TopMatchCard: React.FC<TopMatchCardProps> = ({
 }) => {
   const { language, t } = useLocalization();
   const { getCategoryByName, getCategoryById } = useCategories();
+  const navigation = useNavigation<any>();
   const displayTitle = (title ?? '').trim() || 'Untitled item';
   const ownerDisplayName = owner.displayName?.trim() || '';
   const ownerUsername = owner.username?.trim() || ownerDisplayName || '';
@@ -135,6 +137,9 @@ const TopMatchCard: React.FC<TopMatchCardProps> = ({
     event.stopPropagation();
     if (onOwnerPress) {
       onOwnerPress();
+    } else if (owner.userId) {
+      // Fallback: navigate to user profile if onOwnerPress is not provided but userId is available
+      navigation.navigate('UserProfile', { userId: owner.userId });
     }
   };
 
@@ -321,8 +326,6 @@ const styles = StyleSheet.create({
     height: TOP_MATCH_CARD_HEIGHT,
     marginRight: 8,
     marginBottom: 8, // Add space for shadow to be visible at bottom
-    borderColor: '#E0E0E0',
-    borderWidth: 0.5
   },
   card: {
     width: '100%',
@@ -546,7 +549,6 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   skeletonCard: {
-    backgroundColor: '#f8fafc',
   },
   skeletonMedia: {
     flex: 0.8,

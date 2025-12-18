@@ -1,9 +1,9 @@
 import { Platform, StyleSheet } from 'react-native';
-import { colors as mainColors } from '@navigation/MainTabNavigator.styles';
+import { colors } from '@navigation/MainTabNavigator.styles';
 
 export const styles = StyleSheet.create({
   safeArea: {
-    backgroundColor: mainColors.primaryDark,
+    backgroundColor: colors.primaryDark,
     borderBottomWidth: Platform.OS === 'ios' ? 0.5 : 1,
     borderBottomColor: Platform.OS === 'ios' ? '#C6C6C8' : '#E0E0E0',
     shadowColor: '#000',
@@ -49,10 +49,3 @@ export const styles = StyleSheet.create({
   },
 });
 
-export const colors = {
-  primary: '#007AFF',
-  inactive: '#8E8E93',
-  border: Platform.OS === 'ios' ? '#C6C6C8' : '#E0E0E0',
-  white: mainColors.primaryDark,
-  black: '#000',
-};

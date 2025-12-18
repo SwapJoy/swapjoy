@@ -170,6 +170,7 @@ const OffersScreen: React.FC<OffersScreenProps> = memo(({ route, navigation }) =
             username: otherUser?.username || displayName,
             displayName,
             initials: ownerInitials,
+            userId: otherUser?.id || otherUser?.user_id || undefined,
           }}
           onPress={() => {
             (navigation as any).navigate('OfferDetails', { offer: item });
@@ -306,9 +307,6 @@ const styles = StyleSheet.create({
   },
   tabsWrapper: {
     backgroundColor: colors.primaryDark,
-    paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5EA',
   },
   tabsContainer: {
     flexDirection: 'row',
@@ -324,15 +322,14 @@ const styles = StyleSheet.create({
     borderBottomColor: 'transparent',
   },
   tabButtonActive: {
-    borderBottomColor: '#007AFF',
+    borderBottomColor: colors.primaryYellow,
   },
   tabText: {
-    color: '#8E8E93',
     fontSize: 15,
     fontWeight: '500',
   },
   tabTextActive: {
-    color: '#007AFF',
+    color: colors.primaryYellow,
     fontWeight: '700',
   },
   loadingContainer: {

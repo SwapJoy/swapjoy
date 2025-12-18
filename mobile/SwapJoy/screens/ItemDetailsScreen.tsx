@@ -12,6 +12,7 @@ import { useLocalization } from '../localization';
 import FavoriteToggleButton from '../components/FavoriteToggleButton';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '@navigation/MainTabNavigator.styles';
+import ImageView from 'react-native-image-viewing';
 
 const { width } = Dimensions.get('window');
 
@@ -34,6 +35,8 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
   const [loading, setLoading] = useState(!passedItem); // No loading if item is passed
   const [error, setError] = useState<string | null>(null);
   const [item, setItem] = useState<ListingItem | null>(passedItem || null);
+  const [previewVisible, setPreviewVisible] = useState(false);
+  const [previewImageIndex, setPreviewImageIndex] = useState(0);
 
   const favoriteData = useMemo(() => {
     if (!item) return null;
@@ -96,25 +99,6 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
     return item.user_id !== user.id;
   }, [item?.user_id, user?.id, isAuthenticated, isAnonymous]);
 
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.centered}>
-        <ActivityIndicator size="large" color={colors.primaryYellow} />
-      </SafeAreaView>
-    );
-  }
-
-  if (error || !item) {
-    return (
-      <SafeAreaView style={styles.centered}>
-        <SJText style={styles.errorText}>{error || strings.itemNotFound}</SJText>
-        <TouchableOpacity style={styles.retry} onPress={() => navigation.goBack()}>
-          <SJText style={styles.retryText}>{strings.goBack}</SJText>
-        </TouchableOpacity>
-      </SafeAreaView>
-    );
-  }
-
   const images = useMemo(() => {
     console.log('[ItemDetailsScreen] Processing images:', {
       has_item: !!item,
@@ -146,6 +130,39 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
     return normalized;
   }, [item]);
 
+  // Format images for ImageView component
+  const previewImages = useMemo(() => {
+    return images.map((img) => ({ uri: img.image_url }));
+  }, [images]);
+
+  const openImagePreview = (index: number) => {
+    setPreviewImageIndex(index);
+    setPreviewVisible(true);
+  };
+
+  const closeImagePreview = () => {
+    setPreviewVisible(false);
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.centered}>
+        <ActivityIndicator size="large" color={colors.primaryYellow} />
+      </SafeAreaView>
+    );
+  }
+
+  if (error || !item) {
+    return (
+      <SafeAreaView style={styles.centered}>
+        <SJText style={styles.errorText}>{error || strings.itemNotFound}</SJText>
+        <TouchableOpacity style={styles.retry} onPress={() => navigation.goBack()}>
+          <SJText style={styles.retryText}>{strings.goBack}</SJText>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <FlatList
@@ -161,13 +178,18 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
                   horizontal
                   pagingEnabled
                   showsHorizontalScrollIndicator={false}
-                  renderItem={({ item: img }) => (
-                    <CachedImage
-                      uri={img.image_url}
-                      style={styles.heroImage}
-                      resizeMode="cover"
-                      fallbackUri="https://picsum.photos/400/300?random=5"
-                    />
+                  renderItem={({ item: img, index }) => (
+                    <TouchableOpacity
+                      activeOpacity={0.9}
+                      onPress={() => openImagePreview(index)}
+                    >
+                      <CachedImage
+                        uri={img.image_url}
+                        style={styles.heroImage}
+                        resizeMode="cover"
+                        fallbackUri="https://picsum.photos/400/300?random=5"
+                      />
+                    </TouchableOpacity>
                   )}
                 />
                 {favoriteData ? (
@@ -262,6 +284,14 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
           </TouchableOpacity>
         </View>
       )}
+
+      {/* Fullscreen image preview with horizontal paging */}
+      <ImageView
+        images={previewImages}
+        imageIndex={previewImageIndex}
+        visible={previewVisible}
+        onRequestClose={closeImagePreview}
+      />
     </View>
   );
 };
