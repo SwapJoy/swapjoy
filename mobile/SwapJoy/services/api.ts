@@ -96,14 +96,45 @@ export class ApiService {
         });
 
         if (setSessionError) {
+          const errorMessage = setSessionError.message || String(setSessionError) || '';
+          const errorCode = (setSessionError as any)?.code || '';
+          
+          // Check if user was deleted from Supabase auth (403 with user_not_found)
+          const isUserDeleted = 
+            errorMessage.includes('user_not_found') ||
+            errorMessage.includes('User from sub claim in JWT does not exist') ||
+            errorCode === 'user_not_found';
+          
+          if (isUserDeleted) {
+            console.error('[ApiService] User deleted from Supabase auth, signing out');
+            // Notify AuthService to sign out the user
+            AuthService.notifySessionExpired().catch((err) => {
+              console.error('[ApiService] Error notifying session expired:', err);
+            });
+            // Clear auth state
+            this.isAuthReady = false;
+            this.authInitInFlight = null;
+            throw new Error('User deleted from authentication');
+          }
+          
           console.warn('[ApiService] Error setting session on Supabase client:', setSessionError.message);
           // Continue anyway - the session might still work for RLS
         } else {
           console.log('[ApiService] Session set on Supabase client for RLS');
         }
       } catch (setSessionErr: any) {
+        const errorMessage = setSessionErr?.message || String(setSessionErr) || '';
+        
+        // Check if user was deleted
+        if (errorMessage.includes('User deleted from authentication') || 
+            errorMessage.includes('user_not_found') ||
+            errorMessage.includes('User from sub claim in JWT does not exist')) {
+          console.error('[ApiService] User deleted from auth, re-throwing error');
+          throw setSessionErr;
+        }
+        
         console.warn('[ApiService] Exception setting session:', setSessionErr?.message);
-        // Continue anyway
+        // Continue anyway for other errors
       }
 
       const who = session?.user?.id || 'unknown';

@@ -8,10 +8,14 @@ import { useOnboarding } from '../../hooks/useOnboarding';
 import { ApiService } from '../../services/api';
 import { useLocalization } from '../../localization';
 import { useAuth } from '../../contexts/AuthContext';
+import { UserProfile } from '../../contexts/ProfileContext';
+import SWInputField from '@components/SWInputField';
+import { useNavigation } from '@react-navigation/native';
 
 const UsernameScreen: React.FC = () => {
   const { nextStep, previousStep, skipOnboarding, isFirstStep, currentStepIndex, totalSteps } = useOnboarding();
-  const { user } = useAuth();
+  const { user, isAuthenticated, signOut } = useAuth();
+  const navigation = useNavigation<any>();
   const { t } = useLocalization();
   const [username, setUsername] = useState('');
   const [isChecking, setIsChecking] = useState(false);
@@ -67,19 +71,6 @@ const UsernameScreen: React.FC = () => {
         } else if (available) {
           setIsValid(true);
           setError(null);
-          
-          // Auto-save when valid
-          try {
-            setIsSaving(true);
-            const { error: saveError } = await ApiService.updateProfile({ username: trimmed });
-            if (saveError) {
-              console.error('[UsernameScreen] Error saving username:', saveError);
-            }
-          } catch (saveError) {
-            console.error('[UsernameScreen] Error saving username:', saveError);
-          } finally {
-            setIsSaving(false);
-          }
         } else {
           setIsValid(false);
           setError(t('onboarding.username.errors.taken', { defaultValue: 'This username is already taken' }));
@@ -104,10 +95,38 @@ const UsernameScreen: React.FC = () => {
     const loadOrGenerateUsername = async () => {
       if (user) {
         try {
-          const { data: profile } = await ApiService.getProfile();
-          if (profile?.username) {
+          const { data: profile, error } = await ApiService.getProfile();
+          
+          // Check for auth errors (403, 401, etc.)
+          if (error) {
+            const errorMessage = error.message || String(error) || '';
+            const errorStatus = (error as any)?.status || (error as any)?.code;
+            const isAuthError = 
+              errorStatus === 403 || 
+              errorStatus === 401 ||
+              errorMessage.includes('Not authenticated') || 
+              errorMessage.includes('Forbidden') ||
+              errorMessage.includes('403') ||
+              errorMessage.includes('unauthorized') ||
+              errorMessage.includes('session') ||
+              errorMessage.includes('jwt') ||
+              errorMessage.includes('token');
+            
+            if (isAuthError) {
+              console.log('[UsernameScreen] Auth error detected when loading profile, signing out');
+              await signOut();
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'MainTabs' }],
+              });
+              return;
+            }
+          }
+          
+          const typedProfile = profile as UserProfile | null;
+          if (typedProfile?.username) {
             // User already has username, pre-fill it
-            setUsername(profile.username);
+            setUsername(typedProfile.username);
             setIsValid(true);
           } else {
             // Generate a suggested username based on email or user ID
@@ -129,7 +148,7 @@ const UsernameScreen: React.FC = () => {
           }
         } catch (error) {
           console.error('[UsernameScreen] Error loading profile:', error);
-          // Still generate a suggestion even if profile load fails
+          // Still generate a suggestion even if profile load fails (non-auth errors)
           const suggestedUsername = user.email 
             ? user.email.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '_')
             : `user_${user.id.substring(0, 8)}`;
@@ -139,7 +158,18 @@ const UsernameScreen: React.FC = () => {
       }
     };
     loadOrGenerateUsername();
-  }, [user, handleUsernameChange]);
+  }, [user, handleUsernameChange, signOut, navigation]);
+
+  // Redirect to unauthenticated flow if user is not authenticated
+  useEffect(() => {
+    if (!isAuthenticated || !user) {
+      console.log('[UsernameScreen] User not authenticated, redirecting to MainTabs');
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'MainTabs' }],
+      });
+    }
+  }, [isAuthenticated, user, navigation]);
 
   useEffect(() => {
     return () => {
@@ -149,9 +179,79 @@ const UsernameScreen: React.FC = () => {
     };
   }, []);
 
-  const handleNext = () => {
-    if (isValid && username.trim()) {
+  const handleNext = async () => {
+    if (!isValid || !username.trim() || isSaving) {
+      return;
+    }
+
+    const trimmed = username.trim();
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      const { error: saveError } = await ApiService.updateProfile({ username: trimmed });
+      
+      if (saveError) {
+        console.error('[UsernameScreen] Error saving username:', saveError);
+        
+        // Check for auth errors (403, 401, etc.)
+        const errorMessage = saveError.message || String(saveError) || '';
+        const errorStatus = (saveError as any)?.status || (saveError as any)?.code;
+        const isAuthError = 
+          errorStatus === 403 || 
+          errorStatus === 401 ||
+          errorMessage.includes('Not authenticated') || 
+          errorMessage.includes('Forbidden') ||
+          errorMessage.includes('403') ||
+          errorMessage.includes('unauthorized') ||
+          errorMessage.includes('session') ||
+          errorMessage.includes('jwt') ||
+          errorMessage.includes('token');
+        
+        if (isAuthError) {
+          console.log('[UsernameScreen] Auth error detected when saving username, signing out');
+          await signOut();
+          navigation.reset({
+            index: 0,
+            routes: [{ name: 'MainTabs' }],
+          });
+          return;
+        }
+        
+        setError(t('onboarding.username.errors.saveFailed', { defaultValue: 'Failed to save username. Please try again.' }));
+        setIsSaving(false);
+        return;
+      }
+
+      // Successfully saved, proceed to next step
+      setIsSaving(false);
       nextStep();
+    } catch (saveError) {
+      console.error('[UsernameScreen] Error saving username:', saveError);
+      
+      // Check for auth errors in catch block too
+      const errorMessage = (saveError as any)?.message || String(saveError) || '';
+      const isAuthError = 
+        errorMessage.includes('Not authenticated') || 
+        errorMessage.includes('Forbidden') ||
+        errorMessage.includes('403') ||
+        errorMessage.includes('unauthorized') ||
+        errorMessage.includes('session') ||
+        errorMessage.includes('jwt') ||
+        errorMessage.includes('token');
+      
+      if (isAuthError) {
+        console.log('[UsernameScreen] Auth error detected in catch block, signing out');
+        await signOut();
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'MainTabs' }],
+        });
+        return;
+      }
+      
+      setError(t('onboarding.username.errors.saveFailed', { defaultValue: 'Failed to save username. Please try again.' }));
+      setIsSaving(false);
     }
   };
 
@@ -166,18 +266,6 @@ const UsernameScreen: React.FC = () => {
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Header */}
-          <View style={styles.header}>
-            {!isFirstStep && (
-              <TouchableOpacity onPress={previousStep} style={styles.backButton}>
-                <Ionicons name="arrow-back" size={24} color="#007AFF" />
-              </TouchableOpacity>
-            )}
-            <View style={styles.headerContent}>
-              <SJText style={styles.stepIndicator}>Step {currentStepIndex + 1} of {totalSteps}</SJText>
-            </View>
-          </View>
-
           {/* Content */}
           <View style={styles.content}>
             <SJText style={styles.title}>
@@ -187,38 +275,26 @@ const UsernameScreen: React.FC = () => {
               {t('onboarding.username.description', { defaultValue: 'Pick a unique username that others will see when you swap items.' })}
             </SJText>
 
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={[styles.input, error && styles.inputError]}
-                placeholder={t('onboarding.username.placeholder', { defaultValue: 'username' })}
-                placeholderTextColor="#999"
-                value={username}
-                onChangeText={handleUsernameChange}
-                autoCapitalize="none"
-                autoCorrect={false}
-                maxLength={50}
-              />
-              {isChecking && (
-                <ActivityIndicator size="small" color="#007AFF" style={styles.checkingIndicator} />
-              )}
-              {isValid && !isChecking && (
-                <Ionicons name="checkmark-circle" size={24} color="#34C759" style={styles.validIndicator} />
-              )}
-            </View>
+            <SWInputField
+              placeholder={t('onboarding.username.placeholder', { defaultValue: 'username' })}
+              value={username}
+              onChangeText={handleUsernameChange}
+              autoCapitalize="none"
+              autoCorrect={false}
+              maxLength={50}
+              rightButton={
+                isChecking ? (
+                  <ActivityIndicator size="small" color={colors.primaryYellow} />
+                ) : isValid && !isChecking ? (
+                  <Ionicons name="checkmark-circle" size={24} color="#34C759" />
+                ) : undefined
+              }
+            />
 
             {error && (
               <View style={styles.errorContainer}>
                 <Ionicons name="alert-circle" size={16} color="#FF3B30" />
                 <SJText style={styles.errorText}>{error}</SJText>
-              </View>
-            )}
-
-            {isSaving && (
-              <View style={styles.savingContainer}>
-                <ActivityIndicator size="small" color="#007AFF" />
-                <SJText style={styles.savingText}>
-                  {t('onboarding.common.saving', { defaultValue: 'Saving...' })}
-                </SJText>
               </View>
             )}
           </View>
@@ -227,13 +303,22 @@ const UsernameScreen: React.FC = () => {
         {/* Footer */}
         <View style={styles.footer}>
           <TouchableOpacity
-            style={[styles.nextButton, (!isValid || isChecking) && styles.nextButtonDisabled]}
+            style={[styles.nextButton, (!isValid || isChecking || isSaving) && styles.nextButtonDisabled]}
             onPress={handleNext}
-            disabled={!isValid || isChecking}
+            disabled={!isValid || isChecking || isSaving}
           >
-            <SJText style={[styles.nextButtonText, (!isValid || isChecking) && styles.nextButtonTextDisabled]}>
-              {t('onboarding.common.next', { defaultValue: 'Next' })}
-            </SJText>
+            {isSaving ? (
+              <View style={styles.nextButtonContent}>
+                <ActivityIndicator size="small" color={colors.primaryDark} style={styles.nextButtonLoader} />
+                <SJText style={styles.nextButtonText}>
+                  {t('onboarding.common.saving', { defaultValue: 'Saving...' })}
+                </SJText>
+              </View>
+            ) : (
+              <SJText style={[styles.nextButtonText, (!isValid || isChecking) && styles.nextButtonTextDisabled]}>
+                {t('onboarding.common.next', { defaultValue: 'Next' })}
+              </SJText>
+            )}
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
@@ -282,7 +367,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#000',
     marginBottom: 12,
   },
   description: {
@@ -290,31 +374,6 @@ const styles = StyleSheet.create({
     color: '#666',
     lineHeight: 24,
     marginBottom: 32,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    backgroundColor: '#F8F8F8',
-    marginBottom: 12,
-  },
-  input: {
-    flex: 1,
-    fontSize: 16,
-    color: '#000',
-    paddingVertical: 14,
-  },
-  inputError: {
-    borderColor: '#FF3B30',
-  },
-  checkingIndicator: {
-    marginLeft: 8,
-  },
-  validIndicator: {
-    marginLeft: 8,
   },
   errorContainer: {
     flexDirection: 'row',
@@ -341,12 +400,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 20,
     paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
   },
   nextButton: {
-    backgroundColor: '#007AFF',
-    borderRadius: 12,
+    backgroundColor: colors.primaryYellow,
+    borderRadius: 30,
     paddingVertical: 16,
     alignItems: 'center',
     justifyContent: 'center',
@@ -361,6 +418,14 @@ const styles = StyleSheet.create({
   },
   nextButtonTextDisabled: {
     color: '#8E8E93',
+  },
+  nextButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  nextButtonLoader: {
+    marginRight: 8,
   },
 });
 

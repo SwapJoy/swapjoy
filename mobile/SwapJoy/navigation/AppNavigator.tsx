@@ -76,7 +76,7 @@ const LoadingScreen = () => {
 };
 
 const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((props, ref) => {
-  const { isAuthenticated, isLoading, user, isAnonymous } = useAuth();
+  const { isAuthenticated, isLoading, user, isAnonymous, signOut } = useAuth();
   const [hasUsername, setHasUsername] = useState<boolean | null>(null);
   const [checkingUsername, setCheckingUsername] = useState(false);
   const [introCompleted, setIntroCompleted] = useState<boolean | null>(null);
@@ -105,7 +105,30 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
       const { data: profile, error } = await ApiService.getProfile();
       if (error) {
         console.warn('[AppNavigator] Error fetching profile:', error);
-        setHasUsername(true); // Default to true to avoid blocking
+        // Check for various auth errors that indicate user was deleted or session is invalid
+        const errorMessage = error.message || String(error) || '';
+        const errorStatus = (error as any)?.status || (error as any)?.code;
+        const isAuthError = 
+          errorStatus === 403 || 
+          errorStatus === 401 ||
+          errorMessage.includes('Not authenticated') || 
+          errorMessage.includes('not found') ||
+          errorMessage.includes('Forbidden') ||
+          errorMessage.includes('403') ||
+          errorMessage.includes('unauthorized') ||
+          errorMessage.includes('session') ||
+          errorMessage.includes('jwt') ||
+          errorMessage.includes('token');
+        
+        // If user was deleted from auth or session is invalid, sign them out
+        if (isAuthError) {
+          console.log('[AppNavigator] Auth error detected (user deleted or invalid session), signing out');
+          await signOut();
+          setHasUsername(null);
+          return;
+        }
+        // For other errors, default to true to avoid blocking
+        setHasUsername(true);
       } else {
         const username = (profile as any)?.username;
         const hasUsernameValue = !!username && username.trim() !== '';
@@ -119,11 +142,12 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
       }
     } catch (error) {
       console.error('[AppNavigator] Error checking username status:', error);
-      setHasUsername(true); // Default to true to avoid blocking
+      // For unexpected errors, default to true to avoid blocking
+      setHasUsername(true);
     } finally {
       setCheckingUsername(false);
     }
-  }, [isAuthenticated, user, isAnonymous]);
+  }, [isAuthenticated, user, isAnonymous, signOut]);
 
   // Check if user has username when authenticated (skip for anonymous users)
   useEffect(() => {

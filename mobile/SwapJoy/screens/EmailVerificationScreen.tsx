@@ -4,6 +4,7 @@ import SJText from '../components/SJText';
 import { useEmailVerification } from '../hooks/useEmailVerification';
 import { useAuth } from '../contexts/AuthContext';
 import { EmailVerificationScreenProps } from '../types/navigation';
+import { colors } from '@navigation/MainTabNavigator.styles';
 
 const EmailVerificationScreen: React.FC<EmailVerificationScreenProps> = ({ 
   navigation, 
@@ -52,15 +53,7 @@ const EmailVerificationScreen: React.FC<EmailVerificationScreenProps> = ({
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
-            <SJText style={styles.backButtonText}>← Back</SJText>
-          </TouchableOpacity>
-          <SJText style={styles.title}>Verify Email</SJText>
-          <View style={styles.placeholder} />
-        </View>
-
+    
         {/* Content */}
         <View style={styles.content}>
           <SJText style={styles.subtitle}>Enter verification code</SJText>
@@ -115,7 +108,7 @@ const EmailVerificationScreen: React.FC<EmailVerificationScreenProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#161200f',
+    backgroundColor: colors.primaryDark,
   },
   keyboardView: {
     flex: 1,
@@ -147,13 +140,12 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: 30,
-    paddingTop: 40,
+    paddingTop: 16,
+    alignItems: 'center',
   },
   subtitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 10,
   },
   description: {
@@ -172,17 +164,18 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   otpInput: {
+    color: 'white',
     fontSize: 32,
     fontWeight: 'bold',
     textAlign: 'center',
     letterSpacing: 8,
     borderBottomWidth: 2,
-    borderBottomColor: '#007AFF',
+    borderBottomColor: colors.primaryYellow,
     paddingVertical: 10,
     minWidth: 200,
   },
   verifyButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: colors.primaryYellow,
     paddingVertical: 15,
     borderRadius: 12,
     alignItems: 'center',
@@ -192,9 +185,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#ccc',
   },
   verifyButtonText: {
-    color: 'white',
+    color: colors.primaryDark,
     fontSize: 18,
     fontWeight: 'bold',
+    paddingHorizontal: 10,
   },
   resendContainer: {
     flexDirection: 'row',
@@ -215,6 +209,7 @@ const styles = StyleSheet.create({
 });
 
 export default EmailVerificationScreen;
+
 
 
 

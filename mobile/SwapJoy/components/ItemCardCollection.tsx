@@ -156,7 +156,6 @@ const ItemCardCollection: React.FC<ItemCardCollectionProps> = ({
           metaRightLabel={metaRightLabel || undefined}
           imageUri={imageUrl}
           placeholderLabel={placeholder}
-          chips={chips}
           onPress={handlePress}
           variant="grid"
           style={[

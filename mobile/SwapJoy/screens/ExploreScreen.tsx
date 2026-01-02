@@ -53,7 +53,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
       headerTitle: () => (
         <Image
           source={require('../assets/swapjoy-logo.png')}
-          style={{ width: 100, height: 24 }}
+          style={{ width: 200 }}
           resizeMode='contain'
         />
       ),

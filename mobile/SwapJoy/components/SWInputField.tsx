@@ -6,8 +6,10 @@ import {
   Animated,
   ActivityIndicator,
   TextInputProps,
+  Platform,
 } from 'react-native';
 import SJText from './SJText';
+import { colors } from '@navigation/MainTabNavigator.styles';
 
 interface SWInputFieldProps extends TextInputProps {
   label?: string;
@@ -41,6 +43,8 @@ const SWInputField: React.FC<SWInputFieldProps> = ({
   prefix,
   leftButton,
   rightButton,
+  cursorColor,
+  selectionColor,
   ...textInputProps
 }) => {
   const [isFocused, setIsFocused] = useState(false);
@@ -113,7 +117,7 @@ const SWInputField: React.FC<SWInputFieldProps> = ({
                 styles.floatingLabel,
                 {
                   fontSize: labelFontSize,
-                  color: isFocused ? '#007AFF' : '#8e8e93',
+                  color: isFocused ? colors.primaryYellow : '#8e8e93',
                 },
               ]}
             >
@@ -148,6 +152,8 @@ const SWInputField: React.FC<SWInputFieldProps> = ({
             maxLength={maxLength}
             multiline={multiline}
             textAlignVertical={multiline ? 'top' : 'center'}
+            cursorColor={cursorColor || colors.primaryYellow}
+            selectionColor={selectionColor || colors.primaryYellow}
           />
           {showLoading && !multiline && !rightButton && (
             <View style={styles.loadingContainer}>
@@ -245,11 +251,11 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 1,
-    backgroundColor: '#d1d1d6',
+    backgroundColor: colors.primaryYellow,
   },
   bottomBorderFocused: {
     height: 2,
-    backgroundColor: '#007AFF',
+    backgroundColor: colors.primaryYellow
   },
   charCount: {
     fontSize: 12,

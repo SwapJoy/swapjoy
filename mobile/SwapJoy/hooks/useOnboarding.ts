@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { ApiService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import { UserProfile } from '../contexts/ProfileContext';
 
 export type OnboardingStep = 'username' | 'name';
 
@@ -14,7 +15,7 @@ const ROUTE_TO_STEP_INDEX: Record<string, number> = {
 };
 
 export const useOnboarding = () => {
-  const { user } = useAuth();
+  const { user, isAuthenticated, signOut } = useAuth();
   const navigation = useNavigation<any>();
   const route = useRoute();
   const routeName = route.name as string;
@@ -25,9 +26,19 @@ export const useOnboarding = () => {
   // Check if user needs onboarding (based on username presence)
   useEffect(() => {
     const checkOnboardingStatus = async () => {
-      if (!user) {
+      // If user is not authenticated, redirect to unauthenticated flow
+      if (!isAuthenticated || !user) {
         setIsLoading(false);
         setNeedsOnboarding(false);
+        // Navigate away from onboarding if not authenticated
+        try {
+          navigation.reset({
+            index: 0,
+            routes: [{ name: 'MainTabs' }],
+          });
+        } catch (error) {
+          console.warn('[useOnboarding] Navigation error:', error);
+        }
         return;
       }
 
@@ -35,12 +46,37 @@ export const useOnboarding = () => {
         const { data: profile, error } = await ApiService.getProfile();
         if (error) {
           console.warn('[useOnboarding] Error fetching profile:', error);
+          // Check for various auth errors that indicate user was deleted or session is invalid
+          const errorMessage = error.message || String(error) || '';
+          const errorStatus = (error as any)?.status || (error as any)?.code;
+          const isAuthError = 
+            errorStatus === 403 || 
+            errorStatus === 401 ||
+            errorMessage.includes('Not authenticated') || 
+            errorMessage.includes('not found') ||
+            errorMessage.includes('Forbidden') ||
+            errorMessage.includes('403') ||
+            errorMessage.includes('unauthorized') ||
+            errorMessage.includes('session') ||
+            errorMessage.includes('jwt') ||
+            errorMessage.includes('token');
+          
+          // If user was deleted from auth or session is invalid, sign them out
+          if (isAuthError) {
+            console.log('[useOnboarding] Auth error detected (user deleted or invalid session), signing out');
+            await signOut();
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'MainTabs' }],
+            });
+          }
           setIsLoading(false);
           return;
         }
 
         // If user has a username, assume onboarding was completed
-        const hasUsername = !!profile?.username;
+        const typedProfile = profile as UserProfile | null;
+        const hasUsername = !!typedProfile?.username;
         setNeedsOnboarding(!hasUsername);
         setIsLoading(false);
       } catch (error) {
@@ -50,7 +86,7 @@ export const useOnboarding = () => {
     };
 
     checkOnboardingStatus();
-  }, [user]);
+  }, [user, isAuthenticated, signOut, navigation]);
 
   const completeOnboarding = useCallback(async () => {
     try {
@@ -89,7 +125,7 @@ export const useOnboarding = () => {
       totalSteps: ONBOARDING_STEPS.length,
       routeFromState: currentRoute?.name,
       routeFromHook: route.name,
-      allRoutes: state?.routes.map(r => r.name),
+      allRoutes: state?.routes.map((r: any) => r.name),
       currentIndex: state?.index,
     });
     

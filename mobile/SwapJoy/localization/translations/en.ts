@@ -114,7 +114,7 @@ const en = {
       firstNamePlaceholder: 'First Name',
       lastNamePlaceholder: 'Last Name',
       buttons: {
-        signInWithEmail: 'Sign In with Email',
+        signInWithEmail: 'Log in',
         signUp: 'Sign Up',
         signIn: 'Sign In',
       },
@@ -296,7 +296,7 @@ const en = {
     currencies: {
       USD: 'US Dollar',
       EUR: 'Euro',
-      GEL: 'Georgian Lari',
+      GEL: 'Lari',
     },
     alerts: {
       missingInfoTitle: 'Missing Information',

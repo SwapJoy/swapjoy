@@ -3,6 +3,7 @@ import { Platform, StyleSheet } from 'react-native';
 export const colors = {
   primaryDark: '#161200',
   primaryYellow: '#ffde21',
+  primaryBlue: '#36454F',
   inactive: '#8E8E93',
   border: Platform.OS === 'ios' ? '#C6C6C8' : '#E0E0E0',
   white: '#fff',

@@ -542,6 +542,25 @@ export class AuthService {
     profileImageUrl?: string
   ): Promise<User | null> {
     try {
+      // First check if user already exists in database
+      const userExists = await this.checkUserExists(userId);
+      if (userExists) {
+        // User exists, fetch and return it
+        const { data: existingUser, error: fetchError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', userId)
+          .single();
+        
+        if (fetchError) {
+          console.warn('[AuthService] Error fetching existing user:', fetchError.message);
+          // Continue to try creating/updating
+        } else if (existingUser) {
+          console.log('[AuthService] User already exists in database, returning existing user');
+          return existingUser as User;
+        }
+      }
+
       const timestamp = new Date().toISOString();
       const resolvedEmail = email ?? userData.email;
       const resolvedProfileImage = userData.profile_image_url ?? profileImageUrl;
@@ -549,7 +568,8 @@ export class AuthService {
       const userPayload: Record<string, any> = {
         id: userId,
         // Don't set username automatically - let user set it during onboarding
-        username: userData.username || null,
+        // Convert empty strings to null so username remains unset
+        username: userData.username && userData.username.trim() ? userData.username.trim() : null,
         first_name: userData.first_name,
         last_name: userData.last_name,
         status: 'active',
@@ -578,6 +598,27 @@ export class AuthService {
         .single();
 
       if (error) {
+        // Check if it's an RLS error - user might have been created by trigger
+        const isRLSError = 
+          error.message?.includes('row-level security') ||
+          error.message?.includes('RLS') ||
+          error.code === '42501';
+        
+        if (isRLSError) {
+          console.warn('[AuthService] RLS error when creating user, checking if user was created by trigger');
+          // Try to fetch the user - database trigger might have created it
+          const { data: triggerUser, error: fetchError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', userId)
+            .single();
+          
+          if (triggerUser && !fetchError) {
+            console.log('[AuthService] User was created by database trigger');
+            return triggerUser as User;
+          }
+        }
+        
         console.error('Error creating user in database:', error?.message, error);
         return null;
       }
@@ -666,11 +707,11 @@ export class AuthService {
       '';
 
     // Don't auto-generate username - return null so it can be set during onboarding
+    // Only use explicitly provided username from metadata
     const username: string | undefined =
       rawUser.username ??
       metadata.username ??
       googleMetadata.username ??
-      (email ? email.split('@')[0] : undefined) ??
       undefined;
 
     const profileImageUrl: string | undefined =
@@ -1338,6 +1379,18 @@ export class AuthService {
     }
   ): Promise<AuthResponse> {
     try {
+      // First, try to sign in to check if user already exists
+      // This prevents RLS errors when trying to create an existing user
+      console.log('[AuthService] Checking if user already exists by attempting sign in');
+      const signInAttempt = await this.signInWithEmail(email, password);
+      if (signInAttempt.user && signInAttempt.session) {
+        console.log('[AuthService] User already exists and sign in successful, returning existing session');
+        return signInAttempt;
+      }
+      
+      // User doesn't exist or wrong password - proceed with signup
+      console.log('[AuthService] User does not exist or wrong password, proceeding with signup');
+      
       // Sign up - disable automatic email sending to prevent timeouts
       // We'll send OTP manually after signup completes
       const { data, error } = await supabase.auth.signUp({
@@ -1351,6 +1404,40 @@ export class AuthService {
       });
 
       if (error) {
+        // Check if user already exists - if so, try to sign them in instead
+        const isUserExistsError = 
+          error.message?.includes('User already registered') ||
+          error.message?.includes('already registered') ||
+          error.message?.includes('email address is already registered') ||
+          error.message?.includes('already exists') ||
+          error.code === 'user_already_registered' ||
+          error.code === 'signup_disabled';
+        
+        if (isUserExistsError) {
+          console.log('[AuthService] User already exists, attempting to sign in instead');
+          // Try to sign in with the provided credentials
+          try {
+            const signInResult = await this.signInWithEmail(email, password);
+            if (signInResult.user && signInResult.session) {
+              console.log('[AuthService] Successfully signed in existing user');
+              return signInResult;
+            } else {
+              // Sign in failed - wrong password or other issue
+              return { 
+                user: null, 
+                session: null, 
+                error: signInResult.error || 'User already exists. Please sign in with your password.' 
+              };
+            }
+          } catch (signInError: any) {
+            return { 
+              user: null, 
+              session: null, 
+              error: signInError.message || 'User already exists. Please sign in with your password.' 
+            };
+          }
+        }
+        
         // Check if it's a timeout or email sending error - user might still be created
         const isEmailError = error.message?.includes('confirmation email') || 
                              error.message?.includes('Error sending') ||
@@ -1371,9 +1458,35 @@ export class AuthService {
         return { user: null, session: null, error: 'Failed to create user account' };
       }
 
+      // Check if user already exists in database - if so, they're trying to sign up with existing account
+      const userExistsInDb = await this.checkUserExists(data.user.id);
+      
+      // If user exists in database but no session, they already have an account - sign them in instead
+      if (userExistsInDb && !data.session) {
+        console.log('[AuthService] User already exists in database but no session from signup, attempting to sign in');
+        try {
+          const signInResult = await this.signInWithEmail(email, password);
+          if (signInResult.user && signInResult.session) {
+            console.log('[AuthService] Successfully signed in existing user');
+            return signInResult;
+          } else {
+            return { 
+              user: null, 
+              session: null, 
+              error: signInResult.error || 'User already exists. Please sign in with your password.' 
+            };
+          }
+        } catch (signInError: any) {
+          return { 
+            user: null, 
+            session: null, 
+            error: signInError.message || 'User already exists. Please sign in with your password.' 
+          };
+        }
+      }
+
       // Create user in database (with empty userData if onboarding will handle it)
-      const userExists = await this.checkUserExists(data.user.id);
-      if (!userExists) {
+      if (!userExistsInDb) {
         const createUserData: CreateUserData = {
           username: userData.username || '',
           first_name: userData.first_name || '',

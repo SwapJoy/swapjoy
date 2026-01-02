@@ -1,10 +1,12 @@
 import React from 'react';
-import {View, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, } from 'react-native';
+import {View, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, } from 'react-native';
 import SJText from '../components/SJText';
 import { Ionicons } from '@expo/vector-icons';
 import { EmailSignUpScreenProps } from '../types/navigation';
 import { useLocalization } from '../localization';
 import { useEmailSignUp } from '../hooks/useEmailSignUp';
+import { colors } from '@navigation/MainTabNavigator.styles';
+import SWInputField from '../components/SWInputField';
 
 const EmailSignUpScreen: React.FC<EmailSignUpScreenProps> = ({ navigation }) => {
   const { t } = useLocalization();
@@ -43,8 +45,7 @@ const EmailSignUpScreen: React.FC<EmailSignUpScreenProps> = ({ navigation }) => 
   };
 
   return (
-    <View style={styles.container}>
-      <KeyboardAvoidingView 
+    <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
@@ -66,77 +67,67 @@ const EmailSignUpScreen: React.FC<EmailSignUpScreenProps> = ({ navigation }) => 
               </View>
             )}
 
-            <View style={styles.inputContainer}>
-              <Ionicons name="mail-outline" size={20} color="#666" style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder={t('auth.common.emailPlaceholder')}
-                placeholderTextColor="#999"
-                value={email}
-                onChangeText={(text) => {
-                  setEmail(text);
-                  setError(null);
-                }}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-                autoFocus
-              />
-            </View>
+            <SWInputField
+              placeholder={t('auth.common.emailPlaceholder')}
+              value={email}
+              onChangeText={(text) => {
+                setEmail(text);
+                setError(null);
+              }}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoFocus
+              leftButton={<Ionicons name="mail-outline" size={20} color="#666" />}
+            />
 
-            <View style={styles.inputContainer}>
-              <Ionicons name="lock-closed-outline" size={20} color="#666" style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder={t('auth.common.passwordPlaceholder')}
-                placeholderTextColor="#999"
-                value={password}
-                onChangeText={(text) => {
-                  setPassword(text);
-                  setError(null);
-                }}
-                secureTextEntry={!showPassword}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              <TouchableOpacity
-                onPress={() => setShowPassword(!showPassword)}
-                style={styles.eyeIcon}
-              >
-                <Ionicons
-                  name={showPassword ? 'eye-outline' : 'eye-off-outline'}
-                  size={20}
-                  color="#666"
-                />
-              </TouchableOpacity>
-            </View>
+            <SWInputField
+              placeholder={t('auth.common.passwordPlaceholder')}
+              value={password}
+              onChangeText={(text) => {
+                setPassword(text);
+                setError(null);
+              }}
+              secureTextEntry={!showPassword}
+              autoCapitalize="none"
+              autoCorrect={false}
+              leftButton={<Ionicons name="lock-closed-outline" size={20} color="#666" />}
+              rightButton={
+                <TouchableOpacity
+                  onPress={() => setShowPassword(!showPassword)}
+                >
+                  <Ionicons
+                    name={showPassword ? 'eye-outline' : 'eye-off-outline'}
+                    size={20}
+                    color="#666"
+                  />
+                </TouchableOpacity>
+              }
+            />
 
-            <View style={styles.inputContainer}>
-              <Ionicons name="lock-closed-outline" size={20} color="#666" style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder={t('auth.common.confirmPasswordPlaceholder')}
-                placeholderTextColor="#999"
-                value={confirmPassword}
-                onChangeText={(text) => {
-                  setConfirmPassword(text);
-                  setError(null);
-                }}
-                secureTextEntry={!showConfirmPassword}
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              <TouchableOpacity
-                onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-                style={styles.eyeIcon}
-              >
-                <Ionicons
-                  name={showConfirmPassword ? 'eye-outline' : 'eye-off-outline'}
-                  size={20}
-                  color="#666"
-                />
-              </TouchableOpacity>
-            </View>
+            <SWInputField
+              placeholder={t('auth.common.confirmPasswordPlaceholder')}
+              value={confirmPassword}
+              onChangeText={(text) => {
+                setConfirmPassword(text);
+                setError(null);
+              }}
+              secureTextEntry={!showConfirmPassword}
+              autoCapitalize="none"
+              autoCorrect={false}
+              leftButton={<Ionicons name="lock-closed-outline" size={20} color="#666" />}
+              rightButton={
+                <TouchableOpacity
+                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                >
+                  <Ionicons
+                    name={showConfirmPassword ? 'eye-outline' : 'eye-off-outline'}
+                    size={20}
+                    color="#666"
+                  />
+                </TouchableOpacity>
+              }
+            />
 
             <TouchableOpacity
               style={[styles.signUpButton, isLoading && styles.disabledButton]}
@@ -159,48 +150,19 @@ const EmailSignUpScreen: React.FC<EmailSignUpScreenProps> = ({ navigation }) => 
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#161200f',
-  },
   keyboardView: {
     flex: 1,
+    backgroundColor: colors.primaryDark,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  backButton: {
-    padding: 5,
-  },
-  backButtonText: {
-    fontSize: 16,
-    color: '#007AFF',
-    fontWeight: '500',
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  placeholder: {
-    width: 60,
   },
   content: {
     flex: 1,
@@ -211,7 +173,6 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 10,
   },
   description: {
@@ -230,30 +191,8 @@ const styles = StyleSheet.create({
     color: '#c00',
     fontSize: 14,
   },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 12,
-    paddingHorizontal: 15,
-    marginBottom: 20,
-    backgroundColor: '#f9f9f9',
-  },
-  inputIcon: {
-    marginRight: 10,
-  },
-  input: {
-    flex: 1,
-    fontSize: 16,
-    color: '#333',
-    paddingVertical: 15,
-  },
-  eyeIcon: {
-    padding: 5,
-  },
   signUpButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: colors.primaryYellow,
     paddingVertical: 15,
     borderRadius: 12,
     alignItems: 'center',
@@ -263,7 +202,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ccc',
   },
   signUpButtonText: {
-    color: 'white',
+    color: colors.primaryDark,
     fontSize: 18,
     fontWeight: 'bold',
   },
@@ -274,11 +213,10 @@ const styles = StyleSheet.create({
   },
   signInText: {
     fontSize: 14,
-    color: '#666',
   },
   signInLink: {
     fontSize: 14,
-    color: '#007AFF',
+    color: colors.primaryYellow,
     fontWeight: '600',
   },
 });

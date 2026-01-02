@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import {View, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, } from 'react-native';
+import {View, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, } from 'react-native';
 import SJText from '../components/SJText';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../contexts/AuthContext';
 import { EmailSignInScreenProps } from '../types/navigation';
 import { useLocalization } from '../localization';
+import { colors } from '@navigation/MainTabNavigator.styles';
+import SWInputField from '../components/SWInputField';
 
 const EmailSignInScreen: React.FC<EmailSignInScreenProps> = ({ navigation }) => {
   const [email, setEmail] = useState('');
@@ -79,10 +81,12 @@ const EmailSignInScreen: React.FC<EmailSignInScreenProps> = ({ navigation }) => 
       >
         {/* Content */}
         <View style={styles.content}>
-          <SJText style={styles.subtitle}>{t('auth.signIn.title')}</SJText>
-          <SJText style={styles.description}>
-            {t('auth.signIn.description')}
-          </SJText>
+          <View style={styles.headerSection}>
+            <SJText style={styles.subtitle}>{t('auth.signIn.title')}</SJText>
+            <SJText style={styles.description}>
+              {t('auth.signIn.description')}
+            </SJText>
+          </View>
 
           {error && (
             <View style={styles.errorContainer}>
@@ -90,90 +94,85 @@ const EmailSignInScreen: React.FC<EmailSignInScreenProps> = ({ navigation }) => 
             </View>
           )}
 
-          {/* Google Sign-In as primary option */}
-          <TouchableOpacity
-            style={[styles.googleButton, isLoading && styles.disabledButton]}
-            onPress={handleGoogleSignIn}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <ActivityIndicator color="white" />
-            ) : (
-              <>
-                <Ionicons name="logo-google" size={20} color="#161200" style={styles.googleIcon} />
-                <SJText style={styles.googleButtonText}>{t('auth.common.continueWithGoogle')}</SJText>
-              </>
-            )}
-          </TouchableOpacity>
-
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <SJText style={styles.dividerText}>{t('auth.common.dividerLabel')}</SJText>
-            <View style={styles.dividerLine} />
-          </View>
-
-          {/* Email/Password as secondary option */}
-          <View style={styles.inputContainer}>
-            <Ionicons name="mail-outline" size={20} color="#666" style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder={t('auth.common.emailPlaceholder')}
-              placeholderTextColor="#999"
-              value={email}
-              onChangeText={(text) => {
-                setEmail(text);
-                setError(null);
-              }}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-          </View>
-
-          <View style={styles.inputContainer}>
-            <Ionicons name="lock-closed-outline" size={20} color="#666" style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder={t('auth.common.passwordPlaceholder')}
-              placeholderTextColor="#999"
-              value={password}
-              onChangeText={(text) => {
-                setPassword(text);
-                setError(null);
-              }}
-              secureTextEntry={!showPassword}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
+          <View style={styles.formSection}>
+            {/* Google Sign-In as primary option */}
             <TouchableOpacity
-              onPress={() => setShowPassword(!showPassword)}
-              style={styles.eyeIcon}
+              style={[styles.googleButton, isLoading && styles.disabledButton]}
+              onPress={handleGoogleSignIn}
+              disabled={isLoading}
             >
-              <Ionicons
-                name={showPassword ? 'eye-outline' : 'eye-off-outline'}
-                size={20}
-                color="#666"
-              />
+              {isLoading ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <>
+                  <Ionicons name="logo-google" size={20} color="white" style={styles.googleIcon} />
+                  <SJText style={styles.googleButtonText}>{t('auth.common.continueWithGoogle')}</SJText>
+                </>
+              )}
             </TouchableOpacity>
-          </View>
 
-          <TouchableOpacity
-            style={[styles.signInButton, isLoading && styles.disabledButton]}
-            onPress={handleSignIn}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <ActivityIndicator color="white" />
-            ) : (
-              <SJText style={styles.signInButtonText}>{t('auth.common.buttons.signInWithEmail')}</SJText>
-            )}
-          </TouchableOpacity>
+            <View style={styles.divider}>
+              <View style={styles.dividerLine} />
+              <SJText style={styles.dividerText}>{t('auth.common.dividerLabel')}</SJText>
+              <View style={styles.dividerLine} />
+            </View>
 
-          <View style={styles.signUpContainer}>
-            <SJText style={styles.signUpText}>{t('auth.common.links.noAccount')} </SJText>
-            <TouchableOpacity onPress={handleSignUpPress}>
-              <SJText style={styles.signUpLink}>{t('auth.common.links.signUp')}</SJText>
+            {/* Email/Password as secondary option */}
+            <SWInputField
+            placeholder={t('auth.common.emailPlaceholder')}
+            value={email}
+            onChangeText={(text) => {
+              setEmail(text);
+              setError(null);
+            }}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            leftButton={<Ionicons name="mail-outline" size={20} color="#666" />}
+          />
+
+          <SWInputField
+            placeholder={t('auth.common.passwordPlaceholder')}
+            value={password}
+            onChangeText={(text) => {
+              setPassword(text);
+              setError(null);
+            }}
+            secureTextEntry={!showPassword}
+            autoCapitalize="none"
+            autoCorrect={false}
+            leftButton={<Ionicons name="lock-closed-outline" size={20} color="#666" />}
+            rightButton={
+              <TouchableOpacity
+                onPress={() => setShowPassword(!showPassword)}
+              >
+                <Ionicons
+                  name={showPassword ? 'eye-outline' : 'eye-off-outline'}
+                  size={20}
+                  color="#666"
+                />
+              </TouchableOpacity>
+            }
+            />
+
+            <TouchableOpacity
+              style={[styles.signInButton, isLoading && styles.disabledButton]}
+              onPress={handleSignIn}
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <SJText style={styles.signInButtonText}>{t('auth.common.buttons.signInWithEmail')}</SJText>
+              )}
             </TouchableOpacity>
+
+            <View style={styles.signUpContainer}>
+              <SJText style={styles.signUpText}>{t('auth.common.links.noAccount')} </SJText>
+              <TouchableOpacity onPress={handleSignUpPress}>
+                <SJText style={styles.signUpLink}>{t('auth.common.links.signUp')}</SJText>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -184,45 +183,27 @@ const EmailSignInScreen: React.FC<EmailSignInScreenProps> = ({ navigation }) => 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#161200f',
+    backgroundColor: colors.primaryDark,
   },
   keyboardView: {
     flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  backButton: {
-    padding: 5,
-  },
-  backButtonText: {
-    fontSize: 16,
-    color: '#007AFF',
-    fontWeight: '500',
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  placeholder: {
-    width: 60,
   },
   content: {
     flex: 1,
     paddingHorizontal: 30,
     paddingTop: 40,
+    paddingBottom: 40,
+  },
+  headerSection: {
+    alignItems: 'center',
+    marginBottom: 30,
+  },
+  formSection: {
+    width: '100%',
   },
   subtitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 10,
   },
   description: {
@@ -241,42 +222,22 @@ const styles = StyleSheet.create({
     color: '#c00',
     fontSize: 14,
   },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 12,
-    paddingHorizontal: 15,
-    marginBottom: 20,
-    backgroundColor: '#f9f9f9',
-  },
-  inputIcon: {
-    marginRight: 10,
-  },
-  input: {
-    flex: 1,
-    fontSize: 16,
-    color: '#333',
-    paddingVertical: 15,
-  },
-  eyeIcon: {
-    padding: 5,
-  },
   signInButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: colors.primaryYellow,
     paddingVertical: 15,
     borderRadius: 12,
     alignItems: 'center',
     marginTop: 10,
+    paddingHorizontal: 12,
   },
   disabledButton: {
     backgroundColor: '#ccc',
   },
   signInButtonText: {
-    color: 'white',
+    color: colors.primaryDark,
     fontSize: 18,
     fontWeight: 'bold',
+    paddingHorizontal: 12,
   },
   divider: {
     flexDirection: 'row',
@@ -294,13 +255,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   googleButton: {
-    backgroundColor: '#4285F4',
+    backgroundColor: '#F54927',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 15,
     borderRadius: 12,
     marginTop: 10,
+    paddingHorizontal: 12,
     marginBottom: 20,
   },
   googleIcon: {
@@ -322,8 +284,8 @@ const styles = StyleSheet.create({
   },
   signUpLink: {
     fontSize: 14,
-    color: '#007AFF',
     fontWeight: '600',
+    color: colors.primaryYellow
   },
 });
 
