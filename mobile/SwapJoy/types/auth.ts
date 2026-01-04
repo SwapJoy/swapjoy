@@ -1,3 +1,5 @@
+import { ImageSourcePropType } from 'react-native';
+
 export interface User {
   id: string;
   phone?: string;
@@ -39,7 +41,7 @@ export interface OnboardingSlide {
   key: string;
   title: string;
   text: string;
-  image: string;
+  image: ImageSourcePropType;
 }
 
 export interface AuthState {

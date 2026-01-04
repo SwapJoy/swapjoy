@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -6,21 +6,25 @@ import {
   ScrollView,
   TouchableOpacity,
   SafeAreaView,
+  Image,
 } from 'react-native';
 import { useAppIntro } from '../hooks/useAppIntro';
 import { IntroScreenProps } from '../types/navigation';
 import { useLocalization } from '../localization';
-import { LanguageSelector } from '../components/LanguageSelector';
 import SJText from '../components/SJText';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { colors } from '@navigation/MainTabNavigator.styles';
+import { AppLanguage, SUPPORTED_LANGUAGES, LANGUAGE_LABELS } from '../types/language';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 const INTRO_COMPLETED_KEY = 'intro_completed';
 
 const IntroScreen: React.FC<IntroScreenProps> = ({ navigation }) => {
   const { slides, activeSlide, handleSlideChange, handleGetStarted } = useAppIntro();
   const { t, language, setLanguage } = useLocalization();
+  const scrollViewRef = useRef<ScrollView>(null);
+  const [hasSeenLastSlide, setHasSeenLastSlide] = useState(false);
 
   const handleGetStartedPress = async () => {
     // Mark intro as completed
@@ -31,7 +35,7 @@ const IntroScreen: React.FC<IntroScreenProps> = ({ navigation }) => {
   };
 
   const handleLanguageSelect = useCallback(
-    (nextLanguage: typeof language) => {
+    (nextLanguage: AppLanguage) => {
       void setLanguage(nextLanguage);
     },
     [setLanguage]
@@ -40,39 +44,60 @@ const IntroScreen: React.FC<IntroScreenProps> = ({ navigation }) => {
   const handleScroll = (event: any) => {
     const slideSize = event.nativeEvent.layoutMeasurement.width;
     const index = event.nativeEvent.contentOffset.x / slideSize;
-    handleSlideChange(Math.round(index));
+    const roundedIndex = Math.round(index);
+    handleSlideChange(roundedIndex);
+    
+    // Track if user has seen the last slide
+    if (roundedIndex === slides.length - 1) {
+      setHasSeenLastSlide(true);
+    }
   };
 
   const goToNext = () => {
     if (activeSlide < slides.length - 1) {
       const nextIndex = activeSlide + 1;
-      // Scroll logic would be handled by ScrollView
-      handleSlideChange(nextIndex);
-    }
-  };
-
-  const goToPrevious = () => {
-    if (activeSlide > 0) {
-      const prevIndex = activeSlide - 1;
-      // Scroll logic would be handled by ScrollView
-      handleSlideChange(prevIndex);
+      scrollViewRef.current?.scrollTo({
+        x: nextIndex * width,
+        animated: true,
+      });
+      // Don't update state here - let the scroll event handle it
+      // Track if user has reached the last slide
+      if (nextIndex === slides.length - 1) {
+        setHasSeenLastSlide(true);
+      }
     }
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.topBar}>
-        <LanguageSelector
-          selectedLanguage={language}
-          onSelect={handleLanguageSelect}
-        />
-        <TouchableOpacity style={styles.skipButton} onPress={handleGetStartedPress}>
-          <SJText style={styles.skipText}>{t('onboarding.actions.skip')}</SJText>
-        </TouchableOpacity>
+      {/* Language Switcher - Centered on top */}
+      <View style={styles.languageContainer}>
+        <View style={styles.inlineSelectionContainer}>
+          {SUPPORTED_LANGUAGES.map((lang) => (
+            <TouchableOpacity
+              key={lang}
+              style={[
+                styles.inlineSelectionButton,
+                language === lang && styles.inlineSelectionButtonSelected,
+              ]}
+              onPress={() => handleLanguageSelect(lang)}
+            >
+              <SJText
+                style={[
+                  styles.inlineSelectionText,
+                  language === lang && styles.inlineSelectionTextSelected,
+                ]}
+              >
+                {LANGUAGE_LABELS[lang]}
+              </SJText>
+            </TouchableOpacity>
+          ))}
+        </View>
       </View>
 
       {/* Sliding content */}
       <ScrollView
+        ref={scrollViewRef}
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
@@ -82,11 +107,15 @@ const IntroScreen: React.FC<IntroScreenProps> = ({ navigation }) => {
       >
         {slides.map((item) => (
           <View key={item.key} style={styles.slide}>
-            <View style={styles.imageContainer}>
-              <SJText style={styles.emoji}>{item.image}</SJText>
+            <Image
+              source={item.image}
+              style={styles.introImage}
+              resizeMode="contain"
+            />
+            <View style={styles.textContainer}>
+              <SJText style={styles.title}>{item.title}</SJText>
+              <SJText style={styles.description}>{item.text}</SJText>
             </View>
-            <SJText style={styles.title}>{item.title}</SJText>
-            <SJText style={styles.description}>{item.text}</SJText>
           </View>
         ))}
       </ScrollView>
@@ -106,19 +135,13 @@ const IntroScreen: React.FC<IntroScreenProps> = ({ navigation }) => {
 
       {/* Navigation buttons */}
       <View style={styles.navigationContainer}>
-        {activeSlide > 0 && (
-          <TouchableOpacity style={styles.navButton} onPress={goToPrevious}>
-            <SJText style={styles.navButtonText}>{t('onboarding.actions.previous')}</SJText>
-          </TouchableOpacity>
-        )}
-        
-        {activeSlide < slides.length - 1 ? (
-          <TouchableOpacity style={styles.navButton} onPress={goToNext}>
-            <SJText style={styles.navButtonText}>{t('onboarding.actions.next')}</SJText>
+        {hasSeenLastSlide ? (
+          <TouchableOpacity style={styles.getStartedButton} onPress={handleGetStartedPress}>
+            <SJText style={styles.getStartedButtonText}>{t('onboarding.actions.getStarted')}</SJText>
           </TouchableOpacity>
         ) : (
-          <TouchableOpacity style={styles.signInButton} onPress={handleGetStartedPress}>
-            <SJText style={styles.signInButtonText}>{t('onboarding.actions.getStarted')}</SJText>
+          <TouchableOpacity style={styles.navButton} onPress={goToNext}>
+            <SJText style={styles.navButtonText}>{t('onboarding.actions.next')}</SJText>
           </TouchableOpacity>
         )}
       </View>
@@ -129,23 +152,41 @@ const IntroScreen: React.FC<IntroScreenProps> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#161200f',
+    backgroundColor: colors.primaryDark,
   },
-  topBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  languageContainer: {
     alignItems: 'center',
-    paddingHorizontal: 20,
     paddingTop: 20,
+    paddingBottom: 10,
   },
-  skipButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+  inlineSelectionContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
-  skipText: {
-    fontSize: 16,
-    color: '#666',
+  inlineSelectionButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'transparent',
+    backgroundColor: 'transparent',
+  },
+  inlineSelectionButtonSelected: {
+    backgroundColor: colors.primaryYellow,
+    borderColor: colors.primaryYellow,
+  },
+  inlineSelectionText: {
+    fontSize: 14,
+    color: '#fff',
     fontWeight: '500',
+  },
+  inlineSelectionTextSelected: {
+    color: colors.primaryDark,
+    fontWeight: '600',
   },
   scrollView: {
     flex: 1,
@@ -153,53 +194,53 @@ const styles = StyleSheet.create({
   slide: {
     width,
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 40,
   },
-  imageContainer: {
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    backgroundColor: '#f0f0f0',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 40,
+  introImage: {
+    width: '100%',
+    height: height * 0.42,
   },
-  emoji: {
-    fontSize: 80,
+  textContainer: {
+    paddingHorizontal: 28,
+    paddingTop: 16,
+    paddingBottom: 8,
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    flex: 1,
   },
   title: {
-    fontSize: 28,
+    fontSize: 22,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#fff',
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: 10,
   },
   description: {
-    fontSize: 16,
-    color: '#666',
+    fontSize: 14,
+    color: '#ccc',
     textAlign: 'center',
-    lineHeight: 24,
+    lineHeight: 20,
   },
   indicatorContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginBottom: 40,
+    marginBottom: 30,
+    paddingTop: 10,
   },
   indicator: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#ddd',
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
     marginHorizontal: 4,
   },
   activeIndicator: {
-    backgroundColor: '#007AFF',
+    backgroundColor: colors.primaryYellow,
+    width: 24,
   },
   navigationContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
+    alignItems: 'center',
     paddingHorizontal: 40,
     paddingBottom: 40,
     gap: 12,
@@ -210,19 +251,19 @@ const styles = StyleSheet.create({
   },
   navButtonText: {
     fontSize: 16,
-    color: '#007AFF',
+    color: colors.primaryYellow,
     fontWeight: '500',
   },
-  signInButton: {
-    backgroundColor: '#007AFF',
+  getStartedButton: {
+    backgroundColor: colors.primaryYellow,
     paddingHorizontal: 40,
     paddingVertical: 15,
     borderRadius: 25,
     flex: 1,
     alignItems: 'center',
   },
-  signInButtonText: {
-    color: 'white',
+  getStartedButtonText: {
+    color: colors.primaryDark,
     fontSize: 18,
     fontWeight: 'bold',
   },

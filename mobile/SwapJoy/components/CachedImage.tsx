@@ -72,7 +72,7 @@ const CachedImage: React.FC<CachedImageProps> = React.memo(({
         defaultSource={defaultSource as any}
       />
       {isLoading && showLoader && !imageLoaded && (
-        <View style={styles.loaderContainer}>
+        <View style={styles.loaderContainer} pointerEvents="none">
           <ActivityIndicator size="small" color="#666" />
         </View>
       )}
