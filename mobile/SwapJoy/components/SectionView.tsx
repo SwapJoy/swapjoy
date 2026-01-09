@@ -308,6 +308,7 @@ export const SectionView: React.FC<SectionViewProps> = memo(({
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.horizontalList}
+          nestedScrollEnabled={true}
         />
       </View>
     </View>
