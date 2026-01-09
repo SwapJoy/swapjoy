@@ -53,7 +53,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
       headerTitle: () => (
         <Image
           source={require('../assets/swapjoy-logo.png')}
-          style={{ width: 200 }}
+          style={{ width: 100, height: 24 }}
           resizeMode='contain'
         />
       ),
@@ -104,6 +104,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        nestedScrollEnabled={true}
       >
         {sections.map((section) => (
           <SectionView
