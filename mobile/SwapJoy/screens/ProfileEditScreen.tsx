@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {View, StyleSheet, TouchableOpacity, TextInput, ScrollView, Image, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, } from 'react-native';
+import {View, StyleSheet, TouchableOpacity, ScrollView, Image, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, } from 'react-native';
 import SJText from '../components/SJText';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,6 +10,7 @@ import { useLocalization } from '../localization';
 import { ApiService } from '../services/api';
 import { UserService } from '../services/userService';
 import { ImageUploadService } from '../services/imageUpload';
+import SWInputField from '../components/SWInputField';
 
 const AVATAR_SIZE = 120;
 const BIO_MAX_LENGTH = 240;
@@ -182,7 +183,7 @@ const ProfileEditScreen: React.FC<ProfileEditScreenProps> = ({ navigation, route
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#1f7ae0" />
+        <ActivityIndicator size="large" color={colors.primaryYellow} />
       </View>
     );
   }
@@ -199,7 +200,7 @@ const ProfileEditScreen: React.FC<ProfileEditScreenProps> = ({ navigation, route
               <Image source={{ uri: profileImageUrl }} style={styles.avatar} />
             ) : (
               <View style={styles.avatarPlaceholder}>
-                <Ionicons name="camera" size={32} color="#94a3b8" />
+                <Ionicons name="camera" size={32} color={colors.primaryYellow} />
                 <SJText style={styles.avatarPlaceholderText}>
                   {t('settings.profile.editFormPhotoPlaceholder', { defaultValue: 'Add photo' })}
                 </SJText>
@@ -212,7 +213,7 @@ const ProfileEditScreen: React.FC<ProfileEditScreenProps> = ({ navigation, route
               activeOpacity={0.8}
             >
               {uploadingPhoto ? (
-                <ActivityIndicator size="small" color="#1f7ae0" />
+                <ActivityIndicator size="small" color="#000" />
               ) : (
                 <SJText style={styles.changePhotoText}>
                   {t('settings.profile.editFormChangePhoto', { defaultValue: 'Change photo' })}
@@ -234,81 +235,58 @@ const ProfileEditScreen: React.FC<ProfileEditScreenProps> = ({ navigation, route
         </View>
 
         <View style={styles.form}>
-          <View style={styles.fieldGroup}>
-            <SJText style={styles.fieldLabel}>
-              {t('settings.profile.editFormFirstNameLabel', { defaultValue: 'First name' })}
-            </SJText>
-            <TextInput
-              style={[styles.textInput, firstNameError ? styles.textInputError : null]}
-              value={firstName}
-              onChangeText={setFirstName}
-              placeholder={t('settings.profile.editFormFirstNamePlaceholder', { defaultValue: 'Enter your first name' })}
-              autoCapitalize="words"
-            />
-          </View>
+          <SWInputField
+            label={t('settings.profile.editFormFirstNameLabel', { defaultValue: 'First name' })}
+            placeholder={t('settings.profile.editFormFirstNamePlaceholder', { defaultValue: 'Enter your first name' })}
+            value={firstName}
+            onChangeText={setFirstName}
+            autoCapitalize="words"
+            required
+            error={firstNameError || undefined}
+          />
 
-          <View style={styles.fieldGroup}>
-            <SJText style={styles.fieldLabel}>
-              {t('settings.profile.editFormLastNameLabel', { defaultValue: 'Last name' })}
-            </SJText>
-            <TextInput
-              style={styles.textInput}
-              value={lastName}
-              onChangeText={setLastName}
-              placeholder={t('settings.profile.editFormLastNamePlaceholder', { defaultValue: 'Enter your last name' })}
-              autoCapitalize="words"
-            />
-          </View>
+          <SWInputField
+            label={t('settings.profile.editFormLastNameLabel', { defaultValue: 'Last name' })}
+            placeholder={t('settings.profile.editFormLastNamePlaceholder', { defaultValue: 'Enter your last name' })}
+            value={lastName}
+            onChangeText={setLastName}
+            autoCapitalize="words"
+          />
 
-          <View style={styles.fieldGroup}>
-            <SJText style={styles.fieldLabel}>
-              {t('settings.profile.editFormUsernameLabel', { defaultValue: 'Username' })}
-            </SJText>
-            <TextInput
-              style={styles.textInput}
-              value={username}
-              onChangeText={setUsername}
-              placeholder={t('settings.profile.editFormUsernamePlaceholder', { defaultValue: 'Choose a username' })}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-          </View>
+          <SWInputField
+            label={t('settings.profile.editFormUsernameLabel', { defaultValue: 'Username' })}
+            placeholder={t('settings.profile.editFormUsernamePlaceholder', { defaultValue: 'Choose a username' })}
+            value={username}
+            onChangeText={setUsername}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
 
-          <View style={styles.fieldGroup}>
-            <View style={styles.fieldLabelRow}>
-              <SJText style={styles.fieldLabel}>
-                {t('settings.profile.editFormBioLabel', { defaultValue: 'Bio' })}
-              </SJText>
-              <SJText style={styles.fieldHelper}>
-                {bio.length}/{BIO_MAX_LENGTH}
-              </SJText>
-            </View>
-            <TextInput
-              style={[styles.textInput, styles.bioInput]}
-              value={bio}
-              onChangeText={(value) => {
-                if (value.length <= BIO_MAX_LENGTH) {
-                  setBio(value);
-                }
-              }}
-              placeholder={t('settings.profile.editFormBioPlaceholder', { defaultValue: 'Tell others a bit about you' })}
-              multiline
-              textAlignVertical="top"
-            />
-          </View>
+          <SWInputField
+            label={t('settings.profile.editFormBioLabel', { defaultValue: 'Bio' })}
+            placeholder={t('settings.profile.editFormBioPlaceholder', { defaultValue: 'Tell others a bit about you' })}
+            value={bio}
+            onChangeText={(value) => {
+              if (value.length <= BIO_MAX_LENGTH) {
+                setBio(value);
+              }
+            }}
+            multiline
+            maxLength={BIO_MAX_LENGTH}
+          />
         </View>
 
         <TouchableOpacity
           style={[styles.saveButton, (saving || uploadingPhoto) && styles.saveButtonDisabled]}
           onPress={handleSave}
           disabled={saving || uploadingPhoto}
-          activeOpacity={0.85}
-          >
-            {saving ? (
-              <ActivityIndicator size="small" color={colors.primaryDark} />
-            ) : (
-              <SJText style={styles.saveButtonText}>{t('common.save')}</SJText>
-            )}
+          activeOpacity={0.8}
+        >
+          {saving ? (
+            <ActivityIndicator size="small" color="#000" />
+          ) : (
+            <SJText style={styles.saveButtonText}>{t('common.save')}</SJText>
+          )}
         </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -318,7 +296,7 @@ const ProfileEditScreen: React.FC<ProfileEditScreenProps> = ({ navigation, route
 const styles = StyleSheet.create({
   flex: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.primaryDark,
   },
   container: {
     paddingHorizontal: 20,
@@ -328,7 +306,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f8fafc',
+    backgroundColor: colors.primaryDark,
   },
   avatarSection: {
     alignItems: 'center',
@@ -349,12 +327,12 @@ const styles = StyleSheet.create({
     borderRadius: AVATAR_SIZE / 2,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#e2e8f0',
+    backgroundColor: '#2a2a2a',
     gap: 6,
   },
   avatarPlaceholderText: {
     fontSize: 13,
-    color: '#475569',
+    color: colors.primaryYellow,
     fontWeight: '500',
   },
   changePhotoButton: {
@@ -362,12 +340,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#1f7ae0',
+    borderColor: colors.primaryYellow,
     backgroundColor: colors.primaryYellow,
   },
   changePhotoText: {
     fontSize: 14,
-    color: '#1f7ae0',
+    color: '#000',
     fontWeight: '600',
   },
   removePhotoButton: {
@@ -379,63 +357,22 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   form: {
-    backgroundColor: colors.primaryDark,
-    borderRadius: 16,
-    padding: 20,
-    gap: 18,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  fieldGroup: {
-    gap: 8,
-  },
-  fieldLabelRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  fieldLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#0f172a',
-  },
-  fieldHelper: {
-    fontSize: 12,
-    color: '#94a3b8',
-  },
-  textInput: {
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-    color: '#0f172a',
-    backgroundColor: '#f8fafc',
-  },
-  textInputError: {
-    borderColor: '#ef4444',
-  },
-  bioInput: {
-    minHeight: 110,
-    textAlignVertical: 'top',
+    
   },
   saveButton: {
     marginTop: 24,
-    backgroundColor: '#1f7ae0',
+    backgroundColor: colors.primaryYellow,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 14,
   },
   saveButtonDisabled: {
-    opacity: 0.6,
+    backgroundColor: '#444',
+    opacity: 0.5,
   },
   saveButtonText: {
-    color: colors.primaryDark,
+    color: '#000',
     fontSize: 16,
     fontWeight: '700',
   },

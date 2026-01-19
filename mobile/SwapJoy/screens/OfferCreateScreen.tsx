@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
-import {View, StyleSheet, FlatList, TouchableOpacity, TextInput, Switch, Dimensions, ActivityIndicator, Alert} from 'react-native';
+import {View, StyleSheet, FlatList, TouchableOpacity, Switch, Dimensions, ActivityIndicator, Alert} from 'react-native';
 import { colors } from '@navigation/MainTabNavigator.styles';
 import SJText from '../components/SJText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -9,6 +9,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { ApiService } from '../services/api';
 import { formatCurrency } from '../utils';
 import { useLocalization } from '../localization';
+import SWInputField from '../components/SWInputField';
 
 const { width } = Dimensions.get('window');
 
@@ -179,29 +180,25 @@ const OfferCreateScreen: React.FC<OfferCreateScreenProps> = ({ navigation, route
     return { length: ROW_HEIGHT, offset: ROW_HEIGHT * index, index };
   }, []);
 
+  const firstRequestedItem = useMemo(() => requestedItems[0] || null, [requestedItems]);
+
   const listHeader = useMemo(() => (
     <View>
-      <SJText style={styles.sectionTitle}>{contextTitle || strings.requestedTitle}</SJText>
-      <FlatList
-        data={requestedItems}
-        keyExtractor={(it) => it.id}
-        renderItem={renderRequestedItemFn}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 16 }}
-      />
-
       <View style={styles.moneyBox}>
         <View style={styles.toggleRow}>
           <SJText style={styles.toggleLabel}>{strings.toggleLabel}</SJText>
-          <Switch value={iWillAddMoney} onValueChange={setIWillAddMoney} />
+          <Switch 
+            value={iWillAddMoney} 
+            onValueChange={setIWillAddMoney}
+            trackColor={{ false: '#767577', true: colors.primaryYellow }}
+            thumbColor={iWillAddMoney ? colors.primaryDark : '#f4f3f4'}
+          />
         </View>
-        <TextInput
+        <SWInputField
           placeholder={iWillAddMoney ? strings.placeholderAdd : strings.placeholderRequest}
           keyboardType="decimal-pad"
           value={amountInput}
           onChangeText={setAmountInput}
-          style={styles.amountInput}
         />
       </View>
 
@@ -209,7 +206,7 @@ const OfferCreateScreen: React.FC<OfferCreateScreenProps> = ({ navigation, route
         <SJText style={styles.sectionTitle}>{strings.selectYourItems}</SJText>
       </View>
     </View>
-  ), [contextTitle, requestedItems, iWillAddMoney, amountInput, renderRequestedItemFn, strings.placeholderAdd, strings.placeholderRequest, strings.requestedTitle, strings.selectYourItems, strings.toggleLabel]);
+  ), [iWillAddMoney, amountInput, strings.placeholderAdd, strings.placeholderRequest, strings.selectYourItems, strings.toggleLabel]);
 
   if (loading) {
     return (
@@ -220,13 +217,50 @@ const OfferCreateScreen: React.FC<OfferCreateScreenProps> = ({ navigation, route
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
-      {listHeader}
+    <View style={styles.container}>
+      {firstRequestedItem && (
+        <View style={styles.topItemInfo}>
+          <CachedImage
+            uri={
+              firstRequestedItem.image_url ||
+              firstRequestedItem.images?.[0]?.image_url ||
+              firstRequestedItem.images?.[0]?.url ||
+              'https://via.placeholder.com/200x150'
+            }
+            style={styles.topItemImage}
+            resizeMode="cover"
+            fallbackUri="https://picsum.photos/200/150?random=6"
+            showLoader={false}
+            defaultSource={require('../assets/icon.png')}
+          />
+          <View style={styles.topItemContent}>
+            <SJText style={styles.topItemTitle} numberOfLines={1}>
+              {firstRequestedItem.title}
+            </SJText>
+            {firstRequestedItem.description && (
+              <SJText style={styles.topItemDescription} numberOfLines={2}>
+                {firstRequestedItem.description}
+              </SJText>
+            )}
+            <View style={styles.topItemBottomRow}>
+              <SJText style={styles.topItemPrice}>
+                {formatCurrency(firstRequestedItem.price || 0, firstRequestedItem.currency || 'USD')}
+              </SJText>
+              {firstRequestedItem.condition && (
+                <SJText style={styles.topItemCondition}>
+                  • {firstRequestedItem.condition}
+                </SJText>
+              )}
+            </View>
+          </View>
+        </View>
+      )}
       <FlatList
         data={myItems}
         keyExtractor={(it) => it.id}
         renderItem={renderMyItem}
         extraData={selectedIds}
+        ListHeaderComponent={listHeader}
         contentContainerStyle={{ paddingBottom: 120 }}
         removeClippedSubviews={false}
         windowSize={10}
@@ -237,44 +271,97 @@ const OfferCreateScreen: React.FC<OfferCreateScreenProps> = ({ navigation, route
       />
 
       <View style={styles.footer}>
-        <TextInput
+        <SWInputField
           placeholder={strings.messagePlaceholder}
           value={message}
           onChangeText={setMessage}
-          style={styles.messageInput}
           multiline
         />
-        <TouchableOpacity style={[styles.nextBtn, !canProceed && { opacity: 0.5 }]} disabled={!canProceed} onPress={onNext}>
+        <TouchableOpacity 
+          style={[styles.nextBtn, !canProceed && styles.nextBtnDisabled]} 
+          disabled={!canProceed} 
+          onPress={onNext}
+          activeOpacity={0.8}
+        >
           <SJText style={styles.nextText}>{strings.nextButton}</SJText>
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.primaryDark },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primaryDark },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: '#111', paddingHorizontal: 16, paddingVertical: 8 },
-  reqCard: { backgroundColor: colors.primaryDark, marginRight: 12, borderRadius: 10, overflow: 'hidden', width: Math.min(220, Math.round(width * 0.55)) },
-  reqImage: { width: '100%', height: 120, backgroundColor: '#eee' },
-  reqTitle: { paddingHorizontal: 10, paddingTop: 8, fontSize: 14, fontWeight: '600', color: '#111' },
-  reqPrice: { paddingHorizontal: 10, paddingBottom: 10, paddingTop: 4, fontSize: 13, color: '#007AFF', fontWeight: '600' },
-  moneyBox: { backgroundColor: colors.primaryDark, marginHorizontal: 16, marginVertical: 12, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: '#eee' },
-  toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  toggleLabel: { fontSize: 14, color: '#111', fontWeight: '600' },
-  amountInput: { marginTop: 8, borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 10, backgroundColor: '#fafafa' },
-  myItemCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.primaryDark, marginHorizontal: 16, marginBottom: 10, borderRadius: 12, padding: 10, borderWidth: 1, borderColor: '#eee' },
-  myItemImage: { width: 80, height: 60, marginRight: 10, backgroundColor: '#eee', borderRadius: 8 },
-  myItemTitle: { fontSize: 14, fontWeight: '600', color: '#111' },
-  myItemMeta: { fontSize: 12, color: '#666', marginTop: 2 },
-  checkbox: { width: 20, height: 20, borderRadius: 5, borderWidth: 2, borderColor: '#ccc', marginLeft: 12 },
-  checkboxOn: { backgroundColor: '#007AFF', borderColor: '#007AFF' },
-  selectedCard: { borderColor: '#007AFF' },
-  footer: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: 16, backgroundColor: 'rgba(255,255,255,0.98)', borderTopWidth: 1, borderTopColor: '#eee' },
-  messageInput: { minHeight: 60, maxHeight: 120, borderWidth: 1, borderColor: '#ddd', borderRadius: 10, padding: 10, backgroundColor: colors.primaryDark, marginBottom: 12 },
-  nextBtn: { backgroundColor: '#007AFF', borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
-  nextText: { color: colors.primaryDark, fontSize: 16, fontWeight: '700' },
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.primaryYellow, paddingHorizontal: 16, paddingVertical: 8 },
+  topItemInfo: {
+    height: 80,
+    width: '100%',
+    flexDirection: 'row',
+    backgroundColor: '#1a1a1a',
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+    zIndex: 10,
+  },
+  topItemImage: {
+    width: 100,
+    height: 80,
+    backgroundColor: '#2a2a2a',
+  },
+  topItemContent: {
+    flex: 1,
+    padding: 12,
+    justifyContent: 'space-between',
+  },
+  topItemTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.primaryYellow,
+    marginBottom: 4,
+  },
+  topItemDescription: {
+    fontSize: 12,
+    color: '#999',
+    marginBottom: 4,
+    lineHeight: 16,
+  },
+  topItemBottomRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  topItemPrice: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.primaryYellow,
+  },
+  topItemCondition: {
+    fontSize: 12,
+    color: '#999',
+    marginLeft: 4,
+  },
+  reqCard: { backgroundColor: '#1a1a1a', marginRight: 12, borderRadius: 10, overflow: 'hidden', width: Math.min(220, Math.round(width * 0.55)), borderWidth: 1, borderColor: '#333' },
+  reqImage: { width: '100%', height: 120, backgroundColor: '#2a2a2a' },
+  reqTitle: { paddingHorizontal: 10, paddingTop: 8, fontSize: 14, fontWeight: '600', color: colors.primaryYellow },
+  reqPrice: { paddingHorizontal: 10, paddingBottom: 10, paddingTop: 4, fontSize: 13, color: colors.primaryYellow, fontWeight: '600' },
+  moneyBox: { backgroundColor: '#1a1a1a', marginHorizontal: 16, marginVertical: 12, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: '#333' },
+  toggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+  toggleLabel: { fontSize: 14, color: colors.primaryYellow, fontWeight: '600' },
+  myItemCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1a1a1a', marginHorizontal: 16, marginBottom: 10, borderRadius: 12, padding: 10, borderWidth: 1, borderColor: '#333' },
+  myItemImage: { width: 80, height: 60, marginRight: 10, backgroundColor: '#2a2a2a', borderRadius: 8 },
+  myItemTitle: { fontSize: 14, fontWeight: '600', color: colors.primaryYellow },
+  myItemMeta: { fontSize: 12, color: '#999', marginTop: 2 },
+  checkbox: { width: 20, height: 20, borderRadius: 5, borderWidth: 2, borderColor: '#666', marginLeft: 12 },
+  checkboxOn: { backgroundColor: colors.primaryYellow, borderColor: colors.primaryYellow },
+  selectedCard: { borderColor: colors.primaryYellow },
+  footer: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: 16, backgroundColor: colors.primaryDark, borderTopWidth: 1, borderTopColor: '#333' },
+  nextBtn: { backgroundColor: colors.primaryYellow, borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
+  nextBtnDisabled: { backgroundColor: '#444', opacity: 0.5 },
+  nextText: { color: '#000', fontSize: 16, fontWeight: '700' },
 });
 
 export default OfferCreateScreen;

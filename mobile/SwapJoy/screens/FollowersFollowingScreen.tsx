@@ -164,7 +164,7 @@ const FollowersFollowingScreen: React.FC = memo(() => {
       {/* Content */}
       {isLoading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
+          <ActivityIndicator size="large" color={colors.primaryYellow} />
           <SJText style={styles.loadingText}>Loading...</SJText>
         </View>
       ) : (
@@ -194,9 +194,6 @@ const styles = StyleSheet.create({
   },
   tabsWrapper: {
     backgroundColor: colors.primaryDark,
-    paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5EA',
   },
   tabsContainer: {
     flexDirection: 'row',
@@ -212,7 +209,7 @@ const styles = StyleSheet.create({
     borderBottomColor: 'transparent',
   },
   tabButtonActive: {
-    borderBottomColor: '#007AFF',
+    borderBottomColor: colors.primaryYellow,
   },
   tabText: {
     color: '#8E8E93',
@@ -220,7 +217,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   tabTextActive: {
-    color: '#007AFF',
+    color: colors.primaryYellow,
     fontWeight: '700',
   },
   loadingContainer: {

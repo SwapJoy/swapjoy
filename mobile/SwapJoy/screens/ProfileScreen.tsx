@@ -911,7 +911,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   followButtonPrimary: {
-    backgroundColor: '#007AFF',
+    backgroundColor: colors.primaryYellow,
   },
   followButtonFollowing: {
     borderWidth: 1,

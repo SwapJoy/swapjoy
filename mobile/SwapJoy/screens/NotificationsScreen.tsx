@@ -45,7 +45,7 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = memo(() => {
           style={styles.headerButton}
           onPress={() => setPopoverVisible(true)}
         >
-          <Ionicons name="ellipsis-vertical" size={20} color="#007AFF" />
+          <Ionicons name="ellipsis-vertical" size={20} color={colors.primaryDark} />
         </TouchableOpacity>
       ),
     });
@@ -246,7 +246,7 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = memo(() => {
               style={styles.popoverItem}
               onPress={handleMarkAllAsRead}
             >
-              <Ionicons name="checkmark-done" size={20} color="#007AFF" style={styles.popoverIcon} />
+              <Ionicons name="checkmark-done" size={20} color={colors.primaryYellow} style={styles.popoverIcon} />
               <SJText style={styles.popoverText}>Mark all as read</SJText>
             </Pressable>
           </View>

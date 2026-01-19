@@ -63,7 +63,7 @@ const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
 
         {/* Content */}
         <View style={styles.content}>
-          <SJText style={styles.subtitle}>Enter verication code</SJText>
+          <SJText style={styles.subtitle}>Enter verification code</SJText>
           <SJText style={styles.description}>
             We sent a 6-digit code to{'\n'}
             <SJText style={styles.phoneNumber}>{phone}</SJText>
