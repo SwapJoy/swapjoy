@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import {View, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Image, Dimensions, } from 'react-native';
+import {View, StyleSheet, ScrollView, Alert, ActivityIndicator, Image, Dimensions, } from 'react-native';
 import SJText from '../components/SJText';
 import { Ionicons } from '@expo/vector-icons';
 import { ItemPreviewScreenProps } from '../types/navigation';
@@ -8,6 +8,7 @@ import { Category, ItemCondition } from '../types/item';
 import { formatCurrency } from '../utils';
 import { useLocalization } from '../localization';
 import { colors } from '@navigation/MainTabNavigator.styles';
+import PrimaryButton from '../components/PrimaryButton';
 
 const { width } = Dimensions.get('window');
 
@@ -30,7 +31,6 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
     },
     note: t('addItem.preview.note'),
     buttons: {
-      edit: t('addItem.preview.buttons.edit'),
       submit: t('addItem.preview.buttons.submit'),
       submitting: t('addItem.preview.buttons.submitting'),
     },
@@ -154,9 +154,6 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
     }
   };
 
-  const handleEdit = () => {
-    navigation.goBack();
-  };
 
   if (loading || !itemData) {
     return (
@@ -251,16 +248,6 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
               <SJText style={styles.infoValue}>{category?.name || t('common.notAvailable')}</SJText>
             </View>
             <View style={styles.infoRow}>
-              <SJText style={styles.infoLabel}>{strings.info.condition}</SJText>
-              <SJText style={styles.infoValue}>{getConditionLabel(itemData.condition)}</SJText>
-            </View>
-            <View style={styles.infoRow}>
-              <SJText style={styles.infoLabel}>{strings.info.price}</SJText>
-              <SJText style={styles.infoValue}>
-                {formatCurrency(itemData.price, itemData.currency)}
-              </SJText>
-            </View>
-            <View style={styles.infoRow}>
               <SJText style={styles.infoLabel}>{strings.info.location}</SJText>
               <SJText style={styles.infoValue}>
                 {itemData.location_label ??
@@ -282,32 +269,12 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
       </ScrollView>
 
       {/* Submit Button */}
-      <View style={styles.footer}>
-        <TouchableOpacity
-          style={styles.editButton}
-          onPress={handleEdit}
-          disabled={submitting}
-        >
-          <SJText style={styles.editButtonText}>{strings.buttons.edit}</SJText>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.submitButton, submitting && styles.submitButtonDisabled]}
-          onPress={handleSubmit}
-          disabled={submitting}
-        >
-          {submitting ? (
-            <>
-              <ActivityIndicator size="small" color={colors.primaryDark} />
-              <SJText style={styles.submitButtonText}>{strings.buttons.submitting}</SJText>
-            </>
-          ) : (
-            <>
-              <SJText style={styles.submitButtonText}>{strings.buttons.submit}</SJText>
-              <Ionicons name="checkmark" size={20} color={colors.primaryDark} />
-            </>
-          )}
-        </TouchableOpacity>
-      </View>
+      <PrimaryButton
+        onPress={handleSubmit}
+        disabled={submitting}
+        label={submitting ? strings.buttons.submitting : strings.buttons.submit}
+        showArrow={!submitting}
+      />
     </View>
   );
 };
@@ -435,41 +402,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     lineHeight: 20
-  },
-  footer: {
-    flexDirection: 'row',
-    gap: 12,
-    padding: 16,
-  },
-  editButton: {
-    flex: 1,
-    paddingVertical: 16,
-    borderRadius: 12,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  editButtonText: {
-    fontSize: 18,
-    fontWeight: '600'
-  },
-  submitButton: {
-    flex: 2,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: colors.primaryYellow,
-    paddingVertical: 16,
-    borderRadius: 12,
-  },
-  submitButtonDisabled: {
-    backgroundColor: '#ccc',
-  },
-  submitButtonText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#000',
   },
 });
 

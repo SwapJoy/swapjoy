@@ -1,8 +1,10 @@
 import React from 'react';
-import { View, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import SJText from '../SJText';
+import SWInputField from '../SWInputField';
 import { City } from '../../hooks/useLocation';
+import { colors } from '@navigation/MainTabNavigator.styles';
 
 interface CitySuggestionsProps {
   cities: City[];
@@ -18,7 +20,7 @@ const CitySuggestions: React.FC<CitySuggestionsProps> = ({ cities, onSelectCity 
         onPressOut={() => onSelectCity(city)}
         activeOpacity={0.7}
       >
-        <Ionicons name="location" size={16} color="#64748b" />
+        <Ionicons name="location" size={16} color={colors.primaryYellow} />
         <View style={styles.citySuggestionText}>
           <SJText style={styles.citySuggestionName}>{city.name}</SJText>
           <SJText style={styles.citySuggestionCountry}>
@@ -59,25 +61,24 @@ const InlineLocationInput: React.FC<InlineLocationInputProps> = ({
   t,
 }) => (
   <View style={styles.locationInputContainer}>
-    <View style={styles.locationInputWrapper}>
-      <Ionicons name="location-outline" size={18} color="#64748b" />
-      <TextInput
-        style={styles.locationInput}
-        placeholder={placeholder}
-        placeholderTextColor="#94a3b8"
-        value={value}
-        onChangeText={onChangeText}
-        onFocus={onFocus}
-        onBlur={onBlur}
-      />
-      <TouchableOpacity
-        style={styles.currentLocationButton}
-        onPress={onUseCurrentLocation}
-        accessibilityLabel={t('search.useCurrentLocation', { defaultValue: 'Use current location' })}
-      >
-        <Ionicons name="navigate" size={18} color={hasCurrentLocation ? '#0ea5e9' : '#94a3b8'} />
-      </TouchableOpacity>
-    </View>
+    <SWInputField
+      value={value}
+      onChangeText={onChangeText}
+      onFocus={onFocus}
+      onBlur={onBlur}
+      placeholder={placeholder}
+      leftButton={
+        <Ionicons name="location-outline" size={18} color={colors.primaryYellow} />
+      }
+      rightButton={
+        <TouchableOpacity
+          onPress={onUseCurrentLocation}
+          accessibilityLabel={t('search.useCurrentLocation', { defaultValue: 'Use current location' })}
+        >
+          <Ionicons name="navigate" size={18} color={hasCurrentLocation ? colors.primaryYellow : colors.inactive} />
+        </TouchableOpacity>
+      }
+    />
     {showSuggestions && suggestions.length > 0 && (
       <CitySuggestions cities={suggestions} onSelectCity={onSelectCity} />
     )}
@@ -89,43 +90,16 @@ const styles = StyleSheet.create({
     position: 'relative',
     zIndex: 1000,
   },
-  locationInputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f1f5f9',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  locationInput: {
-    flex: 1,
-    marginLeft: 8,
-    marginRight: 8,
-    fontSize: 14,
-    color: '#0f172a',
-    paddingRight: 32,
-  },
-  currentLocationButton: {
-    position: 'absolute',
-    right: 12,
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 16,
-  },
   citySuggestionsContainer: {
     position: 'absolute',
     top: '100%',
     left: 0,
     right: 0,
     marginTop: 4,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.primaryDark,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: colors.primaryYellow,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -140,7 +114,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#f1f5f9',
+    borderBottomColor: 'rgba(255, 222, 33, 0.2)',
   },
   citySuggestionText: {
     flex: 1,
@@ -149,11 +123,11 @@ const styles = StyleSheet.create({
   citySuggestionName: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#0f172a',
+    color: colors.white,
   },
   citySuggestionCountry: {
     fontSize: 12,
-    color: '#64748b',
+    color: colors.inactive,
     marginTop: 2,
   },
 });
