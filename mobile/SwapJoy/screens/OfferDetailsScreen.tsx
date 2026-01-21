@@ -9,6 +9,7 @@ import { ApiService } from '../services/api';
 import CachedImage from '../components/CachedImage';
 import { useLocalization } from '../localization';
 import { formatCurrency } from '../utils';
+import { getItemImageUri } from '../utils/imageUtils';
 import { resolveCategoryName } from '../utils/category';
 
 const { width } = Dimensions.get('window');
@@ -59,11 +60,7 @@ const OfferDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const fallbackCollection = (isSentByMe ? offeredItems : requestedItems).filter((entry: any) => entry?.item);
   const primaryItem = primaryCollection[0]?.item || fallbackCollection[0]?.item || undefined;
 
-  const primaryImage =
-    primaryItem?.image_url ||
-    primaryItem?.images?.[0]?.image_url ||
-    primaryItem?.images?.[0]?.url ||
-    null;
+  const primaryImage = primaryItem ? getItemImageUri(primaryItem) : null;
 
   const category =
     primaryItem

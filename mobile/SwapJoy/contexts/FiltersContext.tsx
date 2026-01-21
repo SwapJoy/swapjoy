@@ -394,16 +394,19 @@ export const FiltersProvider: React.FC<FiltersProviderProps> = ({ children }) =>
     };
   }, []);
 
-  const value: FiltersContextType = {
-    filters,
-    loading,
-    error,
-    updateFilters,
-    setFilters,
-    clearFilters,
-    resetFilters,
-    hasActiveFilters,
-  };
+  const value: FiltersContextType = useMemo(
+    () => ({
+      filters,
+      loading,
+      error,
+      updateFilters,
+      setFilters,
+      clearFilters,
+      resetFilters,
+      hasActiveFilters,
+    }),
+    [filters, loading, error, updateFilters, setFilters, clearFilters, resetFilters, hasActiveFilters]
+  );
 
   return <FiltersContext.Provider value={value}>{children}</FiltersContext.Provider>;
 };

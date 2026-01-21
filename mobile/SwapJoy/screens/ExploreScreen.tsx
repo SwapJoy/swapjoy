@@ -8,6 +8,7 @@ import { useExploreScreenState } from '../hooks/useExploreScreenState';
 import { DeviceService } from '../services/deviceService';
 import SearchModal from '../components/SearchModal';
 import { Ionicons } from '@expo/vector-icons';
+import { getItemImageUri } from '../utils/imageUtils';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const TOP_MATCH_CARD_WIDTH = SCREEN_WIDTH * 0.75;
@@ -53,7 +54,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
       headerTitle: () => (
         <Image
           source={require('../assets/swapjoy-logo.png')}
-          style={{ width: 100, height: 24 }}
+          style={styles.logo}
           resizeMode='contain'
         />
       ),
@@ -133,11 +134,7 @@ const ExploreScreen: React.FC<ExploreScreenProps> = memo(({ navigation }) => {
         onClearSearch={handleClearSearch}
         onItemPress={(item: any) => (navigation as any).navigate('ItemDetails', { itemId: item.id, item })}
         renderFavoriteButton={(item: any) => {
-      const imageUrl =
-        item?.image_url ||
-        item?.images?.[0]?.image_url ||
-        item?.images?.[0]?.url ||
-        null;
+          const imageUrl = getItemImageUri(item);
           const favoriteData = {
             id: item?.id,
             title: item?.title,
@@ -197,6 +194,10 @@ const styles = StyleSheet.create({
   },
   navLocationButton: {
     marginLeft: 8,
+  },
+  logo: {
+    width: 100,
+    height: 24,
   },
 });
 

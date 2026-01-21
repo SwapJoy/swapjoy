@@ -1,22 +1,16 @@
 import 'react-native-get-random-values';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Alert } from 'react-native';
-import { NavigationProp, useFocusEffect } from '@react-navigation/native';
+import { NavigationProp } from '@react-navigation/native';
 import { ImageUploadService } from '../services/imageUpload';
-import { ImageAnalysisService } from '../services/imageAnalysis';
-import { ApiService } from '../services/api';
 import { UserService } from '../services/userService';
 import { AuthService } from '../services/auth';
 import { ItemCondition } from '../types/item';
 import { useLocalization } from '../localization';
 import type { LocationSelection } from '../types/location';
 import { useCategories } from './useCategories';
+import { useWizardForm } from '../contexts/WizardFormContext';
 import { v4 as uuidv4 } from 'uuid';
-
-type NearestCityData = {
-  name?: string | null;
-  country?: string | null;
-};
 
 interface ImageUploadState {
   id: string;
@@ -44,12 +38,13 @@ const CURRENCY_DEFS: { code: string; symbol: string }[] = [
 interface UseItemDetailsParams {
   imageUris: string[];
   navigation: NavigationProp<any>;
-  route?: any; // Route prop to access params
+  route?: any; // Route prop (kept for compatibility but not used for form data)
 }
 
 export const useItemDetails = ({ imageUris, navigation, route }: UseItemDetailsParams) => {
-  const { language, t } = useLocalization();
+  const { t } = useLocalization();
   const { categories, loading: loadingCategories } = useCategories();
+  const { formData, updateFormData, getFormData: getContextFormData } = useWizardForm();
 
   const strings = useMemo(
     () => ({
@@ -126,35 +121,28 @@ export const useItemDetails = ({ imageUris, navigation, route }: UseItemDetailsP
     [t]
   );
 
-  // State
+  // State - use context for form data, local state for UI and images
   const [images, setImages] = useState<ImageUploadState[]>([]);
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [category, setCategory] = useState<string | null>(null);
-  const [condition, setCondition] = useState<ItemCondition | null>(null);
-  const [price, setPrice] = useState('');
-  const [currency, setCurrency] = useState<string>('USD');
+  
+  // Get form data from context
+  const title = formData.title;
+  const description = formData.description;
+  const category = formData.category;
+  const condition = formData.condition;
+  const price = formData.price;
+  const currency = formData.currency;
+  const locationLabel = formData.locationLabel;
+  const locationCoords = formData.locationCoords;
+  
+  // Local UI state
   const [showLocationSelector, setShowLocationSelector] = useState(false);
-  const [locationLabel, setLocationLabel] = useState<string | null>(null);
-  const [locationCoords, setLocationCoords] = useState<{ lat: number | null; lng: number | null }>({
-    lat: null,
-    lng: null,
-  });
   const [resolvingLocation, setResolvingLocation] = useState(false);
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [showConditionPicker, setShowConditionPicker] = useState(false);
   const [showCurrencyPicker, setShowCurrencyPicker] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
-  const [analyzing, setAnalyzing] = useState(false);
-  const [originalValues, setOriginalValues] = useState<{
-    title: string;
-    description: string;
-    category_id: string | null;
-    condition: ItemCondition | null;
-  } | null>(null);
   const isUploadingRef = useRef(false);
-  const analysisTriggeredRef = useRef(false);
   const categoriesRef = useRef<typeof categories>(categories);
   const uploadsCompletedRef = useRef(false);
   const imageUrisProcessedRef = useRef<string>('');
@@ -186,15 +174,16 @@ export const useItemDetails = ({ imageUris, navigation, route }: UseItemDetailsP
       setImages(initialImages);
       
       // Reset flags for new image set
-      analysisTriggeredRef.current = false;
       isUploadingRef.current = false;
       uploadsCompletedRef.current = false;
       setUploadsCompleted(false);
     }
   }, [imageUris, images.length]);
 
-  // Load user preferred currency
+  // Load user preferred currency on mount if not set
   useEffect(() => {
+    if (formData.currency && formData.currency !== 'USD') return; // Don't override if already set
+    
     const loadPreferredCurrency = async () => {
       try {
         const profileResult = await UserService.getProfile();
@@ -204,7 +193,7 @@ export const useItemDetails = ({ imageUris, navigation, route }: UseItemDetailsP
             typeof profileData.preferred_currency === 'string' &&
             profileData.preferred_currency
           ) {
-            setCurrency(profileData.preferred_currency);
+            updateFormData({ currency: profileData.preferred_currency });
             console.log('[ItemDetailsForm] Loaded preferred currency from profile:', profileData.preferred_currency);
           }
         }
@@ -236,18 +225,6 @@ export const useItemDetails = ({ imageUris, navigation, route }: UseItemDetailsP
     if (imagesToUpload.length === 0) {
       isUploadingRef.current = false;
       setUploading(false);
-      
-      // Check if all images are uploaded and trigger analysis (only if categories are loaded)
-      // But only if analysis hasn't been triggered yet
-      const allUploaded = images.filter((img) => img.uploaded && img.supabaseUrl);
-      if (allUploaded.length > 0 && !analyzing && !analysisTriggeredRef.current && categories.length > 0) {
-        analysisTriggeredRef.current = true;
-        triggerImageAnalysis(allUploaded);
-      } else if (allUploaded.length > 0 && categories.length === 0) {
-        console.warn('[ItemDetailsForm] Categories not loaded yet, will retry analysis when categories are available');
-      } else if (analysisTriggeredRef.current) {
-        console.log('[ItemDetailsForm] Analysis already triggered, skipping');
-      }
       return;
     }
 
@@ -297,7 +274,6 @@ export const useItemDetails = ({ imageUris, navigation, route }: UseItemDetailsP
           uploadsCompletedRef.current = true;
           setUploadsCompleted(true);
           console.log('[ItemDetailsForm] All uploads completed, uploadsCompletedRef set to true');
-          // Analysis will be triggered by the useEffect when images state updates
         }
       },
       // On error
@@ -317,146 +293,8 @@ export const useItemDetails = ({ imageUris, navigation, route }: UseItemDetailsP
         }
       }
     );
-  }, [images, categories, analyzing]);
+  }, [images]);
 
-  const triggerImageAnalysis = useCallback(async (uploadedImages: ImageUploadState[]) => {
-    if (uploadedImages.length === 0) {
-      return;
-    }
-
-    // Check if analysis was already triggered
-    if (analyzing) {
-      console.log('[ItemDetailsForm] Analysis already in progress, skipping');
-      return;
-    }
-
-    console.log(
-      '[ItemDetailsForm] Auto-triggering AI analysis for',
-      uploadedImages.length,
-      'uploaded images'
-    );
-    setAnalyzing(true);
-    try {
-      // Check if categories are loaded
-      if (!categories || categories.length === 0) {
-        console.warn('[ItemDetailsForm] Categories not loaded yet, skipping analysis');
-        analysisTriggeredRef.current = false; // Reset so it can retry
-        setAnalyzing(false);
-        return;
-      }
-
-      const imageUrls = uploadedImages.map((img) => img.supabaseUrl!);
-      // Prepare categories for analysis (only active ones with required fields)
-      const categoriesForAnalysis = categories
-        .filter((cat) => cat && cat.is_active !== false && cat.parent_id !== null)
-        .map((cat) => ({
-          id: cat.id,
-          title_en: cat.title_en || cat.name || '',
-          is_active: cat.is_active !== false,
-        }))
-        .filter((cat) => cat.id && cat.title_en); // Ensure required fields exist
-      
-      if (categoriesForAnalysis.length === 0) {
-        console.warn('[ItemDetailsForm] No valid categories available for analysis');
-        analysisTriggeredRef.current = false; // Reset so it can retry
-        setAnalyzing(false);
-        return;
-      }
-
-      console.log(`[ItemDetailsForm] Analyzing with ${categoriesForAnalysis.length} categories`);
-      const analysisResult = await ImageAnalysisService.analyzeImages(imageUrls, categoriesForAnalysis);
-
-      if (analysisResult.error) {
-        console.error('[ItemDetailsForm] Auto-analysis failed:', analysisResult.error);
-        analysisTriggeredRef.current = false; // Reset so it can retry
-        setAnalyzing(false);
-        return;
-      }
-
-      if (analysisResult.title) {
-        setTitle(analysisResult.title);
-      }
-
-      if (analysisResult.categoryId) {
-        setCategory(analysisResult.categoryId);
-        const categoryExists = categories.find((cat) => cat.id === analysisResult.categoryId);
-        if (!categoryExists) {
-          console.warn(
-            '[ItemDetailsForm] Auto-analysis: Category ID not found in categories list yet (may be timing issue):',
-            analysisResult.categoryId
-          );
-        }
-      }
-    } catch (error) {
-      console.error('[ItemDetailsForm] Auto-analysis failed:', error);
-      analysisTriggeredRef.current = false; // Reset so it can retry on error
-    } finally {
-      setAnalyzing(false);
-    }
-  }, [categories, analyzing]);
-
-  // Trigger analysis when all images are uploaded and categories are available
-  // Only trigger once per unique set of images
-  useEffect(() => {
-    // Check if all images are uploaded
-    const allUploaded = images.filter((img) => img.uploaded && img.supabaseUrl);
-    if (allUploaded.length === 0 || allUploaded.length !== images.length) {
-      console.log('[ItemDetailsForm] Analysis check: Not all images uploaded yet', {
-        allUploaded: allUploaded.length,
-        total: images.length,
-        uploadsCompleted: uploadsCompletedRef.current,
-        uploadsCompletedState: uploadsCompleted,
-      });
-      return;
-    }
-    
-    // Only proceed if uploads are completed (check both ref and state)
-    if (!uploadsCompletedRef.current && !uploadsCompleted) {
-      console.log('[ItemDetailsForm] Analysis check: Uploads not marked as completed yet');
-      return;
-    }
-    
-    // Only proceed if analysis hasn't been triggered and we're not analyzing
-    if (analysisTriggeredRef.current || analyzing) {
-      console.log('[ItemDetailsForm] Analysis check: Already triggered or in progress', {
-        triggered: analysisTriggeredRef.current,
-        analyzing,
-      });
-      return;
-    }
-    
-    // Wait for categories to be loaded
-    if (categories.length === 0 || loadingCategories) {
-      console.log('[ItemDetailsForm] Analysis check: Categories not ready', {
-        categoriesCount: categories.length,
-        loading: loadingCategories,
-      });
-      return;
-    }
-    
-    // Trigger analysis once
-    console.log('[ItemDetailsForm] Triggering analysis...');
-    const timeoutId = setTimeout(() => {
-      // Double-check refs inside timeout to prevent race conditions
-      if (!analyzing && !analysisTriggeredRef.current && (uploadsCompletedRef.current || uploadsCompleted) && categories.length > 0 && allUploaded.length > 0) {
-        console.log('[ItemDetailsForm] Executing analysis trigger');
-        analysisTriggeredRef.current = true;
-        triggerImageAnalysis(allUploaded);
-      } else {
-        console.log('[ItemDetailsForm] Analysis trigger cancelled in timeout', {
-          analyzing,
-          triggered: analysisTriggeredRef.current,
-          uploadsCompleted: uploadsCompletedRef.current,
-          uploadsCompletedState: uploadsCompleted,
-          categoriesCount: categories.length,
-          allUploadedCount: allUploaded.length,
-        });
-      }
-    }, 500);
-    return () => clearTimeout(timeoutId);
-    // Depend on uploadsCompleted state to trigger when uploads complete
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [uploadsCompleted, images.length, categories.length, loadingCategories, analyzing]);
 
   // Trigger uploads when images are set (only if not already uploaded or completed)
   useEffect(() => {
@@ -489,8 +327,8 @@ export const useItemDetails = ({ imageUris, navigation, route }: UseItemDetailsP
   // Category selection callback - will be passed to CategorySelectorScreen
   const handleCategorySelected = useCallback((categoryId: string) => {
     console.log('[ItemDetailsForm] Category selected via callback:', categoryId);
-    setCategory(categoryId);
-  }, [setCategory]);
+    updateFormData({ category: categoryId });
+  }, [updateFormData]);
 
   // Re-validate category when categories are loaded
   useEffect(() => {
@@ -505,32 +343,32 @@ export const useItemDetails = ({ imageUris, navigation, route }: UseItemDetailsP
   }, [category, categories]);
 
   const handleTitleChange = useCallback((text: string) => {
-    setTitle(text);
-  }, []);
+    updateFormData({ title: text });
+  }, [updateFormData]);
 
   const handleDescriptionChange = useCallback((text: string) => {
-    setDescription(text);
-  }, []);
+    updateFormData({ description: text });
+  }, [updateFormData]);
 
   const handleCategorySelect = useCallback((categoryId: string) => {
-    setCategory(categoryId);
+    updateFormData({ category: categoryId });
     setShowCategoryPicker(false);
-  }, []);
+  }, [updateFormData]);
 
   const handleConditionSelect = useCallback((cond: ItemCondition) => {
-    setCondition(cond);
+    updateFormData({ condition: cond });
     setShowConditionPicker(false);
-  }, []);
+  }, [updateFormData]);
 
   const handleCurrencySelect = useCallback((curr: string) => {
-    setCurrency(curr);
+    updateFormData({ currency: curr });
     setShowCurrencyPicker(false);
-  }, []);
+  }, [updateFormData]);
 
   const handleValueChange = useCallback((text: string) => {
     const filtered = text.replace(/[^0-9.]/g, '');
-    setPrice(filtered);
-  }, []);
+    updateFormData({ price: filtered });
+  }, [updateFormData]);
 
   const handleLocationSelected = useCallback(
     async (selection: LocationSelection) => {
@@ -540,10 +378,12 @@ export const useItemDetails = ({ imageUris, navigation, route }: UseItemDetailsP
       });
       const label = labelParts.length > 0 ? labelParts.join(', ') : fallbackLabel;
 
-      setLocationCoords({ lat: selection.lat, lng: selection.lng });
-      setLocationLabel(label);
+      updateFormData({
+        locationCoords: { lat: selection.lat, lng: selection.lng },
+        locationLabel: label,
+      });
     },
-    [t]
+    [t, updateFormData]
   );
 
   const handleRemoveImage = useCallback(
@@ -686,6 +526,11 @@ export const useItemDetails = ({ imageUris, navigation, route }: UseItemDetailsP
     return Math.round(total / images.length);
   }, [images, uploadProgress]);
 
+  const getFormData = useCallback(() => {
+    // Simply return the form data from context - it's the single source of truth
+    return getContextFormData();
+  }, [getContextFormData]);
+
   return {
     // State
     images,
@@ -704,7 +549,6 @@ export const useItemDetails = ({ imageUris, navigation, route }: UseItemDetailsP
     showCurrencyPicker,
     uploading,
     uploadProgress,
-    analyzing,
     loadingCategories,
     categories,
     // Computed values
@@ -732,5 +576,6 @@ export const useItemDetails = ({ imageUris, navigation, route }: UseItemDetailsP
     getCategoryName,
     getConditionLabel,
     getOverallProgress,
+    getFormData,
   };
 };

@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import {View, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Image, Dimensions, Platform, } from 'react-native';
+import {View, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Image, Dimensions, } from 'react-native';
 import SJText from '../components/SJText';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { ItemPreviewScreenProps } from '../types/navigation';
 import { ApiService } from '../services/api';
@@ -162,15 +161,6 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
   if (loading || !itemData) {
     return (
       <View style={styles.container}>
-        <SafeAreaView edges={['top']} style={styles.header}>
-          <View style={styles.headerContent}>
-            <View style={styles.headerSpacer} />
-            <View style={styles.headerTitleContainer}>
-              <SJText style={styles.headerTitle}>{strings.headerTitle}</SJText>
-            </View>
-            <View style={styles.headerSpacer} />
-          </View>
-        </SafeAreaView>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#007AFF" />
           <SJText style={styles.loadingText}>{strings.loading}</SJText>
@@ -181,18 +171,6 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
 
   return (
     <View style={styles.container}>
-      <SafeAreaView edges={['top']} style={styles.header}>
-        <View style={styles.headerContent}>
-          <TouchableOpacity style={styles.backButton} onPress={handleEdit}>
-            <Ionicons name="arrow-back" size={24} color={colors.primary} />
-          </TouchableOpacity>
-          <View style={styles.headerTitleContainer}>
-            <SJText style={styles.headerTitle}>{strings.headerTitle}</SJText>
-          </View>
-          <View style={styles.headerSpacer} />
-        </View>
-      </SafeAreaView>
-
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Image Carousel */}
         <View style={styles.imageCarouselContainer}>
@@ -347,42 +325,6 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 10,
     fontSize: 16,
-  },
-  header: {
-    backgroundColor: colors.primaryYellow,
-    borderBottomWidth: 1,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 44,
-    paddingHorizontal: 16,
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: Platform.OS === 'ios' ? -4 : 0,
-  },
-  headerTitleContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    height: 44,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: colors.primary,
-    letterSpacing: 0.3,
-  },
-  headerSpacer: {
-    width: 44,
-    height: 44,
   },
   scrollView: {
     flex: 1,

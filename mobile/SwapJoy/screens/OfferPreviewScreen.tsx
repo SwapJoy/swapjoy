@@ -7,6 +7,7 @@ import { OfferPreviewScreenProps } from '../types/navigation';
 import CachedImage from '../components/CachedImage';
 import { ApiService } from '../services/api';
 import { formatCurrency } from '../utils';
+import { getItemImageUri } from '../utils/imageUtils';
 import { useLocalization } from '../localization';
 
 const OfferPreviewScreen: React.FC<OfferPreviewScreenProps> = ({ navigation, route }) => {
@@ -72,12 +73,7 @@ const OfferPreviewScreen: React.FC<OfferPreviewScreenProps> = ({ navigation, rou
   const renderItem = ({ item }: { item: any }) => (
     <View style={styles.itemCard}>
       <CachedImage
-        uri={
-          item.image_url ||
-          item.images?.[0]?.image_url ||
-          item.images?.[0]?.url ||
-          'https://via.placeholder.com/200x150'
-        }
+        uri={getItemImageUri(item, 'https://via.placeholder.com/200x150') || 'https://via.placeholder.com/200x150'}
         style={styles.image}
         resizeMode="cover"
         fallbackUri="https://picsum.photos/200/150?random=8"

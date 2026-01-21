@@ -24,6 +24,27 @@ export type RootStackParamList = {
   ItemDetailsForm: {
     imageUris: string[];
   };
+  ItemDetailsWizard: {
+    imageUris: string[];
+  };
+  ImageUploadProgress: {
+    imageUris: string[];
+  };
+  TitleInput: {
+    imageUris: string[];
+  };
+  CategoryInput: {
+    imageUris: string[];
+  };
+  DescInput: {
+    imageUris: string[];
+  };
+  PriceInput: {
+    imageUris: string[];
+  };
+  LocationInput: {
+    imageUris: string[];
+  };
   CategorySelector: {
     multiselect?: boolean;
     selectedCategories?: string[];
@@ -235,6 +256,41 @@ export type CameraScreenProps = {
 export type ItemDetailsFormScreenProps = {
   navigation: NavigationProp<RootStackParamList, 'ItemDetailsForm'>;
   route: RouteProp<RootStackParamList, 'ItemDetailsForm'>;
+};
+
+export type ItemDetailsWizardScreenProps = {
+  navigation: NavigationProp<RootStackParamList, 'ItemDetailsWizard'>;
+  route: RouteProp<RootStackParamList, 'ItemDetailsWizard'>;
+};
+
+export type ImageUploadProgressScreenProps = {
+  navigation: NavigationProp<RootStackParamList, 'ImageUploadProgress'>;
+  route: RouteProp<RootStackParamList, 'ImageUploadProgress'>;
+};
+
+export type TitleInputScreenProps = {
+  navigation: NavigationProp<RootStackParamList, 'TitleInput'>;
+  route: RouteProp<RootStackParamList, 'TitleInput'>;
+};
+
+export type CategoryInputScreenProps = {
+  navigation: NavigationProp<RootStackParamList, 'CategoryInput'>;
+  route: RouteProp<RootStackParamList, 'CategoryInput'>;
+};
+
+export type DescInputScreenProps = {
+  navigation: NavigationProp<RootStackParamList, 'DescInput'>;
+  route: RouteProp<RootStackParamList, 'DescInput'>;
+};
+
+export type PriceInputScreenProps = {
+  navigation: NavigationProp<RootStackParamList, 'PriceInput'>;
+  route: RouteProp<RootStackParamList, 'PriceInput'>;
+};
+
+export type LocationInputScreenProps = {
+  navigation: NavigationProp<RootStackParamList, 'LocationInput'>;
+  route: RouteProp<RootStackParamList, 'LocationInput'>;
 };
 
 export type ItemPreviewScreenProps = {

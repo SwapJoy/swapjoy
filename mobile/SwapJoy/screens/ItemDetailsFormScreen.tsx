@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import {View, StyleSheet, TextInput, TouchableOpacity, ScrollView, Platform, ActivityIndicator, Image, Modal, KeyboardAvoidingView, } from 'react-native';
 import SJText from '../components/SJText';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { HeaderBackButton } from '@react-navigation/elements';
 import { Ionicons } from '@expo/vector-icons';
 import { ItemDetailsFormScreenProps } from '../types/navigation';
 import { getCurrencySymbol } from '../utils';
@@ -33,7 +34,6 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
     showCategoryPicker,
     uploading,
     uploadProgress,
-    analyzing,
     loadingCategories,
     categories,
     // Computed values
@@ -76,9 +76,17 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
     <View style={styles.container}>
       <SafeAreaView edges={['top']} style={styles.header}>
         <View style={styles.headerContent}>
-          <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-            <Ionicons name="arrow-back" size={24} color={colors.primary} />
-          </TouchableOpacity>
+          {Platform.OS === 'ios' ? (
+            <HeaderBackButton
+              onPress={handleBack}
+              tintColor={colors.primary}
+              style={styles.backButton}
+            />
+          ) : (
+            <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+              <Ionicons name="arrow-back" size={24} color={colors.primary} />
+            </TouchableOpacity>
+          )}
           <View style={styles.headerTitleContainer}>
             <SJText style={styles.headerTitle}>{strings.headerTitle}</SJText>
           </View>
@@ -150,8 +158,6 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
                 value={title}
               onChangeText={setTitle}
                 maxLength={100}
-              disabled={analyzing}
-              showLoading={analyzing}
               required
             />
 
@@ -161,17 +167,13 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
               value={category}
               displayValue={getCategoryName()}
               onPress={() => {
-                if (!analyzing) {
-                  navigation.navigate('CategorySelector', {
-                    multiselect: false,
-                    selectedCategories: category ? [category] : [],
-                    updateProfile: false,
-                    onCategorySelected: handleCategorySelected,
-                  });
-                }
+                navigation.navigate('CategorySelector', {
+                  multiselect: false,
+                  selectedCategories: category ? [category] : [],
+                  updateProfile: false,
+                  onCategorySelected: handleCategorySelected,
+                });
               }}
-              disabled={analyzing}
-              showLoading={analyzing}
               required
             />
 
@@ -360,11 +362,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   backButton: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: Platform.OS === 'ios' ? -4 : 0,
+    marginLeft: 0,
   },
   headerTitleContainer: {
     flex: 1,

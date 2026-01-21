@@ -19,6 +19,7 @@ import { resolveCategoryName } from '../utils/category';
 import type { AppLanguage } from '../types/language';
 import SJText from './SJText';
 import { colors } from '@navigation/MainTabNavigator.styles';
+import ConditionChip from './ConditionChip';
 
 const { height } = Dimensions.get('window');
 
@@ -255,22 +256,11 @@ const TopMatchCard: React.FC<TopMatchCardProps> = ({
               </SJText>
             </View>
           )}
-          {conditionPresentation && (
-            <View
-              style={[
-                styles.conditionBadge,
-                { backgroundColor: conditionPresentation.backgroundColor },
-              ]}
-            >
-              <SJText
-                style={[
-                  styles.conditionText,
-                  { color: conditionPresentation.textColor },
-                ]}
-              >
-                {conditionPresentation.label}
-              </SJText>
-            </View>
+          {condition && (
+            <ConditionChip
+              condition={condition}
+              style={styles.conditionBadge}
+            />
           )}
         </View>
 
@@ -405,24 +395,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 12,
     right: 12,
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    shadowColor: '#0f172a',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  conditionEmoji: {
-    fontSize: 12,
-  },
-  conditionText: {
-    fontSize: 11,
-    fontWeight: '600',
   },
   priceBadge: {
     position: 'absolute',

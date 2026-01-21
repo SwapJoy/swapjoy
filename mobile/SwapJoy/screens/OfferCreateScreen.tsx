@@ -8,6 +8,7 @@ import { OfferCreateScreenProps } from '../types/navigation';
 import { useAuth } from '../contexts/AuthContext';
 import { ApiService } from '../services/api';
 import { formatCurrency } from '../utils';
+import { getItemImageUri } from '../utils/imageUtils';
 import { useLocalization } from '../localization';
 import SWInputField from '../components/SWInputField';
 
@@ -105,19 +106,14 @@ const OfferCreateScreen: React.FC<OfferCreateScreenProps> = ({ navigation, route
   const renderRequestedItem = ({ item }: { item: any }) => (
     <View style={styles.reqCard}>
       <CachedImage
-        uri={
-          item.image_url ||
-          item.images?.[0]?.image_url ||
-          item.images?.[0]?.url ||
-          'https://via.placeholder.com/200x150'
-        }
+        uri={getItemImageUri(item, 'https://via.placeholder.com/200x150') || 'https://via.placeholder.com/200x150'}
         style={styles.reqImage}
         resizeMode="cover"
         fallbackUri="https://picsum.photos/200/150?random=6"
         showLoader={false}
         defaultSource={require('../assets/icon.png')}
       />
-      <View style={{ flex: 1 }}>
+      <View style={styles.reqDetails}>
         <SJText style={styles.reqTitle} numberOfLines={1}>{item.title}</SJText>
         <SJText style={styles.reqPrice}>{formatCurrency(item.price || 0, item.currency || 'USD')}</SJText>
       </View>
@@ -132,19 +128,14 @@ const OfferCreateScreen: React.FC<OfferCreateScreenProps> = ({ navigation, route
       return (
         <TouchableOpacity style={[styles.myItemCard, selected && styles.selectedCard]} onPress={() => onToggle(item.id)} activeOpacity={0.8}>
           <CachedImage
-            uri={
-              item.image_url ||
-              item.images?.[0]?.image_url ||
-              item.images?.[0]?.url ||
-              'https://via.placeholder.com/140x100'
-            }
+            uri={getItemImageUri(item, 'https://via.placeholder.com/140x100') || 'https://via.placeholder.com/140x100'}
             style={styles.myItemImage}
             resizeMode="cover"
             fallbackUri="https://picsum.photos/140/100?random=7"
             showLoader={false}
             defaultSource={require('../assets/icon.png')}
           />
-          <View style={{ flex: 1 }}>
+          <View style={styles.myItemDetails}>
             <SJText style={styles.myItemTitle} numberOfLines={1}>{item.title}</SJText>
             <SJText style={styles.myItemMeta}>
               {formatCurrency(item.price || 0, item.currency || 'USD')} • {item.condition || strings.unknownCondition}
@@ -156,14 +147,8 @@ const OfferCreateScreen: React.FC<OfferCreateScreenProps> = ({ navigation, route
     },
     (prev, next) => {
       if (prev.selected !== next.selected) return false;
-      const prevUri =
-        prev.item?.image_url ||
-        prev.item?.images?.[0]?.image_url ||
-        prev.item?.images?.[0]?.url;
-      const nextUri =
-        next.item?.image_url ||
-        next.item?.images?.[0]?.image_url ||
-        next.item?.images?.[0]?.url;
+      const prevUri = getItemImageUri(prev.item);
+      const nextUri = getItemImageUri(next.item);
       if (prevUri !== nextUri) return false;
       // avoid re-render if nothing critical changed
       return true;
@@ -180,7 +165,10 @@ const OfferCreateScreen: React.FC<OfferCreateScreenProps> = ({ navigation, route
     return { length: ROW_HEIGHT, offset: ROW_HEIGHT * index, index };
   }, []);
 
-  const firstRequestedItem = useMemo(() => requestedItems[0] || null, [requestedItems]);
+  const firstRequestedItem = useMemo<any | null>(
+    () => (requestedItems as any[])[0] || null,
+    [requestedItems]
+  );
 
   const listHeader = useMemo(() => (
     <View>
@@ -202,7 +190,7 @@ const OfferCreateScreen: React.FC<OfferCreateScreenProps> = ({ navigation, route
         />
       </View>
 
-      <View style={{ paddingHorizontal: 16, paddingTop: 8 }}>
+      <View style={styles.listHeaderInner}>
         <SJText style={styles.sectionTitle}>{strings.selectYourItems}</SJText>
       </View>
     </View>
@@ -222,9 +210,7 @@ const OfferCreateScreen: React.FC<OfferCreateScreenProps> = ({ navigation, route
         <View style={styles.topItemInfo}>
           <CachedImage
             uri={
-              firstRequestedItem.image_url ||
-              firstRequestedItem.images?.[0]?.image_url ||
-              firstRequestedItem.images?.[0]?.url ||
+              getItemImageUri(firstRequestedItem, 'https://via.placeholder.com/200x150') ||
               'https://via.placeholder.com/200x150'
             }
             style={styles.topItemImage}
@@ -346,6 +332,7 @@ const styles = StyleSheet.create({
   },
   reqCard: { backgroundColor: '#1a1a1a', marginRight: 12, borderRadius: 10, overflow: 'hidden', width: Math.min(220, Math.round(width * 0.55)), borderWidth: 1, borderColor: '#333' },
   reqImage: { width: '100%', height: 120, backgroundColor: '#2a2a2a' },
+  reqDetails: { flex: 1 },
   reqTitle: { paddingHorizontal: 10, paddingTop: 8, fontSize: 14, fontWeight: '600', color: colors.primaryYellow },
   reqPrice: { paddingHorizontal: 10, paddingBottom: 10, paddingTop: 4, fontSize: 13, color: colors.primaryYellow, fontWeight: '600' },
   moneyBox: { backgroundColor: '#1a1a1a', marginHorizontal: 16, marginVertical: 12, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: '#333' },
@@ -353,11 +340,13 @@ const styles = StyleSheet.create({
   toggleLabel: { fontSize: 14, color: colors.primaryYellow, fontWeight: '600' },
   myItemCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1a1a1a', marginHorizontal: 16, marginBottom: 10, borderRadius: 12, padding: 10, borderWidth: 1, borderColor: '#333' },
   myItemImage: { width: 80, height: 60, marginRight: 10, backgroundColor: '#2a2a2a', borderRadius: 8 },
+  myItemDetails: { flex: 1 },
   myItemTitle: { fontSize: 14, fontWeight: '600', color: colors.primaryYellow },
   myItemMeta: { fontSize: 12, color: '#999', marginTop: 2 },
   checkbox: { width: 20, height: 20, borderRadius: 5, borderWidth: 2, borderColor: '#666', marginLeft: 12 },
   checkboxOn: { backgroundColor: colors.primaryYellow, borderColor: colors.primaryYellow },
   selectedCard: { borderColor: colors.primaryYellow },
+  listHeaderInner: { paddingHorizontal: 16, paddingTop: 8 },
   footer: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: 16, backgroundColor: colors.primaryDark, borderTopWidth: 1, borderTopColor: '#333' },
   nextBtn: { backgroundColor: colors.primaryYellow, borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
   nextBtnDisabled: { backgroundColor: '#444', opacity: 0.5 },

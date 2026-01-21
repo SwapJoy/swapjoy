@@ -5,6 +5,7 @@ import CachedImage from './CachedImage';
 import { useAuth } from '@contexts/AuthContext';
 import { formatCurrency } from '@utils/index';
 import { useSwapSuggestions, type SwapSuggestion } from '@hooks/useSwapSuggestions';
+import { getItemImageUri } from '../utils/imageUtils';
 import { useNavigation } from '@react-navigation/native';
 import { RootStackParamList } from '../types/navigation';
 import type { NavigationProp } from '@react-navigation/native';
@@ -99,7 +100,8 @@ const SwapSuggestions: React.FC<SwapSuggestionsProps> = ({
         const currency = suggestion.items[0]?.currency || targetItemCurrency || 'USD';
         const signature = suggestion.items.map((x) => x.id).sort().join(',');
         const thumbnail =
-          suggestion.items.find((it) => !!it.image_url)?.image_url || 'https://via.placeholder.com/150';
+          getItemImageUri(suggestion.items.find((it) => !!it.image_url)) ||
+          'https://via.placeholder.com/150';
 
         const subtitle = isBundle
           ? `${suggestion.items.length} items`

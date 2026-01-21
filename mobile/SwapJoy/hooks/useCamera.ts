@@ -277,7 +277,7 @@ export const useCamera = (onNavigateToMain?: () => void, isVisible?: boolean) =>
       return;
     }
 
-      navigation.navigate('ItemDetailsForm', {
+      navigation.navigate('ImageUploadProgress', {
         imageUris: capturedPhotos,
       });
   };

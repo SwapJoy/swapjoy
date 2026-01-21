@@ -222,23 +222,25 @@ export const SectionView: React.FC<SectionViewProps> = memo(({
       const sideInset = 12;
       const betweenSpacing = 8;
 
-    return (
-      <View
-        style={{
-          marginLeft: isFirst ? sideInset : 0,
-          marginRight: isLast ? sideInset : betweenSpacing,
-        }}
-      >
-        <SectionItemCard
-          item={item}
-          navigation={navigation}
-          toggleFavorite={toggleFavorite}
-          isFavorite={isFavorite}
-          swapSuggestionsLabel={t('explore.labels.swapSuggestions', { defaultValue: 'Possible matches' })}
-          cardWidth={cardWidth}
-        />
-      </View>
-    );
+      return (
+        <View
+          style={[
+            styles.cardWrapper,
+            isFirst && styles.cardWrapperFirst,
+            isLast && styles.cardWrapperLast,
+            !isFirst && !isLast && styles.cardWrapperBetween,
+          ]}
+        >
+          <SectionItemCard
+            item={item}
+            navigation={navigation}
+            toggleFavorite={toggleFavorite}
+            isFavorite={isFavorite}
+            swapSuggestionsLabel={t('explore.labels.swapSuggestions', { defaultValue: 'Possible matches' })}
+            cardWidth={cardWidth}
+          />
+        </View>
+      );
     },
     [items?.length, isFavorite, navigation, toggleFavorite, t]
   );
@@ -342,6 +344,18 @@ const styles = StyleSheet.create({
   },
   horizontalList: {
     paddingRight: 20,
+  },
+  cardWrapper: {
+    marginRight: 8,
+  },
+  cardWrapperFirst: {
+    marginLeft: 12,
+  },
+  cardWrapperLast: {
+    marginRight: 12,
+  },
+  cardWrapperBetween: {
+    marginLeft: 0,
   },
   errorContainer: {
     padding: 20,

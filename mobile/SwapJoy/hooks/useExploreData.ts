@@ -236,7 +236,7 @@ export const useExploreData = (options?: UseExploreDataOptions) => {
       }
       isFetchingRef.current = false;
     }
-  }, [language, user?.id]);
+  }, [user?.id]);
 
   useEffect(() => {
     console.log('[useExploreData] useEffect triggered:', {

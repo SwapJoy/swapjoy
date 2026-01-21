@@ -12,6 +12,7 @@ import ItemCard, { type ItemCardChip } from './ItemCard';
 import { formatCurrency } from '../utils';
 import { resolveCategoryName } from '../utils/category';
 import { getConditionPresentation } from '../utils/conditions';
+import { getItemImageUri } from '../utils/imageUtils';
 import type { AppLanguage } from '../types/language';
 import { DEFAULT_LANGUAGE } from '../types/language';
 
@@ -125,11 +126,7 @@ const ItemCardCollection: React.FC<ItemCardCollectionProps> = ({
           ? formatCurrency(priceValue, item?.currency || 'USD')
           : undefined;
 
-      const imageUrl =
-        item?.image_url ||
-        item?.images?.[0]?.image_url ||
-        item?.images?.[0]?.url ||
-        null;
+      const imageUrl = getItemImageUri(item);
 
       const ownerHandle = item?.user?.username || item?.user?.first_name || undefined;
 
@@ -154,7 +151,7 @@ const ItemCardCollection: React.FC<ItemCardCollectionProps> = ({
           description={item?.description}
           priceLabel={priceLabel}
           metaRightLabel={metaRightLabel || undefined}
-          imageUri={imageUrl}
+          imageUri={imageUrl ?? undefined}
           placeholderLabel={placeholder}
           onPress={handlePress}
           variant="grid"

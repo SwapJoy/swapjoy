@@ -171,15 +171,15 @@ const ProfileHeaderSkeleton = memo(() => (
         <SkeletonLoader width={100} height={100} borderRadius={50} />
       </View>
       <View style={styles.profileRightContent}>
-        <SkeletonLoader width="60%" height={15} style={{ marginBottom: 8 }} />
+        <SkeletonLoader width="60%" height={15} style={styles.skeletonTitleLine} />
         <View style={styles.statsInfoRow}>
           <View style={styles.socialGrid}>
-            <View style={styles.socialStatItem}>
-              <SkeletonLoader width={40} height={20} style={{ marginBottom: 4 }} />
+              <View style={styles.socialStatItem}>
+                <SkeletonLoader width={40} height={20} style={styles.skeletonStatNumber} />
               <SkeletonLoader width={50} height={12} />
             </View>
             <View style={styles.socialStatItem}>
-              <SkeletonLoader width={40} height={20} style={{ marginBottom: 4 }} />
+                <SkeletonLoader width={40} height={20} style={styles.skeletonStatNumber} />
               <SkeletonLoader width={50} height={12} />
             </View>
           </View>
@@ -206,7 +206,7 @@ const GridItemsSkeleton = memo(() => {
 
   return (
     <View style={styles.gridListContent}>
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+      <View style={styles.gridListRow}>
         {skeletonItems.map((item, index) => (
           <View
             key={item}
@@ -217,7 +217,7 @@ const GridItemsSkeleton = memo(() => {
             ]}
           >
             <SkeletonLoader width="100%" height={imageHeight} borderRadius={18} />
-            <View style={{ marginTop: 12, gap: 8 }}>
+            <View style={styles.gridCardDetails}>
               <SkeletonLoader width="70%" height={16} borderRadius={8} />
               <SkeletonLoader width="50%" height={14} borderRadius={7} />
               <SkeletonLoader width="80%" height={12} borderRadius={6} />
@@ -889,8 +889,23 @@ const styles = StyleSheet.create({
     paddingTop: 6,
     paddingBottom: 120,
   },
+  gridListRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
   gridCard: {
     marginBottom: 18,
+  },
+  gridCardDetails: {
+    marginTop: 12,
+    gap: 8,
+  },
+  skeletonTitleLine: {
+    marginBottom: 8,
+  },
+  skeletonStatNumber: {
+    marginBottom: 4,
   },
   gridCardLeft: {
     marginLeft: 0,

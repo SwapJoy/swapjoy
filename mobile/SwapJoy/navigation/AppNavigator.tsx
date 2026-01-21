@@ -1,6 +1,7 @@
 import React, { forwardRef, useState, useEffect, useCallback, useRef } from 'react';
 import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
+import { HeaderBackButton } from '@react-navigation/elements';
 import { Platform, TouchableOpacity, ActivityIndicator, View, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { RootStackParamList } from '../types/navigation';
@@ -21,6 +22,12 @@ import CreateListingScreen from '../screens/CreateListingScreen';
 import AddItemScreen from '../screens/AddItemScreen';
 import CameraScreen from '../screens/CameraScreen';
 import ItemDetailsFormScreen from '../screens/ItemDetailsFormScreen';
+import ImageUploadProgressScreen from '../screens/wizard/ImageUploadProgressScreen';
+import TitleInputScreen from '../screens/wizard/TitleInputScreen';
+import CategoryInputScreen from '../screens/wizard/CategoryInputScreen';
+import DescInputScreen from '../screens/wizard/DescInputScreen';
+import PriceInputScreen from '../screens/wizard/PriceInputScreen';
+import LocationInputScreen from '../screens/wizard/LocationInputScreen';
 import ItemPreviewScreen from '../screens/ItemPreviewScreen';
 import ItemDetailsScreen from '../screens/ItemDetailsScreen';
 import ProfileSettingsScreen from '../screens/ProfileSettingsScreen';
@@ -249,6 +256,7 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
       <Stack.Navigator
         initialRouteName={getInitialRoute()}
         screenOptions={{
+          headerShown: true, // Explicitly set default - ensures header is shown unless screen overrides it
           headerStyle: {
             backgroundColor: colors.primaryYellow,
           },
@@ -259,16 +267,18 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
             letterSpacing: 0.3,
           },
           headerTitleAlign: 'center',
-          headerLeft: ({ navigation, onPress: _onPress, ...props }) => {
-            // Use default behavior by calling the default back handler
-            const handlePress = () => {
-              if (_onPress) {
-                _onPress();
-              } else if (navigation.canGoBack()) {
-                navigation.goBack();
-              }
-            };
-            
+          headerBackTitle: '',
+          headerLeft: (props) => {
+            if (Platform.OS === 'ios') {
+              return (
+                <HeaderBackButton
+                  {...props}
+                  tintColor="#000"
+                  style={{ marginLeft: 0 }}
+                />
+              );
+            }
+            // Android: use custom back button
             return (
               <TouchableOpacity
                 style={{
@@ -276,9 +286,9 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
                   height: 44,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  marginLeft: Platform.OS === 'ios' ? 4 : 8,
+                  marginLeft: 0,
                 }}
-                onPress={handlePress}
+                onPress={props.onPress}
                 activeOpacity={0.7}
               >
                 <Ionicons name="arrow-back" size={24} color='#000' />
@@ -406,11 +416,80 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
               }}
             />
             <Stack.Screen 
+              name="ImageUploadProgress" 
+              component={ImageUploadProgressScreen}
+              options={{
+                title: 'Upload Images',
+                headerShown: true,
+                headerStyle: {
+                  backgroundColor: colors.primaryYellow,
+                },
+              }}
+            />
+            <Stack.Screen 
+              name="TitleInput" 
+              component={TitleInputScreen}
+              options={{
+                title: 'Title & Condition',
+                headerShown: true,
+                headerStyle: {
+                  backgroundColor: colors.primaryYellow,
+                },
+              }}
+            />
+            <Stack.Screen 
+              name="CategoryInput" 
+              component={CategoryInputScreen}
+              options={{
+                title: 'Category',
+                headerShown: true,
+                headerStyle: {
+                  backgroundColor: colors.primaryYellow,
+                },
+              }}
+            />
+            <Stack.Screen 
+              name="DescInput" 
+              component={DescInputScreen}
+              options={{
+                title: 'Description',
+                headerShown: true,
+                headerStyle: {
+                  backgroundColor: colors.primaryYellow,
+                },
+              }}
+            />
+            <Stack.Screen 
+              name="PriceInput" 
+              component={PriceInputScreen}
+              options={{
+                title: 'Price',
+                headerShown: true,
+                headerStyle: {
+                  backgroundColor: colors.primaryYellow,
+                },
+              }}
+            />
+            <Stack.Screen 
+              name="LocationInput" 
+              component={LocationInputScreen}
+              options={{
+                title: 'Location',
+                headerShown: true,
+                headerStyle: {
+                  backgroundColor: colors.primaryYellow,
+                },
+              }}
+            />
+            <Stack.Screen 
               name="ItemPreview" 
               component={ItemPreviewScreen}
-              options={{ 
+              options={{
                 title: 'Preview',
-                headerShown: false,
+                headerShown: true,
+                headerStyle: {
+                  backgroundColor: colors.primaryYellow,
+                },
               }}
             />
             <Stack.Screen

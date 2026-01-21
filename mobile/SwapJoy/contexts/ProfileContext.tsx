@@ -296,20 +296,36 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({ children }) =>
   }, [profile]); // Include full profile object to ensure updates when profile loads
   const preferredRadius = profile?.preferred_radius_km ?? 50;
 
-  const value: ProfileContextType = {
-    profile,
-    stats,
-    rating,
-    favoriteCategories,
-    favoriteCategoryNames,
-    loading,
-    error,
-    refresh,
-    refreshStats,
-    refreshRating,
-    preferredCurrency,
-    preferredRadius,
-  };
+  const value: ProfileContextType = useMemo(
+    () => ({
+      profile,
+      stats,
+      rating,
+      favoriteCategories,
+      favoriteCategoryNames,
+      loading,
+      error,
+      refresh,
+      refreshStats,
+      refreshRating,
+      preferredCurrency,
+      preferredRadius,
+    }),
+    [
+      profile,
+      stats,
+      rating,
+      favoriteCategories,
+      favoriteCategoryNames,
+      loading,
+      error,
+      refresh,
+      refreshStats,
+      refreshRating,
+      preferredCurrency,
+      preferredRadius,
+    ]
+  );
 
   return <ProfileContext.Provider value={value}>{children}</ProfileContext.Provider>;
 };

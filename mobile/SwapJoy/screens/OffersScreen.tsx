@@ -7,6 +7,7 @@ import { useOffersData, Offer } from '../hooks/useOffersData';
 import { useLocalization } from '../localization';
 import TopMatchCard, { TopMatchCardSkeleton } from '../components/TopMatchCard';
 import { formatCurrency } from '../utils';
+import { getItemImageUri } from '../utils/imageUtils';
 import { resolveCategoryName } from '../utils/category';
 import type { AppLanguage } from '../types/language';
 import { DEFAULT_LANGUAGE } from '../types/language';
@@ -69,11 +70,7 @@ const OffersScreen: React.FC<OffersScreenProps> = memo(({ route, navigation }) =
       const fallbackCollection = (isSent ? offeredItems : requestedItems).filter((entry: any) => entry?.item);
       const primaryItem = primaryCollection[0]?.item || fallbackCollection[0]?.item || undefined;
 
-      const imageUrl =
-        primaryItem?.image_url ||
-        primaryItem?.images?.[0]?.image_url ||
-        primaryItem?.images?.[0]?.url ||
-        undefined;
+      const imageUrl = primaryItem ? getItemImageUri(primaryItem) ?? undefined : undefined;
 
       const category =
         primaryItem

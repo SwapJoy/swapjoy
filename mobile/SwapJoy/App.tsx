@@ -21,6 +21,7 @@ import { NotificationNavigation } from './utils/notificationNavigation';
 import { RootStackParamList } from './types/navigation';
 import { LocalizationProvider, useLocalization } from './localization';
 import { MatchInventoryProvider } from './contexts/MatchInventoryContext';
+import { WizardFormProvider } from './contexts/WizardFormContext';
 
 // Configure Google Sign-In as early as possible to ensure native config is set
 const WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID
@@ -142,7 +143,9 @@ export default function App() {
                 <NotificationsProvider>
                   <FavoritesProvider>
                     <MatchInventoryProvider>
-                      <AppContent />
+                      <WizardFormProvider>
+                        <AppContent />
+                      </WizardFormProvider>
                     </MatchInventoryProvider>
                   </FavoritesProvider>
                 </NotificationsProvider>

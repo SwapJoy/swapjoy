@@ -4,6 +4,7 @@ export const colors = {
   primaryDark: '#161200',
   primaryYellow: '#ffde21',
   primaryBlue: '#36454F',
+  primary: '#000',
   inactive: '#8E8E93',
   border: Platform.OS === 'ios' ? '#C6C6C8' : '#E0E0E0',
   white: '#fff',
