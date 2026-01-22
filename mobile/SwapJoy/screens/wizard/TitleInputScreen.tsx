@@ -14,7 +14,7 @@ const TitleInputScreen: React.FC<TitleInputScreenProps> = ({
   route,
 }) => {
   const { t } = useLocalization();
-  const { imageUris } = route.params;
+  const { imageUris, failedUploads } = route.params;
   const hookData = useItemDetails({ imageUris, navigation, route });
   const { title, condition, setTitle, setCondition, conditionOptions } = hookData;
 
@@ -68,7 +68,7 @@ const TitleInputScreen: React.FC<TitleInputScreenProps> = ({
 
       <PrimaryButton
         onPress={() => {
-          navigation.navigate('CategoryInput', { imageUris });
+          navigation.navigate('CategoryInput', { imageUris, failedUploads });
         }}
         disabled={!isValid || !condition}
         label={t('common.next', { defaultValue: 'Next' })}

@@ -13,7 +13,7 @@ const CategoryInputScreen: React.FC<CategoryInputScreenProps> = ({
   route,
 }) => {
   const { t } = useLocalization();
-  const { imageUris } = route.params;
+  const { imageUris, failedUploads } = route.params;
   const hookData = useItemDetails({ imageUris, navigation, route });
   const { category, setCategory } = hookData;
 
@@ -45,7 +45,7 @@ const CategoryInputScreen: React.FC<CategoryInputScreenProps> = ({
 
       <PrimaryButton
         onPress={() => {
-          navigation.navigate('DescInput', { imageUris });
+          navigation.navigate('DescInput', { imageUris, failedUploads });
         }}
         disabled={!isValid}
         label={t('common.next', { defaultValue: 'Next' })}

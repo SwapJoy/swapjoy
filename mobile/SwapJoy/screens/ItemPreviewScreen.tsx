@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import {View, StyleSheet, ScrollView, Alert, ActivityIndicator, Image, Dimensions, } from 'react-native';
+import {View, StyleSheet, ScrollView, Alert, ActivityIndicator, Image, Dimensions, TouchableOpacity, } from 'react-native';
 import SJText from '../components/SJText';
 import { Ionicons } from '@expo/vector-icons';
 import { ItemPreviewScreenProps } from '../types/navigation';
@@ -16,7 +16,7 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
   navigation,
   route,
 }) => {
-  const { itemData } = route.params;
+  const { itemData, failedUploads, imageUris } = route.params;
   const { language, t } = useLocalization();
   const strings = useMemo(() => ({
     loading: t('addItem.preview.loading'),
@@ -100,6 +100,8 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
 
     try {
       // Prepare denormalized images payload
+      // itemData.images are already in the correct order (preserved from wizard)
+      // Map them with sequential order values (0, 1, 2, ...)
       const images =
         itemData.images && itemData.images.length > 0
           ? itemData.images.map((img, index) => ({
@@ -265,6 +267,31 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
               {strings.note}
             </SJText>
           </View>
+
+          {/* Failed Uploads Warning */}
+          {failedUploads && (
+            <View style={styles.failedUploadsContainer}>
+              <Ionicons name="alert-circle" size={20} color="#FF3B30" />
+              <View style={styles.failedUploadsContent}>
+                <SJText style={styles.failedUploadsTitle}>
+                  {t('addItem.preview.failedUploadsTitle', { defaultValue: 'Some images failed to upload' })}
+                </SJText>
+                <SJText style={styles.failedUploadsMessage}>
+                  {t('addItem.preview.failedUploadsMessage', { defaultValue: 'Please go back and fix the image uploads before submitting.' })}
+                </SJText>
+                <TouchableOpacity
+                  style={styles.fixUploadsButton}
+                  onPress={() => {
+                    navigation.navigate('ImageUploadProgress', { imageUris: imageUris || [] });
+                  }}
+                >
+                  <SJText style={styles.fixUploadsButtonText}>
+                    {t('addItem.preview.fixUploads', { defaultValue: 'Fix Image Uploads' })}
+                  </SJText>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
         </View>
       </ScrollView>
 
@@ -402,6 +429,43 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     lineHeight: 20
+  },
+  failedUploadsContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    padding: 16,
+    borderRadius: 8,
+    backgroundColor: '#FFF3F3',
+    borderWidth: 1,
+    borderColor: '#FFE5E5',
+    marginTop: 16,
+  },
+  failedUploadsContent: {
+    flex: 1,
+  },
+  failedUploadsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FF3B30',
+    marginBottom: 4,
+  },
+  failedUploadsMessage: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 12,
+    lineHeight: 20,
+  },
+  fixUploadsButton: {
+    backgroundColor: '#FF3B30',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+  },
+  fixUploadsButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
 

@@ -14,7 +14,7 @@ const PriceInputScreen: React.FC<PriceInputScreenProps> = ({
   route,
 }) => {
   const { t } = useLocalization();
-  const { imageUris } = route.params;
+  const { imageUris, failedUploads } = route.params;
   const hookData = useItemDetails({ imageUris, navigation, route });
   const { price, currency, setPrice, setCurrency } = hookData;
 
@@ -67,7 +67,7 @@ const PriceInputScreen: React.FC<PriceInputScreenProps> = ({
 
       <PrimaryButton
         onPress={() => {
-          navigation.navigate('LocationInput', { imageUris });
+          navigation.navigate('LocationInput', { imageUris, failedUploads });
         }}
         disabled={!isValid}
         label={t('common.next', { defaultValue: 'Next' })}

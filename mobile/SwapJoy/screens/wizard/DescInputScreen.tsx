@@ -13,7 +13,7 @@ const DescInputScreen: React.FC<DescInputScreenProps> = ({
   route,
 }) => {
   const { t } = useLocalization();
-  const { imageUris } = route.params;
+  const { imageUris, failedUploads } = route.params;
   const hookData = useItemDetails({ imageUris, navigation, route });
   const { description, setDescription } = hookData;
 
@@ -48,7 +48,7 @@ const DescInputScreen: React.FC<DescInputScreenProps> = ({
 
       <PrimaryButton
         onPress={() => {
-          navigation.navigate('PriceInput', { imageUris });
+          navigation.navigate('PriceInput', { imageUris, failedUploads });
         }}
         disabled={!isValid}
         label={t('common.next', { defaultValue: 'Next' })}

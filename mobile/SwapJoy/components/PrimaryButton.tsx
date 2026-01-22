@@ -46,7 +46,7 @@ const PrimaryButton: React.FC<PrimaryButtonProps> = ({
           useNativeDriver: false,
         }),
         Animated.timing(buttonWidth, {
-          toValue: SCREEN_WIDTH,
+          toValue: SCREEN_WIDTH * 0.5,
           duration: Platform.OS === 'ios' ? e.duration || 250 : 250,
           useNativeDriver: false,
         }),
@@ -118,13 +118,6 @@ const PrimaryButton: React.FC<PrimaryButtonProps> = ({
           <SJText style={[styles.buttonText, disabled && styles.buttonTextDisabled]}>
             {label}
           </SJText>
-          {showArrow && (
-            <Ionicons
-              name="arrow-forward"
-              size={20}
-              color={disabled ? '#999' : colors.primaryDark}
-            />
-          )}
         </TouchableOpacity>
       </Animated.View>
     </Animated.View>

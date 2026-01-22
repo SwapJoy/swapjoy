@@ -32,6 +32,7 @@ export type RootStackParamList = {
   };
   TitleInput: {
     imageUris: string[];
+    failedUploads?: boolean;
   };
   CategoryInput: {
     imageUris: string[];
@@ -66,8 +67,11 @@ export type RootStackParamList = {
         id: string;
         uri: string;
         supabaseUrl: string;
+        order?: number;
       }>;
     };
+    failedUploads?: boolean;
+    imageUris?: string[];
   };
   RecentlyListed: undefined;
   ItemDetails: {

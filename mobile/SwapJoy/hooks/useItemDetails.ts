@@ -149,14 +149,37 @@ export const useItemDetails = ({ imageUris, navigation, route }: UseItemDetailsP
   const [uploadsCompleted, setUploadsCompleted] = useState(false);
 
   // Initialize images from imageUris (only once per unique set of imageUris)
+  // Note: We preserve the order of imageUris as it represents the user's desired order
   useEffect(() => {
     if (!imageUris || imageUris.length === 0) return;
     
-    // Create a unique key for this set of imageUris
-    const imageUrisKey = imageUris.sort().join('|');
+    // Create a unique key for this set of imageUris (sorted for comparison, but preserve order)
+    const imageUrisKey = [...imageUris].sort().join('|');
+    const imageUrisOrderKey = imageUris.join('|'); // Preserve order for comparison
     
-    // Only initialize if this is a new set of imageUris
+    // Only initialize if this is a new set of imageUris OR if the order changed
     if (imageUrisProcessedRef.current === imageUrisKey && images.length > 0) {
+      // Check if order changed (same URIs but different order)
+      const currentOrderKey = images.map((img) => img.uri).join('|');
+      if (currentOrderKey === imageUrisOrderKey) {
+        return; // Same URIs in same order, no need to reinitialize
+      }
+      // Order changed - reorder existing images to match imageUris order
+      const reorderedImages = imageUris
+        .map((uri) => images.find((img) => img.uri === uri))
+        .filter((img): img is ImageUploadState => img !== undefined);
+      
+      // Add any new images that weren't in the existing set
+      const existingUris = new Set(images.map((img) => img.uri));
+      const newUris = imageUris.filter((uri) => !existingUris.has(uri));
+      const newImages: ImageUploadState[] = newUris.map((uri) => ({
+        id: uuidv4(),
+        uri,
+        uploaded: false,
+        uploadProgress: 0,
+      }));
+      
+      setImages([...reorderedImages, ...newImages]);
       return;
     }
     
@@ -178,7 +201,7 @@ export const useItemDetails = ({ imageUris, navigation, route }: UseItemDetailsP
       uploadsCompletedRef.current = false;
       setUploadsCompleted(false);
     }
-  }, [imageUris, images.length]);
+  }, [imageUris, images]);
 
   // Load user preferred currency on mount if not set
   useEffect(() => {
@@ -415,6 +438,30 @@ export const useItemDetails = ({ imageUris, navigation, route }: UseItemDetailsP
     [images, t]
   );
 
+  const handleAddImages = useCallback(
+    (newUris: string[]) => {
+      const newImages: ImageUploadState[] = newUris.map((uri) => ({
+        id: uuidv4(),
+        uri,
+        uploaded: false,
+        uploadProgress: 0,
+      }));
+      setImages((prev) => [...prev, ...newImages]);
+      // Reset upload completion flags to allow new uploads
+      isUploadingRef.current = false;
+      uploadsCompletedRef.current = false;
+      setUploadsCompleted(false);
+    },
+    []
+  );
+
+  const handleReorderImages = useCallback(
+    (reorderedImages: ImageUploadState[]) => {
+      setImages(reorderedImages);
+    },
+    []
+  );
+
   const handleNext = useCallback(async () => {
     // Validate images first
     const hasImages = images && images.length > 0;
@@ -452,14 +499,24 @@ export const useItemDetails = ({ imageUris, navigation, route }: UseItemDetailsP
       return;
     }
     
-    const pendingUploads = images?.some((img) => !img.uploaded || !img.supabaseUrl) ?? true;
+    // Only block if there are images actively uploading (not just waiting)
+    // Allow navigation if all images are either uploaded or failed
+    const hasActiveUploads = images?.some((img) => 
+      !img.uploaded && !img.supabaseUrl && !img.uploadError && (uploadProgress[img.id] !== undefined && uploadProgress[img.id] < 100)
+    ) ?? false;
 
-    if (pendingUploads) {
+    if (hasActiveUploads) {
       Alert.alert(strings.alerts.uploadingImagesTitle, strings.alerts.uploadingImagesMessage);
       return;
     }
 
-    // Navigate to preview with all data
+    // Filter out failed uploads and get current image URIs
+    // Use the current order of images array (which reflects reordering)
+    const successfulImages = images.filter((img) => img.uploaded && img.supabaseUrl);
+    const hasFailedUploads = images.some((img) => img.uploadError);
+    const currentImageUris = images.map((img) => img.uri);
+
+    // Navigate to preview with all data, preserving the current order
     navigation.navigate('ItemPreview', {
       itemData: {
         title,
@@ -471,12 +528,16 @@ export const useItemDetails = ({ imageUris, navigation, route }: UseItemDetailsP
         location_lat: locationCoords.lat,
         location_lng: locationCoords.lng,
         location_label: locationLabel,
-        images: images.map((img) => ({
+        // Preserve the order from the images array (which reflects reordering)
+        images: successfulImages.map((img, index) => ({
           id: img.id,
           uri: img.uri,
           supabaseUrl: img.supabaseUrl!,
+          order: index, // Add order field to maintain order
         })),
       },
+      failedUploads: hasFailedUploads,
+      imageUris: currentImageUris,
     });
   }, [
     title,
@@ -569,6 +630,8 @@ export const useItemDetails = ({ imageUris, navigation, route }: UseItemDetailsP
     setShowCurrencyPicker,
     handleLocationSelected,
     handleRemoveImage,
+    handleAddImages,
+    handleReorderImages,
     handleNext,
     handleBack,
     handleCategorySelected,
