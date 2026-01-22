@@ -274,6 +274,7 @@ export const useProfileData = (targetUserId?: string) => {
             currency: item.currency,
             condition: item.condition,
             image_url: item.image_url,
+            images: item.images || [], // Include images array for ItemDetailsScreen
             category: item.category ?? item.categories ?? null,
             categories: item.categories ?? null,
             category_name:
