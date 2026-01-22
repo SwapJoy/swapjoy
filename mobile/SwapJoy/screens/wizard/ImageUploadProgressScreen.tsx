@@ -82,6 +82,8 @@ const ImageUploadProgressScreen: React.FC<ImageUploadProgressScreenProps> = ({
   // Reset form data when starting a new wizard flow
   useEffect(() => {
     resetFormData();
+    // Note: We don't clear the imageUploadCache here because we want to preserve
+    // upload status when navigating back from preview screen
   }, [resetFormData]);
 
   // Set up header with + button

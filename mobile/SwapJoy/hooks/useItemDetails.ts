@@ -21,6 +21,16 @@ interface ImageUploadState {
   uploadError?: string;
 }
 
+// Module-level cache to preserve upload status across hook instances
+// Maps image URI to upload state
+const imageUploadCache = new Map<string, {
+  id: string;
+  uploaded: boolean;
+  supabaseUrl?: string;
+  uploadProgress?: number;
+  uploadError?: string;
+}>();
+
 const CONDITION_DEFS: { value: ItemCondition; icon: string }[] = [
   { value: 'new', icon: 'sparkles' },
   { value: 'like_new', icon: 'star' },
@@ -148,21 +158,23 @@ export const useItemDetails = ({ imageUris, navigation, route }: UseItemDetailsP
   const imageUrisProcessedRef = useRef<string>('');
   const [uploadsCompleted, setUploadsCompleted] = useState(false);
 
-  // Initialize images from imageUris (only once per unique set of imageUris)
-  // Note: We preserve the order of imageUris as it represents the user's desired order
+  // Initialize images from imageUris
+  // Strategy: Preserve existing image state (upload status, IDs) when possible
   useEffect(() => {
     if (!imageUris || imageUris.length === 0) return;
     
-    // Create a unique key for this set of imageUris (sorted for comparison, but preserve order)
+    // Create a unique key for this set of imageUris (sorted for comparison)
     const imageUrisKey = [...imageUris].sort().join('|');
     const imageUrisOrderKey = imageUris.join('|'); // Preserve order for comparison
     
-    // Only initialize if this is a new set of imageUris OR if the order changed
-    if (imageUrisProcessedRef.current === imageUrisKey && images.length > 0) {
-      // Check if order changed (same URIs but different order)
-      const currentOrderKey = images.map((img) => img.uri).join('|');
+    // Check if we already have images with these URIs
+    const currentOrderKey = images.map((img) => img.uri).join('|');
+    
+    // If we have images and the URIs match (same set), just reorder if needed
+    if (images.length > 0 && imageUrisProcessedRef.current === imageUrisKey) {
       if (currentOrderKey === imageUrisOrderKey) {
-        return; // Same URIs in same order, no need to reinitialize
+        // Same URIs in same order - no change needed
+        return;
       }
       // Order changed - reorder existing images to match imageUris order
       const reorderedImages = imageUris
@@ -179,27 +191,80 @@ export const useItemDetails = ({ imageUris, navigation, route }: UseItemDetailsP
         uploadProgress: 0,
       }));
       
-      setImages([...reorderedImages, ...newImages]);
+      if (reorderedImages.length !== images.length || newImages.length > 0) {
+        setImages([...reorderedImages, ...newImages]);
+      }
       return;
     }
+    
+    // New set of imageUris - check if we can preserve state from existing images or cache
+    const existingImagesByUri = new Map(images.map((img) => [img.uri, img]));
     
     // Mark this set as processed
     imageUrisProcessedRef.current = imageUrisKey;
     
-    // Only initialize if images haven't been set yet
-    if (images.length === 0) {
-      const initialImages: ImageUploadState[] = imageUris.map((uri) => ({
-        id: uuidv4(),
+    // Initialize images, preserving state from existing images or cache
+    const initialImages: ImageUploadState[] = imageUris.map((uri) => {
+      // First check if we have this image in current state
+      const existing = existingImagesByUri.get(uri);
+      if (existing) {
+        // Update cache with current state
+        imageUploadCache.set(uri, {
+          id: existing.id,
+          uploaded: existing.uploaded,
+          supabaseUrl: existing.supabaseUrl,
+          uploadProgress: existing.uploadProgress,
+          uploadError: existing.uploadError,
+        });
+        return existing;
+      }
+      
+      // Check cache for previously uploaded images
+      const cached = imageUploadCache.get(uri);
+      if (cached) {
+        // Restore from cache (preserves upload status when navigating back)
+        return {
+          id: cached.id,
+          uri,
+          uploaded: cached.uploaded,
+          supabaseUrl: cached.supabaseUrl,
+          uploadProgress: cached.uploadProgress,
+          uploadError: cached.uploadError,
+        };
+      }
+      
+      // New image - create fresh
+      const newId = uuidv4();
+      const newImage: ImageUploadState = {
+        id: newId,
         uri,
         uploaded: false,
         uploadProgress: 0,
-      }));
+      };
+      
+      // Cache the new image
+      imageUploadCache.set(uri, {
+        id: newId,
+        uploaded: false,
+        uploadProgress: 0,
+      });
+      
+      return newImage;
+    });
+    
+    // Only update if images actually changed
+    const currentIds = images.map((img) => img.id).join(',');
+    const newIds = initialImages.map((img) => img.id).join(',');
+    
+    if (currentIds !== newIds || images.length !== initialImages.length) {
       setImages(initialImages);
       
-      // Reset flags for new image set
-      isUploadingRef.current = false;
-      uploadsCompletedRef.current = false;
-      setUploadsCompleted(false);
+      // Only reset flags if this is truly a new set (not just reordering)
+      if (images.length === 0 || !imageUris.every((uri) => existingImagesByUri.has(uri) || imageUploadCache.has(uri))) {
+        isUploadingRef.current = false;
+        uploadsCompletedRef.current = false;
+        setUploadsCompleted(false);
+      }
     }
   }, [imageUris, images]);
 
@@ -276,19 +341,43 @@ export const useItemDetails = ({ imageUris, navigation, route }: UseItemDetailsP
       // On progress
       (imageId, progress) => {
         setUploadProgress((prev) => ({ ...prev, [imageId]: progress }));
+        // Update cache with progress
+        setImages((currentImages) => {
+          const img = currentImages.find((i) => i.id === imageId);
+          if (img) {
+            imageUploadCache.set(img.uri, {
+              id: img.id,
+              uploaded: img.uploaded || false,
+              supabaseUrl: img.supabaseUrl,
+              uploadProgress: progress,
+              uploadError: img.uploadError,
+            });
+          }
+          return currentImages;
+        });
       },
       // On complete
       async (imageId, url) => {
         uploadedUrls.push(url);
         uploadedImageMap.set(imageId, url);
         completedCount++;
-        setImages((prev) =>
-          prev.map((img) =>
-            img.id === imageId
-              ? { ...img, uploaded: true, supabaseUrl: url, uploadProgress: 100 }
-              : img
-          )
-        );
+        setImages((prev) => {
+          const updated = prev.map((img) => {
+            if (img.id === imageId) {
+              const updatedImg = { ...img, uploaded: true, supabaseUrl: url, uploadProgress: 100 };
+              // Update cache with upload status
+              imageUploadCache.set(img.uri, {
+                id: img.id,
+                uploaded: true,
+                supabaseUrl: url,
+                uploadProgress: 100,
+              });
+              return updatedImg;
+            }
+            return img;
+          });
+          return updated;
+        });
         
         // When all uploads complete
         if (completedCount === totalToUpload) {
@@ -303,11 +392,22 @@ export const useItemDetails = ({ imageUris, navigation, route }: UseItemDetailsP
       async (imageId, error) => {
         console.error(`Upload failed for image ${imageId}:`, error);
         completedCount++;
-        setImages((prev) =>
-          prev.map((img) =>
-            img.id === imageId ? { ...img, uploaded: false, uploadError: error } : img
-          )
-        );
+        setImages((prev) => {
+          const updated = prev.map((img) => {
+            if (img.id === imageId) {
+              const updatedImg = { ...img, uploaded: false, uploadError: error };
+              // Update cache with error status
+              imageUploadCache.set(img.uri, {
+                id: img.id,
+                uploaded: false,
+                uploadError: error,
+              });
+              return updatedImg;
+            }
+            return img;
+          });
+          return updated;
+        });
         
         // Even if some fail, check if we're done
         if (completedCount === totalToUpload) {
@@ -429,6 +529,9 @@ export const useItemDetails = ({ imageUris, navigation, route }: UseItemDetailsP
         }
       }
 
+      // Remove from cache
+      imageUploadCache.delete(imageToRemove.uri);
+      
       setImages((prev) => prev.filter((img) => img.id !== imageId));
       setUploadProgress((prev) => {
         const { [imageId]: _removed, ...rest } = prev;
