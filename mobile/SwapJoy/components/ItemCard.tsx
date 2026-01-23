@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import CachedImage from './CachedImage';
 import SJText from './SJText';
+import CategoryChip from './CategoryChip';
 
 export type ItemCardVariant = 'list' | 'horizontal' | 'grid';
 
@@ -81,6 +82,7 @@ interface ItemCardProps {
   favoriteButton?: ReactNode;
   ownerHandle?: string;
   conditionBadge?: ItemCardChip;
+  categoryChipName?: string;
 }
 
 const ItemCard: React.FC<ItemCardProps> = memo(
@@ -103,6 +105,7 @@ const ItemCard: React.FC<ItemCardProps> = memo(
     favoriteButton,
     ownerHandle,
     conditionBadge,
+    categoryChipName,
   }) => {
     const computedImageHeight =
       imageHeight ??
@@ -194,6 +197,12 @@ const ItemCard: React.FC<ItemCardProps> = memo(
           >
             {title}
           </SJText>
+
+          {categoryChipName ? (
+            <View style={styles.categoryChipContainer}>
+              <CategoryChip name={categoryChipName} />
+            </View>
+          ) : null}
 
           {ownerHandle ? (
             <SJText style={styles.ownerHandle} numberOfLines={1}>
@@ -319,6 +328,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 15,
     fontWeight: '600'
+  },
+  categoryChipContainer: {
+    marginTop: 2,
+    marginBottom: 2,
+    alignSelf: 'flex-start',
   },
   ownerHandle: {
     fontSize: 12,

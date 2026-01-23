@@ -64,26 +64,63 @@ export async function logImpressionsBatch(itemIds: string[]) {
 
 // Strong signals: also refresh user preference embedding
 
+async function refreshPreferenceEmbedding() {
+  const userId = await getCurrentUserId();
+  if (!userId) {
+    console.warn('[itemEvents] No authenticated user, skipping preference embedding refresh');
+    return;
+  }
+
+  try {
+    console.log('[itemEvents] Calling refresh_user_preference_embedding for user:', userId);
+    const { data, error } = await supabase.rpc('refresh_user_preference_embedding', {
+      p_user_id: userId,
+    });
+
+    if (error) {
+      console.error('[itemEvents] refresh_user_preference_embedding RPC error:', {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code,
+      });
+    } else {
+      console.log('[itemEvents] refresh_user_preference_embedding RPC succeeded');
+    }
+  } catch (err) {
+    console.error('[itemEvents] refresh_user_preference_embedding exception:', err);
+  }
+}
+
 export async function logView(itemId: string) {
   await logItemEvent(itemId, 'view');
 }
 
 export async function logSave(itemId: string) {
   await logItemEvent(itemId, 'save');
-  await supabase.rpc('refresh_user_preference_embedding', { p_user_id: null }).catch(() => {});
+  // Fire and forget - don't await to avoid blocking UI
+  refreshPreferenceEmbedding().catch((err) => {
+    console.error('[itemEvents] Failed to refresh preference embedding after save:', err);
+  });
 }
 
 export async function logMessage(itemId: string) {
   await logItemEvent(itemId, 'message');
-  await supabase.rpc('refresh_user_preference_embedding', { p_user_id: null }).catch(() => {});
+  refreshPreferenceEmbedding().catch((err) => {
+    console.error('[itemEvents] Failed to refresh preference embedding after message:', err);
+  });
 }
 
 export async function logSwapRequest(itemId: string) {
   await logItemEvent(itemId, 'swap_request');
-  await supabase.rpc('refresh_user_preference_embedding', { p_user_id: null }).catch(() => {});
+  refreshPreferenceEmbedding().catch((err) => {
+    console.error('[itemEvents] Failed to refresh preference embedding after swap_request:', err);
+  });
 }
 
 export async function logHide(itemId: string) {
   await logItemEvent(itemId, 'hide');
-  await supabase.rpc('refresh_user_preference_embedding', { p_user_id: null }).catch(() => {});
+  refreshPreferenceEmbedding().catch((err) => {
+    console.error('[itemEvents] Failed to refresh preference embedding after hide:', err);
+  });
 }

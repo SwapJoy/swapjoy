@@ -1,6 +1,7 @@
-import React, { memo, useCallback, useRef } from 'react';
-import { View, StyleSheet, ActivityIndicator, FlatList } from 'react-native';
+import React, { memo, useCallback, useEffect, useState, useMemo, useRef } from 'react';
+import { View, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import { colors } from '@navigation/MainTabNavigator.styles';
 import { useLocalization } from '../localization';
 import type { AppLanguage } from '../types/language';
@@ -9,45 +10,51 @@ import { useHome } from '../hooks/useHome';
 import ItemCardCollection from '../components/ItemCardCollection';
 import FavoriteToggleButton from '../components/FavoriteToggleButton';
 import SJText from '../components/SJText';
-import { logImpressionsBatch } from '../services/itemEvents';
+import CitySelectorPopover from '../components/CitySelectorPopover';
+import { useAuth } from '../contexts/AuthContext';
+import { useLocation, City } from '../contexts/LocationContext';
+import { ApiService } from '../services/api';
+import type { LocationSelection } from '../types/location';
 
 const HomeScreen: React.FC<ExploreScreenProps> = () => {
   const navigation = useNavigation<ItemDetailsScreenProps['navigation']>();
   const { t, language } = useLocalization();
+  const { user } = useAuth();
   const { items, loading, loadingMore, hasMore, error, refresh, loadMore } = useHome(20, { radiusKm: 50 });
   const [refreshing, setRefreshing] = React.useState(false);
-
-  const impressionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const loggedImpressionIdsRef = useRef<Set<string>>(new Set());
-
-  // Reset impression tracking when items refresh (new feed loaded)
-  React.useEffect(() => {
-    loggedImpressionIdsRef.current.clear();
-  }, [items.length]);
+  const [locationSelectorVisible, setLocationSelectorVisible] = useState(false);
+  const [currentCityName, setCurrentCityName] = useState<string | null>(null);
+  const [loadingCityName, setLoadingCityName] = useState(false);
+  const locationButtonRef = useRef<View>(null);
+  
+  const {
+    manualLocation,
+    cities,
+    citiesLoading,
+    setManualLocation: setLocationContextManualLocation,
+  } = useLocation();
 
   const handleRefresh = React.useCallback(async () => {
-    if (refreshing) return; // Prevent multiple simultaneous refreshes
     setRefreshing(true);
+    const startTime = Date.now();
     try {
       await refresh();
-      // Ensure the refresh indicator is visible for at least 800ms
-      await new Promise(resolve => setTimeout(resolve, 800));
-    } catch (error) {
-      console.error('[HomeScreen] Refresh error:', error);
     } finally {
+      // Ensure refresh indicator is visible for at least 500ms
+      const elapsed = Date.now() - startTime;
+      const minDisplayTime = 500;
+      if (elapsed < minDisplayTime) {
+        await new Promise(resolve => setTimeout(resolve, minDisplayTime - elapsed));
+      }
       setRefreshing(false);
     }
-  }, [refresh, refreshing]);
+  }, [refresh]);
 
   const handleLoadMore = React.useCallback(() => {
-    console.log('[HomeScreen] handleLoadMore called', { hasMore, loadingMore, loading, itemsCount: items.length });
     if (hasMore && !loadingMore && !loading) {
-      console.log('[HomeScreen] Triggering loadMore...');
       loadMore();
-    } else {
-      console.log('[HomeScreen] Skipping loadMore', { hasMore, loadingMore, loading });
     }
-  }, [hasMore, loadingMore, loading, loadMore, items.length]);
+  }, [hasMore, loadingMore, loading, loadMore]);
 
   const handleItemPress = useCallback(
     (item: any) => {
@@ -55,27 +62,6 @@ const HomeScreen: React.FC<ExploreScreenProps> = () => {
       navigation.navigate('ItemDetails', { itemId: item.id, item });
     },
     [navigation]
-  );
-
-  const handleViewableItemsChanged = useCallback(
-    ({ viewableItems }: { viewableItems: Array<{ item: any }> }) => {
-      if (impressionTimeoutRef.current) {
-        clearTimeout(impressionTimeoutRef.current);
-      }
-      impressionTimeoutRef.current = setTimeout(() => {
-        const ids = viewableItems
-          .map(v => v.item?.id)
-          .filter(Boolean)
-          .filter(id => !loggedImpressionIdsRef.current.has(id));
-        
-        if (ids.length > 0) {
-          // Mark these IDs as logged to prevent duplicate impressions
-          ids.forEach(id => loggedImpressionIdsRef.current.add(id));
-          logImpressionsBatch(ids);
-        }
-      }, 500);
-    },
-    []
   );
 
   const buildFavoriteData = useCallback(
@@ -106,6 +92,119 @@ const HomeScreen: React.FC<ExploreScreenProps> = () => {
       <FavoriteToggleButton itemId={item.id} item={buildFavoriteData(item)} size={18} />
     ),
     [buildFavoriteData]
+  );
+
+  // Load current city name from manual_location
+  useEffect(() => {
+    const loadCurrentCityName = async () => {
+      if (!user?.id) {
+        setCurrentCityName(null);
+        return;
+      }
+
+      try {
+        setLoadingCityName(true);
+        const { data: profile } = await ApiService.getProfile();
+        const profileData = profile as any;
+        if (profileData?.manual_location_lat && profileData?.manual_location_lng) {
+          const { data: nearest } = await ApiService.findNearestCity(
+            profileData.manual_location_lat,
+            profileData.manual_location_lng
+          );
+          const nearestData = nearest as any;
+          if (nearestData?.name) {
+            setCurrentCityName(nearestData.name);
+          } else {
+            setCurrentCityName(null);
+          }
+        } else {
+          setCurrentCityName(null);
+        }
+      } catch (error) {
+        console.error('[HomeScreen] Error loading city name:', error);
+        setCurrentCityName(null);
+      } finally {
+        setLoadingCityName(false);
+      }
+    };
+
+    loadCurrentCityName();
+  }, [user?.id, manualLocation]);
+
+
+  const handleLocationSelected = useCallback(
+    async (selection: LocationSelection) => {
+      try {
+        console.log('[HomeScreen] handleLocationSelected called', { selection });
+        
+        // Update in database first
+        const { error } = await ApiService.updateManualLocation({
+          lat: selection.lat,
+          lng: selection.lng,
+        });
+
+        if (error) {
+          throw new Error(error.message || 'Failed to update location');
+        }
+
+        console.log('[HomeScreen] Database updated successfully');
+
+        // Update LocationContext (this will update selectedLocation)
+        await setLocationContextManualLocation({
+          lat: selection.lat,
+          lng: selection.lng,
+          cityId: selection.cityId ?? undefined,
+          cityName: selection.cityName ?? undefined,
+        });
+
+        console.log('[HomeScreen] LocationContext updated');
+
+        // Update city name display
+        if (selection.cityName) {
+          setCurrentCityName(selection.cityName);
+        } else {
+          // Fallback: try to get city name from findNearestCity
+          const { data: nearest } = await ApiService.findNearestCity(selection.lat, selection.lng);
+          const nearestData = nearest as any;
+          if (nearestData?.name) {
+            setCurrentCityName(nearestData.name);
+          }
+        }
+
+        // Close popover
+        setLocationSelectorVisible(false);
+        
+        // The useHome's useEffect should automatically detect the location change
+        // and refetch. The setManualLocationState is synchronous, so the context
+        // should update on the next render, which will trigger the useEffect.
+        console.log('[HomeScreen] Location updated, useHome useEffect should detect change and refetch');
+      } catch (error: any) {
+        console.error('[HomeScreen] Error updating location:', error);
+        throw error;
+      }
+    },
+    [setLocationContextManualLocation, refresh]
+  );
+
+  const handleCitySelect = useCallback(
+    async (city: City) => {
+      console.log('[HomeScreen] handleCitySelect called', { city });
+      try {
+        await handleLocationSelected({
+          lat: city.center_lat,
+          lng: city.center_lng,
+          cityName: city.name,
+          country: city.country,
+          cityId: city.id,
+          stateProvince: city.state_province ?? null,
+          source: 'city',
+        });
+        console.log('[HomeScreen] handleCitySelect completed');
+      } catch (error) {
+        console.error('[HomeScreen] handleCitySelect error:', error);
+      }
+    },
+    [handleLocationSelected]
   );
 
   const listEmptyComponent = (
@@ -141,9 +240,33 @@ const HomeScreen: React.FC<ExploreScreenProps> = () => {
     </View>
   );
 
+  const headerComponent = useMemo(
+    () => (
+      <View style={styles.headerContainer}>
+        <SJText style={styles.header}>Top picks</SJText>
+        <View ref={locationButtonRef} collapsable={false}>
+          <TouchableOpacity
+            style={styles.locationButton}
+            onPress={() => setLocationSelectorVisible(true)}
+            activeOpacity={0.7}
+          >
+          <Ionicons name="location-outline" size={16} color={colors.white} style={styles.locationIcon} />
+          {loadingCityName ? (
+            <ActivityIndicator size="small" color={colors.white} style={styles.locationSpinner} />
+          ) : (
+            <SJText style={styles.locationText} numberOfLines={1}>
+              {currentCityName || 'Location'}
+            </SJText>
+          )}
+          </TouchableOpacity>
+        </View>
+      </View>
+    ),
+    [loadingCityName, currentCityName]
+  );
+
   return (
     <View style={styles.container}>
-      <SJText style={styles.header}>Top picks</SJText>
       <ItemCardCollection
         items={items}
         t={t}
@@ -160,6 +283,7 @@ const HomeScreen: React.FC<ExploreScreenProps> = () => {
         horizontalPadding={2}
         columnSpacing={4}
         rowSpacing={2}
+        listHeaderComponent={headerComponent}
         listFooterComponent={
           loadingMore ? (
             <View style={styles.footerLoader}>
@@ -167,10 +291,15 @@ const HomeScreen: React.FC<ExploreScreenProps> = () => {
             </View>
           ) : null
         }
-        flatListProps={{
-          onViewableItemsChanged: handleViewableItemsChanged,
-          viewabilityConfig: { itemVisiblePercentThreshold: 50 },
-        }}
+      />
+      <CitySelectorPopover
+        visible={locationSelectorVisible}
+        onClose={() => setLocationSelectorVisible(false)}
+        cities={cities}
+        loading={citiesLoading}
+        selectedCityId={manualLocation?.cityId ?? null}
+        onSelectCity={handleCitySelect}
+        anchorRef={locationButtonRef}
       />
     </View>
   );
@@ -181,14 +310,44 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.primaryDark,
   },
+  headerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 12,
+    paddingBottom: 4,
+    paddingHorizontal: 8,
+    backgroundColor: colors.primaryDark,
+  },
   header: { 
     color: colors.white, 
-    marginBottom: 4, 
-    marginTop: 12, 
-    marginLeft: 8, 
     fontSize: 28, 
     fontWeight: '200', 
-    opacity: 0.6 
+    opacity: 0.6,
+    flex: 1,
+  },
+  locationButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderWidth: 0.8,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  locationIcon: {
+    marginRight: 6,
+  },
+  locationText: {
+    color: colors.white,
+    fontSize: 13,
+    fontWeight: '400',
+    opacity: 0.8,
+    maxWidth: 120,
+  },
+  locationSpinner: {
+    marginLeft: 4,
   },
   gridListContent: {
     paddingTop: 6,

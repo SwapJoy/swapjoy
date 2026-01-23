@@ -84,7 +84,7 @@ const MainTabNavigator: React.FC<MainTabNavigatorProps> = ({ onNavigateToAdd }) 
       })}
     >
       <Tab.Screen
-        name="Top picks"
+        name="Explore"
         component={HomeScreen}
         options={{
           tabBarLabel: 'Explore',

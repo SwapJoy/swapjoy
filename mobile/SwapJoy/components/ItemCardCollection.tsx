@@ -16,6 +16,7 @@ import { getConditionPresentation } from '../utils/conditions';
 import { getItemImageUri } from '../utils/imageUtils';
 import type { AppLanguage } from '../types/language';
 import { DEFAULT_LANGUAGE } from '../types/language';
+import { useCategories } from '../contexts/CategoriesContext';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -75,6 +76,7 @@ const ItemCardCollection: React.FC<ItemCardCollectionProps> = ({
   flatListProps,
 }) => {
   const resolvedLanguage = (language ?? DEFAULT_LANGUAGE) as AppLanguage;
+  const { getCategoryById } = useCategories();
 
   const cardWidth = useMemo(() => {
     const totalSpacing = columnSpacing * (numColumns - 1);
@@ -95,11 +97,52 @@ const ItemCardCollection: React.FC<ItemCardCollectionProps> = ({
     ({ item, index }) => {
       const chips: ItemCardChip[] = [];
 
-      const resolvedCategory =
-        resolveCategoryName(item, resolvedLanguage) ||
-        (typeof item?.category_name === 'string' ? item.category_name : undefined) ||
-        (typeof item?.category === 'string' ? item.category.trim() : undefined) ||
-        categoryFallback;
+      // Resolve category name - similar to TopMatchCard approach
+      // This matches how TopMatchCard resolves categories using useCategories hook
+      let resolvedCategory: string | undefined = undefined;
+      
+      // First try category_name (already resolved by transformTopPickItem: category?.title_en || category?.title_ka)
+      if (item?.category_name && typeof item.category_name === 'string' && item.category_name.trim()) {
+        resolvedCategory = item.category_name.trim();
+      }
+      // Then try direct category object access (category is parsed JSONB from transformTopPickItem)
+      else if (item?.category) {
+        if (typeof item.category === 'object' && item.category !== null) {
+          // If category is an object with an id, look it up in CategoriesContext
+          if ('id' in item.category && typeof item.category.id === 'string') {
+            const categoryData = getCategoryById(item.category.id);
+            if (categoryData) {
+              resolvedCategory = categoryData.name || categoryData.title_en || categoryData.title_ka || undefined;
+            }
+          }
+          // Otherwise try direct property access
+          if (!resolvedCategory) {
+            resolvedCategory = item.category[`title_${resolvedLanguage}`] || 
+                             item.category.title_en || 
+                             item.category.title_ka || 
+                             item.category.name || 
+                             undefined;
+          }
+        } else if (typeof item.category === 'string' && item.category.trim()) {
+          resolvedCategory = item.category.trim();
+        }
+      }
+      // Try looking up by category_id if we have it but no category object
+      else if (item?.category_id && typeof item.category_id === 'string') {
+        const categoryData = getCategoryById(item.category_id);
+        if (categoryData) {
+          resolvedCategory = categoryData.name || categoryData.title_en || categoryData.title_ka || undefined;
+        }
+      }
+      // Then try resolveCategoryName utility (handles various category formats)
+      if (!resolvedCategory) {
+        resolvedCategory = resolveCategoryName(item, resolvedLanguage) || undefined;
+      }
+      
+      // Final fallback
+      if (!resolvedCategory && categoryFallback) {
+        resolvedCategory = categoryFallback;
+      }
 
       if (resolvedCategory) {
         chips.push({
@@ -175,6 +218,7 @@ const ItemCardCollection: React.FC<ItemCardCollectionProps> = ({
               : undefined
           }
           favoriteButton={favoriteButton}
+          categoryChipName={resolvedCategory}
         />
       );
     },
@@ -183,6 +227,7 @@ const ItemCardCollection: React.FC<ItemCardCollectionProps> = ({
       categoryFallback,
       columnSpacing,
       favoriteButtonRenderer,
+      getCategoryById,
       metaRightResolver,
       numColumns,
       onItemPress,
@@ -199,18 +244,14 @@ const ItemCardCollection: React.FC<ItemCardCollectionProps> = ({
       <RefreshControl
         refreshing={!!refreshing}
         onRefresh={onRefresh}
-        tintColor="#ffde21" // primaryYellow for iOS
-        colors={['#ffde21']} // Android
-        progressBackgroundColor="#161200" // primaryDark for Android
-        title="Refreshing..." // iOS
-        titleColor="#ffde21" // iOS
+        tintColor="#ffde21"
+        colors={['#ffde21']}
+        progressBackgroundColor="#1a1a1a"
       />
     );
   }, [refreshing, onRefresh]);
 
-  // Handle onEndReached for grid layouts - need to ensure it fires correctly
   const handleEndReached = useCallback((info: { distanceFromEnd: number }) => {
-    console.log('[ItemCardCollection] onEndReached fired', { distanceFromEnd: info.distanceFromEnd, hasCallback: !!onEndReached });
     if (onEndReached) {
       onEndReached(info);
     }
