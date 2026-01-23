@@ -11,12 +11,12 @@ type ConditionStyle = {
 
 const CONDITION_STYLES: Record<ConditionKey, ConditionStyle & { emoji: string }> = {
   mint: { backgroundColor: '#0BDA51', textColor: colors.primaryDark, emoji: '✨' },
-  new: { backgroundColor: '#5CE65C', textColor: colors.primaryDark, emoji: '🆕' },
-  like_new: { backgroundColor: '#0BDA51', textColor: colors.primaryDark, emoji: '🌿' },
+  new: { backgroundColor: '#50C878', textColor: colors.primaryDark, emoji: '🆕' },
+  like_new: { backgroundColor: '#ADEBB3', textColor: colors.primaryDark, emoji: '🌿' },
   excellent: { backgroundColor: '#B163FF', textColor: colors.primaryDark, emoji: '⭐' },
-  good: { backgroundColor: '#E4C80A', textColor: colors.primaryDark, emoji: '👍' },
-  fair: { backgroundColor: '#6D8196', textColor: colors.primaryDark, emoji: '⚠️' },
-  poor: { backgroundColor: '#FA5053', textColor: colors.primaryDark, emoji: '🔧' },
+  good: { backgroundColor: '#FBEC5D', textColor: colors.primaryDark, emoji: '👍' },
+  fair: { backgroundColor: '#CCCCFF', textColor: colors.primaryDark, emoji: '⚠️' },
+  poor: { backgroundColor: '#FFB5C0', textColor: colors.primaryDark, emoji: '🔧' },
 };
 
 const normalizeConditionKey = (condition?: string): ConditionKey | null => {

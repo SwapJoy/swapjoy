@@ -1,54 +1,36 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity, StyleProp, ViewStyle } from 'react-native';
 import SJText from './SJText';
-import { getConditionPresentation } from '../utils/conditions';
-import { useLocalization } from '../localization';
 import { colors } from '@navigation/MainTabNavigator.styles';
 
-interface ConditionChipProps {
-  condition: string;
+interface CategoryChipProps {
+  name: string;
   selected?: boolean;
   onPress?: () => void;
   style?: StyleProp<ViewStyle>;
 }
 
-const ConditionChip: React.FC<ConditionChipProps> = ({
-  condition,
+const CategoryChip: React.FC<CategoryChipProps> = ({
+  name,
   selected = false,
   onPress,
   style,
 }) => {
-  const { language, t } = useLocalization();
-  
-  const conditionPresentation = getConditionPresentation({
-    condition,
-    language,
-    translate: t,
-  });
-
-  if (!conditionPresentation) {
-    return null;
-  }
-
   const chipContent = (
     <View
       style={[
         styles.chip,
-        {
-          backgroundColor: conditionPresentation.backgroundColor,
-          borderWidth: selected ? 3 : 0,
-          borderColor: selected ? colors.white : 'transparent',
-        },
         selected && styles.chipSelected,
         style,
       ]}
     >
       <SJText
         style={[
-          styles.chipText
+          styles.chipText,
+          selected && styles.chipTextSelected,
         ]}
       >
-        {conditionPresentation.label}
+        {name}
       </SJText>
     </View>
   );
@@ -67,21 +49,28 @@ const ConditionChip: React.FC<ConditionChipProps> = ({
 const styles = StyleSheet.create({
   chip: {
     borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 3,
+    borderWidth: 0.8,
+    borderColor: colors.white,
+    backgroundColor: 'transparent',
   },
   chipSelected: {
-    transform: [{ scale: 1.05 }],
+    backgroundColor: colors.primaryYellow,
+    borderColor: colors.primaryYellow,
   },
   chipText: {
     fontSize: 13,
-    fontWeight: '400',
+    fontWeight: '300',
+    color: colors.white,
+  },
+  chipTextSelected: {
     color: colors.primaryDark,
+    fontWeight: '400',
   },
 });
 
-export default ConditionChip;
+export default CategoryChip;

@@ -45,6 +45,7 @@ const SWInputField: React.FC<SWInputFieldProps> = ({
   rightButton,
   cursorColor,
   selectionColor,
+  style,
   ...textInputProps
 }) => {
   const [isFocused, setIsFocused] = useState(false);
@@ -96,13 +97,16 @@ const SWInputField: React.FC<SWInputFieldProps> = ({
     outputRange: [16, 12],
   });
 
-  const displayLabel = label || placeholder;
-  const showFloatingLabel = isFocused || value.length > 0;
+  const showFloatingLabel = label && (isFocused || value.length > 0);
 
   return (
     <View style={styles.container}>
-      <View style={[styles.inputContainer, disabled && styles.inputContainerDisabled]}>
-        {displayLabel && showFloatingLabel && (
+      <View style={[
+        styles.inputContainer,
+        !label && styles.inputContainerNoLabel,
+        disabled && styles.inputContainerDisabled
+      ]}>
+        {label && showFloatingLabel && (
           <Animated.View
             style={[
               styles.labelContainer,
@@ -121,7 +125,7 @@ const SWInputField: React.FC<SWInputFieldProps> = ({
                 },
               ]}
             >
-              {displayLabel}
+              {label}
               {required && <SJText style={styles.required}> *</SJText>}
             </Animated.Text>
           </Animated.View>
@@ -141,6 +145,7 @@ const SWInputField: React.FC<SWInputFieldProps> = ({
               styles.textInput,
               disabled && styles.textInputDisabled,
               multiline && styles.textInputMultiline,
+              style,
             ]}
             placeholder={!hasValue && !isFocused ? placeholder : undefined}
             placeholderTextColor="#8e8e93"
@@ -186,6 +191,9 @@ const styles = StyleSheet.create({
     position: 'relative',
     paddingTop: 20,
     paddingBottom: 8,
+  },
+  inputContainerNoLabel: {
+    paddingTop: 0,
   },
   inputContainerDisabled: {
     opacity: 0.6,

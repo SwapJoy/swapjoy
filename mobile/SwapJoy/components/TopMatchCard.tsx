@@ -20,6 +20,7 @@ import type { AppLanguage } from '../types/language';
 import SJText from './SJText';
 import { colors } from '@navigation/MainTabNavigator.styles';
 import ConditionChip from './ConditionChip';
+import CategoryChip from './CategoryChip';
 
 const { height } = Dimensions.get('window');
 
@@ -284,14 +285,10 @@ const TopMatchCard: React.FC<TopMatchCardProps> = ({
           {normalizedCategory && (
             <View style={styles.metaSection}>
               <View style={styles.chipsRow}>
-                <View
-                  style={[styles.chip, { backgroundColor: colors.primaryYellow }]}
-                >
-                  <SJText style={styles.chipEmoji}>{categoryIcon}</SJText>
-                  <SJText style={[styles.chipText]}>
-                    {normalizedCategory}
-                  </SJText>
-                </View>
+                <CategoryChip
+                  name={normalizedCategory}
+                  style={styles.categoryChip}
+                />
               </View>
             </View>
           )}
@@ -467,21 +464,8 @@ const styles = StyleSheet.create({
     gap: 6,
     alignItems: 'center',
   },
-  chip: {
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  chipEmoji: {
-    fontSize: 12,
-  },
-  chipText: {
-    fontSize: 11,
-    fontWeight: '300',
-    color: '#000',
+  categoryChip: {
+    // CategoryChip has its own styling
   },
   metaSection: {
     marginTop: 8,

@@ -33,11 +33,12 @@ const TitleInputScreen: React.FC<TitleInputScreenProps> = ({
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-          <SJText style={styles.description}>{description}</SJText>
 
           <View style={styles.inputContainer}>
+
+            <SJText style={{ color: colors.white, fontSize: 28, fontWeight: '200', opacity: 0.6 }}>Enter the title</SJText>
+
             <SWInputField
-              label={t('addItem.details.labels.title', { defaultValue: 'Title' })}
               placeholder={t('addItem.details.placeholders.title', { defaultValue: 'Title' })}
               value={title}
               onChangeText={setTitle}
@@ -49,10 +50,7 @@ const TitleInputScreen: React.FC<TitleInputScreenProps> = ({
           </View>
 
           <View style={styles.conditionContainer}>
-            <SJText style={styles.conditionLabel}>
-              {t('addItem.details.labels.condition', { defaultValue: 'Condition' })}{' '}
-              <SJText style={styles.required}>*</SJText>
-            </SJText>
+          <SJText style={{ color: colors.white, fontSize: 28, fontWeight: '200', opacity: 0.6, marginBottom: 12 }}>Condition</SJText>
             <View style={styles.conditionChips}>
               {conditionOptions.map((cond: any) => (
                 <ConditionChip
@@ -86,7 +84,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    padding: 16,
+    paddingHorizontal: 16,
     paddingTop: 24,
   },
   description: {
@@ -95,13 +93,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   inputContainer: {
-    marginBottom: 32,
+    
   },
   titleInput: {
-    fontSize: 24,
+    fontSize: 40,
   },
   conditionContainer: {
-    marginTop: 16,
+    
   },
   conditionLabel: {
     fontSize: 12,

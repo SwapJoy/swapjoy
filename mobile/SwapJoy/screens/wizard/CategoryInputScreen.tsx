@@ -32,7 +32,7 @@ const CategoryInputScreen: React.FC<CategoryInputScreenProps> = ({
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-          <SJText style={styles.description}>{description}</SJText>
+          <SJText style={styles.descriptionText}>Category</SJText>
 
           <View style={styles.selectorContainer}>
             <InlineCategorySelector
@@ -63,14 +63,16 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    padding: 16,
+    paddingHorizontal: 16,
     paddingTop: 24,
     flexGrow: 1,
   },
-  description: {
-    fontSize: 16,
-    marginBottom: 24,
-    textAlign: 'center',
+  descriptionText: {
+    color: colors.white,
+    fontSize: 28,
+    fontWeight: '200',
+    opacity: 0.6,
+    marginBottom: 16,
   },
   selectorContainer: {
     flex: 1,

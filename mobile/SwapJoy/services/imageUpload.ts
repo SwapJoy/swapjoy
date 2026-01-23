@@ -13,9 +13,7 @@ export interface UploadProgress {
 }
 
 export class ImageUploadService {
-  private static readonly BUCKET_NAME = 'images';
-  private static readonly MAX_RETRIES = 3;
-  private static readonly RETRY_DELAY = 1000; // ms
+  static readonly BUCKET_NAME = 'images';
 
   /**
    * Upload a single image to Supabase Storage
@@ -57,12 +55,14 @@ export class ImageUploadService {
       const client = await ApiService.getAuthenticatedClient();
 
       // Upload to Supabase Storage
+      // Use upsert: true to allow overwriting if file already exists
+      // This handles the case where upload completes while user navigates away
       const { data, error } = await client.storage
         .from(this.BUCKET_NAME)
         .upload(filePath, arrayBuffer, {
           contentType: this.getMimeType(extension),
           cacheControl: '3600',
-          upsert: false,
+          upsert: true, // Allow overwriting existing files
         });
 
       if (error) {
@@ -81,13 +81,56 @@ export class ImageUploadService {
 
       return { url: urlData.publicUrl };
     } catch (error: any) {
+      // Check if this is a duplicate error - file already exists
+      const isDuplicateError = 
+        error?.message?.includes('already exists') || 
+        error?.message?.includes('Duplicate') ||
+        error?.message?.includes('resource already exists') ||
+        error?.statusCode === '409' ||
+        error?.statusCode === 409 ||
+        error?.status === 409 ||
+        (error?.name === 'StorageApiError' && error?.statusCode === '409');
+      
+      if (isDuplicateError) {
+        console.log(`[ImageUploadService] File already exists (duplicate error), getting existing URL. Error:`, {
+          message: error?.message,
+          statusCode: error?.statusCode,
+          status: error?.status,
+        });
+        try {
+          // Get authenticated client again
+          const client = await ApiService.getAuthenticatedClient();
+          const user = await AuthService.getCurrentUser();
+          if (!user) {
+            return { url: '', error: 'User not authenticated' };
+          }
+          
+          // Determine file extension and path (reuse logic from above)
+          const extension = ImageUploadService.getFileExtension(imageUri);
+          const fileName = `${imageId}.${extension}`;
+          const filePath = `${user.id}/${fileName}`;
+          
+          // Get the public URL for the existing file
+          const { data: urlData } = client.storage
+            .from(ImageUploadService.BUCKET_NAME)
+            .getPublicUrl(filePath);
+          
+          onProgress?.(100);
+          console.log(`[ImageUploadService] Successfully retrieved existing file URL: ${urlData.publicUrl}`);
+          return { url: urlData.publicUrl };
+        } catch (urlError) {
+          console.error('[ImageUploadService] Could not get existing file URL:', urlError);
+          return { url: '', error: 'File exists but could not get URL' };
+        }
+      }
+      
       console.error('Error uploading image:', error);
-      return { url: '', error: error.message || 'Upload failed' };
+      return { url: '', error: error?.message || 'Upload failed' };
     }
   }
 
   /**
-   * Upload multiple images with progress tracking
+   * Upload multiple images with progress tracking (no automatic retries)
    */
   static async uploadMultipleImages(
     images: Array<{ uri: string; id: string }>,
@@ -99,31 +142,22 @@ export class ImageUploadService {
     const results: UploadProgress[] = [];
 
     for (const image of images) {
-      let attempt = 0;
-      let success = false;
-      let uploadResult: { url: string; error?: string } = { url: '' };
-
-      // Retry logic with exponential backoff
-      while (attempt < this.MAX_RETRIES && !success) {
-        uploadResult = await this.uploadImage(
-          image.uri,
-          image.id,
-          userId,
-          (progress) => {
-            onProgress?.(image.id, progress);
-          }
-        );
-
-        if (uploadResult.url && !uploadResult.error) {
-          success = true;
-          onComplete?.(image.id, uploadResult.url);
-        } else {
-          attempt++;
-          if (attempt < this.MAX_RETRIES) {
-            // Exponential backoff
-            await this.delay(this.RETRY_DELAY * Math.pow(2, attempt - 1));
-          }
+      // Single attempt - no automatic retries
+      const uploadResult = await this.uploadImage(
+        image.uri,
+        image.id,
+        userId,
+        (progress) => {
+          onProgress?.(image.id, progress);
         }
+      );
+
+      const success = uploadResult.url && !uploadResult.error;
+      
+      if (success) {
+        onComplete?.(image.id, uploadResult.url);
+      } else {
+        onError?.(image.id, uploadResult.error || 'Upload failed');
       }
 
       results.push({
@@ -133,13 +167,22 @@ export class ImageUploadService {
         url: uploadResult.url,
         error: success ? undefined : uploadResult.error,
       });
-
-      if (!success) {
-        onError?.(image.id, uploadResult.error || 'Upload failed after retries');
-      }
     }
 
     return results;
+  }
+
+  /**
+   * Retry uploading a single image
+   */
+  static async retryUploadImage(
+    imageUri: string,
+    imageId: string,
+    userId: string,
+    onProgress?: (progress: number) => void
+  ): Promise<{ url: string; error?: string }> {
+    // Clear any previous error state by attempting upload again
+    return this.uploadImage(imageUri, imageId, userId, onProgress);
   }
 
   /**
@@ -220,7 +263,7 @@ export class ImageUploadService {
   /**
    * Get file extension from URI
    */
-  private static getFileExtension(uri: string): string {
+  static getFileExtension(uri: string): string {
     const match = uri.match(/\.([a-zA-Z0-9]+)(\?|$)/);
     return match ? match[1].toLowerCase() : 'jpg';
   }
@@ -252,12 +295,6 @@ export class ImageUploadService {
     }
   }
 
-  /**
-   * Delay helper for retry logic
-   */
-  private static delay(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-  }
 
   /**
    * Validate image size (max 10MB)

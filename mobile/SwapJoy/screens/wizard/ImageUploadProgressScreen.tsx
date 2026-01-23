@@ -20,10 +20,12 @@ const ImageUploadProgressScreen: React.FC<ImageUploadProgressScreenProps> = ({
   route,
 }) => {
   const { t } = useLocalization();
-  const { imageUris } = route.params;
-  const { resetFormData } = useWizardForm();
+  const { imageUris: routeImageUris } = route.params;
+  const { resetFormData, formData, setImageUris } = useWizardForm();
+  // Use context imageUris if available (includes images added via + button), otherwise use route params
+  const imageUris = formData.imageUris.length > 0 ? formData.imageUris : routeImageUris;
   const hookData = useItemDetails({ imageUris, navigation, route });
-  const { images, uploading, uploadProgress, handleRemoveImage, handleAddImages, handleReorderImages, getOverallProgress } = hookData;
+  const { images, uploading, uploadProgress, handleRemoveImage, handleAddImages, handleReorderImages, handleRetryImage, getOverallProgress } = hookData;
   
   // Local state to immediately update grid data when reordering
   // This ensures the library sees the updated data right away
@@ -46,6 +48,15 @@ const ImageUploadProgressScreen: React.FC<ImageUploadProgressScreenProps> = ({
     const currentLocalIds = currentLocal.map((img: any) => img.id).join(',');
     const hookIds = images.map((img: any) => img.id).join(',');
     
+    console.log('[ImageUploadProgress] Sync effect triggered', {
+      currentLocalCount: currentLocal.length,
+      hookImagesCount: images.length,
+      currentLocalIds,
+      hookIds,
+      timeSinceReorder,
+      reorderedIdsRef: reorderedIdsRef.current,
+    });
+    
     // If we reordered recently (< 2 seconds), preserve the local order
     if (timeSinceReorder < 2000 && reorderedIdsRef.current === currentLocalIds) {
       // Recent reorder - update properties from hook but keep local order
@@ -53,6 +64,7 @@ const ImageUploadProgressScreen: React.FC<ImageUploadProgressScreenProps> = ({
         const updatedImg = images.find((img: any) => img.id === localImg.id);
         return updatedImg || localImg;
       });
+      console.log('[ImageUploadProgress] Preserving reorder, updating properties');
       setLocalImages(orderedImages);
     } else {
       // No recent reorder - check what changed
@@ -62,14 +74,23 @@ const ImageUploadProgressScreen: React.FC<ImageUploadProgressScreenProps> = ({
           const updatedImg = images.find((img: any) => img.id === localImg.id);
           return updatedImg || localImg;
         });
+        console.log('[ImageUploadProgress] Same IDs, updating properties');
         setLocalImages(orderedImages);
       } else {
         // IDs changed (add/remove) - use hook order
+        console.log('[ImageUploadProgress] IDs changed, updating localImages with hook images', {
+          oldCount: currentLocal.length,
+          newCount: images.length,
+        });
         setLocalImages(images);
         reorderedIdsRef.current = ''; // Reset reorder tracking
       }
     }
-  }, [images]);
+    
+    // Sync image URIs to context whenever images change
+    const currentUris = images.map((img: any) => img.uri);
+    setImageUris(currentUris);
+  }, [images, setImageUris]);
   
   // Memoize the data array for DraggableGrid
   const gridData = useMemo(() => {
@@ -85,28 +106,6 @@ const ImageUploadProgressScreen: React.FC<ImageUploadProgressScreenProps> = ({
     // Note: We don't clear the imageUploadCache here because we want to preserve
     // upload status when navigating back from preview screen
   }, [resetFormData]);
-
-  // Set up header with + button
-  useLayoutEffect(() => {
-    navigation.setOptions({
-      headerRight: () => {
-        const remainingSlots = MAX_PHOTOS - images.length;
-        return (
-          <TouchableOpacity
-            style={{ marginRight: 16 }}
-            onPress={handleAddMoreImages}
-            disabled={remainingSlots <= 0}
-          >
-            <Ionicons
-              name="add"
-              size={24}
-              color={remainingSlots <= 0 ? '#999' : colors.primaryDark}
-            />
-          </TouchableOpacity>
-        );
-      },
-    });
-  }, [navigation, images.length]);
 
   const handleAddMoreImages = useCallback(async () => {
     try {
@@ -139,6 +138,7 @@ const ImageUploadProgressScreen: React.FC<ImageUploadProgressScreenProps> = ({
       if (!result.canceled && result.assets) {
         const newUris = result.assets.map((asset) => asset.uri);
         handleAddImages(newUris);
+        // Context will be updated by the sync effect when images state changes
       }
     } catch (error) {
       console.error('Error selecting from gallery:', error);
@@ -147,7 +147,29 @@ const ImageUploadProgressScreen: React.FC<ImageUploadProgressScreenProps> = ({
         t('camera.selectError', { defaultValue: 'Failed to select photos. Please try again.' })
       );
     }
-  }, [images.length, handleAddImages, t]);
+  }, [images, handleAddImages, t, setImageUris]);
+
+  // Set up header with + button
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => {
+        const remainingSlots = MAX_PHOTOS - images.length;
+        return (
+          <TouchableOpacity
+            style={{ marginRight: 16 }}
+            onPress={handleAddMoreImages}
+            disabled={remainingSlots <= 0}
+          >
+            <Ionicons
+              name="add"
+              size={24}
+              color={remainingSlots <= 0 ? '#999' : colors.primaryDark}
+            />
+          </TouchableOpacity>
+        );
+      },
+    });
+  }, [navigation, images.length, handleAddMoreImages]);
 
   const hasImages = useMemo(() => {
     return localImages.length > 0;
@@ -242,11 +264,23 @@ const ImageUploadProgressScreen: React.FC<ImageUploadProgressScreenProps> = ({
           <View style={styles.errorOverlay}>
             <Ionicons name="alert-circle" size={24} color="#FF3B30" />
             <SJText style={styles.errorText}>Failed</SJText>
+            <TouchableOpacity
+              style={styles.retryButton}
+              onPress={() => handleRetryImage(img.id)}
+              hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+            >
+              <View style={styles.retryButtonInner}>
+                <Ionicons name="refresh" size={16} color={colors.primaryDark} />
+                <SJText style={styles.retryButtonText}>
+                  {t('common.retry', { defaultValue: 'Retry' })}
+                </SJText>
+              </View>
+            </TouchableOpacity>
           </View>
         )}
       </View>
     );
-  }, [handleRemoveImage, uploadProgress, images]);
+  }, [handleRemoveImage, handleRetryImage, uploadProgress, images, t]);
 
   return (
     <View style={styles.container}>
@@ -284,6 +318,8 @@ const ImageUploadProgressScreen: React.FC<ImageUploadProgressScreenProps> = ({
           onPress={() => {
             // Use localImages to get the current order (includes any reordering)
             const currentUris = localImages.map((img: any) => img.uri);
+            // Update context with current image URIs
+            setImageUris(currentUris);
             navigation.navigate('TitleInput', { 
               imageUris: currentUris,
               failedUploads: failedUploads.length > 0,
@@ -389,6 +425,24 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#fff',
     fontWeight: '600',
+  },
+  retryButton: {
+    marginTop: 8,
+  },
+  retryButtonInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primaryYellow,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    gap: 4,
+  },
+  retryButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.primaryDark,
   },
 });
 

@@ -2282,7 +2282,7 @@ DEPENDENCIES:
   - React-Mapbuffer (from `../node_modules/react-native/ReactCommon`)
   - React-microtasksnativemodule (from `../node_modules/react-native/ReactCommon/react/nativemodule/microtasks`)
   - react-native-get-random-values (from `../node_modules/react-native-get-random-values`)
-  - react-native-maps (from `../../node_modules/react-native-maps`)
+  - react-native-maps (from `../node_modules/react-native-maps`)
   - react-native-safe-area-context (from `../node_modules/react-native-safe-area-context`)
   - React-NativeModulesApple (from `../node_modules/react-native/ReactCommon/react/nativemodule/core/platform/ios`)
   - React-oscompat (from `../node_modules/react-native/ReactCommon/oscompat`)
@@ -2464,7 +2464,7 @@ EXTERNAL SOURCES:
   react-native-get-random-values:
     :path: "../node_modules/react-native-get-random-values"
   react-native-maps:
-    :path: "../../node_modules/react-native-maps"
+    :path: "../node_modules/react-native-maps"
   react-native-safe-area-context:
     :path: "../node_modules/react-native-safe-area-context"
   React-NativeModulesApple:

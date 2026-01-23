@@ -12,6 +12,7 @@ import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useNavigation, NavigationProp, useIsFocused } from '@react-navigation/native';
 import { RootStackParamList } from '../types/navigation';
+import { useWizardForm } from '../contexts/WizardFormContext';
 
 export const MAX_PHOTOS = 10;
 
@@ -78,9 +79,10 @@ export const useCamera = (onNavigateToMain?: () => void, isVisible?: boolean) =>
     setIsActive(shouldBeActive);
   }, [shouldBeActive]);
   
+  const { formData, setImageUris } = useWizardForm();
   const [flashMode, setFlashMode] = useState<'off' | 'on'>('off');
   const [isCapturing, setIsCapturing] = useState(false);
-  const [capturedPhotos, setCapturedPhotos] = useState<string[]>([]);
+  const [capturedPhotos, setCapturedPhotos] = useState<string[]>(formData.imageUris || []);
   const [galleryPermission, setGalleryPermission] = useState<boolean>(false);
   const [lastGalleryImage, setLastGalleryImage] = useState<string | null>(null);
   const [cameraPermissionDenied, setCameraPermissionDenied] = useState<boolean>(false);
@@ -88,6 +90,33 @@ export const useCamera = (onNavigateToMain?: () => void, isVisible?: boolean) =>
   const [lastFrameBase64, setLastFrameBase64] = useState<string | null>(null);
   const cameraRef = useRef<Camera>(null);
   const activeDevice = backDefaultDevice;
+  const isUpdatingFromContextRef = useRef(false);
+
+  // Sync capturedPhotos with context when screen comes into focus or context changes
+  useEffect(() => {
+    if (isFocused && formData.imageUris && formData.imageUris.length > 0) {
+      // Check if context has different images (images were added/removed elsewhere)
+      const contextUris = formData.imageUris;
+      const currentUris = capturedPhotos;
+      
+      if (contextUris.length !== currentUris.length || 
+          contextUris.some((uri, idx) => uri !== currentUris[idx])) {
+        isUpdatingFromContextRef.current = true;
+        setCapturedPhotos(contextUris);
+        // Reset flag after state update
+        setTimeout(() => {
+          isUpdatingFromContextRef.current = false;
+        }, 0);
+      }
+    }
+  }, [formData.imageUris, isFocused]);
+
+  // Sync capturedPhotos to context whenever it changes locally (not from context sync)
+  useEffect(() => {
+    if (!isUpdatingFromContextRef.current && capturedPhotos.length >= 0) {
+      setImageUris(capturedPhotos);
+    }
+  }, [capturedPhotos, setImageUris]);
 
   const format = useCameraFormat(activeDevice, [
     { photoResolution: { width: 1920, height: 1080 } },
@@ -272,14 +301,17 @@ export const useCamera = (onNavigateToMain?: () => void, isVisible?: boolean) =>
   };
 
   const handleNext = async () => {
-    if (capturedPhotos.length === 0) {
+    // Use context imageUris if available (includes images added from ImageUploadProgress), otherwise use capturedPhotos
+    const imageUrisToUse = formData.imageUris.length > 0 ? formData.imageUris : capturedPhotos;
+    
+    if (imageUrisToUse.length === 0) {
       Alert.alert('No Photos', 'Please take at least one photo to continue.');
       return;
     }
 
-      navigation.navigate('ImageUploadProgress', {
-        imageUris: capturedPhotos,
-      });
+    navigation.navigate('ImageUploadProgress', {
+      imageUris: imageUrisToUse,
+    });
   };
 
   const toggleFlash = () => {

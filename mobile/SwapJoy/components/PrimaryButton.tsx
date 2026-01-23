@@ -14,6 +14,7 @@ interface PrimaryButtonProps {
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const DEFAULT_WIDTH = SCREEN_WIDTH * 0.92;
+const HALF_WIDTH = SCREEN_WIDTH * 0.5;
 const DEFAULT_PADDING = 24;
 
 const PrimaryButton: React.FC<PrimaryButtonProps> = ({
@@ -25,7 +26,7 @@ const PrimaryButton: React.FC<PrimaryButtonProps> = ({
   const insets = useSafeAreaInsets();
   const bottomOffset = useRef(new Animated.Value(0)).current;
   const paddingBottom = useRef(new Animated.Value(insets.bottom + 8)).current;
-  const buttonWidth = useRef(new Animated.Value(DEFAULT_WIDTH)).current;
+  const buttonWidth = useRef(new Animated.Value(HALF_WIDTH)).current; // Start with half width (keyboard down)
   const containerPadding = useRef(new Animated.Value(DEFAULT_PADDING)).current;
 
   useEffect(() => {
@@ -46,7 +47,7 @@ const PrimaryButton: React.FC<PrimaryButtonProps> = ({
           useNativeDriver: false,
         }),
         Animated.timing(buttonWidth, {
-          toValue: SCREEN_WIDTH * 0.5,
+          toValue: SCREEN_WIDTH, // Full width (100%) when keyboard is up, no padding
           duration: Platform.OS === 'ios' ? e.duration || 250 : 250,
           useNativeDriver: false,
         }),
@@ -71,7 +72,7 @@ const PrimaryButton: React.FC<PrimaryButtonProps> = ({
           useNativeDriver: false,
         }),
         Animated.timing(buttonWidth, {
-          toValue: DEFAULT_WIDTH,
+          toValue: HALF_WIDTH, // Half width when keyboard is down
           duration: Platform.OS === 'ios' ? e.duration || 250 : 250,
           useNativeDriver: false,
         }),

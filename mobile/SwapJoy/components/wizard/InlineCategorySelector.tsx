@@ -1,7 +1,9 @@
 import React, { useState, useMemo } from 'react';
-import { View, StyleSheet, TouchableOpacity, ScrollView, TextInput } from 'react-native';
-import SJText from '../SJText';
+import { View, StyleSheet, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import SJText from '../SJText';
+import SWInputField from '../SWInputField';
+import CategoryChip from '../CategoryChip';
 import { useCategories } from '../../hooks/useCategories';
 import { colors } from '@navigation/MainTabNavigator.styles';
 
@@ -39,16 +41,14 @@ const InlineCategorySelector: React.FC<InlineCategorySelectorProps> = ({
 
   return (
     <View style={styles.container}>
-      <View style={styles.searchContainer}>
-        <Ionicons name="search" size={18} color="#64748b" />
-        <TextInput
-          style={styles.searchInput}
-          placeholder={t('search.categories', { defaultValue: 'Search categories...' })}
-          placeholderTextColor="#94a3b8"
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-      </View>
+      <SWInputField
+        placeholder={t('search.categories', { defaultValue: 'Search categories...' })}
+        value={searchQuery}
+        onChangeText={setSearchQuery}
+        leftButton={
+          <Ionicons name="search" size={18} color={colors.primaryYellow} />
+        }
+      />
 
       <ScrollView
         style={styles.scrollView}
@@ -58,16 +58,12 @@ const InlineCategorySelector: React.FC<InlineCategorySelectorProps> = ({
         {filteredCategories.map((category) => {
           const isSelected = selectedCategoryId === category.id;
           return (
-            <TouchableOpacity
+            <CategoryChip
               key={category.id}
-              style={[styles.categoryChip, isSelected && styles.categoryChipSelected]}
+              name={category.name}
+              selected={isSelected}
               onPress={() => onSelectCategory(category.id)}
-            >
-              {category.icon && <SJText style={styles.categoryIcon}>{category.icon}</SJText>}
-              <SJText style={[styles.categoryChipText, isSelected && styles.categoryChipTextSelected]}>
-                {category.name}
-              </SJText>
-            </TouchableOpacity>
+            />
           );
         })}
       </ScrollView>
@@ -79,23 +75,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f1f5f9',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  searchInput: {
-    flex: 1,
-    marginLeft: 8,
-    fontSize: 14,
-    color: '#0f172a',
-  },
   scrollView: {
     flex: 1,
   },
@@ -103,32 +82,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-  },
-  categoryChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#f1f5f9',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  categoryChipSelected: {
-    backgroundColor: '#eff6ff',
-    borderColor: '#0ea5e9',
-  },
-  categoryIcon: {
-    fontSize: 14,
-    marginRight: 6,
-  },
-  categoryChipText: {
-    fontSize: 14,
-    color: '#0f172a',
-  },
-  categoryChipTextSelected: {
-    color: '#0ea5e9',
-    fontWeight: '500',
+    marginTop: 16,
   },
   loadingContainer: {
     paddingVertical: 20,

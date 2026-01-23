@@ -19,7 +19,6 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
   const { itemData, failedUploads, imageUris } = route.params;
   const { language, t } = useLocalization();
   const strings = useMemo(() => ({
-    loading: t('addItem.preview.loading'),
     headerTitle: t('addItem.preview.title'),
     descriptionTitle: t('addItem.preview.descriptionTitle'),
     infoTitle: t('addItem.preview.infoTitle'),
@@ -55,7 +54,6 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
   );
 
   const [category, setCategory] = useState<Category | null>(null);
-  const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
@@ -72,7 +70,6 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
           console.error('Error loading category:', error);
         }
       }
-      setLoading(false);
     };
     loadCategory();
   }, [itemData.category_id, language]);
@@ -155,18 +152,6 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
       setSubmitting(false);
     }
   };
-
-
-  if (loading || !itemData) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
-          <SJText style={styles.loadingText}>{strings.loading}</SJText>
-        </View>
-      </View>
-    );
-  }
 
   return (
     <View style={styles.container}>
@@ -310,15 +295,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.primaryDark,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 10,
-    fontSize: 16,
   },
   scrollView: {
     flex: 1,

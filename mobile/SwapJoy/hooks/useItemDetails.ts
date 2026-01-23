@@ -156,22 +156,76 @@ export const useItemDetails = ({ imageUris, navigation, route }: UseItemDetailsP
   const categoriesRef = useRef<typeof categories>(categories);
   const uploadsCompletedRef = useRef(false);
   const imageUrisProcessedRef = useRef<string>('');
+  const removedImageUrisRef = useRef<Set<string>>(new Set()); // Track URIs that were explicitly removed
+  const previousImageUrisRef = useRef<string>(''); // Track previous imageUris to detect external changes
   const [uploadsCompleted, setUploadsCompleted] = useState(false);
 
-  // Initialize images from imageUris
+  // Initialize images from imageUris (only on mount or when imageUris changes from route)
   // Strategy: Preserve existing image state (upload status, IDs) when possible
+  // IMPORTANT: Don't reset images when they're added via handleAddImages - that updates images state directly
   useEffect(() => {
-    if (!imageUris || imageUris.length === 0) return;
+    if (!imageUris || imageUris.length === 0) {
+      // If imageUris is empty and we have images, clear them (but only if not already empty)
+      if (images.length > 0) {
+        setImages([]);
+      }
+      previousImageUrisRef.current = '';
+      return;
+    }
     
     // Create a unique key for this set of imageUris (sorted for comparison)
     const imageUrisKey = [...imageUris].sort().join('|');
     const imageUrisOrderKey = imageUris.join('|'); // Preserve order for comparison
+    const currentImageUrisKey = imageUrisOrderKey;
+    
+    // Only run initialization if imageUris actually changed from outside (not from sync effect)
+    // If imageUris is the same as previous, skip (this prevents loops from sync effects)
+    if (previousImageUrisRef.current === currentImageUrisKey && previousImageUrisRef.current !== '') {
+      // imageUris hasn't changed - this is likely a re-render from images state change
+      return;
+    }
+    
+    // Update the previous ref
+    previousImageUrisRef.current = currentImageUrisKey;
     
     // Check if we already have images with these URIs
     const currentOrderKey = images.map((img) => img.uri).join('|');
+    const currentUrisSet = new Set(images.map((img) => img.uri));
+    const imageUrisSet = new Set(imageUris);
+    
+    // If we have more images than what's in imageUris, it means images were added via handleAddImages
+    // Don't reset in that case - only initialize if we have fewer or different images
+    const hasMoreImages = images.length > imageUris.length;
+    const imageUrisIsSubset = imageUris.every((uri) => currentUrisSet.has(uri));
+    
+    // CRITICAL: If current images are a subset of imageUris (meaning images were removed),
+    // and imageUris was just updated from the sync effect, skip to prevent infinite loop
+    // This happens when: delete image -> images state updates -> sync effect updates imageUris -> this effect runs
+    const currentIsSubsetOfImageUris = images.length > 0 && 
+                                       images.length <= imageUris.length &&
+                                       images.every((img) => imageUrisSet.has(img.uri));
+    
+    if (currentIsSubsetOfImageUris && imageUrisProcessedRef.current !== '' && imageUrisProcessedRef.current !== imageUrisKey) {
+      // This is likely a sync update after deletion - update the processed ref but don't re-initialize
+      console.log('[useItemDetails] Detected sync update after deletion, updating processed ref only');
+      imageUrisProcessedRef.current = imageUrisKey;
+      return;
+    }
     
     // If we have images and the URIs match (same set), just reorder if needed
     if (images.length > 0 && imageUrisProcessedRef.current === imageUrisKey) {
+      // If imageUris is a subset of current images (images were added), don't reset
+      if (hasMoreImages && imageUrisIsSubset) {
+        console.log('[useItemDetails] imageUris is subset of current images (images added via + button), skipping reset');
+        return;
+      }
+      
+      // If current images contain more URIs than imageUris, images were removed - don't re-initialize
+      if (images.length > imageUris.length && imageUris.every((uri) => currentUrisSet.has(uri))) {
+        console.log('[useItemDetails] Images were removed (current has more than imageUris), skipping re-initialization');
+        return;
+      }
+      
       if (currentOrderKey === imageUrisOrderKey) {
         // Same URIs in same order - no change needed
         return;
@@ -183,7 +237,7 @@ export const useItemDetails = ({ imageUris, navigation, route }: UseItemDetailsP
       
       // Add any new images that weren't in the existing set
       const existingUris = new Set(images.map((img) => img.uri));
-      const newUris = imageUris.filter((uri) => !existingUris.has(uri));
+      const newUris = imageUris.filter((uri) => !existingUris.has(uri) && !removedImageUrisRef.current.has(uri));
       const newImages: ImageUploadState[] = newUris.map((uri) => ({
         id: uuidv4(),
         uri,
@@ -200,11 +254,31 @@ export const useItemDetails = ({ imageUris, navigation, route }: UseItemDetailsP
     // New set of imageUris - check if we can preserve state from existing images or cache
     const existingImagesByUri = new Map(images.map((img) => [img.uri, img]));
     
+    // If current images contain all imageUris plus more, don't reset (images were added)
+    if (hasMoreImages && imageUrisIsSubset) {
+      console.log('[useItemDetails] Current images contain imageUris plus more, skipping initialization');
+      // Still mark as processed to prevent re-initialization
+      imageUrisProcessedRef.current = imageUrisKey;
+      return;
+    }
+    
+    // If current images have more URIs than imageUris, and imageUris is a subset, images were removed
+    // Don't re-initialize in this case to prevent loops
+    if (images.length > imageUris.length && imageUris.every((uri) => currentUrisSet.has(uri))) {
+      console.log('[useItemDetails] Images were removed (detected in new set check), skipping initialization to prevent loop');
+      // Update the processed ref to the new key to prevent re-running
+      imageUrisProcessedRef.current = imageUrisKey;
+      return;
+    }
+    
     // Mark this set as processed
     imageUrisProcessedRef.current = imageUrisKey;
     
     // Initialize images, preserving state from existing images or cache
-    const initialImages: ImageUploadState[] = imageUris.map((uri) => {
+    // Filter out URIs that were explicitly removed
+    const validImageUris = imageUris.filter((uri) => !removedImageUrisRef.current.has(uri));
+    
+    const initialImages: ImageUploadState[] = validImageUris.map((uri) => {
       // First check if we have this image in current state
       const existing = existingImagesByUri.get(uri);
       if (existing) {
@@ -223,6 +297,17 @@ export const useItemDetails = ({ imageUris, navigation, route }: UseItemDetailsP
       const cached = imageUploadCache.get(uri);
       if (cached) {
         // Restore from cache (preserves upload status when navigating back)
+        // If upload is in progress (progress > 0 and < 100), mark as uploading
+        const isUploading = cached.uploadProgress !== undefined && 
+                           cached.uploadProgress > 0 && 
+                           cached.uploadProgress < 100 && 
+                           !cached.uploaded;
+        
+        if (isUploading) {
+          // Upload is in progress - don't reset flags, let it continue
+          console.log(`[useItemDetails] Image ${cached.id} upload in progress (${cached.uploadProgress}%), preserving state`);
+        }
+        
         return {
           id: cached.id,
           uri,
@@ -253,20 +338,54 @@ export const useItemDetails = ({ imageUris, navigation, route }: UseItemDetailsP
     });
     
     // Only update if images actually changed
+    // But skip if current images are a subset of initialImages (meaning images were removed)
+    // This prevents re-initialization when images are deleted
+    const currentUrisSetForCheck = new Set(images.map((img) => img.uri));
+    const initialUrisSet = new Set(initialImages.map((img) => img.uri));
+    const currentIsSubsetOfInitial = images.length > 0 && 
+                                     images.every((img) => initialUrisSet.has(img.uri)) &&
+                                     images.length <= initialImages.length;
+    
+    // If current images are a subset (some were removed), don't re-initialize
+    if (currentIsSubsetOfInitial && images.length < initialImages.length) {
+      console.log('[useItemDetails] Images were removed, skipping re-initialization to prevent loop');
+      return;
+    }
+    
     const currentIds = images.map((img) => img.id).join(',');
     const newIds = initialImages.map((img) => img.id).join(',');
     
     if (currentIds !== newIds || images.length !== initialImages.length) {
+      console.log('[useItemDetails] Initializing images from imageUris', {
+        currentCount: images.length,
+        newCount: initialImages.length,
+      });
       setImages(initialImages);
       
-      // Only reset flags if this is truly a new set (not just reordering)
-      if (images.length === 0 || !imageUris.every((uri) => existingImagesByUri.has(uri) || imageUploadCache.has(uri))) {
+      // Check if any images are currently uploading (from cache)
+      const hasUploadsInProgress = initialImages.some((img) => {
+        const cached = imageUploadCache.get(img.uri);
+        return cached && 
+               cached.uploadProgress !== undefined && 
+               cached.uploadProgress > 0 && 
+               cached.uploadProgress < 100 && 
+               !cached.uploaded &&
+               !cached.uploadError;
+      });
+      
+      // Only reset flags if this is truly a new set (not just reordering) AND no uploads are in progress
+      if (!hasUploadsInProgress && (images.length === 0 || !imageUris.every((uri) => existingImagesByUri.has(uri) || imageUploadCache.has(uri)))) {
         isUploadingRef.current = false;
         uploadsCompletedRef.current = false;
         setUploadsCompleted(false);
+      } else if (hasUploadsInProgress) {
+        // Uploads are in progress - mark as uploading to prevent duplicate triggers
+        console.log('[useItemDetails] Uploads in progress detected, preserving upload state');
+        isUploadingRef.current = true;
+        setUploading(true);
       }
     }
-  }, [imageUris, images]);
+  }, [imageUris]); // Only depend on imageUris, not images - prevents loops when images are deleted
 
   // Load user preferred currency on mount if not set
   useEffect(() => {
@@ -303,8 +422,10 @@ export const useItemDetails = ({ imageUris, navigation, route }: UseItemDetailsP
       return;
     }
 
+    // Only upload images that aren't uploaded yet AND don't have errors
+    // Images with errors need manual retry via handleRetryImage
     const imagesToUpload = images
-      .filter((img) => !img.uploaded || !img.supabaseUrl)
+      .filter((img) => (!img.uploaded || !img.supabaseUrl) && !img.uploadError)
       .map((img) => ({
         uri: img.uri,
         id: img.id,
@@ -418,16 +539,125 @@ export const useItemDetails = ({ imageUris, navigation, route }: UseItemDetailsP
     );
   }, [images]);
 
+  const handleRetryImage = useCallback(async (imageId: string) => {
+    const image = images.find((img) => img.id === imageId);
+    if (!image || !image.uploadError) {
+      return; // Only retry if there's an error
+    }
+
+    // Get authenticated user
+    const user = await AuthService.getCurrentUser();
+    if (!user) {
+      Alert.alert('Error', 'User not authenticated');
+      return;
+    }
+    const userId = user.id;
+
+    // Clear error state and start upload
+    setImages((prev) =>
+      prev.map((img) =>
+        img.id === imageId
+          ? { ...img, uploadError: undefined, uploadProgress: 0 }
+          : img
+      )
+    );
+
+    // Retry upload
+    const result = await ImageUploadService.retryUploadImage(
+      image.uri,
+      image.id,
+      userId,
+      (progress) => {
+        setUploadProgress((prev) => ({ ...prev, [imageId]: progress }));
+        setImages((currentImages) => {
+          const img = currentImages.find((i) => i.id === imageId);
+          if (img) {
+            imageUploadCache.set(img.uri, {
+              id: img.id,
+              uploaded: img.uploaded || false,
+              supabaseUrl: img.supabaseUrl,
+              uploadProgress: progress,
+              uploadError: img.uploadError,
+            });
+          }
+          return currentImages;
+        });
+      }
+    );
+
+    if (result.url && !result.error) {
+      // Success
+      setImages((prev) =>
+        prev.map((img) =>
+          img.id === imageId
+            ? { ...img, uploaded: true, supabaseUrl: result.url, uploadProgress: 100, uploadError: undefined }
+            : img
+        )
+      );
+      imageUploadCache.set(image.uri, {
+        id: image.id,
+        uploaded: true,
+        supabaseUrl: result.url,
+        uploadProgress: 100,
+      });
+    } else {
+      // Failed again
+      setImages((prev) =>
+        prev.map((img) =>
+          img.id === imageId
+            ? { ...img, uploadError: result.error || 'Upload failed' }
+            : img
+        )
+      );
+      imageUploadCache.set(image.uri, {
+        id: image.id,
+        uploaded: false,
+        uploadError: result.error || 'Upload failed',
+      });
+    }
+  }, [images]);
+
 
   // Trigger uploads when images are set (only if not already uploaded or completed)
   useEffect(() => {
-    if (images.length === 0 || isUploadingRef.current || uploadsCompletedRef.current) {
+    console.log('[useItemDetails] Upload trigger effect', {
+      imagesCount: images.length,
+      isUploading: isUploadingRef.current,
+      uploadsCompleted: uploadsCompletedRef.current,
+    });
+    
+    if (images.length === 0) {
+      return;
+    }
+    
+    // If already uploading, don't start another upload
+    if (isUploadingRef.current) {
+      console.log('[useItemDetails] Already uploading, skipping');
+      return;
+    }
+    
+    // Check if any images are currently uploading (from cache) - this handles navigation back during upload
+    const hasUploadsInProgress = images.some((img) => {
+      const cached = imageUploadCache.get(img.uri);
+      return cached && 
+             cached.uploadProgress !== undefined && 
+             cached.uploadProgress > 0 && 
+             cached.uploadProgress < 100 && 
+             !cached.uploaded &&
+             !cached.uploadError;
+    });
+    
+    if (hasUploadsInProgress) {
+      console.log('[useItemDetails] Uploads in progress detected from cache, skipping new upload trigger');
+      isUploadingRef.current = true;
+      setUploading(true);
       return;
     }
     
     // Check if all images are already uploaded
     const allUploaded = images.every((img) => img.uploaded && img.supabaseUrl);
     if (allUploaded) {
+      console.log('[useItemDetails] All images already uploaded');
       isUploadingRef.current = false;
       setUploading(false);
       uploadsCompletedRef.current = true;
@@ -436,11 +666,20 @@ export const useItemDetails = ({ imageUris, navigation, route }: UseItemDetailsP
     }
     
     // Only trigger if there are images that need uploading
-    const needsUpload = images.some((img) => !img.uploaded || !img.supabaseUrl);
+    // Skip images that have upload errors (they need manual retry)
+    const needsUpload = images.some((img) => 
+      (!img.uploaded || !img.supabaseUrl) && !img.uploadError
+    );
+    console.log('[useItemDetails] Needs upload:', needsUpload, {
+      imagesNeedingUpload: images.filter((img) => (!img.uploaded || !img.supabaseUrl) && !img.uploadError).length,
+      imagesWithErrors: images.filter((img) => img.uploadError).length,
+    });
+    
     if (needsUpload) {
+      console.log('[useItemDetails] Starting image uploads...');
       startImageUploads();
     }
-  }, [images.length, startImageUploads]);
+  }, [images, startImageUploads]);
 
   // Keep categoriesRef in sync with categories
   useEffect(() => {
@@ -532,6 +771,9 @@ export const useItemDetails = ({ imageUris, navigation, route }: UseItemDetailsP
       // Remove from cache
       imageUploadCache.delete(imageToRemove.uri);
       
+      // Mark this URI as removed to prevent re-initialization
+      removedImageUrisRef.current.add(imageToRemove.uri);
+      
       setImages((prev) => prev.filter((img) => img.id !== imageId));
       setUploadProgress((prev) => {
         const { [imageId]: _removed, ...rest } = prev;
@@ -543,17 +785,24 @@ export const useItemDetails = ({ imageUris, navigation, route }: UseItemDetailsP
 
   const handleAddImages = useCallback(
     (newUris: string[]) => {
+      console.log('[useItemDetails] handleAddImages called with', newUris.length, 'new URIs');
       const newImages: ImageUploadState[] = newUris.map((uri) => ({
         id: uuidv4(),
         uri,
         uploaded: false,
         uploadProgress: 0,
       }));
-      setImages((prev) => [...prev, ...newImages]);
+      console.log('[useItemDetails] Created', newImages.length, 'new image objects');
+      setImages((prev) => {
+        const updated = [...prev, ...newImages];
+        console.log('[useItemDetails] Updated images count:', updated.length);
+        return updated;
+      });
       // Reset upload completion flags to allow new uploads
       isUploadingRef.current = false;
       uploadsCompletedRef.current = false;
       setUploadsCompleted(false);
+      console.log('[useItemDetails] Reset upload flags, uploads should trigger');
     },
     []
   );
@@ -686,8 +935,27 @@ export const useItemDetails = ({ imageUris, navigation, route }: UseItemDetailsP
 
   const getOverallProgress = useCallback(() => {
     if (!images || images.length === 0) return 0;
-    const total = Object.values(uploadProgress).reduce((sum, val) => sum + val, 0);
-    return Math.round(total / images.length);
+    
+    // Calculate average progress only for images that are being tracked
+    // Cap each image's progress at 100% to prevent >100% overall progress
+    let total = 0;
+    let count = 0;
+    
+    images.forEach((img) => {
+      const progress = uploadProgress[img.id];
+      if (progress !== undefined) {
+        // Cap at 100% to prevent overflow
+        total += Math.min(progress, 100);
+        count++;
+      }
+    });
+    
+    // If no images have progress tracked yet, return 0
+    if (count === 0) return 0;
+    
+    // Calculate average and cap at 100%
+    const average = Math.round(total / count);
+    return Math.min(average, 100);
   }, [images, uploadProgress]);
 
   const getFormData = useCallback(() => {
@@ -735,6 +1003,7 @@ export const useItemDetails = ({ imageUris, navigation, route }: UseItemDetailsP
     handleRemoveImage,
     handleAddImages,
     handleReorderImages,
+    handleRetryImage,
     handleNext,
     handleBack,
     handleCategorySelected,
