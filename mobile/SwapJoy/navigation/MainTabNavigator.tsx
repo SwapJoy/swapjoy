@@ -4,7 +4,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useNavigation } from '@react-navigation/native';
 import { MainTabParamList } from '../types/navigation';
 import { Ionicons } from '@expo/vector-icons';
-import ExploreScreen from '../screens/ExploreScreen';
+import HomeScreen from '../screens/HomeScreen';
 import OffersScreen from '../screens/OffersScreen';
 import ChatListScreen from '../screens/ChatListScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
@@ -84,17 +84,10 @@ const MainTabNavigator: React.FC<MainTabNavigatorProps> = ({ onNavigateToAdd }) 
       })}
     >
       <Tab.Screen
-        name="Explore"
-        component={ExploreScreen}
+        name="Top picks"
+        component={HomeScreen}
         options={{
           tabBarLabel: 'Explore',
-          headerTitle: () => (
-            <Image
-              source={require('../assets/swapjoy-logo.png')}
-              style={{ width: 140, height: 32 }}
-              resizeMode="contain"
-            />
-          ),
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons 
               name={focused ? "compass" : "compass-outline"} 

@@ -106,7 +106,7 @@ const ItemCard: React.FC<ItemCardProps> = memo(
   }) => {
     const computedImageHeight =
       imageHeight ??
-      (variant === 'horizontal' ? 180 : variant === 'grid' ? 200 : 220);
+      (variant === 'horizontal' ? 180 : variant === 'grid' ? 240 : 260);
     const computedTitleLines = titleLines ?? (variant === 'horizontal' ? 1 : 2);
     const computedDescriptionLines = descriptionLines ?? 2;
 
@@ -187,7 +187,11 @@ const ItemCard: React.FC<ItemCardProps> = memo(
         </View>
 
         <View style={styles.content}>
-          <SJText numberOfLines={computedTitleLines} style={styles.title}>
+          <SJText 
+            numberOfLines={computedTitleLines} 
+            ellipsizeMode="tail"
+            style={styles.title}
+          >
             {title}
           </SJText>
 
@@ -309,8 +313,8 @@ const styles = StyleSheet.create({
     textTransform: 'capitalize',
   },
   content: {
-    padding: 14,
-    gap: 8,
+    padding: 8,
+    gap: 6,
   },
   title: {
     fontSize: 15,

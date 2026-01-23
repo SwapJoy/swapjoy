@@ -7,6 +7,7 @@ import {
   ViewStyle,
   Dimensions,
   ListRenderItem,
+  RefreshControl,
 } from 'react-native';
 import ItemCard, { type ItemCardChip } from './ItemCard';
 import { formatCurrency } from '../utils';
@@ -155,6 +156,7 @@ const ItemCardCollection: React.FC<ItemCardCollectionProps> = ({
           placeholderLabel={placeholder}
           onPress={handlePress}
           variant="grid"
+          titleLines={1}
           style={[
             {
               width: cardWidth,
@@ -191,6 +193,29 @@ const ItemCardCollection: React.FC<ItemCardCollectionProps> = ({
     ]
   );
 
+  const refreshControl = useMemo(() => {
+    if (!onRefresh) return undefined;
+    return (
+      <RefreshControl
+        refreshing={!!refreshing}
+        onRefresh={onRefresh}
+        tintColor="#ffde21" // primaryYellow for iOS
+        colors={['#ffde21']} // Android
+        progressBackgroundColor="#161200" // primaryDark for Android
+        title="Refreshing..." // iOS
+        titleColor="#ffde21" // iOS
+      />
+    );
+  }, [refreshing, onRefresh]);
+
+  // Handle onEndReached for grid layouts - need to ensure it fires correctly
+  const handleEndReached = useCallback((info: { distanceFromEnd: number }) => {
+    console.log('[ItemCardCollection] onEndReached fired', { distanceFromEnd: info.distanceFromEnd, hasCallback: !!onEndReached });
+    if (onEndReached) {
+      onEndReached(info);
+    }
+  }, [onEndReached]);
+
   return (
     <FlatList
       data={items}
@@ -206,12 +231,12 @@ const ItemCardCollection: React.FC<ItemCardCollectionProps> = ({
       ListHeaderComponent={listHeaderComponent}
       ListFooterComponent={listFooterComponent}
       ListEmptyComponent={emptyComponent}
-      onEndReached={onEndReached}
-      onEndReachedThreshold={onEndReachedThreshold}
-      refreshing={refreshing}
-      onRefresh={onRefresh}
+      onEndReached={onEndReached ? handleEndReached : undefined}
+      onEndReachedThreshold={onEndReachedThreshold ?? 0.2}
+      refreshControl={refreshControl}
       scrollEnabled={scrollEnabled}
       showsVerticalScrollIndicator={showsVerticalScrollIndicator}
+      removeClippedSubviews={false}
       {...flatListProps}
     />
   );

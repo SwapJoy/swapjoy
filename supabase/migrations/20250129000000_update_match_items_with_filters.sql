@@ -2,6 +2,21 @@
 -- This migration adds price, category, distance, and location filters
 -- and makes query_embedding nullable for filter-only searches
 
+-- Drop existing match_items definition to allow changing the return type safely.
+-- We assume this function is owned by the public schema.
+DROP FUNCTION IF EXISTS public.match_items(
+  vector(1536),
+  float,
+  int,
+  float,
+  uuid,
+  float,
+  uuid[],
+  float,
+  float,
+  float
+);
+
 CREATE OR REPLACE FUNCTION match_items(
   query_embedding vector(1536) DEFAULT NULL,  -- Nullable: if null, skip semantic similarity matching
   match_threshold float DEFAULT 0.7,

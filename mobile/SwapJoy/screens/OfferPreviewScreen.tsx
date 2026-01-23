@@ -9,6 +9,7 @@ import { ApiService } from '../services/api';
 import { formatCurrency } from '../utils';
 import { getItemImageUri } from '../utils/imageUtils';
 import { useLocalization } from '../localization';
+import { logSwapRequest } from '../services/itemEvents';
 
 const OfferPreviewScreen: React.FC<OfferPreviewScreenProps> = ({ navigation, route }) => {
   const { receiverId, offeredItemIds, requestedItemIds, topUpAmount, message, summary } = route.params;
@@ -60,6 +61,10 @@ const OfferPreviewScreen: React.FC<OfferPreviewScreenProps> = ({ navigation, rou
         Alert.alert(strings.alerts.failedTitle, error.message || strings.alerts.failedMessage);
         return;
       }
+      // Log swap_request event for each requested item
+      requestedItemIds.forEach(itemId => {
+        logSwapRequest(itemId);
+      });
       Alert.alert(strings.alerts.successTitle, strings.alerts.successMessage);
       navigation.popToTop();
       (navigation as any).navigate('MainTabs');

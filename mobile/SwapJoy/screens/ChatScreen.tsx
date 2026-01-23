@@ -12,6 +12,7 @@ import { useLocalization } from '../localization';
 import CachedImage from '../components/CachedImage';
 import { ImageUploadService } from '../services/imageUpload';
 import ImageView from 'react-native-image-viewing';
+import { logMessage } from '../services/itemEvents';
 
 const ChatScreen: React.FC<ChatScreenProps> = ({ route }) => {
   const { chatId, offerId, otherUserId, offer: initialOffer } = route.params as any;
@@ -42,6 +43,19 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route }) => {
     if (!value) return;
     sendTextMessage(value);
     setText('');
+    // Log message event for requested items in the offer (if available)
+    if (offer?.requested_item_ids && Array.isArray(offer.requested_item_ids) && offer.requested_item_ids.length > 0) {
+      offer.requested_item_ids.forEach((itemId: string) => {
+        logMessage(itemId);
+      });
+    } else if (offer?.items && Array.isArray(offer.items)) {
+      // Fallback: try to get item_id from offer.items
+      const requestedItems = offer.items.filter((it: any) => it?.side === 'requested' || it?.is_requested);
+      requestedItems.forEach((it: any) => {
+        const itemId = it?.item_id || it?.id;
+        if (itemId) logMessage(itemId);
+      });
+    }
   };
 
   const openImagePreview = (url: string) => {

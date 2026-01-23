@@ -1,6 +1,20 @@
 -- Update match_items function to return denormalized columns (images, category, user)
 -- This eliminates the need for JOINs in the function
 
+-- Drop existing match_items to allow changing return type
+DROP FUNCTION IF EXISTS public.match_items(
+  vector(1536),
+  float,
+  int,
+  float,
+  uuid,
+  float,
+  uuid[],
+  float,
+  float,
+  float
+);
+
 CREATE OR REPLACE FUNCTION match_items(
   query_embedding vector(1536) DEFAULT NULL,
   match_threshold float DEFAULT 0.7,

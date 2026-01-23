@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {View, StyleSheet, TouchableOpacity, FlatList, Dimensions, ActivityIndicator} from 'react-native';
 import SJText from '../components/SJText';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -10,6 +10,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { formatCurrency } from '../utils';
 import { useLocalization } from '../localization';
 import FavoriteToggleButton from '../components/FavoriteToggleButton';
+import { logView } from '../services/itemEvents';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '@navigation/MainTabNavigator.styles';
 import ImageView from 'react-native-image-viewing';
@@ -37,6 +38,7 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
   const [item, setItem] = useState<ListingItem | null>(passedItem || null);
   const [previewVisible, setPreviewVisible] = useState(false);
   const [previewImageIndex, setPreviewImageIndex] = useState(0);
+  const loggedViewRef = useRef<string | null>(null); // Track which itemId we've logged view for
 
   const favoriteData = useMemo(() => {
     if (!item) return null;
@@ -62,10 +64,17 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
   }, [item, language]);
 
   useEffect(() => {
+    // Only log view once per itemId
+    if (loggedViewRef.current === itemId) {
+      return;
+    }
+
     // If item was passed, skip fetching
     if (passedItem) {
       // Track view asynchronously (non-blocking)
       ApiService.trackItemView(itemId, user?.id);
+      logView(itemId);
+      loggedViewRef.current = itemId;
       return;
     }
 
@@ -80,6 +89,8 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
         if (data) {
           setItem(data);
           ApiService.trackItemView(itemId, user?.id);
+          logView(itemId);
+          loggedViewRef.current = itemId;
         } else {
           setItem(null);
         }

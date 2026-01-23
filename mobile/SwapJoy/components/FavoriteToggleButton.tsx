@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { FavoriteItemInput, useFavorites } from '../contexts/FavoritesContext';
+import { logSave } from '../services/itemEvents';
 
 interface FavoriteToggleButtonProps {
   itemId: string;
@@ -38,8 +39,13 @@ const FavoriteToggleButton: React.FC<FavoriteToggleButtonProps> = ({
   const handlePress = useCallback(
     (event?: GestureResponderEvent) => {
       event?.stopPropagation?.();
+      const willBeFavorite = !favorite;
       toggleFavorite(itemId, item);
-      onToggle?.(!favorite);
+      onToggle?.(willBeFavorite);
+      // Log save event when favoriting (not when unfavoriting)
+      if (willBeFavorite) {
+        logSave(itemId);
+      }
     },
     [favorite, item, itemId, onToggle, toggleFavorite]
   );
