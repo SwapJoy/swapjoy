@@ -349,10 +349,9 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
         <Stack.Screen
           name="ItemDetails"
           component={ItemDetailsScreen}
-          options={({ route }) => ({
-            title: route.params?.item?.title?.trim() ?? '',
-            headerBackTitleVisible: false,
-          })}
+          options={{
+            headerShown: false,
+          }}
         />
         <Stack.Screen
           name="Search"

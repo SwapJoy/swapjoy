@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -6,9 +6,12 @@ import {
   Dimensions,
   ActivityIndicator,
   ScrollView,
+  Platform,
+  StatusBar,
 } from 'react-native';
 import SJText from '../components/SJText';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { HeaderBackButton } from '@react-navigation/elements';
 import { ItemDetailsScreenProps } from '../types/navigation';
 import { ListingItem } from '../types/listing-item';
 import CachedImage from '../components/CachedImage';
@@ -24,11 +27,15 @@ import { colors } from '@navigation/MainTabNavigator.styles';
 import ImageView from 'react-native-image-viewing';
 import ConditionChip from '../components/ConditionChip';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
+const HERO_HEIGHT = Math.max(320, Math.round(height * 0.45));
 const DIVIDER_COLOR = 'rgba(255,255,255,0.1)';
 const ACTION_CIRCLE_SIZE = 52;
+/** Matches React Navigation default stack header content row height. */
+const HEADER_ROW_HEIGHT = Platform.OS === 'ios' ? 44 : 56;
 
 const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route }) => {
+  const insets = useSafeAreaInsets();
   const { user, isAuthenticated, isAnonymous } = useAuth();
   const { language, t, localized } = useLocalization();
   const { getCategoryById } = useCategories();
@@ -56,14 +63,39 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
   const [previewImageIndex, setPreviewImageIndex] = useState(0);
   const loggedViewRef = useRef<string | null>(null);
 
-  useLayoutEffect(() => {
-    const title = item?.title?.trim();
-    if (title) {
-      navigation.setOptions({ title });
-    }
-  }, [navigation, item?.title]);
-
   const isFav = item ? isFavorite(item.id) : false;
+
+  const renderStackStyleBackButton = (tintColor: string) => (
+    <View
+      pointerEvents="box-none"
+      style={[
+        styles.headerBackSlot,
+        {
+          height: insets.top + HEADER_ROW_HEIGHT,
+          paddingTop: insets.top,
+          paddingLeft: insets.left + 4,
+        },
+      ]}
+    >
+      <View style={styles.headerBackRow}>
+        {Platform.OS === 'ios' ? (
+          <HeaderBackButton
+            onPress={() => navigation.goBack()}
+            tintColor={tintColor}
+            style={{ marginLeft: 0 }}
+          />
+        ) : (
+          <TouchableOpacity
+            style={styles.androidBackTouchable}
+            onPress={() => navigation.goBack()}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="arrow-back" size={24} color={tintColor} />
+          </TouchableOpacity>
+        )}
+      </View>
+    </View>
+  );
 
   const categoryName = useMemo(() => {
     if (!item) return null;
@@ -150,6 +182,11 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
     return `${count} ${viewCount === 1 ? 'view' : 'views'}`;
   }, [viewCount]);
 
+  const scrollContentStyle = useMemo(
+    () => ({ paddingBottom: 40 + insets.bottom }),
+    [insets.bottom],
+  );
+
   const openImagePreview = (index: number) => {
     setPreviewImageIndex(index);
     setPreviewVisible(true);
@@ -188,31 +225,58 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.centered}>
-        <ActivityIndicator size="large" color={colors.primaryYellow} />
-      </SafeAreaView>
+      <View style={styles.rootFill}>
+        <StatusBar
+          translucent={Platform.OS === 'android'}
+          backgroundColor="transparent"
+          barStyle="light-content"
+        />
+        {renderStackStyleBackButton('#fff')}
+        <View style={styles.centeredInner}>
+          <ActivityIndicator size="large" color={colors.primaryYellow} />
+        </View>
+      </View>
     );
   }
 
   if (error || !item) {
     return (
-      <SafeAreaView style={styles.centered}>
-        <SJText style={styles.errorText}>{error || strings.itemNotFound}</SJText>
-        <TouchableOpacity style={styles.retry} onPress={() => navigation.goBack()}>
-          <SJText style={styles.retryText}>{strings.goBack}</SJText>
-        </TouchableOpacity>
-      </SafeAreaView>
+      <View style={styles.rootFill}>
+        <StatusBar
+          translucent={Platform.OS === 'android'}
+          backgroundColor="transparent"
+          barStyle="light-content"
+        />
+        {renderStackStyleBackButton('#fff')}
+        <View style={styles.centeredInner}>
+          <SJText style={styles.errorText}>{error || strings.itemNotFound}</SJText>
+          <TouchableOpacity style={styles.retry} onPress={() => navigation.goBack()}>
+            <SJText style={styles.retryText}>{strings.goBack}</SJText>
+          </TouchableOpacity>
+        </View>
+      </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Image Carousel */}
+      <StatusBar
+        translucent={Platform.OS === 'android'}
+        backgroundColor="transparent"
+        barStyle="light-content"
+      />
+      {renderStackStyleBackButton('#fff')}
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={scrollContentStyle}
+        nestedScrollEnabled
+      >
         <ScrollView
           horizontal
           pagingEnabled
           showsHorizontalScrollIndicator={false}
+          style={styles.heroCarousel}
+          nestedScrollEnabled
         >
           {images.map((img, index) => (
             <TouchableOpacity
@@ -361,14 +425,43 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.primaryDark,
   },
-  scrollContent: {
-    paddingBottom: 40,
+  scrollView: {
+    flex: 1,
+    backgroundColor: colors.primaryDark,
   },
-  centered: {
+  heroCarousel: {
+    backgroundColor: colors.primaryDark,
+  },
+  rootFill: {
+    flex: 1,
+    backgroundColor: colors.primaryDark,
+  },
+  headerBackSlot: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    ...Platform.select({
+      android: { elevation: 10 },
+    }),
+  },
+  headerBackRow: {
+    height: HEADER_ROW_HEIGHT,
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+  },
+  androidBackTouchable: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 0,
+  },
+  centeredInner: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.primaryDark,
   },
   errorText: {
     fontSize: 16,
@@ -385,7 +478,7 @@ const styles = StyleSheet.create({
   },
   heroImage: {
     width,
-    height: Math.min(320, Math.round(width * 0.8)),
+    height: HERO_HEIGHT,
   },
 
   divider: {
