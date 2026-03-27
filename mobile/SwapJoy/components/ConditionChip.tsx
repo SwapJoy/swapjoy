@@ -8,6 +8,7 @@ import { colors } from '@navigation/MainTabNavigator.styles';
 interface ConditionChipProps {
   condition: string;
   selected?: boolean;
+  compact?: boolean;
   onPress?: () => void;
   style?: StyleProp<ViewStyle>;
 }
@@ -15,6 +16,7 @@ interface ConditionChipProps {
 const ConditionChip: React.FC<ConditionChipProps> = ({
   condition,
   selected = false,
+  compact = false,
   onPress,
   style,
 }) => {
@@ -34,6 +36,7 @@ const ConditionChip: React.FC<ConditionChipProps> = ({
     <View
       style={[
         styles.chip,
+        compact && styles.chipCompact,
         {
           backgroundColor: conditionPresentation.backgroundColor,
           borderWidth: selected ? 3 : 0,
@@ -45,7 +48,8 @@ const ConditionChip: React.FC<ConditionChipProps> = ({
     >
       <SJText
         style={[
-          styles.chipText
+          styles.chipText,
+          compact && styles.chipTextCompact,
         ]}
       >
         {conditionPresentation.label}
@@ -77,10 +81,18 @@ const styles = StyleSheet.create({
   chipSelected: {
     transform: [{ scale: 1.05 }],
   },
+  chipCompact: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+  },
   chipText: {
     fontSize: 13,
     fontWeight: '400',
     color: colors.primaryDark,
+  },
+  chipTextCompact: {
+    fontSize: 11,
   },
 });
 

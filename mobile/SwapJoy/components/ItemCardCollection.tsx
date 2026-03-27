@@ -9,14 +9,12 @@ import {
   ListRenderItem,
   RefreshControl,
 } from 'react-native';
-import ItemCard, { type ItemCardChip } from './ItemCard';
+import ItemCard from './ItemCard';
 import { formatCurrency } from '../utils';
-import { resolveCategoryName } from '../utils/category';
 import { getConditionPresentation } from '../utils/conditions';
 import { getItemImageUri } from '../utils/imageUtils';
 import type { AppLanguage } from '../types/language';
 import { DEFAULT_LANGUAGE } from '../types/language';
-import { useCategories } from '../contexts/CategoriesContext';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -26,9 +24,7 @@ export interface ItemCardCollectionProps {
   language?: AppLanguage | string | null;
   onItemPress?: (item: any) => void;
   favoriteButtonRenderer?: (item: any) => React.ReactNode;
-  metaRightResolver?: (item: any) => string | null | undefined;
   placeholderLabel?: string;
-  categoryFallback?: string;
   contentContainerStyle?: StyleProp<ViewStyle>;
   horizontalPadding?: number;
   parentHorizontalPadding?: number;
@@ -54,9 +50,7 @@ const ItemCardCollection: React.FC<ItemCardCollectionProps> = ({
   language,
   onItemPress,
   favoriteButtonRenderer,
-  metaRightResolver,
   placeholderLabel,
-  categoryFallback,
   contentContainerStyle,
   horizontalPadding = 20,
   parentHorizontalPadding = 0,
@@ -76,7 +70,6 @@ const ItemCardCollection: React.FC<ItemCardCollectionProps> = ({
   flatListProps,
 }) => {
   const resolvedLanguage = (language ?? DEFAULT_LANGUAGE) as AppLanguage;
-  const { getCategoryById } = useCategories();
 
   const cardWidth = useMemo(() => {
     const totalSpacing = columnSpacing * (numColumns - 1);
@@ -95,63 +88,6 @@ const ItemCardCollection: React.FC<ItemCardCollectionProps> = ({
 
   const renderItem: ListRenderItem<any> = useCallback(
     ({ item, index }) => {
-      const chips: ItemCardChip[] = [];
-
-      // Resolve category name - similar to TopMatchCard approach
-      // This matches how TopMatchCard resolves categories using useCategories hook
-      let resolvedCategory: string | undefined = undefined;
-      
-      // First try category_name (already resolved by transformTopPickItem: category?.title_en || category?.title_ka)
-      if (item?.category_name && typeof item.category_name === 'string' && item.category_name.trim()) {
-        resolvedCategory = item.category_name.trim();
-      }
-      // Then try direct category object access (category is parsed JSONB from transformTopPickItem)
-      else if (item?.category) {
-        if (typeof item.category === 'object' && item.category !== null) {
-          // If category is an object with an id, look it up in CategoriesContext
-          if ('id' in item.category && typeof item.category.id === 'string') {
-            const categoryData = getCategoryById(item.category.id);
-            if (categoryData) {
-              resolvedCategory = categoryData.name || categoryData.title_en || categoryData.title_ka || undefined;
-            }
-          }
-          // Otherwise try direct property access
-          if (!resolvedCategory) {
-            resolvedCategory = item.category[`title_${resolvedLanguage}`] || 
-                             item.category.title_en || 
-                             item.category.title_ka || 
-                             item.category.name || 
-                             undefined;
-          }
-        } else if (typeof item.category === 'string' && item.category.trim()) {
-          resolvedCategory = item.category.trim();
-        }
-      }
-      // Try looking up by category_id if we have it but no category object
-      else if (item?.category_id && typeof item.category_id === 'string') {
-        const categoryData = getCategoryById(item.category_id);
-        if (categoryData) {
-          resolvedCategory = categoryData.name || categoryData.title_en || categoryData.title_ka || undefined;
-        }
-      }
-      // Then try resolveCategoryName utility (handles various category formats)
-      if (!resolvedCategory) {
-        resolvedCategory = resolveCategoryName(item, resolvedLanguage) || undefined;
-      }
-      
-      // Final fallback
-      if (!resolvedCategory && categoryFallback) {
-        resolvedCategory = categoryFallback;
-      }
-
-      if (resolvedCategory) {
-        chips.push({
-          label: resolvedCategory,
-          backgroundColor: '#e2e8f0',
-          textColor: '#0f172a',
-        });
-      }
-
       const conditionPresentation = getConditionPresentation({
         condition: item?.condition,
         language: resolvedLanguage,
@@ -172,13 +108,9 @@ const ItemCardCollection: React.FC<ItemCardCollectionProps> = ({
 
       const imageUrl = getItemImageUri(item);
 
-      const ownerHandle = item?.user?.username || item?.user?.first_name || undefined;
-
       const favoriteButton = favoriteButtonRenderer
         ? favoriteButtonRenderer(item)
         : undefined;
-
-      const metaRightLabel = metaRightResolver ? metaRightResolver(item) : undefined;
 
       const placeholder =
         item?.placeholderLabel || placeholderLabel || 'No image';
@@ -192,9 +124,7 @@ const ItemCardCollection: React.FC<ItemCardCollectionProps> = ({
               ? item.title
               : t('profileScreen.grid.untitled', { defaultValue: 'Untitled item' })
           }
-          description={item?.description}
           priceLabel={priceLabel}
-          metaRightLabel={metaRightLabel || undefined}
           imageUri={imageUrl ?? undefined}
           placeholderLabel={placeholder}
           onPress={handlePress}
@@ -207,28 +137,15 @@ const ItemCardCollection: React.FC<ItemCardCollectionProps> = ({
               marginBottom: rowSpacing,
             },
           ]}
-          ownerHandle={ownerHandle}
-          conditionBadge={
-            conditionPresentation
-              ? {
-                  label: conditionPresentation.label,
-                  backgroundColor: conditionPresentation.backgroundColor,
-                  textColor: conditionPresentation.textColor,
-                }
-              : undefined
-          }
+          conditionColor={conditionPresentation?.backgroundColor}
           favoriteButton={favoriteButton}
-          categoryChipName={resolvedCategory}
         />
       );
     },
     [
       cardWidth,
-      categoryFallback,
       columnSpacing,
       favoriteButtonRenderer,
-      getCategoryById,
-      metaRightResolver,
       numColumns,
       onItemPress,
       resolvedLanguage,

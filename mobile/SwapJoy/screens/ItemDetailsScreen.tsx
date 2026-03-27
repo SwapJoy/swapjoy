@@ -1,5 +1,12 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import {View, StyleSheet, TouchableOpacity, FlatList, Dimensions, ActivityIndicator} from 'react-native';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  Dimensions,
+  ActivityIndicator,
+  ScrollView,
+} from 'react-native';
 import SJText from '../components/SJText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ItemDetailsScreenProps } from '../types/navigation';
@@ -7,45 +14,71 @@ import { ListingItem } from '../types/listing-item';
 import CachedImage from '../components/CachedImage';
 import { ApiService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
-import { formatCurrency } from '../utils';
+import { formatCurrency, formatRelativeTime } from '../utils';
 import { useLocalization } from '../localization';
-import FavoriteToggleButton from '../components/FavoriteToggleButton';
-import { logView } from '../services/itemEvents';
+import { useCategories } from '../hooks/useCategories';
+import { useFavorites } from '../contexts/FavoritesContext';
+import { logView, logSave } from '../services/itemEvents';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '@navigation/MainTabNavigator.styles';
 import ImageView from 'react-native-image-viewing';
+import ConditionChip from '../components/ConditionChip';
 
 const { width } = Dimensions.get('window');
+const DIVIDER_COLOR = 'rgba(255,255,255,0.1)';
+const ACTION_CIRCLE_SIZE = 52;
 
 const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route }) => {
   const { user, isAuthenticated, isAnonymous } = useAuth();
-  const { language, t } = useLocalization();
+  const { language, t, localized } = useLocalization();
+  const { getCategoryById } = useCategories();
+  const { isFavorite, toggleFavorite } = useFavorites();
+
   const strings = useMemo(
     () => ({
       category: t('addItem.preview.info.category'),
       condition: t('addItem.preview.info.condition'),
-      seller: t('itemDetails.sellerTitle', { defaultValue: 'Seller' }),
       goBack: t('itemDetails.goBack', { defaultValue: 'Go Back' }),
       offer: t('itemDetails.offerButton', { defaultValue: 'Offer' }),
+      favourite: t('itemDetails.favouriteButton', { defaultValue: 'Favourite' }),
+      share: t('itemDetails.shareButton', { defaultValue: 'Share' }),
       loadFailed: t('itemDetails.loadFailed', { defaultValue: 'Failed to load item' }),
       itemNotFound: t('itemDetails.itemNotFound', { defaultValue: 'Item not found' }),
     }),
-    [t]
+    [t],
   );
+
   const { itemId, item: passedItem } = route.params;
-  const [loading, setLoading] = useState(!passedItem); // No loading if item is passed
+  const [loading, setLoading] = useState(!passedItem);
   const [error, setError] = useState<string | null>(null);
   const [item, setItem] = useState<ListingItem | null>(passedItem || null);
   const [previewVisible, setPreviewVisible] = useState(false);
   const [previewImageIndex, setPreviewImageIndex] = useState(0);
-  const loggedViewRef = useRef<string | null>(null); // Track which itemId we've logged view for
+  const loggedViewRef = useRef<string | null>(null);
+
+  useLayoutEffect(() => {
+    const title = item?.title?.trim();
+    if (title) {
+      navigation.setOptions({ title });
+    }
+  }, [navigation, item?.title]);
+
+  const isFav = item ? isFavorite(item.id) : false;
+
+  const categoryName = useMemo(() => {
+    if (!item) return null;
+    if (item.category_id) {
+      const cat = getCategoryById(item.category_id);
+      if (cat?.name) return cat.name;
+    }
+    return localized(item.category ?? undefined) || item.category_name || null;
+  }, [item, getCategoryById, localized]);
 
   const favoriteData = useMemo(() => {
     if (!item) return null;
-    const primaryImage = item.images && item.images.length > 0 ? item.images[0].url : null;
-    const categoryName = item.category
-      ? (language === 'ka' ? item.category.title_ka : item.category.title_en)
-      : null;
+    const firstImg = item.images?.[0] as { url?: string; image_url?: string } | undefined;
+    const primaryImage = firstImg ? firstImg.url ?? firstImg.image_url ?? null : null;
+    const fromCatalog = item.category_id ? getCategoryById(item.category_id) : undefined;
     return {
       id: item.id,
       title: item.title,
@@ -55,45 +88,38 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
       condition: item.condition,
       image_url: primaryImage,
       created_at: item.created_at || item.updated_at || null,
-      category_name: categoryName,
-      category_name_en: item.category?.title_en ?? null,
-      category_name_ka: item.category?.title_ka ?? null,
-      category: item.category ? { ...item.category } as any : null,
+      category_name: fromCatalog?.name ?? localized(item.category ?? undefined) ?? item.category_name ?? null,
+      category_name_en: fromCatalog?.title_en ?? item.category?.title_en ?? null,
+      category_name_ka: fromCatalog?.title_ka ?? item.category?.title_ka ?? null,
+      category: item.category ? ({ ...item.category } as any) : null,
       categories: null,
     };
-  }, [item, language]);
+  }, [item, getCategoryById, localized]);
 
   useEffect(() => {
-    // Only log view once per itemId
     if (loggedViewRef.current === itemId) {
       return;
     }
-
-    // If item was passed, skip fetching
     if (passedItem) {
-      // Track view asynchronously (non-blocking)
       ApiService.trackItemView(itemId, user?.id);
       logView(itemId);
       loggedViewRef.current = itemId;
       return;
     }
-
     let mounted = true;
-    (async () => {
+    void (async () => {
       setLoading(true);
       const { data, error } = await ApiService.getItemById(itemId, language);
       if (!mounted) return;
       if (error) {
         setError(error.message || strings.loadFailed);
+      } else if (data) {
+        setItem(data);
+        ApiService.trackItemView(itemId, user?.id);
+        logView(itemId);
+        loggedViewRef.current = itemId;
       } else {
-        if (data) {
-          setItem(data);
-          ApiService.trackItemView(itemId, user?.id);
-          logView(itemId);
-          loggedViewRef.current = itemId;
-        } else {
-          setItem(null);
-        }
+        setItem(null);
       }
       setLoading(false);
     })();
@@ -102,58 +128,63 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
     };
   }, [itemId, language, strings, user?.id, passedItem]);
 
-  const showOffer = useMemo(() => {
-    if (!item?.user_id) return false;
-    // Show offer button if user is authenticated and not the owner, or if anonymous user
-    if (!isAuthenticated || isAnonymous) return true;
-    if (!user?.id) return false;
-    return item.user_id !== user.id;
-  }, [item?.user_id, user?.id, isAuthenticated, isAnonymous]);
-
   const images = useMemo(() => {
-    console.log('[ItemDetailsScreen] Processing images:', {
-      has_item: !!item,
-      has_images: !!item?.images,
-      images_type: typeof item?.images,
-      images_is_array: Array.isArray(item?.images),
-      images_length: Array.isArray(item?.images) ? item?.images.length : 'N/A',
-      images_sample: Array.isArray(item?.images) && item.images.length > 0 ? item.images[0] : null,
-    });
-    
-    if (!item?.images || item.images.length === 0) {
-      console.log('[ItemDetailsScreen] No images found, returning empty array');
-      return [];
-    }
-    
-    const normalized = item.images
-      .map((img) => ({
-        image_url: img.url,
-        sort_order: img.order,
+    if (!item?.images || item.images.length === 0) return [];
+    return item.images
+      .map((img: any) => ({
+        image_url: img.url ?? img.image_url,
+        sort_order: img.order ?? img.sort_order ?? 0,
       }))
-      .filter((img) => img.image_url) // Filter out images without URLs
+      .filter((img) => img.image_url)
       .sort((a, b) => a.sort_order - b.sort_order);
-    
-    console.log('[ItemDetailsScreen] Normalized images:', {
-      count: normalized.length,
-      sample: normalized[0],
-    });
-    
-    return normalized;
   }, [item]);
 
-  // Format images for ImageView component
   const previewImages = useMemo(() => {
     return images.map((img) => ({ uri: img.image_url }));
   }, [images]);
+
+  const viewCount = item?.view_count ?? 0;
+  const viewCountText = useMemo(() => {
+    const count =
+      viewCount >= 1000 ? `${(viewCount / 1000).toFixed(1)}K` : String(viewCount);
+    return `${count} ${viewCount === 1 ? 'view' : 'views'}`;
+  }, [viewCount]);
 
   const openImagePreview = (index: number) => {
     setPreviewImageIndex(index);
     setPreviewVisible(true);
   };
 
-  const closeImagePreview = () => {
-    setPreviewVisible(false);
-  };
+  const handleOffer = useCallback(() => {
+    if (!item) return;
+    if (!isAuthenticated || isAnonymous) {
+      (navigation as any).navigate('EmailSignIn');
+      return;
+    }
+    if (item.user_id === user?.id) return;
+    (navigation as any).navigate('OfferCreate', {
+      receiverId: item.user_id,
+      requestedItems: [
+        {
+          id: item.id,
+          title: item.title,
+          price: item.price || 0,
+          image_url: item.images && item.images.length > 0 ? item.images[0].url : null,
+          condition: item.condition,
+        },
+      ],
+      contextTitle: item.title,
+    });
+  }, [item, isAuthenticated, isAnonymous, user?.id, navigation]);
+
+  const handleFavourite = useCallback(() => {
+    if (!item || !favoriteData) return;
+    const willBeFavorite = !isFav;
+    toggleFavorite(item.id, favoriteData);
+    if (willBeFavorite) {
+      logSave(item.id);
+    }
+  }, [isFav, item, favoriteData, toggleFavorite]);
 
   if (loading) {
     return (
@@ -176,132 +207,150 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
 
   return (
     <View style={styles.container}>
-      <FlatList
-        data={[{ key: 'header' }, { key: 'details' }, { key: 'spacer' }]}
-        keyExtractor={(i) => i.key}
-        renderItem={({ item: section }) => {
-          if (section.key === 'header') {
-            return (
-              <View style={styles.heroSection}>
-                <FlatList
-                  data={images}
-                  keyExtractor={(_, idx) => String(idx)}
-                  horizontal
-                  pagingEnabled
-                  showsHorizontalScrollIndicator={false}
-                  renderItem={({ item: img, index }) => (
-                    <TouchableOpacity
-                      activeOpacity={0.9}
-                      onPress={() => openImagePreview(index)}
-                    >
-                      <CachedImage
-                        uri={img.image_url}
-                        style={styles.heroImage}
-                        resizeMode="cover"
-                        fallbackUri="https://picsum.photos/400/300?random=5"
-                      />
-                    </TouchableOpacity>
-                  )}
-                />
-                {favoriteData ? (
-                  <FavoriteToggleButton
-                    itemId={favoriteData.id}
-                    item={favoriteData}
-                    size={24}
-                    style={styles.detailsFavoriteButton}
-                  />
-                ) : null}
-              </View>
-            );
-          }
-          if (section.key === 'details') {
-            return (
-              <View style={styles.details}>
-                <SJText style={styles.itemTitle}>{item.title}</SJText>
-                <SJText style={styles.price}>{formatCurrency(item.price || 0, item.currency || 'USD')}</SJText>
-                {item.view_count !== undefined && item.view_count > 0 && (
-                  <View style={styles.viewCountRow}>
-                    <Ionicons name="eye-outline" size={14} color="#666" />
-                    <SJText style={styles.viewCountText}>
-                      {item.view_count >= 1000 ? `${(item.view_count / 1000).toFixed(1)}K` : item.view_count} {item.view_count === 1 ? 'view' : 'views'}
-                    </SJText>
-                  </View>
-                )}
-                {item.category ? (
-                  <SJText style={styles.meta}>
-                    {strings.category}: {language === 'ka' ? item.category.title_ka : item.category.title_en}
-                  </SJText>
-                ) : item.category_name ? (
-                  <SJText style={styles.meta}>
-                    {strings.category}: {item.category_name}
-                  </SJText>
-                ) : null}
-                {item.condition ? (
-                  <SJText style={styles.meta}>
-                    {strings.condition}: {item.condition}
-                  </SJText>
-                ) : null}
-                <SJText style={styles.description}>{item.description}</SJText>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        {/* Image Carousel */}
+        <ScrollView
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+        >
+          {images.map((img, index) => (
+            <TouchableOpacity
+              key={index}
+              activeOpacity={0.9}
+              onPress={() => openImagePreview(index)}
+            >
+              <CachedImage
+                uri={img.image_url}
+                style={styles.heroImage}
+                resizeMode="cover"
+                fallbackUri="https://picsum.photos/400/300?random=5"
+              />
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
 
-                {item.user_id && item.user ? (
-                  <TouchableOpacity
-                    activeOpacity={0.8}
-                    style={styles.sellerBox}
-                    onPress={() => {
-                      (navigation as any).navigate('UserProfile', { userId: item.user_id });
-                    }}
-                  >
-                    <SJText style={styles.sellerTitle}>{strings.seller}</SJText>
-                    <SJText style={styles.sellerName}>
-                      {(item.user.firstname || (item.user as any).first_name || '').trim()} {(item.user.lastname || (item.user as any).last_name || '').trim()} @{item.user.username}
-                    </SJText>
-                  </TouchableOpacity>
-                ) : null}
-              </View>
-            );
-          }
-          return <View style={{ height: 100 }} />;
-        }}
-        contentContainerStyle={{ paddingBottom: showOffer ? 100 : 16 }}
-      />
+        {/* Section 1: Created At & Views */}
+        <View style={styles.divider} />
+        <View style={styles.metaSection}>
+          <View style={styles.metaItem}>
+            <Ionicons name="time-outline" size={13} color="#777" />
+            <SJText style={styles.metaText}>
+              {formatRelativeTime(item.created_at)}
+            </SJText>
+          </View>
+          <View style={styles.metaDot} />
+          <View style={styles.metaItem}>
+            <Ionicons name="eye-outline" size={13} color="#777" />
+            <SJText style={styles.metaText}>{viewCountText}</SJText>
+          </View>
+        </View>
+        <View style={styles.divider} />
 
-      {showOffer && (
-        <View style={styles.offerBar}>
+        {/* Section 2: Action Buttons */}
+        <View style={styles.actionsSection}>
           <TouchableOpacity
-            style={styles.offerButton}
-            onPress={() => {
-              // Check if user is authenticated (not anonymous)
-              if (!isAuthenticated || isAnonymous) {
-                (navigation as any).navigate('EmailSignIn');
-                return;
-              }
-              // Navigate to offer creation
-              (navigation as any).navigate('OfferCreate', {
-                receiverId: item.user_id,
-                requestedItems: [
-                  {
-                    id: item.id,
-                    title: item.title,
-                    price: item.price || 0,
-                    image_url: item.images && item.images.length > 0 ? item.images[0].url : null,
-                    condition: item.condition,
-                  },
-                ],
-                contextTitle: item.title,
-              });
-            }}
+            style={styles.actionButton}
+            onPress={handleOffer}
+            activeOpacity={0.7}
           >
-            <SJText style={styles.offerText}>{strings.offer}</SJText>
+            <View style={[styles.actionCircle, styles.actionCircleOffer]}>
+              <Ionicons name="swap-horizontal" size={22} color={colors.primaryYellow} />
+            </View>
+            <SJText style={[styles.actionLabel, styles.actionLabelOffer]}>{strings.offer}</SJText>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={handleFavourite}
+            activeOpacity={0.7}
+          >
+            <View
+              style={[styles.actionCircle, isFav ? styles.actionCircleFavActive : styles.actionCircleFav]}
+            >
+              <Ionicons
+                name={isFav ? 'heart' : 'heart-outline'}
+                size={22}
+                color={isFav ? '#ef4444' : '#f87171'}
+              />
+            </View>
+            <SJText
+              style={[styles.actionLabel, isFav ? styles.actionLabelFavActive : styles.actionLabelFav]}
+            >
+              {strings.favourite}
+            </SJText>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={() => {}}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.actionCircle, styles.actionCircleShare]}>
+              <Ionicons name="share-social" size={22} color="#60a5fa" />
+            </View>
+            <SJText style={[styles.actionLabel, styles.actionLabelShare]}>{strings.share}</SJText>
           </TouchableOpacity>
         </View>
-      )}
+        <View style={styles.divider} />
 
-      {/* Fullscreen image preview with horizontal paging */}
+        {/* Section 3: Item Info */}
+        <View style={styles.infoSection}>
+          {item.user_id && item.user ? (
+            <TouchableOpacity
+              activeOpacity={0.6}
+              onPress={() => {
+                (navigation as any).navigate('UserProfile', {
+                  userId: item.user_id,
+                });
+              }}
+              style={styles.sellerRow}
+            >
+              <Ionicons name="person-outline" size={13} color="#777" />
+              <SJText style={styles.sellerText}>@{item.user.username}</SJText>
+            </TouchableOpacity>
+          ) : null}
+
+          <SJText style={styles.itemTitle}>{item.title}</SJText>
+
+          {categoryName ? (
+            <View style={styles.categoryChip}>
+              {item.category?.icon ? (
+                <SJText style={styles.categoryIcon}>{item.category.icon}</SJText>
+              ) : (
+                <Ionicons name="pricetag-outline" size={11} color="#aaa" />
+              )}
+              <SJText style={styles.categoryChipText}>{categoryName}</SJText>
+            </View>
+          ) : null}
+
+          <SJText style={styles.price}>
+            {formatCurrency(item.price || 0, item.currency || 'USD')}
+          </SJText>
+
+          {item.condition ? (
+            <ConditionChip
+              condition={item.condition}
+              compact
+              style={styles.conditionChip}
+            />
+          ) : null}
+        </View>
+        <View style={styles.divider} />
+
+        {/* Section 4: Description */}
+        {item.description ? (
+          <View style={styles.descriptionSection}>
+            <SJText style={styles.description}>{item.description}</SJText>
+          </View>
+        ) : null}
+      </ScrollView>
+
       <ImageView
         images={previewImages}
         imageIndex={previewImageIndex}
         visible={previewVisible}
-        onRequestClose={closeImagePreview}
+        onRequestClose={() => setPreviewVisible(false)}
       />
     </View>
   );
@@ -312,11 +361,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.primaryDark,
   },
+  scrollContent: {
+    paddingBottom: 40,
+  },
   centered: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.primaryDark
+    backgroundColor: colors.primaryDark,
   },
   errorText: {
     fontSize: 16,
@@ -333,83 +385,149 @@ const styles = StyleSheet.create({
   },
   heroImage: {
     width,
-    height: Math.min(300, Math.round(width * 0.75))
+    height: Math.min(320, Math.round(width * 0.8)),
   },
-  heroSection: {
-    position: 'relative',
+
+  divider: {
+    height: 1,
+    backgroundColor: DIVIDER_COLOR,
+    marginHorizontal: 16,
   },
-  detailsFavoriteButton: {
-    position: 'absolute',
-    top: 20,
-    right: 20,
-    zIndex: 5,
-    backgroundColor: '#fff'
+
+  metaSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    gap: 6,
   },
-  details: {
-    backgroundColor: colors.primaryDark,
+  metaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  metaText: {
+    fontSize: 12,
+    color: '#777',
+    fontWeight: '300',
+  },
+  metaDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    backgroundColor: '#555',
+    marginHorizontal: 4,
+  },
+
+  actionsSection: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+    paddingVertical: 18,
+    gap: 36,
+  },
+  actionButton: {
+    alignItems: 'center',
+    gap: 6,
+  },
+  actionCircle: {
+    width: ACTION_CIRCLE_SIZE,
+    height: ACTION_CIRCLE_SIZE,
+    borderRadius: ACTION_CIRCLE_SIZE / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+  },
+  actionCircleOffer: {
+    backgroundColor: 'rgba(255,222,33,0.12)',
+    borderColor: 'rgba(255,222,33,0.35)',
+  },
+  actionCircleFav: {
+    backgroundColor: 'rgba(248,113,113,0.10)',
+    borderColor: 'rgba(248,113,113,0.30)',
+  },
+  actionCircleFavActive: {
+    backgroundColor: 'rgba(239,68,68,0.18)',
+    borderColor: 'rgba(239,68,68,0.45)',
+  },
+  actionCircleShare: {
+    backgroundColor: 'rgba(96,165,250,0.10)',
+    borderColor: 'rgba(96,165,250,0.30)',
+  },
+  actionLabel: {
+    fontSize: 11,
+    fontWeight: '400',
+  },
+  actionLabelOffer: {
+    color: colors.primaryYellow,
+  },
+  actionLabelFav: {
+    color: '#f87171',
+  },
+  actionLabelFavActive: {
+    color: '#ef4444',
+  },
+  actionLabelShare: {
+    color: '#60a5fa',
+  },
+
+  infoSection: {
     paddingHorizontal: 16,
     paddingVertical: 16,
+  },
+  sellerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginBottom: 6,
+  },
+  sellerText: {
+    fontSize: 13,
+    color: '#777',
+    fontWeight: '300',
   },
   itemTitle: {
     fontSize: 22,
     fontWeight: '700',
-    
+    marginBottom: 10,
   },
-  price: {
-    marginTop: 6,
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  meta: {
-    marginTop: 6,
-    fontSize: 13
-  },
-  description: {
-    marginTop: 12,
-    fontSize: 15,
-    lineHeight: 21,
-  },
-  sellerBox: {
-    marginTop: 16,
-    padding: 12,
-    borderRadius: 10,
-  },
-  sellerTitle: {
-    fontSize: 13,
-    color: '#666',
-    marginBottom: 4,
-  },
-  sellerName: {
-    fontSize: 15,
-    fontWeight: '600'
-  },
-  offerBar: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 12,
-    paddingHorizontal: 64,
-    paddingBottom: 16,
-  },
-  offerButton: {
-    backgroundColor: colors.primaryYellow,
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  offerText: {
-    color: '#000',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  viewCountRow: {
+  categoryChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 8,
-    gap: 6,
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    gap: 5,
+    marginBottom: 10,
   },
-  viewCountText: {
-    fontSize: 13
+  categoryIcon: {
+    fontSize: 12,
+  },
+  categoryChipText: {
+    fontSize: 11,
+    color: '#aaa',
+    fontWeight: '400',
+  },
+  price: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 10,
+  },
+  conditionChip: {
+    alignSelf: 'flex-start',
+  },
+
+  descriptionSection: {
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+  },
+  description: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: '#bbb',
+    fontWeight: '300',
   },
 });
 

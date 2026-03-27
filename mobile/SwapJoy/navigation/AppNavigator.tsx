@@ -30,6 +30,8 @@ import PriceInputScreen from '../screens/wizard/PriceInputScreen';
 import LocationInputScreen from '../screens/wizard/LocationInputScreen';
 import ItemPreviewScreen from '../screens/ItemPreviewScreen';
 import ItemDetailsScreen from '../screens/ItemDetailsScreen';
+import SearchScreen from '../modules/search/screens/SearchScreen';
+import SearchResultsScreen from '../modules/search/screens/SearchResultsScreen';
 import ProfileSettingsScreen from '../screens/ProfileSettingsScreen';
 import ProfileEditScreen from '../screens/ProfileEditScreen';
 import CategorySelectorScreen from '../screens/CategorySelectorScreen';
@@ -344,12 +346,26 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
           component={MainPageContainer} 
           options={{ headerShown: false }}
         />
-        <Stack.Screen 
-          name="ItemDetails" 
+        <Stack.Screen
+          name="ItemDetails"
           component={ItemDetailsScreen}
-          options={{ 
-            title: 'Item Details',
-            headerBackTitleVisible: false
+          options={({ route }) => ({
+            title: route.params?.item?.title?.trim() ?? '',
+            headerBackTitleVisible: false,
+          })}
+        />
+        <Stack.Screen
+          name="Search"
+          component={SearchScreen}
+          options={{
+            title: '',
+          }}
+        />
+        <Stack.Screen
+          name="SearchResults"
+          component={SearchResultsScreen}
+          options={{
+            title: 'Search results',
           }}
         />
         

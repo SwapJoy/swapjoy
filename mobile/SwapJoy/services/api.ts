@@ -3731,25 +3731,19 @@ export class ApiService {
   }
 
   /**
-   * Track a view for an item (fire-and-forget, non-blocking)
-   * This is called when a user opens the item details screen
+   * Track a view for an item (non-blocking for callers that do not await).
    */
   static async trackItemView(itemId: string, userId?: string): Promise<void> {
-    // Fire-and-forget: don't await, handle errors silently
-    // This ensures view tracking doesn't block the UI
-    (async () => {
-      try {
-        const { error } = await supabase.rpc('fn_track_item_view', {
-          p_item_id: itemId,
-          p_user_id: userId || null,
-        });
-        if (error) {
-          console.warn('[ApiService] Failed to track item view:', error);
-        }
-      } catch (error) {
-        // Silently fail - view tracking is non-critical
-        console.warn('[ApiService] Error tracking item view:', error);
+    try {
+      const { error } = await supabase.rpc('fn_track_item_view', {
+        p_item_id: itemId,
+        p_user_id: userId || null,
+      });
+      if (error) {
+        console.warn('[ApiService] Failed to track item view:', error);
       }
-    })();
+    } catch (error) {
+      console.warn('[ApiService] Error tracking item view:', error);
+    }
   }
 }

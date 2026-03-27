@@ -9,15 +9,8 @@ import {
 } from 'react-native';
 import CachedImage from './CachedImage';
 import SJText from './SJText';
-import CategoryChip from './CategoryChip';
 
 export type ItemCardVariant = 'list' | 'horizontal' | 'grid';
-
-export interface ItemCardChip {
-  label: string;
-  backgroundColor?: string;
-  textColor?: string;
-}
 
 const useFadeAnimation = () => {
   const opacity = useRef(new Animated.Value(0.4)).current;
@@ -65,57 +58,39 @@ const FadePlaceholder: React.FC<{ style?: StyleProp<ViewStyle>; borderRadius?: n
 
 interface ItemCardProps {
   title: string;
-  description?: string;
   priceLabel?: string;
-  metaRightLabel?: string | null;
   imageUri?: string | null;
   fallbackImageUri?: string;
   placeholderLabel?: string;
-  chips?: ItemCardChip[];
   onPress?: () => void;
   variant?: ItemCardVariant;
   style?: StyleProp<ViewStyle>;
   imageHeight?: number;
   titleLines?: number;
-  descriptionLines?: number;
-  metaBadges?: Array<{ label: string; backgroundColor?: string; textColor?: string }>;
   favoriteButton?: ReactNode;
-  ownerHandle?: string;
-  conditionBadge?: ItemCardChip;
-  categoryChipName?: string;
+  conditionColor?: string;
 }
 
 const ItemCard: React.FC<ItemCardProps> = memo(
   ({
     title,
-    description,
     priceLabel,
-    metaRightLabel,
     imageUri,
     fallbackImageUri = 'https://via.placeholder.com/200x150',
     placeholderLabel = 'No image',
-    chips,
     onPress,
     variant = 'list',
     style,
     imageHeight,
     titleLines,
-    descriptionLines,
-    metaBadges,
     favoriteButton,
-    ownerHandle,
-    conditionBadge,
-    categoryChipName,
+    conditionColor,
   }) => {
     const computedImageHeight =
       imageHeight ??
       (variant === 'horizontal' ? 180 : variant === 'grid' ? 240 : 260);
     const computedTitleLines = titleLines ?? (variant === 'horizontal' ? 1 : 2);
-    const computedDescriptionLines = descriptionLines ?? 2;
-
-    const hasChips = Array.isArray(chips) && chips.length > 0;
-    const hasMetaBadges = Array.isArray(metaBadges) && metaBadges.length > 0;
-    const hasMetaRight = !!metaRightLabel;
+    const titleLabel = priceLabel ? `${priceLabel} - ${title}` : title;
 
     return (
       <TouchableOpacity
@@ -138,55 +113,8 @@ const ItemCard: React.FC<ItemCardProps> = memo(
             </View>
           )}
 
-          {hasMetaBadges || priceLabel ? (
-            <View style={styles.metadataOverlay}>
-              <View style={styles.metadataRow}>
-                {priceLabel ? (
-                  <View style={styles.priceBadge}>
-                    <SJText style={styles.priceBadgeText}>{priceLabel}</SJText>
-                  </View>
-                ) : null}
-                {metaBadges?.map((badge, index) => (
-                  <View
-                    key={`${badge.label}-${index}`}
-                    style={[
-                      styles.metaBadge,
-                      badge.backgroundColor ? { backgroundColor: badge.backgroundColor } : null,
-                    ]}
-                  >
-                    <SJText
-                      style={[
-                        styles.metaBadgeText,
-                        badge.textColor ? { color: badge.textColor } : null,
-                      ]}
-                    >
-                      {badge.label}
-                    </SJText>
-                  </View>
-                ))}
-              </View>
-            </View>
-          ) : null}
-
           {favoriteButton ? <View style={styles.favoriteButtonWrapper}>{favoriteButton}</View> : null}
-
-          {conditionBadge ? (
-            <View
-              style={[
-                styles.conditionBadge,
-                conditionBadge.backgroundColor ? { backgroundColor: conditionBadge.backgroundColor } : null,
-              ]}
-            >
-              <SJText
-                style={[
-                  styles.conditionBadgeText,
-                  conditionBadge.textColor ? { color: conditionBadge.textColor } : null,
-                ]}
-              >
-                {conditionBadge.label}
-              </SJText>
-            </View>
-          ) : null}
+          <View style={[styles.conditionLine, conditionColor ? { backgroundColor: conditionColor } : null]} />
         </View>
 
         <View style={styles.content}>
@@ -195,59 +123,8 @@ const ItemCard: React.FC<ItemCardProps> = memo(
             ellipsizeMode="tail"
             style={styles.title}
           >
-            {title}
+            {titleLabel}
           </SJText>
-
-          {categoryChipName ? (
-            <View style={styles.categoryChipContainer}>
-              <CategoryChip name={categoryChipName} />
-            </View>
-          ) : null}
-
-          {ownerHandle ? (
-            <SJText style={styles.ownerHandle} numberOfLines={1}>
-              {ownerHandle.startsWith('@') ? ownerHandle : `@${ownerHandle}`}
-            </SJText>
-          ) : null}
-
-          {description ? (
-            <SJText
-              numberOfLines={computedDescriptionLines}
-              ellipsizeMode="tail"
-              style={styles.description}
-            >
-              {description}
-            </SJText>
-          ) : null}
-
-          {hasMetaRight ? (
-            <View style={styles.metaRow}>
-              <SJText style={styles.metaRight}>{metaRightLabel}</SJText>
-            </View>
-          ) : null}
-
-          {hasChips ? (
-            <View style={styles.chipsRow}>
-              {chips!.map((chip, index) => (
-                <View
-                  key={`${chip.label}-${index}`}
-                  style={[
-                    styles.chip,
-                    chip.backgroundColor ? { backgroundColor: chip.backgroundColor } : null,
-                  ]}
-                >
-                  <SJText
-                    style={[
-                      styles.chipText,
-                      chip.textColor ? { color: chip.textColor } : null,
-                    ]}
-                  >
-                    {chip.label}
-                  </SJText>
-                </View>
-              ))}
-            </View>
-          ) : null}
         </View>
       </TouchableOpacity>
     );
@@ -280,46 +157,19 @@ const styles = StyleSheet.create({
   imagePlaceholderText: {
     fontSize: 12
   },
-  metadataOverlay: {
-    position: 'absolute',
-    top: 12,
-    left: 12,
-    right: 12,
-  },
-  metadataRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: 8,
-  },
-  priceBadge: {
-    backgroundColor: 'rgba(206, 212, 227, 0.85)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-  },
-  priceBadgeText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#161200f',
-  },
   favoriteButtonWrapper: {
     position: 'absolute',
     top: 12,
     right: 12,
     zIndex: 10,
   },
-  metaBadge: {
-    backgroundColor: 'rgba(148, 163, 184, 0.85)',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 999,
-  },
-  metaBadgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#161200f',
-    textTransform: 'capitalize',
+  conditionLine: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 3,
+    backgroundColor: 'transparent',
   },
   content: {
     padding: 8,
@@ -328,60 +178,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 15,
     fontWeight: '600'
-  },
-  categoryChipContainer: {
-    marginTop: 2,
-    marginBottom: 2,
-    alignSelf: 'flex-start',
-  },
-  ownerHandle: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  description: {
-    fontSize: 12,
-    lineHeight: 16,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-  },
-  metaRight: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  chipsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 4,
-  },
-  chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: '#e2e8f0',
-  },
-  chipText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#0f172a',
-  },
-  conditionBadge: {
-    position: 'absolute',
-    left: 12,
-    bottom: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 999,
-    backgroundColor: 'rgba(15, 23, 42, 0.85)',
-  },
-  conditionBadgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#161200f',
-    textTransform: 'capitalize',
   },
   skeletonCard: {
     pointerEvents: 'none',

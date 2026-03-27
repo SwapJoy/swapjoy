@@ -39,6 +39,8 @@ interface LocalizationContextValue {
   setLanguage: (language: AppLanguage) => Promise<void>;
   t: (key: string, options?: TranslationOptions) => string;
   getLanguageLabel: (language: AppLanguage) => string;
+  /** Pick title_en / title_ka (or name_*) from a bilingual object for the active language */
+  localized: (obj: object | null | undefined) => string | null;
 }
 
 const LocalizationContext = createContext<LocalizationContextValue | undefined>(undefined);
@@ -203,6 +205,32 @@ export const LocalizationProvider: React.FC<PropsWithChildren> = ({ children }) 
     [language]
   );
 
+  const localized = useCallback(
+    (obj: object | null | undefined): string | null => {
+      if (!obj || typeof obj !== 'object') {
+        return null;
+      }
+      const record = obj as Record<string, unknown>;
+      const fallback: AppLanguage = language === 'ka' ? 'en' : 'ka';
+      const pick = (key: string): string | null => {
+        const v = record[key];
+        if (typeof v === 'string' && v.trim().length > 0) {
+          return v.trim();
+        }
+        return null;
+      };
+      return (
+        pick(`title_${language}`) ||
+        pick(`name_${language}`) ||
+        pick(`title_${fallback}`) ||
+        pick(`name_${fallback}`) ||
+        pick('title') ||
+        pick('name')
+      );
+    },
+    [language]
+  );
+
   const getLanguageLabel = useCallback(
     (lang: AppLanguage) => LANGUAGE_LABELS[lang] ?? lang,
     []
@@ -216,8 +244,9 @@ export const LocalizationProvider: React.FC<PropsWithChildren> = ({ children }) 
       setLanguage: changeLanguage,
       t: translate,
       getLanguageLabel,
+      localized,
     }),
-    [changeLanguage, getLanguageLabel, isLoading, language, translate]
+    [changeLanguage, getLanguageLabel, isLoading, language, localized, translate]
   );
 
   return (

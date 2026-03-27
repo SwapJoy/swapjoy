@@ -74,6 +74,12 @@ export type RootStackParamList = {
     imageUris?: string[];
   };
   RecentlyListed: undefined;
+  Search: undefined;
+  SearchResults: {
+    query?: string;
+    categoryId?: string;
+    categoryName?: string;
+  };
   ItemDetails: {
     itemId: string;
     item?: ListingItem; // Optional: pass full item data to avoid refetching
@@ -213,6 +219,15 @@ export type CreateListingScreenProps = {
 export type ItemDetailsScreenProps = {
   navigation: NavigationProp<RootStackParamList, 'ItemDetails'>;
   route: RouteProp<RootStackParamList, 'ItemDetails'>;
+};
+
+export type SearchScreenProps = {
+  navigation: NavigationProp<RootStackParamList, 'Search'>;
+};
+
+export type SearchResultsScreenProps = {
+  navigation: NavigationProp<RootStackParamList, 'SearchResults'>;
+  route: RouteProp<RootStackParamList, 'SearchResults'>;
 };
 
 export type BundleItemsScreenProps = {

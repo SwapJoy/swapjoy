@@ -407,6 +407,8 @@ const en = {
     sellerTitle: 'Seller',
     goBack: 'Go Back',
     offerButton: 'Offer',
+    favouriteButton: 'Favourite',
+    shareButton: 'Share',
     loadFailed: 'Failed to load item',
     itemNotFound: 'Item not found',
   },

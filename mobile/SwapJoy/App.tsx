@@ -22,6 +22,8 @@ import { RootStackParamList } from './types/navigation';
 import { LocalizationProvider, useLocalization } from './localization';
 import { MatchInventoryProvider } from './contexts/MatchInventoryContext';
 import { WizardFormProvider } from './contexts/WizardFormContext';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 
 // Configure Google Sign-In as early as possible to ensure native config is set
 const WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID
@@ -134,26 +136,36 @@ function AppContent() {
 
 export default function App() {
   return (
-    <LocalizationProvider>
-      <AuthProvider>
-        <CategoriesProvider>
-          <LocationProvider>
-            <ProfileProvider>
-              <FiltersProvider>
-                <NotificationsProvider>
-                  <FavoritesProvider>
-                    <MatchInventoryProvider>
-                      <WizardFormProvider>
-                        <AppContent />
-                      </WizardFormProvider>
-                    </MatchInventoryProvider>
-                  </FavoritesProvider>
-                </NotificationsProvider>
-              </FiltersProvider>
-            </ProfileProvider>
-          </LocationProvider>
-        </CategoriesProvider>
-      </AuthProvider>
-    </LocalizationProvider>
+    <GestureHandlerRootView style={styles.root}>
+      <BottomSheetModalProvider>
+        <LocalizationProvider>
+          <AuthProvider>
+            <CategoriesProvider>
+              <LocationProvider>
+                <ProfileProvider>
+                  <FiltersProvider>
+                    <NotificationsProvider>
+                      <FavoritesProvider>
+                        <MatchInventoryProvider>
+                          <WizardFormProvider>
+                            <AppContent />
+                          </WizardFormProvider>
+                        </MatchInventoryProvider>
+                      </FavoritesProvider>
+                    </NotificationsProvider>
+                  </FiltersProvider>
+                </ProfileProvider>
+              </LocationProvider>
+            </CategoriesProvider>
+          </AuthProvider>
+        </LocalizationProvider>
+      </BottomSheetModalProvider>
+    </GestureHandlerRootView>
   );
 }
+
+const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
+});

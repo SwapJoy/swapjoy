@@ -407,6 +407,8 @@ const ka = {
     sellerTitle: 'გამყიდველი',
     goBack: 'დაბრუნება',
     offerButton: 'შეთავაზება',
+    favouriteButton: 'რჩეული',
+    shareButton: 'გაზიარება',
     loadFailed: 'ნივთის ჩატვირთვა ვერ მოხერხდა',
     itemNotFound: 'ნივთი ვერ მოიძებნა',
   },

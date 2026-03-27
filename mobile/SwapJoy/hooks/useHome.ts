@@ -97,6 +97,7 @@ const transformTopPickItem = (item: any): ListingItem => {
     user,
     distance_km: typeof item.distance_km === 'number' ? item.distance_km : null,
     similarity: typeof item.score === 'number' ? item.score : item.similarity ?? null,
+    view_count: typeof item.view_count === 'number' ? item.view_count : undefined,
     // legacy compatibility
     image_url: images[0]?.url || null,
     category_name: category?.title_en || category?.title_ka || item.category_name || null,
