@@ -17,6 +17,11 @@ Offers ──< OfferItems
 Conversations ──< Messages
 ```
 
+npm install
+export DATABASE_URL="postgresql://postgres.glbvyusqksnoyjuztceo:eFJVv1mftbGX8Jg6@aws-1-eu-central-2.pooler.supabase.com:5432/postgres"
+export PEXELS_API_KEY="7XYRYzIQr4cYIvuvB0nluqFb04Z5SbFjRjOjh6Zjk7QS3HgBGjgMsoDO"
+node generate-pexels-item-images-migration.mjs
+
 ## Tables/Collections
 
 ### 1. Users
