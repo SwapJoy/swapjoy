@@ -154,7 +154,7 @@ const HomeScreen: React.FC<ExploreScreenProps> = () => {
         onEndReachedThreshold={0.3}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.gridListContent}
-        horizontalPadding={2}
+        horizontalPadding={0}
         columnSpacing={4}
         rowSpacing={2}
         listHeaderComponent={headerComponent}
@@ -179,17 +179,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 12,
+    paddingTop: 8,
     paddingBottom: 4,
     paddingHorizontal: 8,
     backgroundColor: colors.primaryDark,
   },
-  header: { 
-    color: colors.white, 
-    fontSize: 28, 
-    fontWeight: '200', 
+  header: {
+    color: colors.white,
+    fontSize: 28,
+    fontWeight: '200',
     opacity: 0.6,
-    flex: 1,
   },
   gridListContent: {
     paddingTop: 6,

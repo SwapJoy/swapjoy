@@ -17,6 +17,21 @@ const DEFAULT_WIDTH = SCREEN_WIDTH * 0.92;
 const HALF_WIDTH = SCREEN_WIDTH * 0.5;
 const DEFAULT_PADDING = 24;
 
+const resolveKeyboardHeight = (event: any): number => {
+  const reported = event?.endCoordinates?.height;
+  if (typeof reported === 'number' && reported > 0) {
+    return reported;
+  }
+
+  // Fallback for contexts where Android reports height as 0 (e.g. some modal/sheet setups).
+  const screenY = event?.endCoordinates?.screenY;
+  if (typeof screenY === 'number' && screenY > 0) {
+    return Math.max(0, SCREEN_HEIGHT - screenY);
+  }
+
+  return 0;
+};
+
 const PrimaryButton: React.FC<PrimaryButtonProps> = ({
   onPress,
   disabled = false,
@@ -34,7 +49,7 @@ const PrimaryButton: React.FC<PrimaryButtonProps> = ({
     const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
 
     const keyboardWillShow = Keyboard.addListener(showEvent, (e) => {
-      const keyboardHeight = e.endCoordinates.height;
+      const keyboardHeight = resolveKeyboardHeight(e);
       Animated.parallel([
         Animated.timing(bottomOffset, {
           toValue: keyboardHeight,

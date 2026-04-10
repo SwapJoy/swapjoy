@@ -258,7 +258,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: 1,
+    height: 0.5,
     backgroundColor: colors.primaryYellow,
   },
   bottomBorderFocused: {

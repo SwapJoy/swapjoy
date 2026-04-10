@@ -26,6 +26,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors } from '@navigation/MainTabNavigator.styles';
 import ImageView from 'react-native-image-viewing';
 import ConditionChip from '../components/ConditionChip';
+import OfferItemSelectionBottomSheet from './bottomsheets/OfferItemSelectionBottomSheet';
 
 const { width, height } = Dimensions.get('window');
 const HERO_HEIGHT = Math.max(320, Math.round(height * 0.45));
@@ -61,6 +62,7 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
   const [item, setItem] = useState<ListingItem | null>(passedItem || null);
   const [previewVisible, setPreviewVisible] = useState(false);
   const [previewImageIndex, setPreviewImageIndex] = useState(0);
+  const [offerSheetVisible, setOfferSheetVisible] = useState(false);
   const loggedViewRef = useRef<string | null>(null);
 
   const isFav = item ? isFavorite(item.id) : false;
@@ -199,20 +201,33 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
       return;
     }
     if (item.user_id === user?.id) return;
-    (navigation as any).navigate('OfferCreate', {
-      receiverId: item.user_id,
-      requestedItems: [
-        {
-          id: item.id,
-          title: item.title,
-          price: item.price || 0,
-          image_url: item.images && item.images.length > 0 ? item.images[0].url : null,
-          condition: item.condition,
-        },
-      ],
-      contextTitle: item.title,
-    });
+    setOfferSheetVisible(true);
   }, [item, isAuthenticated, isAnonymous, user?.id, navigation]);
+
+  const handleOfferSheetClose = useCallback(() => {
+    setOfferSheetVisible(false);
+  }, []);
+
+  const handleOfferSheetNext = useCallback(
+    (selectedIds: string[]) => {
+      if (!item) return;
+      (navigation as any).navigate('OfferCreate', {
+        receiverId: item.user_id,
+        requestedItems: [
+          {
+            id: item.id,
+            title: item.title,
+            price: item.price || 0,
+            image_url: item.images && item.images.length > 0 ? item.images[0].url : null,
+            condition: item.condition,
+          },
+        ],
+        contextTitle: item.title,
+        initialSelectedOfferedItemIds: selectedIds,
+      });
+    },
+    [item, navigation],
+  );
 
   const handleFavourite = useCallback(() => {
     if (!item || !favoriteData) return;
@@ -415,6 +430,13 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
         imageIndex={previewImageIndex}
         visible={previewVisible}
         onRequestClose={() => setPreviewVisible(false)}
+      />
+
+      <OfferItemSelectionBottomSheet
+        visible={offerSheetVisible}
+        excludeItemId={item.id}
+        onClose={handleOfferSheetClose}
+        onNext={handleOfferSheetNext}
       />
     </View>
   );

@@ -168,16 +168,18 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    height: 3,
+    height: 1,
     backgroundColor: 'transparent',
   },
   content: {
-    padding: 8,
+    paddingLeft: 6,
+    paddingTop: 4,
+    paddingBottom: 8,
     gap: 6,
   },
   title: {
-    fontSize: 15,
-    fontWeight: '600'
+    fontSize: 14,
+    fontWeight: '400'
   },
   skeletonCard: {
     pointerEvents: 'none',

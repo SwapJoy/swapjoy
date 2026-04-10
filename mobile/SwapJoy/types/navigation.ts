@@ -127,6 +127,8 @@ export type RootStackParamList = {
     receiverId: string;
     requestedItems: Array<{ id: string; title?: string; price?: number; image_url?: string; images?: Array<{ url: string; image_url?: string }>; condition?: string }>;
     contextTitle?: string; // e.g., bundle title or item title
+    /** Preselect offered items (e.g. from item-details bottom sheet); still editable on OfferCreate. */
+    initialSelectedOfferedItemIds?: string[];
   };
   OfferPreview: {
     receiverId: string;
