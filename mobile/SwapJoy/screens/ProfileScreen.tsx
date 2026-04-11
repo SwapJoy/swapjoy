@@ -232,7 +232,9 @@ const GridItemsSkeleton = memo(() => {
 const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  const viewedUserId: string | undefined = (route as any)?.name === 'UserProfile' ? (route as any)?.params?.userId : undefined;
+  const routeUserId = (route as any)?.params?.userId;
+  const viewedUserId: string | undefined =
+    typeof routeUserId === 'string' && routeUserId.trim() !== '' ? routeUserId : undefined;
   const { t, language } = useLocalization();
   const { user: currentUser } = useAuth();
   const isViewingOtherUser = Boolean(viewedUserId && currentUser?.id !== viewedUserId);
@@ -278,6 +280,29 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
     favoriteCategories,
     favoriteCategoryNames,
   } = profileData;
+
+  const resolvedUsername = useMemo(() => {
+    if (profile?.username) return profile.username;
+    if (isViewingOtherUser) return null;
+    return (user as any)?.user_metadata?.username || (user as any)?.email?.split?.('@')?.[0] || null;
+  }, [profile?.username, isViewingOtherUser, user]);
+
+  const resolvedAvatarUri = useMemo(() => {
+    if ((profile as any)?.profile_image_url) return (profile as any).profile_image_url;
+    if (isViewingOtherUser) return 'https://via.placeholder.com/100?text=Avatar';
+    return (
+      (user as any)?.profile_image_url ||
+      (user as any)?.user_metadata?.avatar_url ||
+      'https://via.placeholder.com/100?text=Avatar'
+    );
+  }, [profile, isViewingOtherUser, user]);
+
+  const resolvedFullName = useMemo(() => {
+    const firstName = profile?.first_name || (!isViewingOtherUser ? (user as any)?.user_metadata?.first_name : '');
+    const lastName = profile?.last_name || (!isViewingOtherUser ? (user as any)?.user_metadata?.last_name : '');
+    const value = `${firstName || ''} ${lastName || ''}`.trim();
+    return value || null;
+  }, [profile?.first_name, profile?.last_name, isViewingOtherUser, user]);
 
   const [activeTab, setActiveTab] = useState<'published' | 'saved' | 'drafts'>('published');
   useEffect(() => {
@@ -383,12 +408,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
             <View style={styles.avatarSection}>
               <View style={styles.avatarWrapper}>
                 <CachedImage
-                  uri={
-                    (profile as any)?.profile_image_url ||
-                    (user as any)?.profile_image_url ||
-                    (user as any)?.user_metadata?.avatar_url ||
-                    'https://via.placeholder.com/100?text=Avatar'
-                  }
+                  uri={resolvedAvatarUri}
                   style={styles.avatar}
                   resizeMode="cover"
                 />
@@ -398,15 +418,9 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
             {/* Right Content */}
             <View style={styles.profileRightContent}>
               {/* Username - Top */}
-              {(
-                profile?.username ||
-                (user as any)?.user_metadata?.username ||
-                (user as any)?.email?.split?.('@')?.[0]
-              ) && (
+              {resolvedUsername && (
                 <SJText style={styles.username}>@
-                  {profile?.username ||
-                    (user as any)?.user_metadata?.username ||
-                    (user as any)?.email?.split?.('@')?.[0]}
+                  {resolvedUsername}
                 </SJText>
               )}
 
@@ -448,10 +462,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
 
           {/* Full Name - Under Avatar */}
           <View style={styles.userNameSection}>
-            <SJText style={styles.userName}>
-              {profile?.first_name || (user as any)?.user_metadata?.first_name || ''}{' '}
-              {profile?.last_name || (user as any)?.user_metadata?.last_name || ''}
-            </SJText>
+            <SJText style={styles.userName}>{resolvedFullName || ''}</SJText>
           </View>
 
           {/* Bio - Under Full Name */}

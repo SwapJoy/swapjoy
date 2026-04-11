@@ -13,7 +13,6 @@ import type { AppLanguage } from '../types/language';
 import { DEFAULT_LANGUAGE } from '../types/language';
 
 const { width } = Dimensions.get('window');
-const noop = () => {};
 
 const OffersScreen: React.FC<OffersScreenProps> = memo(({ route, navigation }) => {
   const { sentOffers, receivedOffers, loading, refreshing, onRefresh, getStatusColor, getStatusText } = useOffersData();
@@ -68,7 +67,7 @@ const OffersScreen: React.FC<OffersScreenProps> = memo(({ route, navigation }) =
       const offeredItems = entries.filter((entry: any) => entry?.side === 'offered');
       const primaryCollection = (isSent ? requestedItems : offeredItems).filter((entry: any) => entry?.item);
       const fallbackCollection = (isSent ? offeredItems : requestedItems).filter((entry: any) => entry?.item);
-      const primaryItem = primaryCollection[0]?.item || fallbackCollection[0]?.item || undefined;
+      const primaryItem: any = primaryCollection[0]?.item || fallbackCollection[0]?.item || undefined;
 
       const imageUrl = primaryItem ? getItemImageUri(primaryItem) ?? undefined : undefined;
 
@@ -102,7 +101,7 @@ const OffersScreen: React.FC<OffersScreenProps> = memo(({ route, navigation }) =
         primaryPrice ??
         (topUpAmount !== 0 ? formatCurrency(topUpAbs, fallbackCurrency) : strings.evenSwap);
 
-      const otherUser = isSent ? item.receiver : item.sender;
+      const otherUser: any = isSent ? item.receiver : item.sender;
       const displayNameParts = [
         otherUser?.first_name ?? '',
         otherUser?.last_name ?? '',
@@ -112,7 +111,7 @@ const OffersScreen: React.FC<OffersScreenProps> = memo(({ route, navigation }) =
       const ownerInitials =
         initialsSource
           .split(' ')
-          .map((part) => part.charAt(0))
+          .map((part: string) => part.charAt(0))
           .join('')
           .slice(0, 2)
           .toUpperCase() || '?';
@@ -173,6 +172,7 @@ const OffersScreen: React.FC<OffersScreenProps> = memo(({ route, navigation }) =
             (navigation as any).navigate('OfferDetails', { offer: item });
           }}
           disableLikeButton
+          cardWidth={width - 32}
           containerStyle={styles.offerCard}
           swapSuggestions={
             <View style={styles.offerMetaSection}>
@@ -274,8 +274,8 @@ const OffersScreen: React.FC<OffersScreenProps> = memo(({ route, navigation }) =
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={['#007AFF']}
-            tintColor="#007AFF"
+            colors={[colors.primaryYellow]}
+            tintColor={colors.primaryYellow}
           />
         }
         initialNumToRender={10}
@@ -314,7 +314,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
+    paddingVertical: 14,
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
   },
@@ -324,41 +324,41 @@ const styles = StyleSheet.create({
   tabText: {
     fontSize: 15,
     fontWeight: '500',
+    color: '#8e8e8e',
   },
   tabTextActive: {
     color: colors.primaryYellow,
     fontWeight: '700',
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: 16,
-    color: '#555',
-  },
   listContainer: {
-    padding: 20,
+    paddingTop: 14,
+    paddingBottom: 24,
+    paddingHorizontal: 16,
   },
   offerCard: {
-    width: width - 80,
-    marginHorizontal: 20,
-    marginBottom: 18,
+    width: '100%',
+    marginBottom: 14,
+    backgroundColor: '#1a1a1a',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#303030',
+    paddingBottom: 10,
   },
   statusBadge: {
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 10,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
   statusText: {
     color: colors.primaryDark,
     fontSize: 12,
+    fontWeight: '700',
   },
   offerMetaSection: {
     gap: 12,
+    paddingHorizontal: 10,
   },
   offerMetaHeader: {
     flexDirection: 'row',
@@ -369,12 +369,12 @@ const styles = StyleSheet.create({
   offerMetaUser: {
     flex: 1,
     fontSize: 12,
-    color: '#475569',
+    color: '#b8b8b8',
     fontWeight: '600',
   },
   offerMetaDate: {
     fontSize: 12,
-    color: '#94a3b8',
+    color: '#8f8f8f',
   },
   offerMetaRow: {
     flexDirection: 'row',
@@ -385,7 +385,7 @@ const styles = StyleSheet.create({
     minWidth: 70,
     fontSize: 12,
     fontWeight: '700',
-    color: '#0f172a',
+    color: '#9b9b9b',
   },
   offerMetaContent: {
     flex: 1,
@@ -395,29 +395,29 @@ const styles = StyleSheet.create({
   },
   offerItemText: {
     fontSize: 12,
-    color: '#475569',
-    fontWeight: '500',
+    color: '#d2d2d2',
+    fontWeight: '600',
   },
   offerItemEmpty: {
     fontSize: 12,
-    color: '#cbd5f5',
+    color: '#8a8a8a',
   },
   offerMoreItems: {
     fontSize: 12,
-    color: '#0ea5e9',
+    color: colors.primaryYellow,
     fontWeight: '600',
   },
   offerTopUpRow: {
     marginTop: 4,
     paddingVertical: 6,
     paddingHorizontal: 12,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: '#242424',
     borderRadius: 12,
   },
   offerTopUpLabel: {
     fontSize: 13,
-    fontWeight: '600',
-    color: '#0f172a',
+    fontWeight: '700',
+    color: colors.primaryYellow,
   },
   emptyContainer: {
     flex: 1,
@@ -427,19 +427,18 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: '700',
+    color: '#e3e3e3',
     marginBottom: 8,
   },
   emptySubtitle: {
     fontSize: 14,
-    color: '#666',
+    color: '#9e9e9e',
     textAlign: 'center',
   },
   offerSkeletonCard: {
-    width: width - 40,
-    marginHorizontal: 20,
-    marginBottom: 18,
+    width: width - 32,
+    marginBottom: 14,
   },
 });
 

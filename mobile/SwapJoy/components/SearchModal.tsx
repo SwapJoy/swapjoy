@@ -198,7 +198,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
   );
 
   const searchResultsNode =
-    hasSearchQuery || searchLoading || searchError ? (
+    hasSearchQuery || hasActiveFilters || searchLoading || searchError ? (
       <View style={styles.searchResultsContainer}>
         {!searchLoading && hasSearchQuery && searchResults.length === 0 ? (
           <View style={styles.searchStatusContainer}>
@@ -232,7 +232,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
       </View>
     ) : null;
 
-  const showRecent = !hasSearchQuery && !searchLoading && recentSearches.length > 0;
+  const showRecent = !hasSearchQuery && !hasActiveFilters && !searchLoading && recentSearches.length > 0;
 
   if (!visible) {
     return null;

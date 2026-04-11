@@ -11,6 +11,7 @@ import { useLocation } from '../contexts/LocationContext';
 import { SectionType } from '../types/section';
 import { ListingItem } from '../types/listing-item';
 import { useFilters } from '../contexts/FiltersContext';
+import { useCategories } from '../contexts/CategoriesContext';
 
 const DEFAULT_RADIUS = 50;
 
@@ -179,6 +180,7 @@ export const useExploreScreenState = (): ExploreScreenState => {
   const { isFavorite, toggleFavorite } = useFavorites();
   const { currentLocation, locationLoading: locationContextLoading, setCurrentLocationFromIP, ensureLocationDetected } = useLocation();
   const { filters } = useFilters();
+  const { categories } = useCategories();
 
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -211,6 +213,54 @@ export const useExploreScreenState = (): ExploreScreenState => {
 
   const trimmedSearchQuery = useMemo(() => searchQuery.trim(), [searchQuery]);
   const hasSearchQuery = trimmedSearchQuery.length > 0;
+  const hasSearchFilters = useMemo(
+    () =>
+      filters.categories.length > 0 ||
+      filters.priceMin > 0 ||
+      filters.priceMax !== null ||
+      filters.distance !== null ||
+      (filters.locationLat !== null && filters.locationLat !== undefined) ||
+      (filters.locationLng !== null && filters.locationLng !== undefined),
+    [
+      filters.categories,
+      filters.distance,
+      filters.locationLat,
+      filters.locationLng,
+      filters.priceMax,
+      filters.priceMin,
+    ],
+  );
+
+  const expandedCategoryFilters = useMemo(() => {
+    if (filters.categories.length === 0) {
+      return [];
+    }
+
+    const childrenByParent = new Map<string, string[]>();
+    categories.forEach((category) => {
+      if (!category.parent_id) return;
+      const existing = childrenByParent.get(category.parent_id) || [];
+      existing.push(category.id);
+      childrenByParent.set(category.parent_id, existing);
+    });
+
+    const collected = new Set<string>();
+    const stack = [...filters.categories];
+
+    while (stack.length > 0) {
+      const current = stack.pop();
+      if (!current || collected.has(current)) continue;
+      collected.add(current);
+      const children = childrenByParent.get(current) || [];
+      children.forEach((childId) => {
+        if (!collected.has(childId)) {
+          stack.push(childId);
+        }
+      });
+    }
+
+    return Array.from(collected);
+  }, [categories, filters.categories]);
 
   const heroGreeting = useMemo(() => {
     const currentHour = new Date().getHours();
@@ -483,7 +533,7 @@ export const useExploreScreenState = (): ExploreScreenState => {
     async (rawQuery: string) => {
       const query = (rawQuery || '').trim();
 
-      if (!query) {
+      if (!query && !hasSearchFilters) {
         setSearchResults([]);
         setSearchError(null);
         setSearchLoading(false);
@@ -518,16 +568,32 @@ export const useExploreScreenState = (): ExploreScreenState => {
         const searchFilters = {
           minPrice: filters.priceMin,
           maxPrice: filters.priceMax,
-          categories: filters.categories,
+          categories: expandedCategoryFilters,
           distance: filters.distance,
           coordinates: (filters.locationLat !== null && filters.locationLat !== undefined && 
                         filters.locationLng !== null && filters.locationLng !== undefined)
             ? { lat: filters.locationLat, lng: filters.locationLng }
             : null,
-          currency: filters.currency,
         };
         
-        const { data: searchData, error: apiError } = await ApiService.semanticSearch(query, 30, searchFilters);
+        let { data: searchData, error: apiError } = await ApiService.semanticSearch(
+          query || null,
+          30,
+          searchFilters,
+        );
+
+        const shouldRetryCategoryOnly =
+          !!query &&
+          expandedCategoryFilters.length > 0 &&
+          !apiError &&
+          Array.isArray(searchData) &&
+          searchData.length === 0;
+
+        if (shouldRetryCategoryOnly) {
+          const retry = await ApiService.semanticSearch(null, 30, searchFilters);
+          searchData = retry.data;
+          apiError = retry.error;
+        }
         
         if (currentRequestId !== searchRequestIdRef.current) {
           return;
@@ -554,7 +620,7 @@ export const useExploreScreenState = (): ExploreScreenState => {
         }
       }
     },
-    [searchStrings.error, filters]
+    [expandedCategoryFilters, searchStrings.error, filters, hasSearchFilters]
   );
 
   useEffect(() => {
@@ -562,7 +628,7 @@ export const useExploreScreenState = (): ExploreScreenState => {
       clearTimeout(searchDebounceRef.current);
     }
 
-    if (trimmedSearchQuery.length === 0) {
+    if (trimmedSearchQuery.length === 0 && !hasSearchFilters) {
       performSearch('');
       return;
     }
@@ -576,7 +642,7 @@ export const useExploreScreenState = (): ExploreScreenState => {
         clearTimeout(searchDebounceRef.current);
       }
     };
-  }, [performSearch, trimmedSearchQuery]);
+  }, [performSearch, trimmedSearchQuery, hasSearchFilters]);
 
   useEffect(() => {
     return () => {

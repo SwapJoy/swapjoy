@@ -12,12 +12,10 @@ import {
 import { colors } from '@navigation/MainTabNavigator.styles';
 import SJText from '../components/SJText';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import CachedImage from '../components/CachedImage';
 import { OfferCreateScreenProps } from '../types/navigation';
 import { useAuth } from '../contexts/AuthContext';
 import { ApiService } from '../services/api';
-import { formatCurrency, getCurrencySymbol } from '../utils';
-import { getItemImageUri } from '../utils/imageUtils';
+import { getCurrencySymbol } from '../utils';
 import { useLocalization } from '../localization';
 import SWInputField from '../components/SWInputField';
 import OfferItemSelectionBottomSheet from './bottomsheets/OfferItemSelectionBottomSheet';
@@ -25,6 +23,7 @@ import AmountInputBottomSheet, {
   AmountCurrency,
 } from '@screens/bottomsheets/AmountInputBottomSheet';
 import PrimaryButton from '../components/PrimaryButton';
+import OfferItemComponent from '../components/OfferItemComponent';
 
 const OfferCreateScreen: React.FC<OfferCreateScreenProps> = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
@@ -207,39 +206,12 @@ const OfferCreateScreen: React.FC<OfferCreateScreenProps> = ({ navigation, route
         showsVerticalScrollIndicator={false}
       >
         {firstRequestedItem && (
-          <View style={styles.requestedCard}>
-            <CachedImage
-              uri={
-                getItemImageUri(firstRequestedItem, 'https://via.placeholder.com/200x150') ||
-                'https://via.placeholder.com/200x150'
-              }
-              style={styles.requestedImage}
-              resizeMode="cover"
-              fallbackUri="https://picsum.photos/200/150?random=6"
-              showLoader={false}
-              defaultSource={require('../assets/icon.png')}
-            />
-            <View style={styles.requestedBody}>
-              <SJText style={styles.requestedKicker}>{strings.requestedItems}</SJText>
-
-              <SJText style={styles.requestedTitle} numberOfLines={1}>
-                {firstRequestedItem.title}
-              </SJText>
-
-              <SJText style={styles.requestedSubtitle} numberOfLines={2}>
-                {firstRequestedItem.description || requestedTitlesPreview || '—'}
-              </SJText>
-
-              <View style={styles.requestedMetaRow}>
-                <SJText style={styles.requestedPrice}>
-                  {formatCurrency(firstRequestedItem.price || 0, firstRequestedItem.currency || 'USD')}
-                </SJText>
-                {firstRequestedItem.condition && (
-                  <SJText style={styles.requestedCondition}>• {firstRequestedItem.condition}</SJText>
-                )}
-              </View>
-            </View>
-          </View>
+          <OfferItemComponent
+            item={firstRequestedItem}
+            kicker={strings.requestedItems}
+            subtitle={firstRequestedItem.description || requestedTitlesPreview || '—'}
+            containerStyle={styles.requestedCard}
+          />
         )}
 
         <View style={styles.offerSection}>
@@ -287,6 +259,7 @@ const OfferCreateScreen: React.FC<OfferCreateScreenProps> = ({ navigation, route
 
       <OfferItemSelectionBottomSheet
         visible={itemsSheetVisible}
+        items={myItems}
         excludeItemId={undefined}
         initialSelectedIds={selectedIds}
         onClose={onItemsSheetClose}
@@ -322,55 +295,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primaryDark,
   },
   requestedCard: {
-    width: '100%',
-    flexDirection: 'row',
-    backgroundColor: '#1a1a1a',
+    borderRadius: 0,
+    borderLeftWidth: 0,
+    borderRightWidth: 0,
+    borderTopWidth: 0,
     borderBottomWidth: 1,
-    borderBottomColor: '#2f2f2f',
-  },
-  requestedImage: {
-    width: 126,
-    height: 126,
-    backgroundColor: '#2a2a2a',
-  },
-  requestedBody: {
-    flex: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    justifyContent: 'space-between',
-  },
-  requestedKicker: {
-    fontSize: 11,
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-    color: '#9f9f9f',
-    marginBottom: 6,
-  },
-  requestedTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: colors.primaryYellow,
-    marginBottom: 4,
-  },
-  requestedSubtitle: {
-    fontSize: 12,
-    color: '#9a9a9a',
-    lineHeight: 16,
-    marginBottom: 8,
-  },
-  requestedMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  requestedPrice: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.primaryYellow,
-  },
-  requestedCondition: {
-    fontSize: 12,
-    color: '#a2a2a2',
-    marginLeft: 6,
+    marginBottom: 2,
   },
   offerSection: {
     paddingHorizontal: 16,

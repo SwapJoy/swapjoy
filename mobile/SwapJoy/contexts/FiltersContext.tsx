@@ -19,7 +19,7 @@ export interface FilterState {
 
 const DEFAULT_FILTERS: FilterState = {
   priceMin: 0,
-  priceMax: PRICE_MAX,
+  priceMax: null,
   currency: 'USD', // Default currency, will be updated from user profile
   categories: [],
   distance: null,
@@ -56,6 +56,18 @@ export const FiltersProvider: React.FC<FiltersProviderProps> = ({ children }) =>
   const isMountedRef = useRef(true);
   const initializedRef = useRef(false);
   const userIdRef = useRef<string | null>(null);
+
+  const normalizeLoadedFilters = useCallback((loaded: FilterState): FilterState => {
+    // Backward compatibility: previous default persisted as PRICE_MAX,
+    // which unintentionally applied an upper-bound filter in searches.
+    if (loaded.priceMax === PRICE_MAX) {
+      return {
+        ...loaded,
+        priceMax: null,
+      };
+    }
+    return loaded;
+  }, []);
 
   // Update userId ref when it changes
   useEffect(() => {
@@ -275,7 +287,7 @@ export const FiltersProvider: React.FC<FiltersProviderProps> = ({ children }) =>
         try {
           const cachedData = await AsyncStorage.getItem(storageKey);
           if (cachedData) {
-            savedFilters = JSON.parse(cachedData) as FilterState;
+            savedFilters = normalizeLoadedFilters(JSON.parse(cachedData) as FilterState);
             console.log('[FiltersContext] ✅ Successfully loaded filters from storage:', {
               priceMin: savedFilters.priceMin,
               priceMax: savedFilters.priceMax,
@@ -347,7 +359,7 @@ export const FiltersProvider: React.FC<FiltersProviderProps> = ({ children }) =>
     };
 
     initializeFilters();
-  }, [user?.id, preferredCurrency]); // Only depend on user?.id and preferredCurrency - load directly from storage
+  }, [user?.id, preferredCurrency, normalizeLoadedFilters]); // Only depend on user?.id and preferredCurrency - load directly from storage
 
   // Sync currency when preferredCurrency changes (e.g., profile loads)
   // This runs after initialization to update currency when profile loads

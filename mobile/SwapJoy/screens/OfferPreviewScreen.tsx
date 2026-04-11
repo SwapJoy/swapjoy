@@ -1,17 +1,18 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import {View, StyleSheet, FlatList, TouchableOpacity, Alert} from 'react-native';
+import { View, StyleSheet, ScrollView, Alert } from 'react-native';
 import { colors } from '@navigation/MainTabNavigator.styles';
 import SJText from '../components/SJText';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { OfferPreviewScreenProps } from '../types/navigation';
-import CachedImage from '../components/CachedImage';
 import { ApiService } from '../services/api';
 import { formatCurrency } from '../utils';
-import { getItemImageUri } from '../utils/imageUtils';
 import { useLocalization } from '../localization';
 import { logSwapRequest } from '../services/itemEvents';
+import PrimaryButton from '../components/PrimaryButton';
+import OfferItemComponent from '../components/OfferItemComponent';
 
 const OfferPreviewScreen: React.FC<OfferPreviewScreenProps> = ({ navigation, route }) => {
+  const insets = useSafeAreaInsets();
   const { receiverId, offeredItemIds, requestedItemIds, topUpAmount, message, summary } = route.params;
   const { t } = useLocalization();
   const strings = useMemo(
@@ -32,26 +33,31 @@ const OfferPreviewScreen: React.FC<OfferPreviewScreenProps> = ({ navigation, rou
         successMessage: t('offers.preview.alerts.successMessage'),
       },
     }),
-    [t]
+    [t],
   );
   const [submitting, setSubmitting] = useState(false);
 
+  const moneyCurrency = useMemo(
+    () => summary?.offered?.[0]?.currency || summary?.requested?.[0]?.currency || 'USD',
+    [summary?.offered, summary?.requested],
+  );
+
   const moneyDescriptor = useMemo(() => {
     if (!topUpAmount) return strings.evenSwap;
-    const amount = `$${Math.abs(topUpAmount).toFixed(2)}`;
+    const amount = formatCurrency(Math.abs(topUpAmount), moneyCurrency);
     return topUpAmount > 0
       ? strings.youAdd.replace('{amount}', amount)
       : strings.theyAdd.replace('{amount}', amount);
-  }, [strings.evenSwap, strings.theyAdd, strings.youAdd, topUpAmount]);
+  }, [moneyCurrency, strings.evenSwap, strings.theyAdd, strings.youAdd, topUpAmount]);
 
   const onSubmit = useCallback(async () => {
     try {
       setSubmitting(true);
       const offer_items = [
-        ...offeredItemIds.map(id => ({ item_id: id, side: 'offered' as const })),
-        ...requestedItemIds.map(id => ({ item_id: id, side: 'requested' as const })),
+        ...offeredItemIds.map((id) => ({ item_id: id, side: 'offered' as const })),
+        ...requestedItemIds.map((id) => ({ item_id: id, side: 'requested' as const })),
       ];
-      const { data, error } = await ApiService.createOffer({
+      const { error } = await ApiService.createOffer({
         receiver_id: receiverId,
         message,
         top_up_amount: topUpAmount || 0,
@@ -61,10 +67,11 @@ const OfferPreviewScreen: React.FC<OfferPreviewScreenProps> = ({ navigation, rou
         Alert.alert(strings.alerts.failedTitle, error.message || strings.alerts.failedMessage);
         return;
       }
-      // Log swap_request event for each requested item
-      requestedItemIds.forEach(itemId => {
+
+      requestedItemIds.forEach((itemId) => {
         logSwapRequest(itemId);
       });
+
       Alert.alert(strings.alerts.successTitle, strings.alerts.successMessage);
       navigation.popToTop();
       (navigation as any).navigate('MainTabs');
@@ -73,92 +80,118 @@ const OfferPreviewScreen: React.FC<OfferPreviewScreenProps> = ({ navigation, rou
     } finally {
       setSubmitting(false);
     }
-  }, [receiverId, offeredItemIds, requestedItemIds, topUpAmount, message, navigation, strings.alerts.failedMessage, strings.alerts.failedTitle, strings.alerts.successMessage, strings.alerts.successTitle]);
-
-  const renderItem = ({ item }: { item: any }) => (
-    <View style={styles.itemCard}>
-      <CachedImage
-        uri={getItemImageUri(item, 'https://via.placeholder.com/200x150') || 'https://via.placeholder.com/200x150'}
-        style={styles.image}
-        resizeMode="cover"
-        fallbackUri="https://picsum.photos/200/150?random=8"
-      />
-      <View style={{ flex: 1 }}>
-        <SJText style={styles.title} numberOfLines={1}>{item.title}</SJText>
-        <SJText style={styles.price}>{formatCurrency(item.price || 0, item.currency || 'USD')}</SJText>
-      </View>
-    </View>
-  );
+  }, [
+    receiverId,
+    offeredItemIds,
+    requestedItemIds,
+    topUpAmount,
+    message,
+    navigation,
+    strings.alerts.failedMessage,
+    strings.alerts.failedTitle,
+    strings.alerts.successMessage,
+    strings.alerts.successTitle,
+  ]);
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
-      <FlatList
-        ListHeaderComponent={
-          <View>
-            <SJText style={styles.sectionTitle}>{strings.youOffer}</SJText>
-            <FlatList
-              data={summary.offered}
-              keyExtractor={(it) => it.id}
-              renderItem={renderItem}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: 16 }}
-            />
-            <SJText style={styles.sectionTitle}>{strings.youWant}</SJText>
-            <FlatList
-              data={summary.requested}
-              keyExtractor={(it) => it.id}
-              renderItem={renderItem}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ paddingHorizontal: 16 }}
-            />
-            <View style={styles.infoBox}>
-              <SJText style={styles.infoLabel}>{strings.moneyLabel}</SJText>
-              <SJText style={styles.infoValue}>{moneyDescriptor}</SJText>
-            </View>
-            {message ? (
-              <View style={styles.infoBox}>
-                <SJText style={styles.infoLabel}>{strings.messageLabel}</SJText>
-                <SJText style={styles.message}>{message}</SJText>
-              </View>
-            ) : null}
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[styles.contentContainer, { paddingBottom: insets.bottom + 88 }]}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.section}>
+          <SJText style={styles.sectionTitle}>{strings.youOffer}</SJText>
+          <View style={styles.itemsList}>
+            {summary.offered.map((item: any) => (
+              <OfferItemComponent key={item.id} item={item} containerStyle={styles.previewItemCard} />
+            ))}
           </View>
-        }
-        data={[]}
-        renderItem={() => null}
-        ListFooterComponent={<View style={{ height: 120 }} />}
-      />
+        </View>
 
-      <View style={styles.footer}>
-        <TouchableOpacity 
-          style={[styles.submitBtn, submitting && styles.submitBtnDisabled]} 
-          onPress={onSubmit} 
-          disabled={submitting}
-          activeOpacity={0.8}
-        >
-          <SJText style={styles.submitText}>{submitting ? strings.submittingButton : strings.submitButton}</SJText>
-        </TouchableOpacity>
-      </View>
+        <View style={styles.section}>
+          <SJText style={styles.sectionTitle}>{strings.youWant}</SJText>
+          <View style={styles.itemsList}>
+            {summary.requested.map((item: any) => (
+              <OfferItemComponent key={item.id} item={item} containerStyle={styles.previewItemCard} />
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.infoBox}>
+          <SJText style={styles.infoLabel}>{strings.moneyLabel}</SJText>
+          <SJText style={styles.infoValue}>{moneyDescriptor}</SJText>
+        </View>
+
+        {message ? (
+          <View style={styles.infoBox}>
+            <SJText style={styles.infoLabel}>{strings.messageLabel}</SJText>
+            <SJText style={styles.message}>{message}</SJText>
+          </View>
+        ) : null}
+      </ScrollView>
+
+      <PrimaryButton
+        onPress={onSubmit}
+        disabled={submitting}
+        label={submitting ? strings.submittingButton : strings.submitButton}
+      />
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.primaryDark },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: colors.primaryYellow, paddingHorizontal: 16, paddingVertical: 8 },
-  itemCard: { backgroundColor: '#1a1a1a', marginRight: 12, borderRadius: 10, overflow: 'hidden', width: 220, borderWidth: 1, borderColor: '#333' },
-  image: { width: '100%', height: 120, backgroundColor: '#2a2a2a' },
-  title: { paddingHorizontal: 10, paddingTop: 8, fontSize: 14, fontWeight: '600', color: colors.primaryYellow },
-  price: { paddingHorizontal: 10, paddingBottom: 10, paddingTop: 4, fontSize: 13, color: colors.primaryYellow, fontWeight: '600' },
-  infoBox: { backgroundColor: '#1a1a1a', marginHorizontal: 16, marginVertical: 12, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: '#333' },
-  infoLabel: { fontSize: 13, color: '#999', marginBottom: 4 },
-  infoValue: { fontSize: 15, color: colors.primaryYellow, fontWeight: '600' },
-  message: { fontSize: 14, color: '#ccc' },
-  footer: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: 16, backgroundColor: colors.primaryDark, borderTopWidth: 1, borderTopColor: '#333' },
-  submitBtn: { backgroundColor: colors.primaryYellow, borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
-  submitBtnDisabled: { backgroundColor: '#444', opacity: 0.5 },
-  submitText: { color: '#000', fontSize: 16, fontWeight: '700' },
+  scroll: { flex: 1 },
+  contentContainer: {
+    paddingTop: 14,
+  },
+  section: {
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#888',
+    marginBottom: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    paddingHorizontal: 16,
+  },
+  itemsList: {
+    paddingHorizontal: 16,
+    gap: 10,
+  },
+  previewItemCard: {
+    borderColor: '#313131',
+  },
+  infoBox: {
+    backgroundColor: '#1a1a1a',
+    marginHorizontal: 16,
+    marginBottom: 12,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: '#313131',
+  },
+  infoLabel: {
+    fontSize: 12,
+    color: '#8f8f8f',
+    marginBottom: 6,
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  infoValue: {
+    fontSize: 15,
+    color: colors.primaryYellow,
+    fontWeight: '700',
+  },
+  message: {
+    fontSize: 14,
+    color: '#c8c8c8',
+    lineHeight: 20,
+  },
 });
 
 export default OfferPreviewScreen;

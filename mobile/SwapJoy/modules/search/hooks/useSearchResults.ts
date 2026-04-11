@@ -168,10 +168,10 @@ export const useSearchResults = ({
       const selectedCity = filters.selectedCityId
         ? cities.find((city) => city.id === filters.selectedCityId) ?? null
         : null;
-      const effectiveLat = selectedCity?.center_lat ?? selectedLocation?.lat ?? null;
-      const effectiveLng = selectedCity?.center_lng ?? selectedLocation?.lng ?? null;
+      const effectiveLat = selectedCity?.center_lat ?? null;
+      const effectiveLng = selectedCity?.center_lng ?? null;
       const effectiveDistanceKm =
-        effectiveLat !== null && effectiveLng !== null ? SEARCH_RADIUS_KM : null;
+        selectedCity && effectiveLat !== null && effectiveLng !== null ? SEARCH_RADIUS_KM : null;
       const searchRpcParams = {
         query_text: query?.trim() ? query.trim() : null,
         category_ids: filters.categoryIds,
@@ -190,7 +190,7 @@ export const useSearchResults = ({
 
       if (hasTextQuery) {
         const semanticLimit = offset + PAGE_SIZE;
-        const semanticResponse = await ApiService.semanticSearch(normalizedQuery, semanticLimit, {
+        let semanticResponse = await ApiService.semanticSearch(normalizedQuery, semanticLimit, {
           minPrice: filters.minPrice ?? 0,
           maxPrice: filters.maxPrice,
           categories: filters.categoryIds,
@@ -199,6 +199,25 @@ export const useSearchResults = ({
             ? { lat: effectiveLat, lng: effectiveLng }
             : null,
         });
+
+        const shouldRetryFilterOnly =
+          filters.categoryIds.length > 0 &&
+          !semanticResponse.error &&
+          Array.isArray(semanticResponse.data) &&
+          semanticResponse.data.length === 0;
+
+        if (shouldRetryFilterOnly) {
+          semanticResponse = await ApiService.semanticSearch(null, semanticLimit, {
+            minPrice: filters.minPrice ?? 0,
+            maxPrice: filters.maxPrice,
+            categories: filters.categoryIds,
+            distance: effectiveDistanceKm,
+            coordinates: effectiveLat !== null && effectiveLng !== null
+              ? { lat: effectiveLat, lng: effectiveLng }
+              : null,
+          });
+        }
+
         data = semanticResponse.data ?? [];
         rpcError = semanticResponse.error;
       } else if (!searchItemsRpcUnavailable) {

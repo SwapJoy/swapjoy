@@ -26,6 +26,8 @@ export interface OfferItemSelectionBottomSheetProps {
   excludeItemId?: string;
   /** When opening (e.g. Edit on OfferCreate), pre-select these ids. */
   initialSelectedIds?: string[];
+  /** Already loaded available items from parent screen. */
+  items?: any[];
   onClose: () => void;
   /** Called when user taps Next; may be empty selection. */
   onNext: (selectedIds: string[]) => void;
@@ -35,6 +37,7 @@ const OfferItemSelectionBottomSheet: React.FC<OfferItemSelectionBottomSheetProps
   visible,
   excludeItemId,
   initialSelectedIds,
+  items,
   onClose,
   onNext,
 }) => {
@@ -44,9 +47,9 @@ const OfferItemSelectionBottomSheet: React.FC<OfferItemSelectionBottomSheetProps
   const bottomSheetModalRef = useRef<BottomSheetModal>(null);
   const snapPoints = useMemo(() => ['55%', '78%'], []);
 
-  const [myItems, setMyItems] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [fetchedItems, setFetchedItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (visible) {
@@ -57,28 +60,38 @@ const OfferItemSelectionBottomSheet: React.FC<OfferItemSelectionBottomSheetProps
     }
   }, [visible, initialSelectedIds]);
 
+  const hasProvidedItems = useMemo(() => Array.isArray(items), [items]);
+
   useEffect(() => {
-    if (!visible || !user?.id) return;
+    if (!visible || hasProvidedItems || !user?.id) return;
     let mounted = true;
+
     (async () => {
       setLoading(true);
       const { data, error } = await ApiService.getUserItems(user.id);
       if (!mounted) return;
-      if (!error && data) {
-        const available = (data || []).filter((it: any) => it.status === 'available');
-        const filtered = excludeItemId
-          ? available.filter((it: any) => it.id !== excludeItemId)
-          : available;
-        setMyItems(filtered);
+
+      if (!error && Array.isArray(data)) {
+        setFetchedItems(data);
       } else {
-        setMyItems([]);
+        setFetchedItems([]);
       }
       setLoading(false);
     })();
+
     return () => {
       mounted = false;
     };
-  }, [visible, user?.id, excludeItemId]);
+  }, [visible, hasProvidedItems, user?.id]);
+
+  const myItems = useMemo(() => {
+    const sourceItems = hasProvidedItems ? (items as any[]) : fetchedItems;
+    const available = (sourceItems || []).filter((it: any) => !it?.status || it?.status === 'available');
+    if (!excludeItemId) {
+      return available;
+    }
+    return available.filter((it: any) => it?.id !== excludeItemId);
+  }, [items, fetchedItems, hasProvidedItems, excludeItemId]);
 
   const toggleSelect = useCallback((id: string) => {
     setSelectedIds((prev) =>
@@ -126,7 +139,7 @@ const OfferItemSelectionBottomSheet: React.FC<OfferItemSelectionBottomSheetProps
         </View>
 
         <View style={styles.contentArea}>
-          {loading ? (
+          {loading && myItems.length === 0 ? (
             <View style={styles.loadingBox}>
               <ActivityIndicator size="large" color={colors.primaryYellow} />
             </View>
@@ -227,7 +240,7 @@ const styles = StyleSheet.create({
   },
   loadingBox: {
     flex: 1,
-    minHeight: 140,
+    minHeight: 120,
     alignItems: 'center',
     justifyContent: 'center',
   },

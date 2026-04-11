@@ -640,7 +640,7 @@ const FilterPopover: React.FC<FilterPopoverProps> = ({
     await clearFilters();
     setLocalFilters({
       priceMin: 0,
-      priceMax: PRICE_MAX,
+      priceMax: null,
       currency: filters.currency, // Keep current currency
       categories: [],
       distance: null,

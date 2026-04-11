@@ -1,4 +1,4 @@
-import React, { memo, useEffect, useMemo, useRef } from 'react';
+import React, { memo, ReactNode, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -103,6 +103,7 @@ interface TopMatchCardProps {
   sectionPaddingHorizontal?: number;
   borderRadius?: number;
   viewCount?: number;
+  swapSuggestions?: ReactNode;
 }
 
 const TopMatchCard: React.FC<TopMatchCardProps> = ({
@@ -125,7 +126,8 @@ const TopMatchCard: React.FC<TopMatchCardProps> = ({
   cardWidth = DEFAULT_CARD_WIDTH,
   sectionPaddingHorizontal = 0,
   borderRadius = 12,
-  viewCount
+  viewCount,
+  swapSuggestions,
 }) => {
   const { language, t } = useLocalization();
   const { getCategoryByName, getCategoryById } = useCategories();
@@ -295,6 +297,10 @@ const TopMatchCard: React.FC<TopMatchCardProps> = ({
 
           {price ? (
             <SJText style={styles.priceText}>{price}</SJText>
+          ) : null}
+
+          {swapSuggestions ? (
+            <View style={styles.suggestionsSlot}>{swapSuggestions}</View>
           ) : null}
         </View>
       </TouchableOpacity>
