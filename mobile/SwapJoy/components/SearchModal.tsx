@@ -3,7 +3,7 @@ import {View, StyleSheet, TextInput, ActivityIndicator, TouchableOpacity, FlatLi
 import SJText from '../components/SJText';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import TopMatchCard from './TopMatchCard';
+import { MatchCard } from './OfferListCard';
 import { useRecentSearches } from '../hooks/useRecentSearches';
 import type { useExploreScreenState } from '../hooks/useExploreScreenState';
 import { formatCurrency } from '../utils';
@@ -159,7 +159,7 @@ const SearchModal: React.FC<SearchModalProps> = ({
 
       return (
         <View style={styles.searchResultItem}>
-          <TopMatchCard
+          <MatchCard
             title={item.title || 'Untitled item'}
             price={displayedPrice}
             imageUrl={imageUrl}

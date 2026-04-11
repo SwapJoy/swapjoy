@@ -429,6 +429,7 @@ export class ApiService {
     }
   ) {
     const q = query ? query.trim() : null;
+    const normalizedSearchText = q?.toLowerCase() || null;
     
     // Prepare request body
     const requestBody: any = {
@@ -475,8 +476,100 @@ export class ApiService {
           return { data: [], error } as any;
         }
         
-        if (data && Array.isArray(data.items)) {
+        if (data && Array.isArray(data.items) && data.items.length > 0) {
           return { data: data.items, error: null } as any;
+        }
+
+        // Edge function can miss short keyword searches (e.g. "ESP").
+        // Fallback to direct case-insensitive title search to ensure exact text discoverability.
+        if (normalizedSearchText) {
+          let fallbackQuery = client
+            .from('items')
+            .select(`
+              id,
+              user_id,
+              title,
+              description,
+              category_id,
+              condition,
+              price,
+              currency,
+              status,
+              location_lat,
+              location_lng,
+              created_at,
+              updated_at,
+              image_url,
+              images,
+              category_name,
+              category_name_en,
+              category_name_ka,
+              category:categories!items_category_id_fkey(title_en, title_ka),
+              user:users!items_user_id_fkey(id, username, first_name, last_name, profile_image_url)
+            `)
+            .eq('status', 'available')
+            .ilike('title', `%${normalizedSearchText}%`)
+            .order('created_at', { ascending: false })
+            .limit(limit);
+
+          if (filters?.minPrice !== undefined) {
+            fallbackQuery = fallbackQuery.gte('price', filters.minPrice);
+          }
+          if (filters?.maxPrice !== null && filters?.maxPrice !== undefined) {
+            fallbackQuery = fallbackQuery.lte('price', filters.maxPrice);
+          }
+          if (Array.isArray(filters?.categories) && filters.categories.length > 0) {
+            fallbackQuery = fallbackQuery.in('category_id', filters.categories);
+          }
+
+          const { data: fallbackData, error: fallbackError } = await fallbackQuery;
+          if (!fallbackError && Array.isArray(fallbackData) && fallbackData.length > 0) {
+            return { data: fallbackData, error: null } as any;
+          }
+
+          let descriptionFallbackQuery = client
+            .from('items')
+            .select(`
+              id,
+              user_id,
+              title,
+              description,
+              category_id,
+              condition,
+              price,
+              currency,
+              status,
+              location_lat,
+              location_lng,
+              created_at,
+              updated_at,
+              image_url,
+              images,
+              category_name,
+              category_name_en,
+              category_name_ka,
+              category:categories!items_category_id_fkey(title_en, title_ka),
+              user:users!items_user_id_fkey(id, username, first_name, last_name, profile_image_url)
+            `)
+            .eq('status', 'available')
+            .ilike('description', `%${normalizedSearchText}%`)
+            .order('created_at', { ascending: false })
+            .limit(limit);
+
+          if (filters?.minPrice !== undefined) {
+            descriptionFallbackQuery = descriptionFallbackQuery.gte('price', filters.minPrice);
+          }
+          if (filters?.maxPrice !== null && filters?.maxPrice !== undefined) {
+            descriptionFallbackQuery = descriptionFallbackQuery.lte('price', filters.maxPrice);
+          }
+          if (Array.isArray(filters?.categories) && filters.categories.length > 0) {
+            descriptionFallbackQuery = descriptionFallbackQuery.in('category_id', filters.categories);
+          }
+
+          const { data: descriptionFallbackData, error: descriptionFallbackError } = await descriptionFallbackQuery;
+          if (!descriptionFallbackError && Array.isArray(descriptionFallbackData) && descriptionFallbackData.length > 0) {
+            return { data: descriptionFallbackData, error: null } as any;
+          }
         }
         
         return { data: [], error: null } as any;

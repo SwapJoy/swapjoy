@@ -1,4 +1,4 @@
-import React, { forwardRef, useState, useEffect, useCallback, useRef } from 'react';
+import React, { forwardRef, useState, useEffect, useCallback, useRef, memo } from 'react';
 import { NavigationContainer, NavigationContainerRef } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { HeaderBackButton } from '@react-navigation/elements';
@@ -51,7 +51,7 @@ import SJText from '@components/SJText';
 const Stack = createStackNavigator<RootStackParamList>();
 
 // Loading screen component with animation
-const LoadingScreen = () => {
+const LoadingScreen = memo(() => {
   const fadeAnim = useRef(new Animated.Value(1)).current;
   const translateYAnim = useRef(new Animated.Value(0)).current;
 
@@ -82,15 +82,17 @@ const LoadingScreen = () => {
       </Animated.View>
     </View>
   );
-};
+});
 
 const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((props, ref) => {
   const { isAuthenticated, isLoading, user, isAnonymous, signOut } = useAuth();
   const [hasUsername, setHasUsername] = useState<boolean | null>(null);
   const [checkingUsername, setCheckingUsername] = useState(false);
+  const [hasResolvedInitialUsernameCheck, setHasResolvedInitialUsernameCheck] = useState(false);
   const [introCompleted, setIntroCompleted] = useState<boolean | null>(null);
   const navigationRef = useRef<NavigationContainerRef<RootStackParamList> | null>(null);
   const previousRouteNameRef = useRef<string | undefined>(undefined);
+  const activeUserId = user?.id ?? null;
 
   // Check intro completion status
   useEffect(() => {
@@ -158,12 +160,34 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
     }
   }, [isAuthenticated, user, isAnonymous, signOut]);
 
-  // Check if user has username when authenticated (skip for anonymous users)
+  // Complete startup only after the first username resolution for authenticated users.
+  // This prevents navigator <-> loading toggles that remount the launch animation.
   useEffect(() => {
-    if (isAuthenticated && !isLoading && !isAnonymous) {
-      checkUsernameStatus();
+    if (isLoading) {
+      setHasResolvedInitialUsernameCheck(false);
+      return;
     }
-  }, [isAuthenticated, user, isLoading, isAnonymous, checkUsernameStatus]);
+
+    if (!isAuthenticated || isAnonymous) {
+      setHasResolvedInitialUsernameCheck(true);
+      return;
+    }
+
+    let isMounted = true;
+    const runInitialUsernameCheck = async () => {
+      await checkUsernameStatus();
+      if (isMounted) {
+        setHasResolvedInitialUsernameCheck(true);
+      }
+    };
+
+    setHasResolvedInitialUsernameCheck(false);
+    runInitialUsernameCheck();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isAuthenticated, isLoading, isAnonymous, activeUserId, checkUsernameStatus]);
 
   // Listen to navigation state changes to re-check username after onboarding
   const handleNavigationStateChange = useCallback(() => {
@@ -219,7 +243,7 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
   }, [ref]);
 
   // Show loading screen while checking authentication, intro status, or username
-  if (isLoading || introCompleted === null || (isAuthenticated && !isAnonymous && checkingUsername)) {
+  if (isLoading || introCompleted === null || (isAuthenticated && !isAnonymous && !hasResolvedInitialUsernameCheck)) {
     return <LoadingScreen />;
   }
 

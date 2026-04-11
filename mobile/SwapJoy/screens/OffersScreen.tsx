@@ -5,10 +5,8 @@ import SJText from '../components/SJText';
 import { OffersScreenProps } from '../types/navigation';
 import { useOffersData, Offer } from '../hooks/useOffersData';
 import { useLocalization } from '../localization';
-import TopMatchCard, { TopMatchCardSkeleton } from '../components/TopMatchCard';
-import { formatCurrency } from '../utils';
-import { getItemImageUri } from '../utils/imageUtils';
-import { resolveCategoryName } from '../utils/category';
+import OfferListCard from '../components/OfferListCard';
+import { MatchCardSkeleton } from '../components/OfferListCard';
 import type { AppLanguage } from '../types/language';
 import { DEFAULT_LANGUAGE } from '../types/language';
 
@@ -47,157 +45,21 @@ const OffersScreen: React.FC<OffersScreenProps> = memo(({ route, navigation }) =
 
   const data = activeTab === 'sent' ? sentOffers : receivedOffers;
 
-  const formatUserLabel = useCallback(
-    (username: string, isSent: boolean) =>
-      (isSent ? strings.toUser : strings.fromUser).replace('{username}', username || ''),
-    [strings.fromUser, strings.toUser]
-  );
-
-  const formatMoreItems = useCallback(
-    (count: number) => strings.moreItems.replace('{count}', String(count)),
-    [strings.moreItems]
-  );
-
   const OfferRow = React.memo(
     ({ item }: { item: Offer }) => {
       const isSent = activeTab === 'sent';
       const resolvedLanguage = (language ?? DEFAULT_LANGUAGE) as AppLanguage;
-      const entries = Array.isArray(item.offer_items) ? item.offer_items : [];
-      const requestedItems = entries.filter((entry: any) => entry?.side === 'requested');
-      const offeredItems = entries.filter((entry: any) => entry?.side === 'offered');
-      const primaryCollection = (isSent ? requestedItems : offeredItems).filter((entry: any) => entry?.item);
-      const fallbackCollection = (isSent ? offeredItems : requestedItems).filter((entry: any) => entry?.item);
-      const primaryItem: any = primaryCollection[0]?.item || fallbackCollection[0]?.item || undefined;
-
-      const imageUrl = primaryItem ? getItemImageUri(primaryItem) ?? undefined : undefined;
-
-      const category =
-        primaryItem
-          ? resolveCategoryName(primaryItem, resolvedLanguage) ||
-            (typeof primaryItem.category_name === 'string' ? primaryItem.category_name : undefined) ||
-            (typeof primaryItem.category === 'string' ? primaryItem.category : undefined)
-          : undefined;
-
-      const primaryPrice =
-        typeof primaryItem?.price === 'number'
-          ? formatCurrency(primaryItem.price, primaryItem.currency || 'USD')
-          : null;
-
-      const fallbackCurrency =
-        primaryItem?.currency ||
-        primaryItem?.item_currency ||
-        'USD';
-
-      const topUpAmount = item.top_up_amount ?? 0;
-      const topUpAbs = Math.abs(topUpAmount);
-      const topUpText =
-        topUpAmount === 0
-          ? strings.evenSwap
-          : topUpAmount > 0
-            ? strings.topUpYouAdd.replace('{amount}', formatCurrency(topUpAbs, fallbackCurrency))
-            : strings.topUpTheyAdd.replace('{amount}', formatCurrency(topUpAbs, fallbackCurrency));
-
-      const priceLabel =
-        primaryPrice ??
-        (topUpAmount !== 0 ? formatCurrency(topUpAbs, fallbackCurrency) : strings.evenSwap);
-
-      const otherUser: any = isSent ? item.receiver : item.sender;
-      const displayNameParts = [
-        otherUser?.first_name ?? '',
-        otherUser?.last_name ?? '',
-      ].filter(Boolean);
-      const displayName = displayNameParts.join(' ') || otherUser?.username || '';
-      const initialsSource = displayName || otherUser?.username || '?';
-      const ownerInitials =
-        initialsSource
-          .split(' ')
-          .map((part: string) => part.charAt(0))
-          .join('')
-          .slice(0, 2)
-          .toUpperCase() || '?';
-
-      const description =
-        item.message && item.message.trim().length > 0 ? item.message : strings.noMessage;
-
-      const youGiveItems = isSent ? offeredItems : requestedItems;
-      const youReceiveItems = isSent ? requestedItems : offeredItems;
-
-      const statusColor = getStatusColor(item.status);
-      const statusText = getStatusText(item.status);
-      const userLabel = formatUserLabel(otherUser?.username || displayName || '', isSent);
-      const createdAtLabel = new Date(item.created_at).toLocaleDateString();
-
-      const renderItemsList = (list: any[]) => {
-        const titles = list
-          .map((entry) => entry?.item?.title)
-          .filter((title): title is string => Boolean(title && title.trim().length > 0));
-
-        if (titles.length === 0) {
-          return <SJText style={styles.offerItemEmpty}>—</SJText>;
-        }
-
-        const visible = titles.slice(0, 2);
-        const remaining = titles.length - visible.length;
-
-        return (
-          <View style={styles.offerItemsList}>
-            {visible.map((title, idx) => (
-              <SJText key={`${title}-${idx}`} style={styles.offerItemText} numberOfLines={1}>
-                • {title}
-              </SJText>
-            ))}
-            {remaining > 0 ? (
-              <SJText style={styles.offerMoreItems}>{formatMoreItems(remaining)}</SJText>
-            ) : null}
-          </View>
-        );
-      };
-
       return (
-        <TopMatchCard
-          title={primaryItem?.title || strings.types[isSent ? 'sent' : 'received']}
-          price={priceLabel}
-          description={description}
-          descriptionLines={2}
-          category={category}
-          condition={primaryItem?.condition}
-          imageUrl={imageUrl}
-          owner={{
-            username: otherUser?.username || displayName,
-            displayName,
-            initials: ownerInitials,
-            userId: otherUser?.id || otherUser?.user_id || undefined,
-          }}
+        <OfferListCard
+          item={item}
+          isSent={isSent}
+          language={resolvedLanguage}
+          strings={strings}
+          getStatusColor={getStatusColor}
+          getStatusText={getStatusText}
           onPress={() => {
             (navigation as any).navigate('OfferDetails', { offer: item });
           }}
-          disableLikeButton
-          cardWidth={width - 32}
-          containerStyle={styles.offerCard}
-          swapSuggestions={
-            <View style={styles.offerMetaSection}>
-              <View style={styles.offerMetaHeader}>
-                <View style={[styles.statusBadge, { backgroundColor: statusColor }]}>
-                  <SJText style={styles.statusText}>{statusText}</SJText>
-                </View>
-                <SJText style={styles.offerMetaUser} numberOfLines={1}>
-                  {userLabel}
-                </SJText>
-                <SJText style={styles.offerMetaDate}>{createdAtLabel}</SJText>
-              </View>
-              <View style={styles.offerMetaRow}>
-                <SJText style={styles.offerMetaLabel}>{strings.youOffer}</SJText>
-                <View style={styles.offerMetaContent}>{renderItemsList(youGiveItems)}</View>
-              </View>
-              <View style={styles.offerMetaRow}>
-                <SJText style={styles.offerMetaLabel}>{strings.youWant}</SJText>
-                <View style={styles.offerMetaContent}>{renderItemsList(youReceiveItems)}</View>
-              </View>
-              <View style={styles.offerTopUpRow}>
-                <SJText style={styles.offerTopUpLabel}>{topUpText}</SJText>
-              </View>
-            </View>
-          }
         />
       );
     },
@@ -238,7 +100,7 @@ const OffersScreen: React.FC<OffersScreenProps> = memo(({ route, navigation }) =
         <FlatList
           data={skeletons}
           keyExtractor={(i) => `skeleton-${i}`}
-          renderItem={() => <TopMatchCardSkeleton style={styles.offerSkeletonCard} />}
+          renderItem={() => <MatchCardSkeleton cardWidth={width} style={styles.offerSkeletonCard} />}
           contentContainerStyle={styles.listContainer}
           showsVerticalScrollIndicator={false}
         />
@@ -333,91 +195,7 @@ const styles = StyleSheet.create({
   listContainer: {
     paddingTop: 14,
     paddingBottom: 24,
-    paddingHorizontal: 16,
-  },
-  offerCard: {
-    width: '100%',
-    marginBottom: 14,
-    backgroundColor: '#1a1a1a',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#303030',
-    paddingBottom: 10,
-  },
-  statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  statusText: {
-    color: colors.primaryDark,
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  offerMetaSection: {
-    gap: 12,
-    paddingHorizontal: 10,
-  },
-  offerMetaHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-  },
-  offerMetaUser: {
-    flex: 1,
-    fontSize: 12,
-    color: '#b8b8b8',
-    fontWeight: '600',
-  },
-  offerMetaDate: {
-    fontSize: 12,
-    color: '#8f8f8f',
-  },
-  offerMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-  },
-  offerMetaLabel: {
-    minWidth: 70,
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#9b9b9b',
-  },
-  offerMetaContent: {
-    flex: 1,
-  },
-  offerItemsList: {
-    gap: 4,
-  },
-  offerItemText: {
-    fontSize: 12,
-    color: '#d2d2d2',
-    fontWeight: '600',
-  },
-  offerItemEmpty: {
-    fontSize: 12,
-    color: '#8a8a8a',
-  },
-  offerMoreItems: {
-    fontSize: 12,
-    color: colors.primaryYellow,
-    fontWeight: '600',
-  },
-  offerTopUpRow: {
-    marginTop: 4,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    backgroundColor: '#242424',
-    borderRadius: 12,
-  },
-  offerTopUpLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.primaryYellow,
+    paddingHorizontal: 0,
   },
   emptyContainer: {
     flex: 1,
@@ -437,7 +215,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   offerSkeletonCard: {
-    width: width - 32,
+    width: width,
     marginBottom: 14,
   },
 });

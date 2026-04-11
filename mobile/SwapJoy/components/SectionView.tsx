@@ -9,7 +9,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useLocalization } from '../localization';
 import { useFavorites } from '../contexts/FavoritesContext';
 import { ListingItem } from '../types/listing-item';
-import TopMatchCard, { TopMatchCardSkeleton } from './TopMatchCard';
+import { MatchCard, MatchCardSkeleton } from './OfferListCard';
 import { ExploreScreenProps } from '../types/navigation';
 import { useLocation } from '../contexts/LocationContext';
 import { calculateDistance } from '../types/recommendation';
@@ -35,12 +35,10 @@ const SectionItemCard: React.FC<SectionItemCardProps> = memo(
     // Normalize user data from ListingItem (new fields) and legacy flat fields
     const firstName =
       item.user?.firstname ??
-      item.user?.first_name ??
       item.first_name ??
       '';
     const lastName =
       item.user?.lastname ??
-      item.user?.last_name ??
       item.last_name ??
       '';
     const ownerDisplayName = `${firstName} ${lastName}`.trim();
@@ -60,15 +58,15 @@ const SectionItemCard: React.FC<SectionItemCardProps> = memo(
 
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { formatCurrency } = require('../utils');
-    const displayedPrice = formatCurrency(item.price || item.estimated_value || 0, item.currency || 'USD');
+    const displayedPrice = formatCurrency(item.price || 0, item.currency || 'USD');
 
     return (
-      <TopMatchCard
+      <MatchCard
         title={item.title}
         price={displayedPrice}
         imageUrl={item.image_url || item.images?.[0]?.url}
         description={item.description}
-        category={item.category}
+        category={item.category?.title_en || item.category_name || undefined}
         condition={item.condition}
         owner={{
           username: ownerUsername,
@@ -101,7 +99,7 @@ const SectionItemCard: React.FC<SectionItemCardProps> = memo(
             id: item.id,
             title: item.title,
             description: item.description,
-            price: item.price || item.estimated_value || 0,
+            price: item.price || 0,
             currency: item.currency || 'USD',
             condition: item.condition,
             image_url: item.image_url,
@@ -132,7 +130,7 @@ const SectionSkeleton = ({ cardWidth }: { cardWidth?: number }) => (
   <View style={styles.horizontalScroller}>
     <View style={styles.horizontalList}>
       {[1, 2].map((index) => (
-        <TopMatchCardSkeleton key={index} cardWidth={cardWidth} />
+        <MatchCardSkeleton key={index} cardWidth={cardWidth} />
       ))}
     </View>
   </View>

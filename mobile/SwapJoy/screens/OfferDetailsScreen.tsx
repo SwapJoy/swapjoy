@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import {View, StyleSheet, TouchableOpacity, ScrollView, FlatList, Dimensions} from 'react-native';
+import { View, StyleSheet, TouchableOpacity, ScrollView, Dimensions } from 'react-native';
 import { colors } from '@navigation/MainTabNavigator.styles';
 import SJText from '../components/SJText';
 import { NavigationProp, RouteProp } from '@react-navigation/native';
@@ -11,6 +11,7 @@ import { useLocalization } from '../localization';
 import { formatCurrency } from '../utils';
 import { getItemImageUri } from '../utils/imageUtils';
 import { resolveCategoryName } from '../utils/category';
+import { Ionicons } from '@expo/vector-icons';
 
 const { width } = Dimensions.get('window');
 
@@ -31,11 +32,14 @@ const OfferDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
     () => ({
       youOffer: t('offers.preview.youOffer'),
       youWant: t('offers.preview.youWant'),
+      yourItem: t('offers.details.yourItem', { defaultValue: 'Your item' }),
+      offerLabel: t('offers.details.offer', { defaultValue: 'Offer' }),
       evenSwap: t('offers.preview.evenSwap'),
-      topUpYouAdd: t('offers.list.topUpYouAdd'),
-      topUpTheyAdd: t('offers.list.topUpTheyAdd'),
+      noMessage: t('offers.list.noMessage'),
       fromUser: t('offers.list.fromUser'),
       toUser: t('offers.list.toUser'),
+      messageAboutOffer: t('offers.details.messageAboutOffer', { defaultValue: 'Message about this offer' }),
+      offerDetails: t('offers.details.title', { defaultValue: 'Offer details' }),
     }),
     [t]
   );
@@ -56,41 +60,22 @@ const OfferDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const resolvedLanguage = (language || 'en') as any;
 
-  const primaryCollection = (isSentByMe ? requestedItems : offeredItems).filter((entry: any) => entry?.item);
-  const fallbackCollection = (isSentByMe ? offeredItems : requestedItems).filter((entry: any) => entry?.item);
-  const primaryItem = primaryCollection[0]?.item || fallbackCollection[0]?.item || undefined;
-
-  const primaryImage = primaryItem ? getItemImageUri(primaryItem) : null;
-
-  const category =
-    primaryItem
-      ? resolveCategoryName(primaryItem, resolvedLanguage) ||
-        (typeof primaryItem.category_name === 'string' ? primaryItem.category_name : undefined) ||
-        (typeof primaryItem.category === 'string' ? primaryItem.category : undefined)
-      : undefined;
-
-  const primaryPrice =
-    typeof primaryItem?.price === 'number'
-      ? formatCurrency(primaryItem.price, primaryItem.currency || 'USD')
-      : null;
-
+  const fallbackPrimary = (isSentByMe ? requestedItems : offeredItems).find((entry: any) => entry?.item)?.item;
   const fallbackCurrency =
-    primaryItem?.currency ||
-    primaryItem?.item_currency ||
+    fallbackPrimary?.currency ||
+    fallbackPrimary?.item_currency ||
     'USD';
 
   const topUpAmount = offer.top_up_amount ?? 0;
   const topUpAbs = Math.abs(topUpAmount);
+  const topUpValue = formatCurrency(topUpAbs, fallbackCurrency);
+  const topUpTone = topUpAmount === 0 ? 'neutral' : isSentByMe ? 'outgoing' : 'incoming';
   const topUpText =
     topUpAmount === 0
       ? strings.evenSwap
-      : topUpAmount > 0
-        ? strings.topUpYouAdd.replace('{amount}', formatCurrency(topUpAbs, fallbackCurrency))
-        : strings.topUpTheyAdd.replace('{amount}', formatCurrency(topUpAbs, fallbackCurrency));
-
-  const priceLabel =
-    primaryPrice ??
-    (topUpAmount !== 0 ? formatCurrency(topUpAbs, fallbackCurrency) : strings.evenSwap);
+      : isSentByMe
+        ? `You add cash: -${topUpValue}`
+        : `Cash included: +${topUpValue}`;
 
   const otherUser = isSentByMe ? offer.receiver : offer.sender;
   const displayNameParts = [
@@ -103,22 +88,76 @@ const OfferDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   const userLabel = userLabelTemplate.replace('{username}', otherUser?.username || displayName || '');
 
   const createdAtLabel = new Date(offer.created_at).toLocaleString();
+  const messageText = offer.message && offer.message.trim().length > 0 ? offer.message : strings.noMessage;
 
-  const renderItemsList = (list: any[]) => {
+  const statusColor = (() => {
+    switch (offer.status) {
+      case 'accepted':
+        return '#3ebd7b';
+      case 'rejected':
+        return '#e75f5f';
+      case 'completed':
+        return '#38bdf8';
+      case 'pending':
+        return '#f59e0b';
+      default:
+        return '#7a7a7a';
+    }
+  })();
+  const statusText = t(`offers.statuses.${offer.status}`, { defaultValue: offer.status || 'pending' });
+
+  const getItemImages = (list: any[]) => {
+    const uris: string[] = [];
+    list.forEach((entry) => {
+      const imageUri = getItemImageUri(entry?.item);
+      if (imageUri) {
+        uris.push(imageUri);
+      }
+    });
+    return Array.from(new Set(uris));
+  };
+
+  const buildSideModel = (list: any[]) => {
     const items = list
       .map((entry) => entry?.item)
       .filter((it): it is any => Boolean(it));
+    const mainItem = items[0];
+    const imageUrls = getItemImages(list);
+    return {
+      title: mainItem?.title || '—',
+      category:
+        mainItem &&
+        (resolveCategoryName(mainItem, resolvedLanguage) ||
+          (typeof mainItem.category_name === 'string' ? mainItem.category_name : undefined) ||
+          (typeof mainItem.category === 'string' ? mainItem.category : undefined)),
+      price: typeof mainItem?.price === 'number' ? formatCurrency(mainItem.price, mainItem.currency || 'USD') : null,
+      condition: mainItem?.condition,
+      imageUrl: imageUrls[0],
+      thumbnails: imageUrls.slice(1, 4),
+      items,
+    };
+  };
 
-    if (items.length === 0) {
-      return <SJText style={styles.itemsEmpty}>—</SJText>;
-    }
+  const myInitials = user?.username?.[0]?.toUpperCase() || 'Y';
+  const otherInitials = (displayName || otherUser?.username || '?')
+    .split(' ')
+    .map((part: string) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+  const leftSideLabel = isSentByMe ? strings.youOffer : strings.yourItem;
+  const rightSideLabel = isSentByMe ? strings.youWant : strings.offerLabel;
+  const leftSide = buildSideModel(youGiveItems);
+  const rightSide = buildSideModel(youReceiveItems);
 
+  const renderItemsList = (items: any[]) => {
+    if (items.length === 0) return <SJText style={styles.itemsEmpty}>—</SJText>;
     return (
       <View style={styles.itemsList}>
-        {items.map((it, idx) => (
-          <View key={it.id || idx} style={styles.itemRow}>
+        {items.slice(0, 3).map((it, idx) => (
+          <View key={`${it.id || it.title}-${idx}`} style={styles.itemRow}>
             <SJText style={styles.itemBullet}>•</SJText>
-            <View style={{ flex: 1 }}>
+            <View style={styles.itemInfo}>
               <SJText style={styles.itemTitle} numberOfLines={1}>
                 {it.title}
               </SJText>
@@ -130,9 +169,68 @@ const OfferDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
             </View>
           </View>
         ))}
+        {items.length > 3 ? (
+          <SJText style={styles.moreItems}>+{items.length - 3} more items</SJText>
+        ) : null}
       </View>
     );
   };
+
+  const renderTradeSide = (
+    side: ReturnType<typeof buildSideModel>,
+    label: string,
+    username: string,
+    initials: string,
+    avatarUri?: string
+  ) => (
+    <View style={styles.tradeSide}>
+      <View style={styles.tradeSideHeader}>
+        <SJText style={styles.tradeSideLabel}>{label}</SJText>
+        <View style={styles.tradeUserRow}>
+          {avatarUri ? (
+            <CachedImage uri={avatarUri} style={styles.tradeAvatar} resizeMode="cover" />
+          ) : (
+            <View style={styles.tradeAvatarFallback}>
+              <SJText style={styles.tradeAvatarText}>{initials}</SJText>
+            </View>
+          )}
+          <SJText style={styles.tradeUsername} numberOfLines={1}>
+            {username}
+          </SJText>
+        </View>
+      </View>
+      <View style={styles.tradeImageFrame}>
+        <CachedImage
+          uri={side.imageUrl || 'https://via.placeholder.com/260x180'}
+          style={styles.tradeImage}
+          resizeMode="cover"
+          fallbackUri="https://picsum.photos/260/180?random=53"
+        />
+      </View>
+      {side.thumbnails.length > 0 ? (
+        <View style={styles.thumbnailRow}>
+          {side.thumbnails.map((uri, index) => (
+            <CachedImage key={`${uri}-${index}`} uri={uri} style={styles.thumbnail} resizeMode="cover" />
+          ))}
+        </View>
+      ) : null}
+      <SJText style={styles.tradeTitle} numberOfLines={1}>
+        {side.title}
+      </SJText>
+      {side.category ? (
+        <SJText style={styles.tradeMeta} numberOfLines={1}>
+          {side.category}
+        </SJText>
+      ) : null}
+      {side.condition ? (
+        <SJText style={styles.tradeMeta} numberOfLines={1}>
+          Condition: {side.condition}
+        </SJText>
+      ) : null}
+      {side.price ? <SJText style={styles.tradePrice}>{side.price}</SJText> : null}
+      {renderItemsList(side.items)}
+    </View>
+  );
 
   const onStartChat = async () => {
     if (!otherUserId) return;
@@ -157,61 +255,72 @@ const OfferDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
-        <SJText style={styles.title}>{primaryItem?.title || 'Offer'}</SJText>
-        <SJText style={styles.price}>{priceLabel}</SJText>
-
-        {category && (
-          <SJText style={styles.meta}>
-            Category: {category}
-          </SJText>
-        )}
-
-        {primaryItem?.condition && (
-          <SJText style={styles.meta}>
-            Condition: {primaryItem.condition}
-          </SJText>
-        )}
-
-        <SJText style={styles.meta}>
-          {userLabel}
-        </SJText>
-
-        <SJText style={styles.meta}>
-          Created at: {createdAtLabel}
-        </SJText>
-
-        {offer.message && offer.message.trim().length > 0 && (
-          <SJText style={styles.description}>{offer.message}</SJText>
-        )}
-
-        {primaryImage && (
-          <View style={styles.heroWrapper}>
-            <CachedImage
-              uri={primaryImage}
-              style={styles.heroImage}
-              resizeMode="cover"
-            />
+        <View style={styles.headerCard}>
+          <View style={[styles.statusBadge, { backgroundColor: statusColor }]}>
+            <SJText style={styles.statusText}>{statusText}</SJText>
           </View>
-        )}
-
-        <View style={styles.section}>
-          <SJText style={styles.sectionTitle}>{strings.youOffer}</SJText>
-          {renderItemsList(youGiveItems)}
+          <SJText style={styles.offerDirection} numberOfLines={1}>
+            {userLabel}
+          </SJText>
+          <SJText style={styles.metaDate}>{createdAtLabel}</SJText>
         </View>
 
-        <View style={styles.section}>
-          <SJText style={styles.sectionTitle}>{strings.youWant}</SJText>
-          {renderItemsList(youReceiveItems)}
+        <SJText style={styles.screenTitle}>{strings.offerDetails}</SJText>
+
+        <View style={styles.swapBoard}>
+          <View style={styles.swapRow}>
+            {renderTradeSide(leftSide, leftSideLabel, 'You', myInitials)}
+            {renderTradeSide(
+              rightSide,
+              rightSideLabel,
+              otherUser?.username || displayName || '?',
+              otherInitials,
+              otherUser?.profile_image_url
+            )}
+          </View>
+          <View style={styles.swapIcon}>
+            <Ionicons name="swap-horizontal" size={20} color={colors.primaryDark} />
+          </View>
         </View>
 
-        <View style={styles.topUpBox}>
-          <SJText style={styles.topUpText}>{topUpText}</SJText>
+        <View
+          style={[
+            styles.topUpBox,
+            topUpTone === 'incoming' ? styles.topUpIncoming : null,
+            topUpTone === 'outgoing' ? styles.topUpOutgoing : null,
+          ]}
+        >
+          <Ionicons
+            name={topUpAmount === 0 ? 'checkmark-circle-outline' : 'cash-outline'}
+            size={16}
+            color={
+              topUpTone === 'incoming'
+                ? styles.topUpIncomingText.color
+                : topUpTone === 'outgoing'
+                  ? styles.topUpOutgoingText.color
+                  : styles.topUpText.color
+            }
+          />
+          <SJText
+            style={[
+              styles.topUpText,
+              topUpTone === 'incoming' ? styles.topUpIncomingText : null,
+              topUpTone === 'outgoing' ? styles.topUpOutgoingText : null,
+            ]}
+          >
+            {topUpText}
+          </SJText>
+        </View>
+
+        <View style={styles.messageCard}>
+          <SJText style={styles.messageLabel}>Message</SJText>
+          <SJText style={styles.messageText}>{messageText}</SJText>
         </View>
       </ScrollView>
 
       <View style={styles.bottomBar}>
         <TouchableOpacity style={styles.chatButton} onPress={onStartChat}>
-          <SJText style={styles.chatButtonText}>Message about this offer</SJText>
+          <SJText style={styles.chatButtonText}>{strings.messageAboutOffer}</SJText>
         </TouchableOpacity>
       </View>
     </View>
@@ -224,91 +333,235 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primaryDark,
   },
   content: {
-    padding: 16,
+    paddingHorizontal: 14,
+    paddingTop: 12,
     paddingBottom: 100,
   },
-  title: {
-    fontSize: 22,
-    fontWeight: '700',
-    marginBottom: 8,
-    color: '#111',
+  headerCard: {
+    backgroundColor: '#1d1d1d',
+    borderWidth: 1,
+    borderColor: '#2f2f2f',
+    borderRadius: 14,
+    padding: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
-  price: {
-    marginTop: 6,
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
+  },
+  statusText: {
+    color: '#13211a',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  offerDirection: {
+    flex: 1,
+    fontSize: 12,
+    color: '#d3d3d3',
+    fontWeight: '600',
+  },
+  metaDate: {
+    fontSize: 11,
+    color: '#8f8f8f',
+  },
+  screenTitle: {
+    marginTop: 14,
     fontSize: 20,
-    color: '#007AFF',
+    color: '#f4f4f4',
     fontWeight: '700',
   },
-  subtitle: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 16,
-  },
-  meta: {
-    marginTop: 6,
-    fontSize: 13,
-    color: '#666',
-  },
-  description: {
+  swapBoard: {
     marginTop: 12,
-    fontSize: 15,
-    color: '#333',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#343434',
+    backgroundColor: '#202020',
+    paddingVertical: 10,
+    paddingHorizontal: 8,
   },
-  heroWrapper: {
-    marginTop: 16,
+  swapRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  swapIcon: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    marginLeft: -18,
+    marginTop: -18,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.primaryYellow,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tradeSide: {
+    flex: 1,
     borderRadius: 12,
-    overflow: 'hidden',
+    backgroundColor: '#121212',
+    borderWidth: 1,
+    borderColor: '#2f2f2f',
+    padding: 8,
+    gap: 6,
   },
-  heroImage: {
-    width: width - 32,
-    height: Math.min(260, Math.round(width * 0.6)),
-    backgroundColor: '#e5e7eb',
+  tradeSideHeader: {
+    gap: 6,
   },
-  section: {
-    marginTop: 16,
-  },
-  sectionTitle: {
-    fontSize: 14,
+  tradeSideLabel: {
+    fontSize: 11,
     fontWeight: '700',
-    color: '#111827',
-    marginBottom: 8,
+    color: colors.primaryYellow,
+  },
+  tradeUserRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  tradeAvatar: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+  },
+  tradeAvatarFallback: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#d1d5db',
+  },
+  tradeAvatarText: {
+    fontSize: 10,
+    color: '#1f2937',
+    fontWeight: '700',
+  },
+  tradeUsername: {
+    flex: 1,
+    fontSize: 11,
+    color: '#cfcfcf',
+    fontWeight: '600',
+  },
+  tradeImageFrame: {
+    width: '100%',
+    height: Math.min(140, Math.round(width * 0.34)),
+    borderRadius: 10,
+    overflow: 'hidden',
+    backgroundColor: '#262626',
+  },
+  tradeImage: {
+    width: '100%',
+    height: '100%',
+  },
+  thumbnailRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  thumbnail: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    backgroundColor: '#292929',
+  },
+  tradeTitle: {
+    marginTop: 2,
+    fontSize: 13,
+    color: '#efefef',
+    fontWeight: '700',
+  },
+  tradeMeta: {
+    fontSize: 11,
+    color: '#a1a1a1',
+  },
+  tradePrice: {
+    fontSize: 12,
+    color: '#f4f4f4',
+    fontWeight: '700',
   },
   itemsList: {
-    gap: 4,
+    gap: 3,
+    marginTop: 2,
   },
   itemRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
+    alignItems: 'flex-start',
+  },
+  itemInfo: {
+    flex: 1,
   },
   itemBullet: {
-    fontSize: 14,
-    color: '#6b7280',
+    fontSize: 13,
+    color: '#7d7d7d',
     marginRight: 6,
   },
   itemTitle: {
-    fontSize: 13,
-    color: '#111827',
+    fontSize: 12,
+    color: '#dfdfdf',
   },
   itemPrice: {
-    fontSize: 12,
-    color: '#4b5563',
+    fontSize: 11,
+    color: '#b5b5b5',
   },
   itemsEmpty: {
-    fontSize: 13,
-    color: '#9ca3af',
+    fontSize: 12,
+    color: '#858585',
+  },
+  moreItems: {
+    fontSize: 11,
+    color: colors.primaryYellow,
+    fontWeight: '600',
   },
   topUpBox: {
-    marginTop: 16,
-    paddingVertical: 10,
+    marginTop: 12,
+    paddingVertical: 9,
     paddingHorizontal: 12,
-    backgroundColor: '#f1f5f9',
-    borderRadius: 12,
+    borderRadius: 10,
+    backgroundColor: '#242424',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  topUpIncoming: {
+    backgroundColor: '#13271d',
+  },
+  topUpOutgoing: {
+    backgroundColor: '#2b1c14',
   },
   topUpText: {
     fontSize: 13,
-    fontWeight: '600',
-    color: '#0f172a',
+    fontWeight: '700',
+    color: colors.primaryYellow,
+  },
+  topUpIncomingText: {
+    color: '#4ade80',
+  },
+  topUpOutgoingText: {
+    color: '#fb923c',
+  },
+  messageCard: {
+    marginTop: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#2f2f2f',
+    backgroundColor: '#1d1d1d',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 4,
+  },
+  messageLabel: {
+    fontSize: 10,
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+    color: '#949494',
+    fontWeight: '700',
+  },
+  messageText: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: '#dfdfdf',
   },
   bottomBar: {
     position: 'absolute',
@@ -318,17 +571,17 @@ const styles = StyleSheet.create({
     padding: 16,
     backgroundColor: colors.primaryDark,
     borderTopWidth: 1,
-    borderTopColor: '#eee',
+    borderTopColor: '#3a3a3a',
   },
   chatButton: {
-    backgroundColor: '#007AFF',
-    borderRadius: 10,
+    backgroundColor: colors.primaryYellow,
+    borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
   },
   chatButtonText: {
-    color: colors.primaryDark,
-    fontSize: 16,
+    color: '#202020',
+    fontSize: 15,
     fontWeight: '700',
   },
 });
