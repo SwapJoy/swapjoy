@@ -7,9 +7,11 @@ import { ApiService } from '../services/api';
 import { NotificationService } from '../services/notificationService';
 import { useAuth } from '../contexts/AuthContext';
 import { RecommendationWeights, DEFAULT_RECOMMENDATION_WEIGHTS, clampWeight } from '../types/recommendation';
+import { useLocalization } from '../localization';
 
 const DevRecommendationSettingsScreen: React.FC = () => {
   const { user } = useAuth();
+  const { t } = useLocalization();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [weights, setWeights] = useState<RecommendationWeights>(DEFAULT_RECOMMENDATION_WEIGHTS);
@@ -32,7 +34,7 @@ const DevRecommendationSettingsScreen: React.FC = () => {
       setHasChanges(false);
     } catch (error) {
       console.error('Error loading recommendation weights:', error);
-      Alert.alert('Error', 'Failed to load recommendation weights');
+      Alert.alert(t('common.error'), t('devRecommendation.alerts.loadFailed'));
     } finally {
       setLoading(false);
     }
@@ -49,19 +51,19 @@ const DevRecommendationSettingsScreen: React.FC = () => {
       
       if (result.error) {
         console.error('[DevRecommendationSettings] Error saving recommendation weights:', result.error);
-        const errorMessage = result.error?.message || JSON.stringify(result.error) || 'Unknown error';
-        Alert.alert('Error', `Failed to save recommendation weights: ${errorMessage}`);
+        const errorMessage = result.error?.message || JSON.stringify(result.error) || t('devRecommendation.unknownError');
+        Alert.alert(t('common.error'), t('devRecommendation.alerts.saveFailed', { error: errorMessage }));
         setSaving(false);
         return;
       }
 
       setHasChanges(false);
       setSaving(false);
-      Alert.alert('Success', 'Recommendation weights saved! Top Picks will refresh automatically.');
+      Alert.alert(t('common.success'), t('devRecommendation.alerts.saveSuccess'));
     } catch (error: any) {
       console.error('[DevRecommendationSettings] Exception saving recommendation weights:', error);
-      const errorMessage = error?.message || JSON.stringify(error) || 'Unknown error';
-      Alert.alert('Error', `Failed to save recommendation weights: ${errorMessage}`);
+      const errorMessage = error?.message || JSON.stringify(error) || t('devRecommendation.unknownError');
+      Alert.alert(t('common.error'), t('devRecommendation.alerts.saveFailed', { error: errorMessage }));
       setSaving(false);
     }
   }, [user?.id, weights, hasChanges]);
@@ -76,12 +78,12 @@ const DevRecommendationSettingsScreen: React.FC = () => {
 
   const resetToDefaults = useCallback(() => {
     Alert.alert(
-      'Reset to Defaults',
-      'Are you sure you want to reset all weights to default values?',
+      t('devRecommendation.resetTitle'),
+      t('devRecommendation.resetMessage'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Reset',
+          text: t('devRecommendation.resetAction'),
           style: 'destructive',
           onPress: () => {
             setWeights(DEFAULT_RECOMMENDATION_WEIGHTS);
@@ -96,7 +98,7 @@ const DevRecommendationSettingsScreen: React.FC = () => {
     return (
       <View style={styles.centerContainer}>
         <ActivityIndicator size="large" color="#007AFF" />
-        <SJText style={styles.loadingText}>Loading settings...</SJText>
+        <SJText style={styles.loadingText}>{t('devRecommendation.loadingSettings')}</SJText>
       </View>
     );
   }
@@ -236,7 +238,7 @@ const DevRecommendationSettingsScreen: React.FC = () => {
                 onValueChange(newValue);
               }}
             >
-              <SJText style={styles.quickButtonText}>0%</SJText>
+              <SJText style={styles.quickButtonText}>{t('devRecommendation.quickValues.zero')}</SJText>
             </TouchableOpacity>
             <TouchableOpacity 
               style={styles.quickButton}
@@ -246,7 +248,7 @@ const DevRecommendationSettingsScreen: React.FC = () => {
                 onValueChange(newValue);
               }}
             >
-              <SJText style={styles.quickButtonText}>50%</SJText>
+              <SJText style={styles.quickButtonText}>{t('devRecommendation.quickValues.half')}</SJText>
             </TouchableOpacity>
             <TouchableOpacity 
               style={styles.quickButton}
@@ -256,13 +258,13 @@ const DevRecommendationSettingsScreen: React.FC = () => {
                 onValueChange(newValue);
               }}
             >
-              <SJText style={styles.quickButtonText}>100%</SJText>
+              <SJText style={styles.quickButtonText}>{t('devRecommendation.quickValues.full')}</SJText>
             </TouchableOpacity>
           </View>
         </View>
         <View style={styles.sliderLabels}>
-          <SJText style={styles.sliderLabelText}>0% (ignored)</SJText>
-          <SJText style={styles.sliderLabelText}>100% (critical)</SJText>
+          <SJText style={styles.sliderLabelText}>{t('devRecommendation.scaleLabels.ignored')}</SJText>
+          <SJText style={styles.sliderLabelText}>{t('devRecommendation.scaleLabels.critical')}</SJText>
         </View>
       </View>
     );
@@ -272,75 +274,74 @@ const DevRecommendationSettingsScreen: React.FC = () => {
     <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
         <View style={styles.header}>
-          <SJText style={styles.title}>🔧 DEV: Recommendation Weights</SJText>
+          <SJText style={styles.title}>{t('devRecommendation.title')}</SJText>
           <SJText style={styles.subtitle}>
-            Adjust how strongly different factors influence your Top Picks
+            {t('devRecommendation.subtitle')}
           </SJText>
         </View>
 
         <View style={styles.section}>
-          <SJText style={styles.sectionTitle}>Scoring Weights</SJText>
+          <SJText style={styles.sectionTitle}>{t('devRecommendation.scoringTitle')}</SJText>
           <SJText style={styles.sectionDescription}>
-            Each weight controls how much that factor affects recommendations. 
-            0% = factor ignored, 100% = factor is critical.
+            {t('devRecommendation.scoringDescription')}
           </SJText>
 
           <SliderControl
-            label="Category Score"
+            label={t('devRecommendation.sliders.categoryScore.label')}
             value={weights.category_score}
             onValueChange={(value) => updateWeight('category_score', value)}
-            description="How much favorite categories matter. 100% = only show items from favorite categories."
+            description={t('devRecommendation.sliders.categoryScore.description')}
           />
 
           <SliderControl
-            label="Price Score"
+            label={t('devRecommendation.sliders.priceScore.label')}
             value={weights.price_score}
             onValueChange={(value) => updateWeight('price_score', value)}
-            description="How much price similarity matters. Higher = prioritize items with similar prices."
+            description={t('devRecommendation.sliders.priceScore.description')}
           />
 
           <SliderControl
-            label="Location (Latitude)"
+            label={t('devRecommendation.sliders.locationLat.label')}
             value={weights.location_lat}
             onValueChange={(value) => updateWeight('location_lat', value)}
-            description="How much location matters (latitude). Higher = prioritize nearby items."
+            description={t('devRecommendation.sliders.locationLat.description')}
           />
 
           <SliderControl
-            label="Location (Longitude)"
+            label={t('devRecommendation.sliders.locationLng.label')}
             value={weights.location_lng}
             onValueChange={(value) => updateWeight('location_lng', value)}
-            description="How much location matters (longitude). Higher = prioritize nearby items."
+            description={t('devRecommendation.sliders.locationLng.description')}
           />
 
           <SliderControl
-            label="Similarity Weight (Base)"
+            label={t('devRecommendation.sliders.similarityWeight.label')}
             value={weights.similarity_weight}
             onValueChange={(value) => updateWeight('similarity_weight', value)}
-            description="Base weight for semantic similarity (embeddings). Usually keep at 100%."
+            description={t('devRecommendation.sliders.similarityWeight.description')}
           />
         </View>
 
         <View style={styles.infoSection}>
-          <SJText style={styles.infoTitle}>💡 How It Works</SJText>
+          <SJText style={styles.infoTitle}>{t('devRecommendation.infoTitle')}</SJText>
           <SJText style={styles.infoText}>
-            • Setting a weight to 100% makes that factor critical (e.g., category_score = 1.0 means only show favorite categories)
+            {t('devRecommendation.infoLines.line1')}
           </SJText>
           <SJText style={styles.infoText}>
-            • Setting to 50% means that factor is moderately important
+            {t('devRecommendation.infoLines.line2')}
           </SJText>
           <SJText style={styles.infoText}>
-            • Setting to 0% means that factor is ignored completely
+            {t('devRecommendation.infoLines.line3')}
           </SJText>
           <SJText style={styles.infoText}>
-            • Final score combines all weighted factors automatically
+            {t('devRecommendation.infoLines.line4')}
           </SJText>
         </View>
 
         <View style={styles.section}>
-          <SJText style={styles.sectionTitle}>🔔 Test Push Notifications</SJText>
+          <SJText style={styles.sectionTitle}>{t('devRecommendation.testPush.title')}</SJText>
           <SJText style={styles.sectionDescription}>
-            Test push notifications by creating a notification for yourself.
+            {t('devRecommendation.testPush.description')}
           </SJText>
           
           <View style={styles.testButtonContainer}>
@@ -348,7 +349,7 @@ const DevRecommendationSettingsScreen: React.FC = () => {
               style={styles.testButton}
               onPress={async () => {
                 if (!user?.id) {
-                  Alert.alert('Error', 'User not found');
+                  Alert.alert(t('common.error'), t('devRecommendation.testPush.userNotFound'));
                   return;
                 }
 
@@ -356,21 +357,21 @@ const DevRecommendationSettingsScreen: React.FC = () => {
                   const result = await NotificationService.notifyNewOffer({
                     userId: user.id,
                     offerId: 'test-offer-' + Date.now(),
-                    senderName: 'Test User',
-                    itemTitle: 'Test Item',
+                    senderName: t('devRecommendation.testPush.senderName'),
+                    itemTitle: t('devRecommendation.testPush.itemTitle'),
                   });
 
                   if (result.error) {
-                    Alert.alert('Error', `Failed to send notification: ${result.error.message}`);
+                    Alert.alert(t('common.error'), t('devRecommendation.testPush.sendFailed', { error: result.error.message }));
                   } else {
-                    Alert.alert('Success', 'Test notification sent! Check your device for push notification.');
+                    Alert.alert(t('common.success'), t('devRecommendation.testPush.sendSuccess'));
                   }
                 } catch (error: any) {
-                  Alert.alert('Error', `Failed: ${error.message}`);
+                  Alert.alert(t('common.error'), t('devRecommendation.testPush.failed', { error: error.message }));
                 }
               }}
             >
-              <SJText style={styles.testButtonText}>Test New Offer Notification</SJText>
+              <SJText style={styles.testButtonText}>{t('devRecommendation.testPush.newOfferButton')}</SJText>
             </TouchableOpacity>
           </View>
 
@@ -379,7 +380,7 @@ const DevRecommendationSettingsScreen: React.FC = () => {
               style={styles.testButton}
               onPress={async () => {
                 if (!user?.id) {
-                  Alert.alert('Error', 'User not found');
+                  Alert.alert(t('common.error'), t('devRecommendation.testPush.userNotFound'));
                   return;
                 }
 
@@ -387,20 +388,20 @@ const DevRecommendationSettingsScreen: React.FC = () => {
                   const result = await NotificationService.notifyNewFollower({
                     userId: user.id,
                     followerId: 'test-follower-' + Date.now(),
-                    followerName: 'Test Follower',
+                    followerName: t('devRecommendation.testPush.followerName'),
                   });
 
                   if (result.error) {
-                    Alert.alert('Error', `Failed to send notification: ${result.error.message}`);
+                    Alert.alert(t('common.error'), t('devRecommendation.testPush.sendFailed', { error: result.error.message }));
                   } else {
-                    Alert.alert('Success', 'Test notification sent! Check your device for push notification.');
+                    Alert.alert(t('common.success'), t('devRecommendation.testPush.sendSuccess'));
                   }
                 } catch (error: any) {
-                  Alert.alert('Error', `Failed: ${error.message}`);
+                  Alert.alert(t('common.error'), t('devRecommendation.testPush.failed', { error: error.message }));
                 }
               }}
             >
-              <SJText style={styles.testButtonText}>Test New Follower Notification</SJText>
+              <SJText style={styles.testButtonText}>{t('devRecommendation.testPush.newFollowerButton')}</SJText>
             </TouchableOpacity>
           </View>
         </View>
@@ -412,7 +413,7 @@ const DevRecommendationSettingsScreen: React.FC = () => {
                 style={[styles.resetButton, !hasChanges && styles.disabledButton]}
                 onPress={resetToDefaults}
               >
-                Reset to Defaults
+                {t('devRecommendation.resetButton')}
               </SJText>
             </View>
             <View style={styles.buttonContainer}>
@@ -420,7 +421,7 @@ const DevRecommendationSettingsScreen: React.FC = () => {
                 style={[styles.saveButton, (!hasChanges || saving) && styles.disabledButton]}
                 onPress={handleSave}
               >
-                {saving ? 'Saving...' : 'Save Changes'}
+                {saving ? t('devRecommendation.saving') : t('devRecommendation.saveChanges')}
               </SJText>
             </View>
           </View>

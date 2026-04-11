@@ -116,11 +116,6 @@ export type RootStackParamList = {
     offer: any;
   };
   ProfileSettings: undefined;
-  CategorySelector: {
-    multiselect?: boolean;
-    selectedCategories?: string[];
-    updateProfile?: boolean;
-  };
   DevRecommendationSettings: undefined;
   // Offer flow
   OfferCreate: {
@@ -157,7 +152,6 @@ export type RootStackParamList = {
 export type MainTabParamList = {
   Explore: undefined;
   Offers: undefined;
-  Chats: undefined;
   Notifications: undefined;
   Profile: undefined;
 };

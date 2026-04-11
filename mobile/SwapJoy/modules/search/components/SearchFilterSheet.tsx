@@ -31,14 +31,6 @@ interface SearchFilterSheetProps {
   language: AppLanguage;
 }
 
-const TITLE_BY_PAGE: Record<FilterPage, string> = {
-  main: 'Filters',
-  categories: 'Category',
-  conditions: 'Condition',
-  price: 'Price',
-  location: 'Location',
-};
-
 const SearchFilterSheet: React.FC<SearchFilterSheetProps> = ({
   visible,
   initialFilters,
@@ -131,43 +123,43 @@ const SearchFilterSheet: React.FC<SearchFilterSheetProps> = ({
 
   const summary = useMemo(() => {
     const selectedCategoryName =
-      categories.find((category) => category.id === draft.categoryIds[0])?.name || 'Any';
-    const conditionsText = draft.conditions.length > 0 ? draft.conditions.join(', ') : 'Any';
+      categories.find((category) => category.id === draft.categoryIds[0])?.name || t('search.filters.any');
+    const conditionsText = draft.conditions.length > 0 ? draft.conditions.join(', ') : t('search.filters.any');
     const priceText =
       draft.minPrice !== null || draft.maxPrice !== null
         ? `${draft.minPrice ?? ''} - ${draft.maxPrice ?? ''}`.trim()
-        : 'Any';
+        : t('search.filters.any');
     const locationText =
-      cities.find((city) => city.id === draft.selectedCityId)?.name || 'Any';
+      cities.find((city) => city.id === draft.selectedCityId)?.name || t('search.filters.any');
     return { selectedCategoryName, conditionsText, priceText, locationText };
-  }, [categories, cities, draft.categoryIds, draft.conditions, draft.maxPrice, draft.minPrice, draft.selectedCityId]);
+  }, [categories, cities, draft.categoryIds, draft.conditions, draft.maxPrice, draft.minPrice, draft.selectedCityId, t]);
 
   const renderMain = () => (
     <View style={styles.mainList}>
       <TouchableOpacity style={styles.mainRow} onPress={() => pushPage('categories')}>
         <View>
-          <SJText style={styles.mainLabel}>Categories</SJText>
+          <SJText style={styles.mainLabel}>{t('search.categories')}</SJText>
           <SJText style={styles.mainValue}>{summary.selectedCategoryName}</SJText>
         </View>
         <Ionicons name="chevron-forward" size={22} color="#8b8b8b" />
       </TouchableOpacity>
       <TouchableOpacity style={styles.mainRow} onPress={() => pushPage('conditions')}>
         <View>
-          <SJText style={styles.mainLabel}>Condition</SJText>
+          <SJText style={styles.mainLabel}>{t('search.filters.condition')}</SJText>
           <SJText style={styles.mainValue}>{summary.conditionsText}</SJText>
         </View>
         <Ionicons name="chevron-forward" size={22} color="#8b8b8b" />
       </TouchableOpacity>
       <TouchableOpacity style={styles.mainRow} onPress={() => pushPage('price')}>
         <View>
-          <SJText style={styles.mainLabel}>Price range</SJText>
+          <SJText style={styles.mainLabel}>{t('search.filters.priceRange')}</SJText>
           <SJText style={styles.mainValue}>{summary.priceText}</SJText>
         </View>
         <Ionicons name="chevron-forward" size={22} color="#8b8b8b" />
       </TouchableOpacity>
       <TouchableOpacity style={styles.mainRow} onPress={() => pushPage('location')}>
         <View>
-          <SJText style={styles.mainLabel}>Location</SJText>
+          <SJText style={styles.mainLabel}>{t('navigation.location')}</SJText>
           <SJText style={styles.mainValue}>{summary.locationText}</SJText>
         </View>
         <Ionicons name="chevron-forward" size={22} color="#8b8b8b" />
@@ -259,10 +251,10 @@ const SearchFilterSheet: React.FC<SearchFilterSheetProps> = ({
                 <Ionicons name="chevron-back" size={22} color="#fff" />
               </TouchableOpacity>
             )}
-            <SJText style={styles.title}>{TITLE_BY_PAGE[page]}</SJText>
+            <SJText style={styles.title}>{t(`search.filters.titles.${page}`)}</SJText>
             <TouchableOpacity style={styles.headerButton} onPress={resetCurrentPage}>
               <SJText style={styles.resetText}>
-                {page === 'main' ? 'RESET ALL' : 'Reset'}
+                {page === 'main' ? t('search.filters.resetAll') : t('search.filters.reset')}
               </SJText>
             </TouchableOpacity>
           </View>
@@ -279,7 +271,7 @@ const SearchFilterSheet: React.FC<SearchFilterSheetProps> = ({
                 dismissSheet();
               }}
             >
-              <SJText style={styles.applyButtonText}>See items</SJText>
+              <SJText style={styles.applyButtonText}>{t('search.filters.seeItems')}</SJText>
             </TouchableOpacity>
           </View>
       </BottomSheetView>

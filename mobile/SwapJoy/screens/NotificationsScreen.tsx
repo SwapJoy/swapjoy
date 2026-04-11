@@ -11,9 +11,11 @@ import { useNotifications } from '../contexts/NotificationsContext';
 import CachedImage from '../components/CachedImage';
 import { NotificationNavigation } from '../utils/notificationNavigation';
 import { colors } from '@navigation/MainTabNavigator.styles';
+import { useLocalization } from '../localization';
 
 const NotificationsScreen: React.FC<NotificationsScreenProps> = memo(() => {
   const navigation = useNavigation();
+  const { t } = useLocalization();
   const {
     notifications,
     loading,
@@ -172,7 +174,7 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = memo(() => {
   const renderNotification = ({ item }: { item: Notification }) => {
     // Get user data for new_follower notifications
     const userData = item.type === 'new_follower' && item.data ? {
-      username: item.data.username || item.data.firstName || 'User',
+      username: item.data.username || item.data.firstName || t('notifications.userFallback'),
       profileImageUrl: item.data.profileImageUrl,
     } : null;
 
@@ -223,7 +225,7 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = memo(() => {
     return (
       <View style={styles.container}>
         <View style={styles.loadingContainer}>
-          <SJText style={styles.loadingText}>Loading notifications...</SJText>
+          <SJText style={styles.loadingText}>{t('notifications.loading')}</SJText>
         </View>
       </View>
     );
@@ -247,7 +249,7 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = memo(() => {
               onPress={handleMarkAllAsRead}
             >
               <Ionicons name="checkmark-done" size={20} color={colors.primaryYellow} style={styles.popoverIcon} />
-              <SJText style={styles.popoverText}>Mark all as read</SJText>
+              <SJText style={styles.popoverText}>{t('notifications.markAllAsRead')}</SJText>
             </Pressable>
           </View>
         </Pressable>
@@ -274,15 +276,15 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = memo(() => {
         ListFooterComponent={
           loadingMore ? (
             <View style={styles.footerContainer}>
-              <SJText style={styles.footerText}>Loading more...</SJText>
+              <SJText style={styles.footerText}>{t('notifications.loadingMore')}</SJText>
             </View>
           ) : null
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <SJText style={styles.emptyTitle}>No notifications</SJText>
+            <SJText style={styles.emptyTitle}>{t('notifications.emptyTitle')}</SJText>
             <SJText style={styles.emptySubtitle}>
-              You're all caught up! New notifications will appear here.
+              {t('notifications.emptySubtitle')}
             </SJText>
           </View>
         }

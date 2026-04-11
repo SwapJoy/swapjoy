@@ -6,12 +6,12 @@ import { MainTabParamList } from '../types/navigation';
 import { Ionicons } from '@expo/vector-icons';
 import HomeScreen from '../screens/HomeScreen';
 import OffersScreen from '../screens/OffersScreen';
-import ChatListScreen from '../screens/ChatListScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import { styles, colors } from './MainTabNavigator.styles';
 import { useNotifications } from '../contexts/NotificationsContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useLocalization } from '../localization';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
@@ -20,8 +20,9 @@ interface MainTabNavigatorProps {
 }
 
 const MainTabNavigator: React.FC<MainTabNavigatorProps> = ({ onNavigateToAdd }) => {
-  const { unreadCount, totalUnreadChats } = useNotifications();
+  const { unreadCount } = useNotifications();
   const { isAuthenticated, isAnonymous } = useAuth();
+  const { t } = useLocalization();
   const navigation = useNavigation<any>();
 
   const navigateToSignIn = () => {
@@ -87,7 +88,8 @@ const MainTabNavigator: React.FC<MainTabNavigatorProps> = ({ onNavigateToAdd }) 
         name="Explore"
         component={HomeScreen}
         options={{
-          tabBarLabel: 'Explore',
+          title: t('navigation.explore'),
+          tabBarLabel: t('navigation.explore'),
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons 
               name={focused ? "compass" : "compass-outline"} 
@@ -109,6 +111,7 @@ const MainTabNavigator: React.FC<MainTabNavigatorProps> = ({ onNavigateToAdd }) 
           },
         }}
         options={{
+          title: t('navigation.offers'),
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons 
               name={focused ? "swap-horizontal" : "swap-horizontal-outline"} 
@@ -130,6 +133,7 @@ const MainTabNavigator: React.FC<MainTabNavigatorProps> = ({ onNavigateToAdd }) 
           },
         }}
         options={{
+          title: t('navigation.notifications'),
           tabBarBadge: unreadCount > 0 ? (unreadCount > 99 ? '99+' : unreadCount) : undefined,
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons 
@@ -151,6 +155,7 @@ const MainTabNavigator: React.FC<MainTabNavigatorProps> = ({ onNavigateToAdd }) 
           },
         }}
         options={{
+          title: t('navigation.profile'),
           tabBarIcon: ({ color, size, focused }) => (
             <Ionicons 
               name={focused ? "person" : "person-outline"} 

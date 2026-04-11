@@ -5,11 +5,13 @@ import { useEmailVerification } from '../hooks/useEmailVerification';
 import { useAuth } from '../contexts/AuthContext';
 import { EmailVerificationScreenProps } from '../types/navigation';
 import { colors } from '@navigation/MainTabNavigator.styles';
+import { useLocalization } from '../localization';
 
 const EmailVerificationScreen: React.FC<EmailVerificationScreenProps> = ({ 
   navigation, 
   route 
 }) => {
+  const { t } = useLocalization();
   const { email } = route.params;
   const [otpCode, setOtpCode] = useState('');
   const inputRef = useRef<TextInput>(null);
@@ -56,9 +58,9 @@ const EmailVerificationScreen: React.FC<EmailVerificationScreenProps> = ({
     
         {/* Content */}
         <View style={styles.content}>
-          <SJText style={styles.subtitle}>Enter verification code</SJText>
+          <SJText style={styles.subtitle}>{t('auth.verification.enterCodeTitle')}</SJText>
           <SJText style={styles.description}>
-            We sent a 6-digit code to{'\n'}
+            {t('auth.verification.sentCodeTo')}{'\n'}
             <SJText style={styles.emailAddress}>{email}</SJText>
           </SJText>
 
@@ -71,7 +73,7 @@ const EmailVerificationScreen: React.FC<EmailVerificationScreenProps> = ({
               keyboardType="number-pad"
               maxLength={6}
               autoFocus
-              placeholder="000000"
+              placeholder={t('auth.verification.codePlaceholder')}
               placeholderTextColor="#ccc"
             />
           </View>
@@ -84,18 +86,18 @@ const EmailVerificationScreen: React.FC<EmailVerificationScreenProps> = ({
             {isLoading ? (
               <ActivityIndicator color="white" />
             ) : (
-              <SJText style={styles.verifyButtonText}>Verify Code</SJText>
+              <SJText style={styles.verifyButtonText}>{t('auth.verification.verifyCode')}</SJText>
             )}
           </TouchableOpacity>
 
           <View style={styles.resendContainer}>
-            <SJText style={styles.resendText}>Didn't receive the code? </SJText>
+            <SJText style={styles.resendText}>{t('auth.verification.didNotReceiveCode')}</SJText>
             <TouchableOpacity
               onPress={handleResendOTPPress}
               disabled={!canResend || isLoading}
             >
               <SJText style={[styles.resendLink, !canResend && styles.disabledText]}>
-                {canResend ? 'Resend' : `Resend in ${resendTimer}s`}
+                {canResend ? t('auth.verification.resend') : t('auth.verification.resendIn', { seconds: resendTimer })}
               </SJText>
             </TouchableOpacity>
           </View>

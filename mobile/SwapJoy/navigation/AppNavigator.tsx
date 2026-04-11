@@ -47,6 +47,7 @@ import RecentlyListedScreen from '../screens/RecentlyListedScreen';
 import ChatScreen from '../screens/ChatScreen';
 import OfferDetailsScreen from '../screens/OfferDetailsScreen';
 import SJText from '@components/SJText';
+import { useLocalization } from '../localization';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
@@ -86,6 +87,7 @@ const LoadingScreen = memo(() => {
 
 const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((props, ref) => {
   const { isAuthenticated, isLoading, user, isAnonymous, signOut } = useAuth();
+  const { t } = useLocalization();
   const [hasUsername, setHasUsername] = useState<boolean | null>(null);
   const [checkingUsername, setCheckingUsername] = useState(false);
   const [hasResolvedInitialUsernameCheck, setHasResolvedInitialUsernameCheck] = useState(false);
@@ -334,13 +336,13 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
         <Stack.Screen 
           name="PhoneSignIn" 
           component={PhoneSignInScreen}
-          options={{ title: 'Sign In' }}
+          options={{ title: t('navigation.signIn') }}
         />
         <Stack.Screen 
           name="EmailSignIn" 
           component={EmailSignInScreen}
           options={{ 
-            title: 'Sign In',
+            title: t('navigation.signIn'),
             animationEnabled: false,
             transitionSpec: {
               open: { animation: 'timing', config: { duration: 0 } },
@@ -351,17 +353,17 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
         <Stack.Screen 
           name="EmailSignUp" 
           component={EmailSignUpScreen}
-          options={{ title: 'Sign Up' }}
+          options={{ title: t('navigation.signUp') }}
         />
         <Stack.Screen 
           name="EmailVerification" 
           component={EmailVerificationScreen}
-          options={{ title: 'Verify Email' }}
+          options={{ title: t('navigation.verifyEmail') }}
         />
         <Stack.Screen 
           name="OTPVerification" 
           component={OTPVerificationScreen}
-          options={{ title: 'Verify Phone' }}
+          options={{ title: t('navigation.verifyPhone') }}
         />
         
         {/* Screens accessible to both authenticated and anonymous users */}
@@ -388,7 +390,7 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
           name="SearchResults"
           component={SearchResultsScreen}
           options={{
-            title: 'Search results',
+            title: t('navigation.searchResults'),
           }}
         />
         
@@ -413,13 +415,13 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
             <Stack.Screen 
               name="CreateListing" 
               component={CreateListingScreen}
-              options={{ title: 'Create Listing' }}
+              options={{ title: t('navigation.createListing') }}
             />
             <Stack.Screen 
               name="AddItem" 
               component={AddItemScreen}
               options={{ 
-                title: 'Add Item',
+                title: t('navigation.addItem'),
                 headerShown: false,
                 presentation: 'modal',
               }}
@@ -428,7 +430,7 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
               name="Camera" 
               component={CameraScreen}
               options={{ 
-                title: 'Camera',
+                title: t('navigation.camera'),
                 headerShown: false,
                 presentation: 'fullScreenModal',
               }}
@@ -441,7 +443,7 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
                 // Disable animation when navigating back from CategorySelector
                 const shouldDisableAnimation = params?.selectedCategoryId !== undefined;
                 return {
-                title: 'Item Details',
+                title: t('navigation.itemDetails'),
                 headerShown: false,
                   ...(shouldDisableAnimation ? {
                     animationEnabled: false,
@@ -458,7 +460,7 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
               name="ImageUploadProgress" 
               component={ImageUploadProgressScreen}
               options={{
-                title: 'Upload Images',
+                title: t('navigation.uploadImages'),
                 headerShown: true,
                 headerStyle: {
                   backgroundColor: colors.primaryYellow,
@@ -469,7 +471,7 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
               name="TitleInput" 
               component={TitleInputScreen}
               options={{
-                title: 'Title & Condition',
+                title: t('navigation.titleAndCondition'),
                 headerShown: true,
                 headerStyle: {
                   backgroundColor: colors.primaryYellow,
@@ -480,7 +482,7 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
               name="CategoryInput" 
               component={CategoryInputScreen}
               options={{
-                title: 'Category',
+                title: t('navigation.category'),
                 headerShown: true,
                 headerStyle: {
                   backgroundColor: colors.primaryYellow,
@@ -491,7 +493,7 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
               name="DescInput" 
               component={DescInputScreen}
               options={{
-                title: 'Description',
+                title: t('navigation.description'),
                 headerShown: true,
                 headerStyle: {
                   backgroundColor: colors.primaryYellow,
@@ -502,7 +504,7 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
               name="PriceInput" 
               component={PriceInputScreen}
               options={{
-                title: 'Price',
+                title: t('navigation.price'),
                 headerShown: true,
                 headerStyle: {
                   backgroundColor: colors.primaryYellow,
@@ -513,7 +515,7 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
               name="LocationInput" 
               component={LocationInputScreen}
               options={{
-                title: 'Location',
+                title: t('navigation.location'),
                 headerShown: true,
                 headerStyle: {
                   backgroundColor: colors.primaryYellow,
@@ -524,7 +526,7 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
               name="ItemPreview" 
               component={ItemPreviewScreen}
               options={{
-                title: 'Preview',
+                title: t('navigation.preview'),
                 headerShown: true,
                 headerStyle: {
                   backgroundColor: colors.primaryYellow,
@@ -540,7 +542,7 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
               name="UserProfile"
               component={ProfileScreen}
               options={{
-                title: 'Profile',
+                title: t('navigation.profile'),
                 headerBackTitleVisible: false,
               }}
             />
@@ -548,24 +550,24 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
               name="BundleItems" 
               component={BundleItemsScreen}
               options={({ route }) => ({ 
-                title: (route.params as any).title || 'Bundle',
+                title: (route.params as any).title || t('navigation.bundle'),
                 headerBackTitleVisible: false,
               })}
             />
             <Stack.Screen 
               name="OfferCreate" 
               component={OfferCreateScreen}
-              options={{ title: 'Create Offer' }}
+              options={{ title: t('navigation.createOffer') }}
             />
             <Stack.Screen 
               name="OfferPreview" 
               component={OfferPreviewScreen}
-              options={{ title: 'Preview Offer' }}
+              options={{ title: t('navigation.previewOffer') }}
             />
             <Stack.Screen 
               name="ProfileSettings" 
               component={ProfileSettingsScreen}
-              options={{ title: 'Settings' }}
+              options={{ title: t('navigation.settings') }}
             />
             <Stack.Screen
               name="CategorySelector"
@@ -575,7 +577,7 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
                 // Disable animation when opened from ItemDetailsForm (multiselect=false, updateProfile=false)
                 const shouldDisableAnimation = params?.multiselect === false && params?.updateProfile === false;
                 return {
-                  title: 'Select Categories',
+                  title: t('navigation.selectCategories'),
                   headerBackTitleVisible: false,
                   headerShown: true,
                   ...(shouldDisableAnimation ? {
@@ -592,37 +594,37 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
             <Stack.Screen
               name="ProfileEdit"
               component={ProfileEditScreen}
-              options={{ title: 'Edit Profile', headerBackTitleVisible: false }}
+              options={{ title: t('navigation.editProfile'), headerBackTitleVisible: false }}
             />
             <Stack.Screen 
               name="DevRecommendationSettings" 
               component={DevRecommendationSettingsScreen}
-              options={{ title: 'DEV: Recommendation Weights' }}
+              options={{ title: t('navigation.devRecommendationSettings') }}
             />
             <Stack.Screen 
               name="FollowersFollowing" 
               component={FollowersFollowingScreen}
-              options={{ title: 'Followers & Following' }}
+              options={{ title: t('navigation.followersFollowing') }}
             />
             <Stack.Screen
               name="Offers"
               component={OffersScreen}
-              options={{ title: 'Offers' }}
+              options={{ title: t('navigation.offers') }}
             />
             <Stack.Screen
               name="OfferDetails"
               component={OfferDetailsScreen}
-              options={{ title: 'Offer Details' }}
+              options={{ title: t('navigation.offerDetails') }}
             />
             <Stack.Screen
               name="Chat"
               component={ChatScreen}
-              options={{ title: 'Chat' }}
+              options={{ title: t('navigation.chat') }}
             />
             <Stack.Screen 
               name="SuggestionDetails" 
               component={SuggestionDetailsScreen}
-              options={{ title: 'Suggestion Details' }}
+              options={{ title: t('navigation.suggestionDetails') }}
             />
           </>
         )}

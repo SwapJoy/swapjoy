@@ -15,6 +15,7 @@ import { RootStackParamList } from '../../../types/navigation';
 import { NavigationProp } from '@react-navigation/native';
 import { useSearch } from '../hooks/useSearch';
 import { colors } from '../../../navigation/MainTabNavigator.styles';
+import { useLocalization } from '../../../localization';
 
 interface SearchRowItem {
   id: string;
@@ -25,6 +26,7 @@ interface SearchRowItem {
 
 const SearchScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<RootStackParamList>>();
+  const { t } = useLocalization();
   const insets = useSafeAreaInsets();
   const inputRef = useRef<TextInput | null>(null);
   const {
@@ -68,13 +70,13 @@ const SearchScreen: React.FC = () => {
 
     if (recentItems.length > 0) {
       computedSections.push({
-        title: 'Recent searches',
+        title: t('search.recentSearches'),
         data: recentItems,
       });
     }
 
     computedSections.push({
-      title: 'Categories',
+      title: t('search.categories'),
       data: filteredCategories.map((category) => ({
         id: category.id,
         type: 'category',
@@ -84,7 +86,7 @@ const SearchScreen: React.FC = () => {
     });
 
     return computedSections;
-  }, [filteredCategories, recentSearches]);
+  }, [filteredCategories, recentSearches, t]);
 
   return (
     <View style={styles.container}>
@@ -103,7 +105,7 @@ const SearchScreen: React.FC = () => {
             value={searchText}
             onChangeText={setSearchText}
             style={styles.searchInput}
-            placeholder="What do you want to buy?"
+            placeholder={t('search.searchPrompt')}
             placeholderTextColor="#7c7c7c"
             autoCorrect={false}
             autoCapitalize="none"
@@ -121,9 +123,9 @@ const SearchScreen: React.FC = () => {
         renderSectionHeader={({ section }) => (
           <View style={styles.sectionHeader}>
             <SJText style={styles.sectionTitle}>{section.title}</SJText>
-            {section.title === 'Recent searches' && recentSearches.length > 0 ? (
+            {section.title === t('search.recentSearches') && recentSearches.length > 0 ? (
               <TouchableOpacity onPress={() => void clearRecentSearches()}>
-                <SJText style={styles.clearAll}>Clear all</SJText>
+                <SJText style={styles.clearAll}>{t('search.clearAll')}</SJText>
               </TouchableOpacity>
             ) : null}
           </View>

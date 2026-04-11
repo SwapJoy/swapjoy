@@ -132,10 +132,10 @@ const MatchCardBase: React.FC<MatchCardProps> = ({
   fixedHeight = true,
   imageHeight,
 }) => {
-  const { language } = useLocalization();
+  const { language, t } = useLocalization();
   const { getCategoryByName, getCategoryById } = useCategories();
   const navigation = useNavigation<any>();
-  const displayTitle = (title ?? '').trim() || 'Untitled item';
+  const displayTitle = (title ?? '').trim() || t('offers.list.untitledItem');
   const ownerDisplayName = owner.displayName?.trim() || '';
   const ownerUsername = owner.username?.trim() || ownerDisplayName || '';
   const hasOwner = ownerUsername.length > 0 || owner.initials?.length > 0;
@@ -325,6 +325,7 @@ const OfferListCard: React.FC<Props> = ({
   getStatusText,
   onPress,
 }) => {
+  const { t } = useLocalization();
   const entries = Array.isArray(item.offer_items) ? item.offer_items : [];
   const requestedItems = entries.filter((entry: any) => entry?.side === 'requested');
   const offeredItems = entries.filter((entry: any) => entry?.side === 'offered');
@@ -338,8 +339,8 @@ const OfferListCard: React.FC<Props> = ({
     topUpAmount === 0
       ? strings.evenSwap
       : isSent
-        ? `You add cash: -${topUpFormatted}`
-        : `Cash included: +${topUpFormatted}`;
+        ? t('offers.list.youAddCash', { amount: topUpFormatted })
+        : t('offers.list.cashIncluded', { amount: topUpFormatted });
 
   const otherUser: any = isSent ? item.receiver : item.sender;
   const displayNameParts = [otherUser?.first_name ?? '', otherUser?.last_name ?? ''].filter(Boolean);
@@ -360,8 +361,8 @@ const OfferListCard: React.FC<Props> = ({
   const statusText = getStatusText(item.status);
   const userLabel = (isSent ? strings.toUser : strings.fromUser).replace('{username}', otherUser?.username || displayName || '');
   const createdAtLabel = new Date(item.created_at).toLocaleDateString();
-  const leftSideLabel = isSent ? strings.youOffer : 'Your item';
-  const rightSideLabel = isSent ? strings.youWant : 'Offer';
+  const leftSideLabel = isSent ? strings.youOffer : t('offers.list.yourItem');
+  const rightSideLabel = isSent ? strings.youWant : t('offers.list.offerLabel');
 
   const getItemImages = (entries: any[]) => {
     const uris: string[] = [];
@@ -487,7 +488,7 @@ const OfferListCard: React.FC<Props> = ({
 
       <View style={styles.swapBoard}>
         <View style={styles.swapBoardRow}>
-          {renderSide(leftSide, leftSideLabel, 'You', 'Y')}
+          {renderSide(leftSide, leftSideLabel, t('offers.list.youLabel'), t('offers.list.youInitials'))}
           {renderSide(
             rightSide,
             rightSideLabel,
@@ -532,7 +533,7 @@ const OfferListCard: React.FC<Props> = ({
 
       <View style={styles.messageBox}>
         <SJText style={styles.messageLabel} numberOfLines={1}>
-          Message
+          {t('offers.list.messageLabel')}
         </SJText>
         <SJText style={styles.messageText} numberOfLines={2}>
           {description}

@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { ApiService } from '../services/api';
 import CachedImage from '../components/CachedImage';
+import { useLocalization } from '../localization';
 
 interface FollowerUser {
   id: string;
@@ -19,6 +20,7 @@ interface FollowerUser {
 const FollowersFollowingScreen: React.FC = memo(() => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
+  const { t } = useLocalization();
   const { userId, initialTab = 'followers' } = (route.params as any) || {};
 
   const [activeTab, setActiveTab] = useState<'followers' | 'following'>(initialTab);
@@ -102,7 +104,7 @@ const FollowersFollowingScreen: React.FC = memo(() => {
   const renderUserItem = useCallback(({ item }: { item: FollowerUser }) => {
     const displayName = item.first_name || item.last_name
       ? `${item.first_name || ''} ${item.last_name || ''}`.trim()
-      : item.username || 'User';
+      : item.username || t('chat.list.userFallback');
     
     const handlePress = () => {
       navigation.navigate('UserProfile', { userId: item.id });
@@ -135,10 +137,10 @@ const FollowersFollowingScreen: React.FC = memo(() => {
         </View>
       </TouchableOpacity>
     );
-  }, [navigation]);
+  }, [navigation, t]);
 
   return (
-    <View style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       {/* Tabs */}
       <View style={styles.tabsWrapper}>
         <View style={styles.tabsContainer}>
@@ -147,7 +149,7 @@ const FollowersFollowingScreen: React.FC = memo(() => {
             style={[styles.tabButton, activeTab === 'followers' && styles.tabButtonActive]}
           >
             <SJText style={[styles.tabText, activeTab === 'followers' && styles.tabTextActive]}>
-              Followers
+              {t('profileScreen.stats.followers')}
             </SJText>
           </TouchableOpacity>
           <TouchableOpacity
@@ -155,7 +157,7 @@ const FollowersFollowingScreen: React.FC = memo(() => {
             style={[styles.tabButton, activeTab === 'following' && styles.tabButtonActive]}
           >
             <SJText style={[styles.tabText, activeTab === 'following' && styles.tabTextActive]}>
-              Following
+              {t('profileScreen.stats.following')}
             </SJText>
           </TouchableOpacity>
         </View>
@@ -165,7 +167,7 @@ const FollowersFollowingScreen: React.FC = memo(() => {
       {isLoading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primaryYellow} />
-          <SJText style={styles.loadingText}>Loading...</SJText>
+          <SJText style={styles.loadingText}>{t('common.loading')}</SJText>
         </View>
       ) : (
         <FlatList
@@ -176,14 +178,14 @@ const FollowersFollowingScreen: React.FC = memo(() => {
           ListEmptyComponent={
             <View style={styles.emptyView}>
               <SJText style={styles.emptyText}>
-                No {activeTab === 'followers' ? 'followers' : 'following'} yet
+                {activeTab === 'followers' ? t('followersFollowing.emptyFollowers') : t('followersFollowing.emptyFollowing')}
               </SJText>
             </View>
           }
           showsVerticalScrollIndicator={false}
         />
       )}
-    </View>
+    </SafeAreaView>
   );
 });
 

@@ -74,8 +74,8 @@ const OfferDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
     topUpAmount === 0
       ? strings.evenSwap
       : isSentByMe
-        ? `You add cash: -${topUpValue}`
-        : `Cash included: +${topUpValue}`;
+        ? t('offers.list.youAddCash', { amount: topUpValue })
+        : t('offers.list.cashIncluded', { amount: topUpValue });
 
   const otherUser = isSentByMe ? offer.receiver : offer.sender;
   const displayNameParts = [
@@ -138,7 +138,7 @@ const OfferDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
     };
   };
 
-  const myInitials = user?.username?.[0]?.toUpperCase() || 'Y';
+  const myInitials = user?.username?.[0]?.toUpperCase() || t('offers.list.youInitials');
   const otherInitials = (displayName || otherUser?.username || '?')
     .split(' ')
     .map((part: string) => part[0])
@@ -170,7 +170,7 @@ const OfferDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
           </View>
         ))}
         {items.length > 3 ? (
-          <SJText style={styles.moreItems}>+{items.length - 3} more items</SJText>
+          <SJText style={styles.moreItems}>{t('offers.list.moreItems', { count: items.length - 3 })}</SJText>
         ) : null}
       </View>
     );
@@ -224,7 +224,7 @@ const OfferDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
       ) : null}
       {side.condition ? (
         <SJText style={styles.tradeMeta} numberOfLines={1}>
-          Condition: {side.condition}
+          {`${t('search.filters.condition')}: ${side.condition}`}
         </SJText>
       ) : null}
       {side.price ? <SJText style={styles.tradePrice}>{side.price}</SJText> : null}
@@ -269,7 +269,7 @@ const OfferDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
 
         <View style={styles.swapBoard}>
           <View style={styles.swapRow}>
-            {renderTradeSide(leftSide, leftSideLabel, 'You', myInitials)}
+            {renderTradeSide(leftSide, leftSideLabel, t('offers.list.youLabel'), myInitials)}
             {renderTradeSide(
               rightSide,
               rightSideLabel,
@@ -313,7 +313,7 @@ const OfferDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
         </View>
 
         <View style={styles.messageCard}>
-          <SJText style={styles.messageLabel}>Message</SJText>
+          <SJText style={styles.messageLabel}>{t('offers.list.messageLabel')}</SJText>
           <SJText style={styles.messageText}>{messageText}</SJText>
         </View>
       </ScrollView>

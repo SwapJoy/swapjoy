@@ -35,8 +35,8 @@ const SearchResultsScreen: React.FC = () => {
   });
 
   const title = useMemo(
-    () => query?.trim() || categoryName || 'Search results',
-    [categoryName, query]
+    () => query?.trim() || categoryName || t('navigation.searchResults'),
+    [categoryName, query, t]
   );
 
   useLayoutEffect(() => {
@@ -121,7 +121,7 @@ const SearchResultsScreen: React.FC = () => {
           }
           emptyComponent={
             <View style={styles.emptyWrap}>
-              <SJText style={styles.emptyText}>No results found</SJText>
+              <SJText style={styles.emptyText}>{t('search.noResultsTitle')}</SJText>
               {error ? <SJText style={styles.errorText}>{error}</SJText> : null}
             </View>
           }

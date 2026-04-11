@@ -4,11 +4,13 @@ import SJText from '../components/SJText';
 import { useOTPVerification } from '../hooks/useOTPVerification';
 import { useAuth } from '../contexts/AuthContext';
 import { OTPVerificationScreenProps } from '../types/navigation';
+import { useLocalization } from '../localization';
 
 const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({ 
   navigation, 
   route 
 }) => {
+  const { t } = useLocalization();
   const { phone } = route.params;
   const [otpCode, setOtpCode] = useState('');
   const inputRef = useRef<TextInput>(null);
@@ -55,22 +57,22 @@ const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
-            <SJText style={styles.backButtonText}>← Back</SJText>
+            <SJText style={styles.backButtonText}>{`← ${t('navigation.back')}`}</SJText>
           </TouchableOpacity>
-          <SJText style={styles.title}>Verify Phone</SJText>
+          <SJText style={styles.title}>{t('navigation.verifyPhone')}</SJText>
           <View style={styles.placeholder} />
         </View>
 
         {/* Content */}
         <View style={styles.content}>
-          <SJText style={styles.subtitle}>Enter verification code</SJText>
+          <SJText style={styles.subtitle}>{t('auth.verification.enterCodeTitle')}</SJText>
           <SJText style={styles.description}>
-            We sent a 6-digit code to{'\n'}
+            {t('auth.verification.sentCodeTo')}{'\n'}
             <SJText style={styles.phoneNumber}>{phone}</SJText>
           </SJText>
           
           <SJText style={styles.testCode}>
-            ⚠️ Test Mode: Enter exactly "1234" to verify
+            {t('auth.verification.testModeHint')}
           </SJText>
 
           <View style={styles.otpContainer}>
@@ -82,7 +84,7 @@ const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
               keyboardType="number-pad"
               maxLength={6}
               autoFocus
-              placeholder="000000"
+              placeholder={t('auth.verification.codePlaceholder')}
               placeholderTextColor="#ccc"
             />
           </View>
@@ -95,18 +97,18 @@ const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
             {isLoading ? (
               <ActivityIndicator color="white" />
             ) : (
-              <SJText style={styles.verifyButtonText}>Verify Code</SJText>
+              <SJText style={styles.verifyButtonText}>{t('auth.verification.verifyCode')}</SJText>
             )}
           </TouchableOpacity>
 
           <View style={styles.resendContainer}>
-            <SJText style={styles.resendText}>Didn't receive the code? </SJText>
+            <SJText style={styles.resendText}>{t('auth.verification.didNotReceiveCode')}</SJText>
             <TouchableOpacity
               onPress={handleResendOTPPress}
               disabled={!canResend || isLoading}
             >
               <SJText style={[styles.resendLink, !canResend && styles.disabledText]}>
-                {canResend ? 'Resend' : `Resend in ${resendTimer}s`}
+                {canResend ? t('auth.verification.resend') : t('auth.verification.resendIn', { seconds: resendTimer })}
               </SJText>
             </TouchableOpacity>
           </View>

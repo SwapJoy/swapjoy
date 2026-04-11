@@ -4,18 +4,21 @@ import { colors } from '@navigation/MainTabNavigator.styles';
 import SJText from '../components/SJText';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CreateListingScreenProps } from '../types/navigation';
+import { useLocalization } from '../localization';
 
 const CreateListingScreen: React.FC<CreateListingScreenProps> = ({ navigation }) => {
+  const { t } = useLocalization();
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
-        <SJText style={styles.title}>Create Listing</SJText>
-        <SJText style={styles.subtitle}>Coming soon!</SJText>
+        <SJText style={styles.title}>{t('navigation.createListing')}</SJText>
+        <SJText style={styles.subtitle}>{t('createListing.comingSoon')}</SJText>
         <TouchableOpacity
           style={styles.button}
           onPress={() => navigation.goBack()}
         >
-          <SJText style={styles.buttonText}>Go Back</SJText>
+          <SJText style={styles.buttonText}>{t('itemDetails.goBack')}</SJText>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

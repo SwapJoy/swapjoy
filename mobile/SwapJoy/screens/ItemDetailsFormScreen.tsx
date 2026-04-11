@@ -154,7 +154,7 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
           <View style={styles.formContainer}>
             {/* Title */}
             <SWInputField
-              placeholder="Title: i.e. iPhone 16 Pro max black"
+              placeholder={strings.placeholders.title}
                 value={title}
               onChangeText={setTitle}
                 maxLength={100}
@@ -163,7 +163,7 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
 
             {/* Category */}
             <SWCategorySelector
-              placeholder="Category"
+              placeholder={strings.placeholders.category}
               value={category}
               displayValue={getCategoryName()}
               onPress={() => {
@@ -179,7 +179,7 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
 
             {/* Description */}
             <SWInputField
-              placeholder="Description: Describe your item in detail"
+              placeholder={strings.placeholders.description}
                 value={description}
               onChangeText={setDescription}
                 maxLength={1000}
@@ -228,7 +228,7 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
 
             {/* Price */}
             <SWInputField
-              placeholder="Price"
+              placeholder={strings.labels.price}
                   value={price}
               onChangeText={setPrice}
                   keyboardType="decimal-pad"

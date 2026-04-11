@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { BottomSheetTextInput } from '@gorhom/bottom-sheet';
+import { useLocalization } from '../../../localization';
 
 interface FilterPriceScreenProps {
   minPrice: string;
@@ -15,12 +16,14 @@ const FilterPriceScreen: React.FC<FilterPriceScreenProps> = ({
   onChangeMinPrice,
   onChangeMaxPrice,
 }) => {
+  const { t } = useLocalization();
+
   return (
     <View style={styles.container}>
       <BottomSheetTextInput
         value={minPrice}
         onChangeText={onChangeMinPrice}
-        placeholder="Minimum"
+        placeholder={t('search.filters.minimum')}
         placeholderTextColor="#8b8b8b"
         keyboardType="numeric"
         style={styles.input}
@@ -28,7 +31,7 @@ const FilterPriceScreen: React.FC<FilterPriceScreenProps> = ({
       <BottomSheetTextInput
         value={maxPrice}
         onChangeText={onChangeMaxPrice}
-        placeholder="Maximum"
+        placeholder={t('search.filters.maximum')}
         placeholderTextColor="#8b8b8b"
         keyboardType="numeric"
         style={styles.input}
