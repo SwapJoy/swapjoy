@@ -192,10 +192,10 @@ const FollowersFollowingScreen: React.FC = memo(() => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
   },
   tabsWrapper: {
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
   },
   tabsContainer: {
     flexDirection: 'row',
@@ -214,12 +214,12 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.primaryYellow,
   },
   tabText: {
-    color: '#8E8E93',
+    color: colors.textSemiDark,
     fontSize: 15,
     fontWeight: '500',
   },
   tabTextActive: {
-    color: colors.primaryYellow,
+    color: colors.textSemiDark,
     fontWeight: '700',
   },
   loadingContainer: {
@@ -230,7 +230,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: '#666',
+    color: colors.textSemiDark,
   },
   emptyContainer: {
     flexGrow: 1,
@@ -244,7 +244,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
-    color: '#666',
+    color: colors.textSemiDark,
     textAlign: 'center',
   },
   listContent: {
@@ -253,7 +253,7 @@ const styles = StyleSheet.create({
   userItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
     padding: 12,
     marginBottom: 8,
     borderRadius: 12,
@@ -277,12 +277,12 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    color: colors.textDark,
     marginBottom: 2,
   },
   username: {
     fontSize: 14,
-    color: '#666',
+    color: colors.textSemiDark,
   },
 });
 

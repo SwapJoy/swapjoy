@@ -36,7 +36,7 @@ const TitleInputScreen: React.FC<TitleInputScreenProps> = ({
 
           <View style={styles.inputContainer}>
 
-            <SJText style={{ color: colors.white, fontSize: 28, fontWeight: '200', opacity: 0.6 }}>Enter the title</SJText>
+            <SJText style={{ color: colors.textSemiDark, fontSize: 28, fontWeight: '200', opacity: 0.6 }}>Enter the title</SJText>
 
             <SWInputField
               placeholder={t('addItem.details.placeholders.title', { defaultValue: 'Title' })}
@@ -50,7 +50,7 @@ const TitleInputScreen: React.FC<TitleInputScreenProps> = ({
           </View>
 
           <View style={styles.conditionContainer}>
-          <SJText style={{ color: colors.white, fontSize: 28, fontWeight: '200', opacity: 0.6, marginBottom: 12 }}>Condition</SJText>
+          <SJText style={{ color: colors.textSemiDark, fontSize: 28, fontWeight: '200', opacity: 0.6, marginBottom: 12 }}>Condition</SJText>
             <View style={styles.conditionChips}>
               {conditionOptions.map((cond: any) => (
                 <ConditionChip
@@ -78,7 +78,7 @@ const TitleInputScreen: React.FC<TitleInputScreenProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
   },
   scrollView: {
     flex: 1,
@@ -107,7 +107,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   required: {
-    color: '#FF3B30',
+    color: colors.textSemiDark,
   },
   conditionChips: {
     flexDirection: 'row',

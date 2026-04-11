@@ -201,6 +201,7 @@ const SearchFilterSheet: React.FC<SearchFilterSheetProps> = ({
         <FilterPriceScreen
           minPrice={draft.minPrice === null ? '' : String(draft.minPrice)}
           maxPrice={draft.maxPrice === null ? '' : String(draft.maxPrice)}
+          t={t}
           onChangeMinPrice={(value) =>
             setDraft((prev) => ({
               ...prev,
@@ -248,7 +249,7 @@ const SearchFilterSheet: React.FC<SearchFilterSheetProps> = ({
               <View style={styles.headerButton} />
             ) : (
               <TouchableOpacity style={styles.headerButton} onPress={popPage}>
-                <Ionicons name="chevron-back" size={22} color="#fff" />
+                <Ionicons name="chevron-back" size={22} color="#000000" />
               </TouchableOpacity>
             )}
             <SJText style={styles.title}>{t(`search.filters.titles.${page}`)}</SJText>
@@ -284,7 +285,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   sheetBackground: {
-    backgroundColor: '#161616',
   },
   handle: {
     width: 40,
@@ -308,11 +308,11 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 28,
-    color: '#fff',
+    color: colors.textLight,
     fontWeight: '700',
   },
   resetText: {
-    color: '#9f9f9f',
+    color: colors.textSemiDark,
     fontSize: 14,
     textAlign: 'right',
   },
@@ -333,27 +333,25 @@ const styles = StyleSheet.create({
   },
   mainLabel: {
     fontSize: 20,
-    color: '#fff',
     fontWeight: '600',
   },
   mainValue: {
     fontSize: 14,
-    marginTop: 2,
-    color: '#adadad',
+    marginTop: 2
   },
   footer: {
-    paddingHorizontal: 14,
-    paddingVertical: 14,
+    paddingHorizontal: 34,
+    paddingVertical: 28,
   },
   applyButton: {
     height: 52,
-    borderRadius: 12,
+    borderRadius: 6,
     backgroundColor: colors.primaryYellow,
     alignItems: 'center',
     justifyContent: 'center',
   },
   applyButtonText: {
-    color: colors.primaryDark,
+    color: colors.textColorLight,
     fontSize: 22,
     fontWeight: '700',
   },

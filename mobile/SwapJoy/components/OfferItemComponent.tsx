@@ -72,9 +72,8 @@ const styles = StyleSheet.create({
   card: {
     width: '100%',
     flexDirection: 'row',
-    backgroundColor: '#1a1a1a',
     borderWidth: 1,
-    borderColor: '#2f2f2f',
+    borderColor: colors.border,
     borderRadius: 12,
     overflow: 'hidden',
   },
@@ -93,18 +92,18 @@ const styles = StyleSheet.create({
     fontSize: 11,
     letterSpacing: 0.5,
     textTransform: 'uppercase',
-    color: '#9f9f9f',
+    color: colors.textSemiDark,
     marginBottom: 6,
   },
   title: {
     fontSize: 17,
     fontWeight: '700',
-    color: colors.primaryYellow,
+    color: colors.textSemiDark,
     marginBottom: 4,
   },
   subtitle: {
     fontSize: 12,
-    color: '#9a9a9a',
+    color: colors.textSemiDark,
     lineHeight: 16,
     marginBottom: 8,
   },
@@ -115,11 +114,11 @@ const styles = StyleSheet.create({
   price: {
     fontSize: 14,
     fontWeight: '700',
-    color: colors.primaryYellow,
+    color: colors.textSemiDark,
   },
   condition: {
     fontSize: 12,
-    color: '#a2a2a2',
+    color: colors.textSemiDark,
     marginLeft: 6,
   },
 });

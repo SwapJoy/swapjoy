@@ -55,7 +55,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 0.8,
-    borderColor: colors.white,
+    borderColor: colors.border,
     backgroundColor: 'transparent',
   },
   chipSelected: {
@@ -65,10 +65,10 @@ const styles = StyleSheet.create({
   chipText: {
     fontSize: 13,
     fontWeight: '300',
-    color: colors.white,
+    color: colors.textColor,
   },
   chipTextSelected: {
-    color: colors.primaryDark,
+    color: colors.textColorLight,
     fontWeight: '400',
   },
 });

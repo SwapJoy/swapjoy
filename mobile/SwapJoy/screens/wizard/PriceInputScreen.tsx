@@ -41,7 +41,7 @@ const PriceInputScreen: React.FC<PriceInputScreenProps> = ({
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-          <SJText style={styles.description}>{description}</SJText>
+      <SJText style={{ color: colors.textSemiDark, fontSize: 28, fontWeight: '200', opacity: 0.6 }}>Price</SJText>
 
           <View style={styles.inputContainer}>
             <SWInputField
@@ -79,7 +79,7 @@ const PriceInputScreen: React.FC<PriceInputScreenProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
   },
   scrollView: {
     flex: 1,
@@ -95,12 +95,13 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     flex: 1,
+    paddingTop: 12,
   },
   currencySwitcher: {
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,

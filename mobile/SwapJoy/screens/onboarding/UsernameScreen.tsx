@@ -309,7 +309,7 @@ const UsernameScreen: React.FC = () => {
           >
             {isSaving ? (
               <View style={styles.nextButtonContent}>
-                <ActivityIndicator size="small" color={colors.primaryDark} style={styles.nextButtonLoader} />
+                <ActivityIndicator size="small" color={colors.backgroundColor} style={styles.nextButtonLoader} />
                 <SJText style={styles.nextButtonText}>
                   {t('onboarding.common.saving', { defaultValue: 'Saving...' })}
                 </SJText>
@@ -329,7 +329,7 @@ const UsernameScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
   },
   keyboardView: {
     flex: 1,
@@ -356,7 +356,7 @@ const styles = StyleSheet.create({
   },
   stepIndicator: {
     fontSize: 14,
-    color: '#666',
+    color: colors.textSemiDark,
     fontWeight: '500',
   },
   content: {
@@ -371,7 +371,7 @@ const styles = StyleSheet.create({
   },
   description: {
     fontSize: 16,
-    color: '#666',
+    color: colors.textSemiDark,
     lineHeight: 24,
     marginBottom: 32,
   },
@@ -383,7 +383,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 14,
-    color: '#FF3B30',
+    color: colors.textSemiDark,
     marginLeft: 6,
   },
   savingContainer: {
@@ -393,7 +393,7 @@ const styles = StyleSheet.create({
   },
   savingText: {
     fontSize: 14,
-    color: '#007AFF',
+    color: colors.textSemiDark,
     marginLeft: 8,
   },
   footer: {
@@ -414,10 +414,10 @@ const styles = StyleSheet.create({
   nextButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: colors.primaryDark,
+    color: colors.textSemiDark,
   },
   nextButtonTextDisabled: {
-    color: '#8E8E93',
+    color: colors.textSemiDark,
   },
   nextButtonContent: {
     flexDirection: 'row',

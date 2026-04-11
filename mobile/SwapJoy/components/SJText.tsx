@@ -1,5 +1,6 @@
 import React from 'react';
 import { Text, StyleSheet, TextProps, TextStyle } from 'react-native';
+import { colors } from '@navigation/MainTabNavigator.styles';
 
 interface SJTextProps extends TextProps {
   children?: React.ReactNode;
@@ -26,7 +27,7 @@ const SJText: React.FC<SJTextProps> = (props) => {
     
     // Merge: defaultFont provides fontFamily, custom style overrides everything else
     return {
-      color: '#fff',
+      color: colors.textColor,
       ...defaultFontFlattened,
       ...customStyleFlattened,
       fontFamily, // Override with appropriate font family based on weight

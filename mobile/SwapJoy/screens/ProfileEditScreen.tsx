@@ -296,7 +296,7 @@ const ProfileEditScreen: React.FC<ProfileEditScreenProps> = ({ navigation, route
 const styles = StyleSheet.create({
   flex: {
     flex: 1,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
   },
   container: {
     paddingHorizontal: 20,
@@ -306,7 +306,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
   },
   avatarSection: {
     alignItems: 'center',
@@ -332,7 +332,7 @@ const styles = StyleSheet.create({
   },
   avatarPlaceholderText: {
     fontSize: 13,
-    color: colors.primaryYellow,
+    color: colors.textSemiDark,
     fontWeight: '500',
   },
   changePhotoButton: {
@@ -345,7 +345,7 @@ const styles = StyleSheet.create({
   },
   changePhotoText: {
     fontSize: 14,
-    color: '#000',
+    color: colors.textDark,
     fontWeight: '600',
   },
   removePhotoButton: {
@@ -353,7 +353,7 @@ const styles = StyleSheet.create({
   },
   removePhotoText: {
     fontSize: 13,
-    color: '#ef4444',
+    color: colors.textSemiDark,
     fontWeight: '500',
   },
   form: {
@@ -372,7 +372,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   saveButtonText: {
-    color: '#000',
+    color: colors.textDark,
     fontSize: 16,
     fontWeight: '700',
   },

@@ -5,6 +5,7 @@ import { useOTPVerification } from '../hooks/useOTPVerification';
 import { useAuth } from '../contexts/AuthContext';
 import { OTPVerificationScreenProps } from '../types/navigation';
 import { useLocalization } from '../localization';
+import { colors } from '@navigation/MainTabNavigator.styles';
 
 const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({ 
   navigation, 
@@ -85,7 +86,7 @@ const OTPVerificationScreen: React.FC<OTPVerificationScreenProps> = ({
               maxLength={6}
               autoFocus
               placeholder={t('auth.verification.codePlaceholder')}
-              placeholderTextColor="#ccc"
+              placeholderTextColor={colors.inputPlaceholder}
             />
           </View>
 
@@ -140,13 +141,13 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     fontSize: 16,
-    color: '#007AFF',
+    color: colors.textSemiDark,
     fontWeight: '500',
   },
   title: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: colors.textDark,
   },
   placeholder: {
     width: 60,
@@ -159,23 +160,23 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+    color: colors.textDark,
     marginBottom: 10,
   },
   description: {
     fontSize: 16,
-    color: '#666',
+    color: colors.textSemiDark,
     lineHeight: 22,
     marginBottom: 20,
     textAlign: 'center',
   },
   phoneNumber: {
     fontWeight: 'bold',
-    color: '#333',
+    color: colors.textDark,
   },
   testCode: {
     fontSize: 14,
-    color: '#007AFF',
+    color: colors.textSemiDark,
     fontWeight: 'bold',
     textAlign: 'center',
     marginBottom: 30,
@@ -208,7 +209,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ccc',
   },
   verifyButtonText: {
-    color: 'white',
+    color: colors.textLight,
     fontSize: 18,
     fontWeight: 'bold',
   },
@@ -219,14 +220,14 @@ const styles = StyleSheet.create({
   },
   resendText: {
     fontSize: 16,
-    color: '#666',
+    color: colors.textSemiDark,
   },
   resendLink: {
-    color: '#007AFF',
+    color: colors.textSemiDark,
     fontWeight: '500',
   },
   disabledText: {
-    color: '#ccc',
+    color: colors.textSemiDark,
   },
 });
 

@@ -152,7 +152,7 @@ const IntroScreen: React.FC<IntroScreenProps> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
   },
   languageContainer: {
     alignItems: 'center',
@@ -181,11 +181,11 @@ const styles = StyleSheet.create({
   },
   inlineSelectionText: {
     fontSize: 14,
-    color: '#fff',
+    color: colors.textLight,
     fontWeight: '500',
   },
   inlineSelectionTextSelected: {
-    color: colors.primaryDark,
+    color: colors.textSemiDark,
     fontWeight: '600',
   },
   scrollView: {
@@ -210,13 +210,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#fff',
+    color: colors.textLight,
     textAlign: 'center',
     marginBottom: 10,
   },
   description: {
     fontSize: 14,
-    color: '#ccc',
+    color: colors.textSemiDark,
     textAlign: 'center',
     lineHeight: 20,
   },
@@ -251,7 +251,7 @@ const styles = StyleSheet.create({
   },
   navButtonText: {
     fontSize: 16,
-    color: colors.primaryYellow,
+    color: colors.textSemiDark,
     fontWeight: '500',
   },
   getStartedButton: {
@@ -263,7 +263,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   getStartedButtonText: {
-    color: colors.primaryDark,
+    color: colors.textSemiDark,
     fontSize: 18,
     fontWeight: 'bold',
   },

@@ -294,7 +294,7 @@ const ItemPreviewScreen: React.FC<ItemPreviewScreenProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
   },
   scrollView: {
     flex: 1,
@@ -329,7 +329,7 @@ const styles = StyleSheet.create({
     width: 20,
   },
   detailsContainer: {
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
     padding: 16,
   },
   titleSection: {
@@ -362,7 +362,7 @@ const styles = StyleSheet.create({
   tagText: {
     fontSize: 14,
     fontWeight: '500',
-    color: colors.primary,
+    color: colors.textDark,
   },
   divider: {
     height: 1,
@@ -422,12 +422,12 @@ const styles = StyleSheet.create({
   failedUploadsTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#FF3B30',
+    color: colors.textSemiDark,
     marginBottom: 4,
   },
   failedUploadsMessage: {
     fontSize: 14,
-    color: '#666',
+    color: colors.textSemiDark,
     marginBottom: 12,
     lineHeight: 20,
   },
@@ -439,7 +439,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   fixUploadsButtonText: {
-    color: '#fff',
+    color: colors.textLight,
     fontSize: 14,
     fontWeight: '600',
   },

@@ -6,6 +6,7 @@ import { useCategories } from '../contexts/CategoriesContext';
 import { resolveCategoryName } from '../utils/category';
 import { SectionType } from '../types/section';
 import { ListingItem } from '../types/listing-item';
+import { colors } from '@navigation/MainTabNavigator.styles';
 
 interface UseSectionOptions {
   autoFetch?: boolean;
@@ -141,7 +142,7 @@ export const useSection = (sectionType: SectionType, options?: UseSectionOptions
               title_en: resolved,
               title_ka: resolved,
               icon: '📦',
-              color: '#e5e7eb',
+              color: colors.textSemiDark,
               slug: resolved.toLowerCase().replace(/\s+/g, '-'),
             };
           }

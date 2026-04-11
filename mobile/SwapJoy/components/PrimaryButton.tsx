@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
     paddingTop: 8,
     alignItems: 'center',
     zIndex: 1000,
@@ -183,10 +183,10 @@ const styles = StyleSheet.create({
   buttonText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#000',
+    color: 'white',
   },
   buttonTextDisabled: {
-    color: '#999',
+    color: colors.textSemiDark,
   },
 });
 

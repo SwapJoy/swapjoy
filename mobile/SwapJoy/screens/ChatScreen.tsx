@@ -215,16 +215,16 @@ const ChatScreen: React.FC<ChatScreenProps> = ({ route }) => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
   },
   container: {
     flex: 1,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
   },
   offerHeader: {
     flexDirection: 'row',
     padding: 12,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#E0E0E0',
   },
@@ -242,12 +242,12 @@ const styles = StyleSheet.create({
   offerTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#111827',
+    color: colors.textDark,
     marginBottom: 2,
   },
   offerSubtitle: {
     fontSize: 12,
-    color: '#6B7280',
+    color: colors.textSemiDark,
   },
   messagesContainer: {
     paddingHorizontal: 12,
@@ -284,22 +284,22 @@ const styles = StyleSheet.create({
   },
   messageTextOwn: {
     fontSize: 15,
-    color: colors.primaryDark,
+    color: colors.textSemiDark,
   },
   messageTextOther: {
     fontSize: 15,
-    color: '#111827',
+    color: colors.textDark,
   },
   messageTime: {
     fontSize: 11,
   },
   messageTimeOwn: {
     fontSize: 11,
-    color: 'rgba(255,255,255,0.8)',
+    color: colors.textLight,
   },
   messageTimeOther: {
     fontSize: 11,
-    color: '#6B7280',
+    color: colors.textSemiDark,
     marginTop: 4,
     textAlign: 'right',
   },
@@ -316,7 +316,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     paddingHorizontal: 8,
     paddingVertical: 8,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#E0E0E0',
   },
@@ -337,7 +337,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: '#F3F4F6',
     fontSize: 15,
-    color: '#111827',
+    color: colors.textDark,
     marginRight: 8,
   },
   sendButton: {
@@ -350,7 +350,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#9CA3AF',
   },
   sendText: {
-    color: colors.primaryDark,
+    color: colors.textSemiDark,
     fontSize: 15,
     fontWeight: '600',
   },

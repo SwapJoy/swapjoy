@@ -2,6 +2,7 @@ import React from 'react';
 import { FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
 import SJText from '../../../components/SJText';
 import { Category } from '../../../contexts/CategoriesContext';
+import { colors } from '@navigation/MainTabNavigator.styles';
 
 interface FilterCategoriesScreenProps {
   categories: Category[];
@@ -75,7 +76,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 18,
-    color: '#fff',
+    color: colors.textColor,
   },
   radio: {
     width: 22,
@@ -85,8 +86,8 @@ const styles = StyleSheet.create({
     borderColor: '#8b8b8b',
   },
   radioSelected: {
-    borderColor: '#2d8cff',
-    backgroundColor: '#2d8cff',
+    borderColor: colors.primaryYellow,
+    backgroundColor: colors.primaryYellow,
   },
   separator: {
     height: StyleSheet.hairlineWidth,

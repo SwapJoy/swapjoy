@@ -141,7 +141,7 @@ const OfferPreviewScreen: React.FC<OfferPreviewScreenProps> = ({ navigation, rou
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.primaryDark },
+  container: { flex: 1 },
   scroll: { flex: 1 },
   contentContainer: {
     paddingTop: 14,
@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#888',
+    color: colors.textSemiDark,
     marginBottom: 10,
     textTransform: 'uppercase',
     letterSpacing: 0.4,
@@ -163,33 +163,32 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   previewItemCard: {
-    borderColor: '#313131',
+    borderColor: colors.border,
   },
   infoBox: {
-    backgroundColor: '#1a1a1a',
     marginHorizontal: 16,
     marginBottom: 12,
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 12,
     borderWidth: 1,
-    borderColor: '#313131',
+    borderColor: colors.border,
   },
   infoLabel: {
     fontSize: 12,
-    color: '#8f8f8f',
+    color: colors.textSemiDark,
     marginBottom: 6,
     textTransform: 'uppercase',
     letterSpacing: 0.3,
   },
   infoValue: {
     fontSize: 15,
-    color: colors.primaryYellow,
+    color: colors.textSemiDark,
     fontWeight: '700',
   },
   message: {
     fontSize: 14,
-    color: '#c8c8c8',
+    color: colors.textSemiDark,
     lineHeight: 20,
   },
 });

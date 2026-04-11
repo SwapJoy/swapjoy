@@ -515,6 +515,9 @@ const en = {
     emptyFollowers: 'No followers yet',
     emptyFollowing: 'No following yet',
   },
+  homeScreen: {
+    forYou: 'For you',
+  },
   devRecommendation: {
     unknownError: 'Unknown error',
     loadingSettings: 'Loading settings...',

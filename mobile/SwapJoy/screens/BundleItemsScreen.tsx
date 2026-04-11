@@ -53,7 +53,7 @@ const BundleItemsScreen: React.FC<BundleItemsScreenProps> = ({ navigation, route
             onPress={() => (navigation as any).navigate('UserProfile', { userId: ownerId })}
             activeOpacity={0.8}
           >
-            <SJText style={{ color: '#007AFF', fontWeight: '600' }}>View seller profile</SJText>
+            <SJText style={{ color: colors.textSemiDark, fontWeight: '600' }}>View seller profile</SJText>
           </TouchableOpacity>
         ) : null}
       </View>
@@ -89,10 +89,10 @@ const BundleItemsScreen: React.FC<BundleItemsScreenProps> = ({ navigation, route
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
   },
   infoSection: {
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
     paddingHorizontal: 20,
     paddingVertical: 16,
     marginHorizontal: 16,
@@ -107,19 +107,19 @@ const styles = StyleSheet.create({
   bundleTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#111',
+    color: colors.textDark,
   },
   bundleSubtitle: {
     marginTop: 4,
     fontSize: 13,
-    color: '#666',
+    color: colors.textSemiDark,
   },
   list: {
     padding: 16,
     paddingBottom: 100,
   },
   itemCard: {
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
     borderRadius: 12,
     overflow: 'hidden',
     marginBottom: 12,
@@ -139,18 +139,18 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#111',
+    color: colors.textDark,
     marginBottom: 4,
   },
   price: {
     fontSize: 15,
-    color: '#007AFF',
+    color: colors.textSemiDark,
     fontWeight: '600',
     marginBottom: 2,
   },
   condition: {
     fontSize: 12,
-    color: '#777',
+    color: colors.textSemiDark,
     textTransform: 'capitalize',
   },
   offerBar: {
@@ -170,7 +170,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   offerText: {
-    color: colors.primaryDark,
+    color: colors.textSemiDark,
     fontSize: 16,
     fontWeight: '700',
   },

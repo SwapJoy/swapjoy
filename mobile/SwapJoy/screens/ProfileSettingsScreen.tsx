@@ -307,11 +307,11 @@ const ProfileSettingsScreen: React.FC<ProfileSettingsScreenProps> = ({ navigatio
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
   },
   scrollContainer: {
     padding: 16,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
   },
   title: {
     fontSize: 22,
@@ -352,8 +352,8 @@ const styles = StyleSheet.create({
   },
   itemTextWrap: { flex: 1 },
   itemTitle: { fontSize: 16, fontWeight: '500' },
-  itemSubtitle: { fontSize: 13, marginTop: 2, color: '#9ca3af' },
-  itemArrow: { fontSize: 20, color: '#c2c2c2' },
+  itemSubtitle: { fontSize: 13, marginTop: 2, color: colors.textSemiDark },
+  itemArrow: { fontSize: 20, color: colors.textSemiDark },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
@@ -362,11 +362,10 @@ const styles = StyleSheet.create({
   sectionSubtitle: {
     fontSize: 13,
     marginBottom: 8,
-    color: '#9ca3af',
+    color: colors.textSemiDark,
   },
   switcherContainer: {
     flexDirection: 'row',
-    backgroundColor: colors.primaryBlue,
     borderRadius: 12,
     marginTop: 8,
   },
@@ -390,7 +389,7 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 10,
   },
   switcherOptionActive: {
-    backgroundColor: '#f1f5f9',
+    backgroundColor: colors.primaryYellowLight,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
@@ -408,25 +407,25 @@ const styles = StyleSheet.create({
   },
   switcherText: {
     fontSize: 13,
-    color: '#64748b',
+    color: colors.textSemiDark,
     fontWeight: '500',
   },
   switcherTextActive: {
-    color: '#0f172a',
+    color: colors.textDark,
     fontWeight: '600',
   },
   switcherSymbol: {
     fontSize: 11,
-    color: '#94a3b8',
+    color: colors.textSemiDark,
     fontWeight: '500',
   },
   switcherSymbolActive: {
-    color: '#475569',
+    color: colors.textSemiDark,
     fontWeight: '600',
   },
-  dangerCard: { backgroundColor: colors.primaryDark, borderRadius: 12, padding: 12 },
+  dangerCard: { backgroundColor: colors.backgroundColor, borderRadius: 12, width: '30%', alignSelf: 'center' },
   dangerButton: { backgroundColor: '#FF3B30', borderRadius: 10, alignItems: 'center', paddingVertical: 14 },
-  dangerText: { fontSize: 16, fontWeight: '700' },
+  dangerText: { fontSize: 16, fontWeight: '700', color: colors.textColorLight },
 });
 
 export default ProfileSettingsScreen;

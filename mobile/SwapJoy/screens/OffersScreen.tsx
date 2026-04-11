@@ -162,10 +162,10 @@ const OffersScreen: React.FC<OffersScreenProps> = memo(({ route, navigation }) =
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
   },
   tabsWrapper: {
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
   },
   tabsContainer: {
     flexDirection: 'row',
@@ -186,10 +186,10 @@ const styles = StyleSheet.create({
   tabText: {
     fontSize: 15,
     fontWeight: '500',
-    color: '#8e8e8e',
+    color: colors.textSemiDark,
   },
   tabTextActive: {
-    color: colors.primaryYellow,
+    color: colors.textSemiDark,
     fontWeight: '700',
   },
   listContainer: {
@@ -206,12 +206,12 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#e3e3e3',
+    color: colors.textSemiDark,
     marginBottom: 8,
   },
   emptySubtitle: {
     fontSize: 14,
-    color: '#9e9e9e',
+    color: colors.textSemiDark,
     textAlign: 'center',
   },
   offerSkeletonCard: {

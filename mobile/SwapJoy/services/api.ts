@@ -477,7 +477,18 @@ export class ApiService {
         }
         
         if (data && Array.isArray(data.items) && data.items.length > 0) {
-          return { data: data.items, error: null } as any;
+          const normalizedItems = data.items.map((item: any) => {
+            const category = item?.category ?? null;
+            const category_name_en = item?.category_name_en ?? category?.title_en ?? null;
+            const category_name_ka = item?.category_name_ka ?? category?.title_ka ?? null;
+            return {
+              ...item,
+              category_name_en,
+              category_name_ka,
+              category_name: item?.category_name ?? category_name_en ?? category_name_ka ?? null,
+            };
+          });
+          return { data: normalizedItems, error: null } as any;
         }
 
         // Edge function can miss short keyword searches (e.g. "ESP").
@@ -499,11 +510,7 @@ export class ApiService {
               location_lng,
               created_at,
               updated_at,
-              image_url,
               images,
-              category_name,
-              category_name_en,
-              category_name_ka,
               category:categories!items_category_id_fkey(title_en, title_ka),
               user:users!items_user_id_fkey(id, username, first_name, last_name, profile_image_url)
             `)
@@ -524,7 +531,18 @@ export class ApiService {
 
           const { data: fallbackData, error: fallbackError } = await fallbackQuery;
           if (!fallbackError && Array.isArray(fallbackData) && fallbackData.length > 0) {
-            return { data: fallbackData, error: null } as any;
+            const normalizedFallbackData = fallbackData.map((item: any) => {
+              const category = item?.category ?? null;
+              const category_name_en = category?.title_en ?? null;
+              const category_name_ka = category?.title_ka ?? null;
+              return {
+                ...item,
+                category_name_en,
+                category_name_ka,
+                category_name: category_name_en ?? category_name_ka ?? null,
+              };
+            });
+            return { data: normalizedFallbackData, error: null } as any;
           }
 
           let descriptionFallbackQuery = client
@@ -543,11 +561,7 @@ export class ApiService {
               location_lng,
               created_at,
               updated_at,
-              image_url,
               images,
-              category_name,
-              category_name_en,
-              category_name_ka,
               category:categories!items_category_id_fkey(title_en, title_ka),
               user:users!items_user_id_fkey(id, username, first_name, last_name, profile_image_url)
             `)
@@ -568,7 +582,18 @@ export class ApiService {
 
           const { data: descriptionFallbackData, error: descriptionFallbackError } = await descriptionFallbackQuery;
           if (!descriptionFallbackError && Array.isArray(descriptionFallbackData) && descriptionFallbackData.length > 0) {
-            return { data: descriptionFallbackData, error: null } as any;
+            const normalizedDescriptionFallbackData = descriptionFallbackData.map((item: any) => {
+              const category = item?.category ?? null;
+              const category_name_en = category?.title_en ?? null;
+              const category_name_ka = category?.title_ka ?? null;
+              return {
+                ...item,
+                category_name_en,
+                category_name_ka,
+                category_name: category_name_en ?? category_name_ka ?? null,
+              };
+            });
+            return { data: normalizedDescriptionFallbackData, error: null } as any;
           }
         }
         

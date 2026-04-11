@@ -5,6 +5,7 @@ import { useNavigation } from '@react-navigation/native';
 import CameraScreen from './CameraScreen';
 import MainTabNavigator from '../navigation/MainTabNavigator';
 import { useAuth } from '../contexts/AuthContext';
+import { colors } from '@navigation/MainTabNavigator.styles';
 
 const { width } = Dimensions.get('window');
 
@@ -116,10 +117,12 @@ const MainPageContainer: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: colors.backgroundColor,
   },
   page: {
     width: width,
     flex: 1,
+    backgroundColor: colors.backgroundColor,
   },
 });
 

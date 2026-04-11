@@ -2,6 +2,7 @@ import React from 'react';
 import { FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
 import SJText from '../../../components/SJText';
 import { City } from '../../../contexts/LocationContext';
+import { colors } from '@navigation/MainTabNavigator.styles';
 
 interface FilterLocationScreenProps {
   cities: City[];
@@ -57,18 +58,18 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 18,
-    color: '#fff',
+    color: colors.textColor,
   },
   radio: {
     width: 22,
     height: 22,
     borderRadius: 11,
     borderWidth: 2,
-    borderColor: '#8b8b8b',
+    borderColor: colors.primaryYellow,
   },
   radioSelected: {
-    borderColor: '#2d8cff',
-    backgroundColor: '#2d8cff',
+    borderColor: colors.primaryYellow,
+    backgroundColor: colors.primaryYellow,
   },
   separator: {
     height: StyleSheet.hairlineWidth,

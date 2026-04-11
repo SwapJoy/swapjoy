@@ -207,7 +207,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   sheetBackground: {
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
   },
   handle: {
     width: 40,
@@ -229,7 +229,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 22,
-    color: '#fff',
+    color: colors.textLight,
     fontWeight: '700',
     textAlign: 'center',
   },
@@ -253,7 +253,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 15,
-    color: '#9f9f9f',
+    color: colors.textSemiDark,
     textAlign: 'center',
   },
   horizontalScroll: {
@@ -301,7 +301,7 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#333',
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
   },
   nextBtn: {
     height: 52,
@@ -311,7 +311,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   nextText: {
-    color: colors.primaryDark,
+    color: colors.textColorLight,
     fontSize: 18,
     fontWeight: '700',
   },

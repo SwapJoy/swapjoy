@@ -103,7 +103,7 @@ const NameScreen: React.FC = () => {
               <TextInput
                 style={styles.input}
                 placeholder={t('onboarding.name.firstNamePlaceholder', { defaultValue: 'Enter your first name' })}
-                placeholderTextColor="#999"
+                placeholderTextColor={colors.inputPlaceholder}
                 value={firstName}
                 onChangeText={setFirstName}
                 autoCapitalize="words"
@@ -118,7 +118,7 @@ const NameScreen: React.FC = () => {
               <TextInput
                 style={styles.input}
                 placeholder={t('onboarding.name.lastNamePlaceholder', { defaultValue: 'Enter your last name' })}
-                placeholderTextColor="#999"
+                placeholderTextColor={colors.inputPlaceholder}
                 value={lastName}
                 onChangeText={setLastName}
                 autoCapitalize="words"
@@ -167,7 +167,7 @@ const NameScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
   },
   keyboardView: {
     flex: 1,
@@ -194,7 +194,7 @@ const styles = StyleSheet.create({
   },
   stepIndicator: {
     fontSize: 14,
-    color: '#666',
+    color: colors.textSemiDark,
     fontWeight: '500',
   },
   content: {
@@ -205,12 +205,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#000',
+    color: colors.textDark,
     marginBottom: 12,
   },
   description: {
     fontSize: 16,
-    color: '#666',
+    color: colors.textSemiDark,
     lineHeight: 24,
     marginBottom: 32,
   },
@@ -220,7 +220,7 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#000',
+    color: colors.textDark,
     marginBottom: 8,
   },
   input: {
@@ -230,7 +230,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 16,
-    color: '#000',
+    color: colors.textDark,
     backgroundColor: '#F8F8F8',
   },
   savingContainer: {
@@ -240,7 +240,7 @@ const styles = StyleSheet.create({
   },
   savingText: {
     fontSize: 14,
-    color: '#007AFF',
+    color: colors.textSemiDark,
     marginLeft: 8,
   },
   footer: {
@@ -264,7 +264,7 @@ const styles = StyleSheet.create({
   skipButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#666',
+    color: colors.textSemiDark,
   },
   nextButton: {
     flex: 1,
@@ -277,7 +277,7 @@ const styles = StyleSheet.create({
   nextButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: colors.primaryDark,
+    color: colors.textSemiDark,
   },
 });
 

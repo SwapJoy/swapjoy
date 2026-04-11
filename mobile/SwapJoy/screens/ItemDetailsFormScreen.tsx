@@ -132,12 +132,12 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
                     hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
                   >
                     <View style={styles.imageRemoveCircle}>
-                      <Ionicons name="close" size={12} color={colors.primaryDark} />
+                      <Ionicons name="close" size={12} color={colors.backgroundColor} />
                     </View>
                   </TouchableOpacity>
                   {!img.uploaded && (
                     <View style={styles.imageUploadingOverlay}>
-                      <ActivityIndicator size="small" color={colors.primaryDark} />
+                      <ActivityIndicator size="small" color={colors.backgroundColor} />
                     </View>
                   )}
                   {img.uploaded && (
@@ -284,7 +284,7 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
             <Ionicons 
               name="arrow-forward" 
               size={20} 
-              color={(uploading || images.length === 0) ? '#999' : colors.primaryDark} 
+              color={(uploading || images.length === 0) ? '#999' : colors.backgroundColor} 
             />
           </TouchableOpacity>
         </View>
@@ -339,7 +339,7 @@ const ItemDetailsFormScreen: React.FC<ItemDetailsFormScreenProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
   },
   loadingContainer: {
     flex: 1,
@@ -349,7 +349,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 10,
     fontSize: 16,
-    color: '#666',
+    color: colors.textSemiDark,
   },
   header: {
     backgroundColor: colors.primaryYellow,
@@ -376,7 +376,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: colors.primary,
+    color: colors.textDark,
     letterSpacing: 0.3,
   },
   headerSpacer: {
@@ -397,7 +397,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   uploadProgressContainer: {
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
     padding: 16,
     marginBottom: 8,
   },
@@ -422,7 +422,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primaryYellow,
   },
   imagePreviewContainer: {
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
     paddingVertical: 16,
     paddingLeft: 16,
     marginBottom: 8,
@@ -469,7 +469,7 @@ const styles = StyleSheet.create({
     right: 4,
   },
   formContainer: {
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
     padding: 16,
   },
   fieldContainer: {
@@ -484,13 +484,13 @@ const styles = StyleSheet.create({
   fieldLabel: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1a1a1a',
+    color: colors.textDark,
   },
   fieldLoadingIndicator: {
     marginLeft: 8,
   },
   required: {
-    color: '#FF3B30',
+    color: colors.textSemiDark,
   },
   textInput: {
     borderWidth: 1,
@@ -498,8 +498,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
-    color: '#1a1a1a',
-    backgroundColor: colors.primaryDark,
+    color: colors.textDark,
+    backgroundColor: colors.backgroundColor,
   },
   textInputDisabled: {
     backgroundColor: '#f5f5f5',
@@ -511,7 +511,7 @@ const styles = StyleSheet.create({
   },
   charCount: {
     fontSize: 12,
-    color: '#8e8e93',
+    color: colors.textSemiDark,
     textAlign: 'right',
     marginTop: 4,
   },
@@ -531,10 +531,10 @@ const styles = StyleSheet.create({
   },
   pickerButtonText: {
     fontSize: 16,
-    color: '#1a1a1a',
+    color: colors.textDark,
   },
   placeholder: {
-    color: '#8e8e93',
+    color: colors.textSemiDark,
   },
   valueInputContainer: {
     flexDirection: 'row',
@@ -543,7 +543,7 @@ const styles = StyleSheet.create({
   currencySymbol: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1a1a1a',
+    color: colors.textDark,
     marginRight: 8,
   },
   valueInput: {
@@ -552,16 +552,16 @@ const styles = StyleSheet.create({
   locationStatus: {
     marginTop: 6,
     fontSize: 12,
-    color: '#0ea5e9',
+    color: colors.textSemiDark,
   },
   locationCoordinates: {
     marginTop: 6,
     fontSize: 12,
-    color: '#64748b',
+    color: colors.textSemiDark,
   },
   footer: {
     padding: 16,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
   },
@@ -580,10 +580,10 @@ const styles = StyleSheet.create({
   nextButtonText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#000',
+    color: colors.textDark,
   },
   nextButtonTextDisabled: {
-    color: '#999',
+    color: colors.textSemiDark,
   },
   modalOverlay: {
     flex: 1,
@@ -591,7 +591,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     maxHeight: '70%',
@@ -607,7 +607,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1a1a1a',
+    color: colors.textDark,
   },
   modalItem: {
     flexDirection: 'row',
@@ -622,7 +622,7 @@ const styles = StyleSheet.create({
   },
   modalItemText: {
     fontSize: 16,
-    color: '#1a1a1a',
+    color: colors.textDark,
   },
   inlineSelectionContainer: {
     flexDirection: 'row',
@@ -650,11 +650,11 @@ const styles = StyleSheet.create({
   },
   inlineSelectionText: {
     fontSize: 14,
-    color: '#1a1a1a',
+    color: colors.textDark,
     fontWeight: '500',
   },
   inlineSelectionTextSelected: {
-    color: colors.primaryDark,
+    color: colors.textSemiDark,
   },
   fieldContainerWithLabel: {
     marginBottom: 24,
@@ -684,7 +684,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,

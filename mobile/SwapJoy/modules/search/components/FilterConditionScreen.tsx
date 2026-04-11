@@ -3,6 +3,7 @@ import { FlatList, StyleSheet, TouchableOpacity, View } from 'react-native';
 import SJText from '../../../components/SJText';
 import { getConditionPresentation } from '../../../utils/conditions';
 import type { AppLanguage } from '../../../types/language';
+import { colors } from '@navigation/MainTabNavigator.styles';
 
 const CONDITION_KEYS = ['mint', 'new', 'like_new', 'excellent', 'good', 'fair', 'poor'];
 
@@ -86,18 +87,18 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 18,
-    color: '#fff',
+    color: colors.textColor,
   },
   checkbox: {
     width: 22,
     height: 22,
     borderRadius: 5,
     borderWidth: 2,
-    borderColor: '#8b8b8b',
+    borderColor: colors.primaryYellow,
   },
   checkboxSelected: {
-    borderColor: '#2d8cff',
-    backgroundColor: '#2d8cff',
+    borderColor: colors.primaryYellow,
+    backgroundColor: colors.primaryYellow,
   },
   separator: {
     height: StyleSheet.hairlineWidth,

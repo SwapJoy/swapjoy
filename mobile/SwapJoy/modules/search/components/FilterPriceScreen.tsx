@@ -1,13 +1,14 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { BottomSheetTextInput } from '@gorhom/bottom-sheet';
-import { useLocalization } from '../../../localization';
+import { colors } from '@navigation/MainTabNavigator.styles';
 
 interface FilterPriceScreenProps {
   minPrice: string;
   maxPrice: string;
   onChangeMinPrice: (value: string) => void;
   onChangeMaxPrice: (value: string) => void;
+  t: (key: string, options?: { defaultValue?: string }) => string;
 }
 
 const FilterPriceScreen: React.FC<FilterPriceScreenProps> = ({
@@ -15,16 +16,15 @@ const FilterPriceScreen: React.FC<FilterPriceScreenProps> = ({
   maxPrice,
   onChangeMinPrice,
   onChangeMaxPrice,
+  t,
 }) => {
-  const { t } = useLocalization();
-
   return (
     <View style={styles.container}>
       <BottomSheetTextInput
         value={minPrice}
         onChangeText={onChangeMinPrice}
         placeholder={t('search.filters.minimum')}
-        placeholderTextColor="#8b8b8b"
+        placeholderTextColor={colors.inputPlaceholder}
         keyboardType="numeric"
         style={styles.input}
       />
@@ -32,7 +32,7 @@ const FilterPriceScreen: React.FC<FilterPriceScreenProps> = ({
         value={maxPrice}
         onChangeText={onChangeMaxPrice}
         placeholder={t('search.filters.maximum')}
-        placeholderTextColor="#8b8b8b"
+        placeholderTextColor={colors.inputPlaceholder}
         keyboardType="numeric"
         style={styles.input}
       />
@@ -51,12 +51,11 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 52,
     borderWidth: 1,
-    borderColor: '#3c3c3c',
+    borderColor: colors.border,
     borderRadius: 10,
-    color: '#fff',
+    color: colors.textColor,
     fontSize: 18,
-    paddingHorizontal: 14,
-    backgroundColor: '#1f1f1f',
+    paddingHorizontal: 14
   },
 });
 

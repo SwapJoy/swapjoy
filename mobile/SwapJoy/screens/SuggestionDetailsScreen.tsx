@@ -48,20 +48,20 @@ const SuggestionDetailsScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.primaryDark },
+  container: { flex: 1, backgroundColor: colors.backgroundColor },
   header: { padding: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#eee' },
-  title: { fontSize: 18, fontWeight: '700', color: '#1a1a1a' },
-  subtitle: { fontSize: 12, color: '#707070', marginTop: 4 },
-  total: { fontSize: 14, color: '#007AFF', fontWeight: '700', marginTop: 6 },
+  title: { fontSize: 18, fontWeight: '700', color: colors.textDark },
+  subtitle: { fontSize: 12, color: colors.textSemiDark, marginTop: 4 },
+  total: { fontSize: 14, color: colors.textSemiDark, fontWeight: '700', marginTop: 6 },
   row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8 },
   sep: { height: StyleSheet.hairlineWidth, backgroundColor: '#eee' },
   thumb: { width: 48, height: 48, borderRadius: 8, backgroundColor: '#eee' },
   info: { flex: 1, marginLeft: 10 },
-  itemTitle: { fontSize: 14, color: '#1a1a1a', fontWeight: '600' },
-  itemId: { fontSize: 11, color: '#707070', marginTop: 2 },
-  itemPrice: { fontSize: 14, color: '#007AFF', fontWeight: '700' },
+  itemTitle: { fontSize: 14, color: colors.textDark, fontWeight: '600' },
+  itemId: { fontSize: 11, color: colors.textSemiDark, marginTop: 2 },
+  itemPrice: { fontSize: 14, color: colors.textSemiDark, fontWeight: '700' },
   closeBtn: { position: 'absolute', bottom: 24, right: 24, backgroundColor: '#1f7ae0', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10 },
-  closeText: { color: colors.primaryDark, fontWeight: '700' },
+  closeText: { color: colors.textSemiDark, fontWeight: '700' },
 });
 
 export default SuggestionDetailsScreen;

@@ -136,7 +136,7 @@ const AmountInputBottomSheet: React.FC<AmountInputBottomSheetProps> = ({
             <BottomSheetTextInput
               style={styles.amountInput}
               placeholder={draftWillAddMoney ? placeholderAdd : placeholderRequest}
-              placeholderTextColor="#8e8e93"
+              placeholderTextColor="#7b7b7b"
               keyboardType="decimal-pad"
               value={draftAmount}
               onChangeText={setDraftAmount}
@@ -164,7 +164,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   sheetBackground: {
-    backgroundColor: '#161616',
+    
   },
   handle: {
     width: 40,
@@ -199,24 +199,23 @@ const styles = StyleSheet.create({
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderBottomWidth: 0.5,
-    borderBottomColor: colors.primaryYellow,
-    paddingBottom: 8,
+    gap: 10,
   },
   amountInput: {
     flex: 1,
-    minHeight: 24,
-    color: '#fff',
-    fontSize: 16,
-    paddingVertical: 8,
-    paddingHorizontal: 0,
+    minHeight: 52,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+    color: colors.textColor,
+    fontSize: 18,
+    paddingHorizontal: 14,
   },
   currencySwitcher: {
-    marginLeft: 8,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.textColorLight,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
@@ -230,7 +229,7 @@ const styles = StyleSheet.create({
     alignItems: 'stretch',
     paddingTop: 0,
     paddingBottom: 0,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.textColorLight,
   },
   actionButton: {
     backgroundColor: colors.primaryYellow,
@@ -240,7 +239,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   actionButtonText: {
-    color: colors.primaryDark,
+    color: colors.textColorLight,
     fontSize: 18,
     fontWeight: '700',
   },

@@ -32,10 +32,10 @@ const ka = {
     description: 'აღწერა',
     price: 'ფასი',
     location: 'მდებარეობა',
-    preview: 'პრევიუ',
+    preview: 'გადახედვა',
     bundle: 'კომპლექტი',
     createOffer: 'შეთავაზების შექმნა',
-    previewOffer: 'შეთავაზების პრევიუ',
+    previewOffer: 'შეთავაზების დათვალიერება',
     settings: 'პარამეტრები',
     selectCategories: 'კატეგორიების არჩევა',
     editProfile: 'პროფილის რედაქტირება',
@@ -360,8 +360,8 @@ const ka = {
       uploadingImagesMessage: 'დაიცადეთ, სანამ სურათები აიტვირთება',
     },
     preview: {
-      title: 'პრევიუ',
-      loading: 'პრივიუსი იტვირთება...',
+      title: 'დათვალიერება',
+      loading: 'იტვირთება...',
       descriptionTitle: 'აღწერა',
       infoTitle: 'ნივთის ინფორმაცია',
       info: {
@@ -401,7 +401,7 @@ const ka = {
     recentSearches: 'ბოლო ძიებები',
     categories: 'კატეგორიები',
     searchPrompt: 'რის ყიდვას ეძებ?',
-    clearAll: 'ყველას გასუფთავება',
+    clearAll: 'გასუფთავება',
     filters: {
       any: 'ნებისმიერი',
       minimum: 'მინიმუმი',
@@ -473,7 +473,7 @@ const ka = {
       evenSwap: 'თანასწორი გაცვლა',
       youAdd: 'შენ დაამატებ {amount}',
       theyAdd: 'ისინი დაამატებენ {amount}',
-      submitButton: 'შეთავაზების გაგზავნა',
+      submitButton: 'გაგზავნა',
       submittingButton: 'იგზავნება...',
       alerts: {
         failedTitle: 'შეთავაზება ვერ გაიგზავნა',
@@ -514,6 +514,9 @@ const ka = {
   followersFollowing: {
     emptyFollowers: 'გამომწერები ჯერ არ არის',
     emptyFollowing: 'გამოწერები ჯერ არ არის',
+  },
+  homeScreen: {
+    forYou: 'შენთვის',
   },
   devRecommendation: {
     unknownError: 'უცნობი შეცდომა',

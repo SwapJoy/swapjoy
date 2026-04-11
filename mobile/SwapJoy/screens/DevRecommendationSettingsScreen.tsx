@@ -434,7 +434,7 @@ const DevRecommendationSettingsScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
   },
   scrollView: {
     flex: 1,
@@ -450,7 +450,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 14,
-    color: '#666',
+    color: colors.textSemiDark,
   },
   header: {
     marginBottom: 24,
@@ -458,16 +458,16 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#000',
+    color: colors.textDark,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 14,
-    color: '#666',
+    color: colors.textSemiDark,
     lineHeight: 20,
   },
   section: {
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
@@ -480,12 +480,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#000',
+    color: colors.textDark,
     marginBottom: 8,
   },
   sectionDescription: {
     fontSize: 13,
-    color: '#666',
+    color: colors.textSemiDark,
     marginBottom: 20,
     lineHeight: 18,
   },
@@ -501,16 +501,16 @@ const styles = StyleSheet.create({
   sliderLabel: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#000',
+    color: colors.textDark,
   },
   sliderValue: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#007AFF',
+    color: colors.textSemiDark,
   },
   sliderDescription: {
     fontSize: 12,
-    color: '#666',
+    color: colors.textSemiDark,
     marginBottom: 12,
     lineHeight: 16,
   },
@@ -548,7 +548,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
     borderWidth: 2,
-    borderColor: colors.primaryDark,
+    borderColor: colors.backgroundColor,
   },
   quickButtons: {
     flexDirection: 'row',
@@ -564,7 +564,7 @@ const styles = StyleSheet.create({
   quickButtonText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#007AFF',
+    color: colors.textSemiDark,
   },
   valueContainer: {
     flexDirection: 'row',
@@ -573,7 +573,7 @@ const styles = StyleSheet.create({
   valueInput: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#007AFF',
+    color: colors.textSemiDark,
     minWidth: 40,
     textAlign: 'right',
     paddingHorizontal: 4,
@@ -581,7 +581,7 @@ const styles = StyleSheet.create({
   percentSign: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#007AFF',
+    color: colors.textSemiDark,
   },
   sliderLabels: {
     flexDirection: 'row',
@@ -590,7 +590,7 @@ const styles = StyleSheet.create({
   },
   sliderLabelText: {
     fontSize: 11,
-    color: '#999',
+    color: colors.textSemiDark,
   },
   infoSection: {
     backgroundColor: '#E8F4FD',
@@ -601,12 +601,12 @@ const styles = StyleSheet.create({
   infoTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#000',
+    color: colors.textDark,
     marginBottom: 12,
   },
   infoText: {
     fontSize: 13,
-    color: '#333',
+    color: colors.textDark,
     marginBottom: 8,
     lineHeight: 18,
   },
@@ -622,7 +622,7 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     backgroundColor: '#007AFF',
-    color: colors.primaryDark,
+    color: colors.textSemiDark,
     fontSize: 16,
     fontWeight: '700',
     textAlign: 'center',
@@ -632,7 +632,7 @@ const styles = StyleSheet.create({
   },
   resetButton: {
     backgroundColor: '#F2F2F7',
-    color: '#000',
+    color: colors.textDark,
     fontSize: 16,
     fontWeight: '600',
     textAlign: 'center',
@@ -654,7 +654,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   testButtonText: {
-    color: colors.primaryDark,
+    color: colors.textSemiDark,
     fontSize: 14,
     fontWeight: '600',
   },

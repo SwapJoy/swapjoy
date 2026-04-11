@@ -408,7 +408,7 @@ const LocationInput: React.FC<LocationInputProps> = ({
       <TextInput
         style={styles.locationInput}
         placeholder={placeholder}
-        placeholderTextColor="#94a3b8"
+        placeholderTextColor={colors.inputPlaceholder}
         value={value}
         onChangeText={onChangeText}
         onFocus={onFocus}
@@ -821,7 +821,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   popoverContainer: {
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     shadowColor: '#000',
@@ -925,10 +925,10 @@ const styles = StyleSheet.create({
   },
   categoryChipText: {
     fontSize: 14,
-    color: '#0f172a',
+    color: colors.textDark,
   },
   categoryChipTextSelected: {
-    color: '#0ea5e9',
+    color: colors.textSemiDark,
     fontWeight: '500',
   },
   seeMoreButton: {
@@ -959,11 +959,11 @@ const styles = StyleSheet.create({
   },
   distanceOptionText: {
     fontSize: 14,
-    color: '#0f172a',
+    color: colors.textDark,
   },
 
   distanceOptionTextSelected: {
-    color: '#0ea5e9',
+    color: colors.textSemiDark,
     fontWeight: '600',
   },
   locationInputContainer: {
@@ -985,7 +985,7 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     marginRight: 8,
     fontSize: 14,
-    color: '#0f172a',
+    color: colors.textDark,
     paddingRight: 32,
   },
   currentLocationButton: {
@@ -1030,11 +1030,11 @@ const styles = StyleSheet.create({
   citySuggestionName: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#0f172a',
+    color: colors.textDark,
   },
   citySuggestionCountry: {
     fontSize: 12,
-    color: '#64748b',
+    color: colors.textSemiDark,
     marginTop: 2,
   },
   mapContainer: {
@@ -1060,7 +1060,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 14,
     fontWeight: '500',
-    color: '#64748b',
+    color: colors.textSemiDark,
   },
   footer: {
     flexDirection: 'row',
@@ -1069,7 +1069,7 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#e2e8f0',
     gap: 12,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
     flexShrink: 0,
   },
   clearButton: {
@@ -1085,7 +1085,7 @@ const styles = StyleSheet.create({
   clearButtonText: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#64748b',
+    color: colors.textSemiDark,
   },
   applyButton: {
     flex: 2,
@@ -1098,7 +1098,7 @@ const styles = StyleSheet.create({
   applyButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: colors.primary,
+    color: colors.textDark,
   },
   priceSliderContainer: {
     marginTop: 8,
@@ -1113,7 +1113,7 @@ const styles = StyleSheet.create({
   },
   priceLabel: {
     fontSize: 12,
-    color: '#64748b',
+    color: colors.textSemiDark,
     marginBottom: 4,
   },
   priceValue: {

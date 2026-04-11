@@ -121,7 +121,7 @@ const PhoneSignInScreen: React.FC<PhoneSignInScreenProps> = ({ navigation }) => 
               <ActivityIndicator color="white" />
             ) : (
               <>
-                <Ionicons name="logo-google" size={20} color={colors.primaryDark} style={styles.googleIcon} />
+                <Ionicons name="logo-google" size={20} color={colors.backgroundColor} style={styles.googleIcon} />
                 <SJText style={styles.googleButtonText}>{t('auth.common.continueWithGoogle')}</SJText>
               </>
             )}
@@ -135,7 +135,7 @@ const PhoneSignInScreen: React.FC<PhoneSignInScreenProps> = ({ navigation }) => 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
   },
   keyboardView: {
     flex: 1,
@@ -154,13 +154,13 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     fontSize: 16,
-    color: '#007AFF',
+    color: colors.textSemiDark,
     fontWeight: '500',
   },
   title: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: colors.textDark,
   },
   placeholder: {
     width: 60,
@@ -173,12 +173,12 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+    color: colors.textDark,
     marginBottom: 10,
   },
   description: {
     fontSize: 16,
-    color: '#666',
+    color: colors.textSemiDark,
     lineHeight: 22,
     marginBottom: 40,
   },
@@ -194,14 +194,14 @@ const styles = StyleSheet.create({
   },
   countryCode: {
     fontSize: 18,
-    color: '#333',
+    color: colors.textDark,
     fontWeight: '500',
     marginRight: 10,
   },
   phoneInput: {
     flex: 1,
     fontSize: 18,
-    color: '#333',
+    color: colors.textDark,
     paddingVertical: 15,
   },
   sendButton: {
@@ -214,7 +214,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ccc',
   },
   sendButtonText: {
-    color: 'white',
+    color: colors.textLight,
     fontSize: 18,
     fontWeight: 'bold',
   },
@@ -230,7 +230,7 @@ const styles = StyleSheet.create({
   },
   dividerText: {
     marginHorizontal: 15,
-    color: '#999',
+    color: colors.textSemiDark,
     fontSize: 14,
   },
   emailButton: {
@@ -248,7 +248,7 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   emailButtonText: {
-    color: '#007AFF',
+    color: colors.textSemiDark,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -265,7 +265,7 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   googleButtonText: {
-    color: 'white',
+    color: colors.textLight,
     fontSize: 16,
     fontWeight: '600',
   },

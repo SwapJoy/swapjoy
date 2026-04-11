@@ -36,6 +36,34 @@ const customFetch = async (url: RequestInfo | URL, options?: RequestInit) => {
   }
 
   const urlString = typeof url === 'string' ? url : url.toString();
+  let requestUrl = urlString;
+
+  // Temporary DB-compat guard: strip legacy projections from `items` REST selects.
+  // Some older call paths may still request removed columns.
+  if (requestUrl.includes('/rest/v1/items?') && requestUrl.includes('select=')) {
+    try {
+      const parsedUrl = new URL(requestUrl);
+      const select = parsedUrl.searchParams.get('select');
+
+      if (select) {
+        const legacyColumns = ['image_url', 'category_name', 'category_name_en', 'category_name_ka'];
+        let sanitizedSelect = select;
+
+        for (const column of legacyColumns) {
+          sanitizedSelect = sanitizedSelect.replace(new RegExp(`(^|,)${column}(?=,|$)`, 'g'), '$1');
+        }
+
+        sanitizedSelect = sanitizedSelect
+          .replace(/,,+/g, ',')
+          .replace(/^,|,$/g, '');
+
+        parsedUrl.searchParams.set('select', sanitizedSelect);
+        requestUrl = parsedUrl.toString();
+      }
+    } catch {
+      // Keep original URL if parsing fails; request will behave as before.
+    }
+  }
   
   // CRITICAL: Ensure apikey header is present - Supabase requires this for all requests
   // Merge headers properly to preserve Supabase's internal headers (apikey, authorization, etc.)
@@ -85,8 +113,8 @@ const customFetch = async (url: RequestInfo | URL, options?: RequestInit) => {
     }).catch(() => {});
     // #endregion
     
-    console.log('[Supabase] Fetching:', urlString.substring(0, 100), 'hasApikey:', headers.has('apikey'));
-    const fetchPromise = fetch(url, {
+    console.log('[Supabase] Fetching:', requestUrl.substring(0, 100), 'hasApikey:', headers.has('apikey'));
+    const fetchPromise = fetch(requestUrl, {
       ...options,
       headers: headers,
     });
@@ -126,7 +154,7 @@ const customFetch = async (url: RequestInfo | URL, options?: RequestInit) => {
         console.error('[Supabase] Fetch error:', {
           status: response.status,
           statusText: response.statusText,
-          url: urlString.substring(0, 100),
+          url: requestUrl.substring(0, 100),
           body: errorText?.slice(0, 500) || ''
         });
         if (response.status === 401) {

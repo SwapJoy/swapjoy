@@ -28,7 +28,7 @@ const CreateListingScreen: React.FC<CreateListingScreenProps> = ({ navigation })
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
   },
   content: {
     flex: 1,
@@ -39,12 +39,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#1a1a1a',
+    color: colors.textDark,
     marginBottom: 10,
   },
   subtitle: {
     fontSize: 16,
-    color: '#666',
+    color: colors.textSemiDark,
     marginBottom: 30,
   },
   button: {
@@ -54,7 +54,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   buttonText: {
-    color: colors.primaryDark,
+    color: colors.textSemiDark,
     fontSize: 16,
     fontWeight: 'bold',
   },

@@ -301,7 +301,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(15, 23, 42, 0.5)',
   },
   sheet: {
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     paddingBottom: 32,
@@ -319,11 +319,11 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#0f172a',
+    color: colors.textDark,
   },
   cancelText: {
     fontSize: 16,
-    color: '#0ea5e9',
+    color: colors.textSemiDark,
     fontWeight: '500',
   },
   content: {
@@ -343,7 +343,7 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     fontSize: 15,
     fontWeight: '500',
-    color: '#0369a1',
+    color: colors.textSemiDark,
   },
   currentLocationSpinner: {
     marginLeft: 'auto',
@@ -362,7 +362,7 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     fontSize: 15,
     flex: 1,
-    color: '#0f172a',
+    color: colors.textDark,
   },
   loadingContainer: {
     flexDirection: 'row',
@@ -373,7 +373,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 14,
-    color: '#475569',
+    color: colors.textSemiDark,
   },
   emptyState: {
     paddingVertical: 24,
@@ -381,7 +381,7 @@ const styles = StyleSheet.create({
   },
   emptyStateText: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: colors.textSemiDark,
     textAlign: 'center',
   },
   cityList: {
@@ -402,12 +402,12 @@ const styles = StyleSheet.create({
   cityName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#0f172a',
+    color: colors.textDark,
   },
   cityMeta: {
     marginTop: 2,
     fontSize: 13,
-    color: '#64748b',
+    color: colors.textSemiDark,
   },
 });
 

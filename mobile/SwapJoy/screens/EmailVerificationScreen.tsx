@@ -74,7 +74,7 @@ const EmailVerificationScreen: React.FC<EmailVerificationScreenProps> = ({
               maxLength={6}
               autoFocus
               placeholder={t('auth.verification.codePlaceholder')}
-              placeholderTextColor="#ccc"
+              placeholderTextColor={colors.inputPlaceholder}
             />
           </View>
 
@@ -110,7 +110,7 @@ const EmailVerificationScreen: React.FC<EmailVerificationScreenProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
   },
   keyboardView: {
     flex: 1,
@@ -129,13 +129,13 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     fontSize: 16,
-    color: '#007AFF',
+    color: colors.textSemiDark,
     fontWeight: '500',
   },
   title: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: colors.textDark,
   },
   placeholder: {
     width: 60,
@@ -152,21 +152,21 @@ const styles = StyleSheet.create({
   },
   description: {
     fontSize: 16,
-    color: '#666',
+    color: colors.textSemiDark,
     lineHeight: 22,
     marginBottom: 20,
     textAlign: 'center',
   },
   emailAddress: {
     fontWeight: 'bold',
-    color: '#333',
+    color: colors.textDark,
   },
   otpContainer: {
     alignItems: 'center',
     marginBottom: 30,
   },
   otpInput: {
-    color: 'white',
+    color: colors.textLight,
     fontSize: 32,
     fontWeight: 'bold',
     textAlign: 'center',
@@ -187,7 +187,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ccc',
   },
   verifyButtonText: {
-    color: colors.primaryDark,
+    color: colors.textSemiDark,
     fontSize: 18,
     fontWeight: 'bold',
     paddingHorizontal: 10,
@@ -199,14 +199,14 @@ const styles = StyleSheet.create({
   },
   resendText: {
     fontSize: 16,
-    color: '#666',
+    color: colors.textSemiDark,
   },
   resendLink: {
-    color: '#007AFF',
+    color: colors.textSemiDark,
     fontWeight: '500',
   },
   disabledText: {
-    color: '#ccc',
+    color: colors.textSemiDark,
   },
 });
 

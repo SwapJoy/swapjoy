@@ -14,6 +14,7 @@ import { formatCurrency } from '../utils';
 import { getConditionPresentation } from '../utils/conditions';
 import { resolveCategoryName } from '../utils/category';
 import { RootStackParamList } from '../types/navigation';
+import { colors } from '@navigation/MainTabNavigator.styles';
 
 const { width } = Dimensions.get('window');
 const GRID_ITEM_WIDTH = (width - 60) / 2;
@@ -303,7 +304,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 18,
     fontWeight: '700',
-    color: '#0f172a',
+    color: colors.textDark,
   },
   headerSpacer: {
     width: 40,
@@ -345,13 +346,13 @@ const styles = StyleSheet.create({
   gridTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#0f172a',
+    color: colors.textDark,
     minHeight: 32,
   },
   gridPrice: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#047857',
+    color: colors.textSemiDark,
   },
   itemChipsRow: {
     flexDirection: 'row',
@@ -368,7 +369,7 @@ const styles = StyleSheet.create({
   itemChipText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#0f172a',
+    color: colors.textDark,
   },
   loaderContainer: {
     paddingVertical: 40,
@@ -382,11 +383,11 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 13,
-    color: '#dc2626',
+    color: colors.textSemiDark,
   },
   emptyText: {
     fontSize: 13,
-    color: '#64748b',
+    color: colors.textSemiDark,
   },
 });
 

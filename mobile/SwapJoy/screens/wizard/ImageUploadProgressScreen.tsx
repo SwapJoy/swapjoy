@@ -163,7 +163,7 @@ const ImageUploadProgressScreen: React.FC<ImageUploadProgressScreenProps> = ({
             <Ionicons
               name="add"
               size={24}
-              color={remainingSlots <= 0 ? '#999' : colors.primaryDark}
+              color={remainingSlots <= 0 ? '#999' : colors.backgroundColor}
             />
           </TouchableOpacity>
         );
@@ -244,12 +244,12 @@ const ImageUploadProgressScreen: React.FC<ImageUploadProgressScreenProps> = ({
           hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
         >
           <View style={styles.removeCircle}>
-            <Ionicons name="close" size={12} color={colors.primaryDark} />
+            <Ionicons name="close" size={12} color={colors.backgroundColor} />
           </View>
         </TouchableOpacity>
         {isUploading && (
           <View style={styles.uploadingOverlay}>
-            <ActivityIndicator size="small" color={colors.primaryDark} />
+            <ActivityIndicator size="small" color={colors.backgroundColor} />
             {progress !== undefined && (
               <SJText style={styles.uploadProgressText}>{progress}%</SJText>
             )}
@@ -270,7 +270,7 @@ const ImageUploadProgressScreen: React.FC<ImageUploadProgressScreenProps> = ({
               hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
             >
               <View style={styles.retryButtonInner}>
-                <Ionicons name="refresh" size={16} color={colors.primaryDark} />
+                <Ionicons name="refresh" size={16} color={colors.backgroundColor} />
                 <SJText style={styles.retryButtonText}>
                   {t('common.retry', { defaultValue: 'Retry' })}
                 </SJText>
@@ -335,7 +335,7 @@ const ImageUploadProgressScreen: React.FC<ImageUploadProgressScreenProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
   },
   content: {
     flex: 1,
@@ -406,7 +406,7 @@ const styles = StyleSheet.create({
   uploadProgressText: {
     marginTop: 4,
     fontSize: 10,
-    color: '#fff',
+    color: colors.textLight,
   },
   uploadedBadge: {
     position: 'absolute',
@@ -423,7 +423,7 @@ const styles = StyleSheet.create({
   errorText: {
     marginTop: 4,
     fontSize: 10,
-    color: '#fff',
+    color: colors.textLight,
     fontWeight: '600',
   },
   retryButton: {
@@ -442,7 +442,7 @@ const styles = StyleSheet.create({
   retryButtonText: {
     fontSize: 12,
     fontWeight: '600',
-    color: colors.primaryDark,
+    color: colors.textSemiDark,
   },
 });
 

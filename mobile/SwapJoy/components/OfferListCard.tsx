@@ -498,7 +498,7 @@ const OfferListCard: React.FC<Props> = ({
           )}
         </View>
         <View style={styles.swapIconWrapper}>
-          <Ionicons name="swap-horizontal" size={20} color={colors.primaryDark} />
+          <Ionicons name="swap-horizontal" size={20} color={colors.backgroundColor} />
         </View>
       </View>
 
@@ -569,7 +569,6 @@ const styles = StyleSheet.create({
   skeletonBackground: {
     width: '100%',
     height: '100%',
-    backgroundColor: '#161200ff',
     flexDirection: 'column',
   },
   ownerHeader: {
@@ -737,7 +736,7 @@ const styles = StyleSheet.create({
   viewCountText: {
     fontSize: 11,
     fontWeight: '600',
-    color: colors.primary,
+    color: colors.textDark,
   },
   offerCard: {
     width: width - 20,
@@ -745,7 +744,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderRadius: 18,
     padding: 12,
-    backgroundColor: '#171717',
+    backgroundColor: 'white',
   },
   statusBadge: {
     paddingHorizontal: 10,
@@ -755,7 +754,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   statusText: {
-    color: colors.primaryDark,
+    color: colors.textDark,
     fontSize: 11,
     fontWeight: '700',
   },
@@ -768,12 +767,12 @@ const styles = StyleSheet.create({
   offerMetaUser: {
     flex: 1,
     fontSize: 11,
-    color: '#b8b8b8',
+    color: colors.textSemiDark,
     fontWeight: '600',
   },
   offerMetaDate: {
     fontSize: 11,
-    color: '#878787',
+    color: colors.textSemiDark,
   },
   swapBoard: {
     position: 'relative',
@@ -785,9 +784,8 @@ const styles = StyleSheet.create({
   swapSide: {
     flex: 1,
     borderRadius: 12,
-    backgroundColor: '#121212',
     borderWidth: 1,
-    borderColor: '#2f2f2f',
+    borderColor: colors.border,
     padding: 8,
     gap: 8,
   },
@@ -797,7 +795,7 @@ const styles = StyleSheet.create({
   sideLabel: {
     fontSize: 11,
     fontWeight: '700',
-    color: colors.primaryYellow,
+    color: colors.textSemiDark,
   },
   sideUserRow: {
     flexDirection: 'row',
@@ -820,12 +818,12 @@ const styles = StyleSheet.create({
   sideAvatarText: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#1f2937',
+    color: colors.textDark,
   },
   sideUsername: {
     flex: 1,
     fontSize: 11,
-    color: '#cfcfcf',
+    color: colors.textSemiDark,
     fontWeight: '600',
   },
   sideImageFrame: {
@@ -854,12 +852,12 @@ const styles = StyleSheet.create({
   },
   sideTitle: {
     fontSize: 13,
-    color: '#efefef',
+    color: colors.textSemiDark,
     fontWeight: '700',
   },
   sideMeta: {
     fontSize: 11,
-    color: '#a1a1a1',
+    color: colors.textSemiDark,
   },
   sideConditionRow: {
     marginTop: 2,
@@ -868,12 +866,12 @@ const styles = StyleSheet.create({
   sidePrice: {
     marginTop: 2,
     fontSize: 12,
-    color: '#f4f4f4',
+    color: colors.textSemiDark,
     fontWeight: '700',
   },
   sideMoreItems: {
     fontSize: 12,
-    color: colors.primaryYellow,
+    color: colors.textSemiDark,
     fontWeight: '600',
   },
   swapIconWrapper: {
@@ -885,7 +883,6 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: colors.primaryYellow,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -893,35 +890,33 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingVertical: 8,
     paddingHorizontal: 12,
-    backgroundColor: '#242424',
     borderRadius: 10,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
   offerTopUpRowIncoming: {
-    backgroundColor: '#13271d',
+    
   },
   offerTopUpRowOutgoing: {
-    backgroundColor: '#2b1c14',
+    
   },
   offerTopUpLabel: {
     fontSize: 13,
     fontWeight: '700',
-    color: colors.primaryYellow,
+    color: colors.textSemiDark,
   },
   offerTopUpIncomingLabel: {
-    color: '#4ade80',
+    color: colors.textSemiDark,
   },
   offerTopUpOutgoingLabel: {
-    color: '#fb923c',
+    color: colors.textSemiDark,
   },
   messageBox: {
     marginTop: 10,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#2f2f2f',
-    backgroundColor: '#1d1d1d',
+    borderColor: colors.border,
     paddingHorizontal: 12,
     paddingVertical: 10,
     gap: 4,
@@ -930,13 +925,13 @@ const styles = StyleSheet.create({
     fontSize: 10,
     letterSpacing: 0.4,
     textTransform: 'uppercase',
-    color: '#949494',
+    color: colors.textSemiDark,
     fontWeight: '700',
   },
   messageText: {
     fontSize: 13,
     lineHeight: 18,
-    color: '#dfdfdf',
+    color: colors.textSemiDark,
   },
 });
 

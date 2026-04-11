@@ -24,6 +24,7 @@ import { MatchInventoryProvider } from './contexts/MatchInventoryContext';
 import { WizardFormProvider } from './contexts/WizardFormContext';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
+import { colors } from '@navigation/MainTabNavigator.styles';
 
 // Configure Google Sign-In as early as possible to ensure native config is set
 const WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID
@@ -52,11 +53,11 @@ const toastConfig = {
       text1Style={{
         fontSize: 15,
         fontWeight: '600',
-        color: '#000',
+        color: colors.textDark,
       }}
       text2Style={{
         fontSize: 13,
-        color: '#666',
+        color: colors.textSemiDark,
       }}
     />
   ),
@@ -68,11 +69,11 @@ const toastConfig = {
       text1Style={{
         fontSize: 15,
         fontWeight: '600',
-        color: '#000',
+        color: colors.textDark,
       }}
       text2Style={{
         fontSize: 13,
-        color: '#666',
+        color: colors.textSemiDark,
       }}
     />
   ),

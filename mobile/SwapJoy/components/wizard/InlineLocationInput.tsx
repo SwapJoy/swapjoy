@@ -96,7 +96,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     marginTop: 4,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.primaryYellow,
@@ -123,11 +123,11 @@ const styles = StyleSheet.create({
   citySuggestionName: {
     fontSize: 14,
     fontWeight: '500',
-    color: colors.white,
+    color: colors.textLight,
   },
   citySuggestionCountry: {
     fontSize: 12,
-    color: colors.inactive,
+    color: colors.textSemiDark,
     marginTop: 2,
   },
 });

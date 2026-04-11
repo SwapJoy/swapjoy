@@ -445,18 +445,18 @@ const ItemDetailsScreen: React.FC<ItemDetailsScreenProps> = ({ navigation, route
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
   },
   scrollView: {
     flex: 1,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
   },
   heroCarousel: {
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
   },
   rootFill: {
     flex: 1,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
   },
   headerBackSlot: {
     position: 'absolute',
@@ -523,7 +523,7 @@ const styles = StyleSheet.create({
   },
   metaText: {
     fontSize: 12,
-    color: '#777',
+    color: colors.textSemiDark,
     fontWeight: '300',
   },
   metaDot: {
@@ -574,16 +574,16 @@ const styles = StyleSheet.create({
     fontWeight: '400',
   },
   actionLabelOffer: {
-    color: colors.primaryYellow,
+    color: colors.textSemiDark,
   },
   actionLabelFav: {
-    color: '#f87171',
+    color: colors.textSemiDark,
   },
   actionLabelFavActive: {
-    color: '#ef4444',
+    color: colors.textSemiDark,
   },
   actionLabelShare: {
-    color: '#60a5fa',
+    color: colors.textSemiDark,
   },
 
   infoSection: {
@@ -598,7 +598,7 @@ const styles = StyleSheet.create({
   },
   sellerText: {
     fontSize: 13,
-    color: '#777',
+    color: colors.textSemiDark,
     fontWeight: '300',
   },
   itemTitle: {
@@ -622,7 +622,7 @@ const styles = StyleSheet.create({
   },
   categoryChipText: {
     fontSize: 11,
-    color: '#aaa',
+    color: colors.textSemiDark,
     fontWeight: '400',
   },
   price: {
@@ -641,7 +641,7 @@ const styles = StyleSheet.create({
   description: {
     fontSize: 15,
     lineHeight: 22,
-    color: '#bbb',
+    color: colors.textSemiDark,
     fontWeight: '300',
   },
 });

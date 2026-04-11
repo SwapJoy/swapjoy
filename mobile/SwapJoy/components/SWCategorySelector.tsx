@@ -2,6 +2,7 @@ import React from 'react';
 import {View, StyleSheet, TouchableOpacity, ActivityIndicator, } from 'react-native';
 import SJText from '../components/SJText';
 import { Ionicons } from '@expo/vector-icons';
+import { colors } from '@navigation/MainTabNavigator.styles';
 
 interface SWCategorySelectorProps {
   placeholder?: string;
@@ -50,7 +51,7 @@ const SWCategorySelector: React.FC<SWCategorySelectorProps> = ({
               style={[
                 styles.floatingLabel,
                 {
-                  color: hasValue ? '#8e8e93' : '#8e8e93',
+                  color: colors.inputPlaceholder,
                 },
               ]}
             >
@@ -108,7 +109,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   required: {
-    color: '#FF3B30',
+    color: colors.textSemiDark,
   },
   contentWrapper: {
     flexDirection: 'row',
@@ -123,10 +124,10 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   selectorTextPlaceholder: {
-    color: '#8e8e93',
+    color: colors.textSemiDark,
   },
   selectorTextDisabled: {
-    color: '#8e8e93',
+    color: colors.textSemiDark,
   },
   loadingContainer: {
     marginLeft: 8,
@@ -141,7 +142,7 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 12,
-    color: '#FF3B30',
+    color: colors.textSemiDark,
     marginTop: 4,
   },
 });

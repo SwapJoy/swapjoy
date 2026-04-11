@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import CachedImage from './CachedImage';
 import SJText from './SJText';
+import { colors } from '@navigation/MainTabNavigator.styles';
 
 export type ItemCardVariant = 'list' | 'horizontal' | 'grid';
 
@@ -135,20 +136,21 @@ ItemCard.displayName = 'ItemCard';
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#161200f',
     overflow: 'hidden',
     shadowColor: '#0f172a',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 10,
     elevation: 3,
+    borderColor: colors.border,
+    borderWidth: 0.2,
   },
   imageWrapper: {
     position: 'relative',
   },
   image: {
     width: '100%',
-    backgroundColor: '#e2e8f0',
+    backgroundColor: colors.backgroundColor,
   },
   imagePlaceholder: {
     alignItems: 'center',
@@ -223,7 +225,7 @@ const styles = StyleSheet.create({
     borderRadius: 9,
   },
   fadePlaceholder: {
-    backgroundColor: '#e2e8f0',
+    backgroundColor: colors.backgroundColor,
   },
 });
 

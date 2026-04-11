@@ -183,7 +183,7 @@ const EmailSignInScreen: React.FC<EmailSignInScreenProps> = ({ navigation }) => 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
   },
   keyboardView: {
     flex: 1,
@@ -208,7 +208,7 @@ const styles = StyleSheet.create({
   },
   description: {
     fontSize: 16,
-    color: '#666',
+    color: colors.textSemiDark,
     lineHeight: 22,
     marginBottom: 30,
   },
@@ -219,7 +219,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   errorText: {
-    color: '#c00',
+    color: colors.textSemiDark,
     fontSize: 14,
   },
   signInButton: {
@@ -234,7 +234,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ccc',
   },
   signInButtonText: {
-    color: colors.primaryDark,
+    color: colors.textSemiDark,
     fontSize: 18,
     fontWeight: 'bold',
     paddingHorizontal: 12,
@@ -251,7 +251,7 @@ const styles = StyleSheet.create({
   },
   dividerText: {
     marginHorizontal: 15,
-    color: '#999',
+    color: colors.textSemiDark,
     fontSize: 14,
   },
   googleButton: {
@@ -269,7 +269,7 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   googleButtonText: {
-    color: 'white',
+    color: colors.textLight,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -280,12 +280,12 @@ const styles = StyleSheet.create({
   },
   signUpText: {
     fontSize: 14,
-    color: '#666',
+    color: colors.textSemiDark,
   },
   signUpLink: {
     fontSize: 14,
     fontWeight: '600',
-    color: colors.primaryYellow
+    color: colors.textSemiDark
   },
 });
 

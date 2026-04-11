@@ -121,7 +121,7 @@ const SWInputField: React.FC<SWInputFieldProps> = ({
                 styles.floatingLabel,
                 {
                   fontSize: labelFontSize,
-                  color: isFocused ? colors.primaryYellow : '#8e8e93',
+                  color: isFocused ? colors.textDark : colors.inputPlaceholder,
                 },
               ]}
             >
@@ -148,7 +148,7 @@ const SWInputField: React.FC<SWInputFieldProps> = ({
               style,
             ]}
             placeholder={!hasValue && !isFocused ? placeholder : undefined}
-            placeholderTextColor="#8e8e93"
+            placeholderTextColor={colors.inputPlaceholder}
             value={value}
             onChangeText={onChangeText}
             onFocus={handleFocus}
@@ -207,7 +207,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   required: {
-    color: '#FF3B30',
+    color: colors.textSemiDark,
   },
   inputWrapper: {
     flexDirection: 'row',
@@ -229,7 +229,7 @@ const styles = StyleSheet.create({
   prefix: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1a1a1a',
+    color: colors.textDark,
     marginRight: 8,
     alignSelf: 'flex-start',
     paddingTop: 8,
@@ -237,13 +237,13 @@ const styles = StyleSheet.create({
   textInput: {
     flex: 1,
     fontSize: 16,
-    color: '#fff',
+    color: colors.textColor,
     paddingVertical: 8,
     paddingHorizontal: 0,
     minHeight: 24,
   },
   textInputDisabled: {
-    color: '#8e8e93',
+    color: colors.textSemiDark,
   },
   textInputMultiline: {
     minHeight: 40,
@@ -267,13 +267,13 @@ const styles = StyleSheet.create({
   },
   charCount: {
     fontSize: 12,
-    color: '#8e8e93',
+    color: colors.textSemiDark,
     textAlign: 'right',
     marginTop: 4,
   },
   errorText: {
     fontSize: 12,
-    color: '#FF3B30',
+    color: colors.textSemiDark,
     marginTop: 4,
   },
 });

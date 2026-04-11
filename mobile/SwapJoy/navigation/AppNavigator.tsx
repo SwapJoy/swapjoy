@@ -72,14 +72,14 @@ const LoadingScreen = memo(() => {
   }, [fadeAnim, translateYAnim]);
 
   return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.primaryDark }}>
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.backgroundColor }}>
       <Animated.View
         style={{
           opacity: fadeAnim,
           transform: [{ translateY: translateYAnim }],
         }}
       >
-        <SJText style={{ color: colors.primaryYellow, fontSize: 24, fontWeight: 'bold' }}>SwapJoy</SJText>
+        <SJText style={{ color: colors.textColor, fontSize: 24, fontWeight: 'bold' }}>SwapJoy</SJText>
       </Animated.View>
     </View>
   );
@@ -291,9 +291,10 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
           headerTitleStyle: {
             fontSize: 18,
             fontWeight: '700',
-            color: '#000',
+            color: colors.backgroundColor,
             letterSpacing: 0.3,
           },
+          headerTintColor: colors.textLight,
           headerTitleAlign: 'center',
           headerBackTitle: '',
           headerLeft: (props) => {
@@ -301,7 +302,7 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
               return (
                 <HeaderBackButton
                   {...props}
-                  tintColor="#000"
+                  tintColor={colors.textLight}
                   style={{ marginLeft: 0 }}
                 />
               );
@@ -319,7 +320,7 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
                 onPress={props.onPress}
                 activeOpacity={0.7}
               >
-                <Ionicons name="arrow-back" size={24} color='#000' />
+                <Ionicons name="arrow-back" size={24} color={colors.textLight} />
               </TouchableOpacity>
             );
           },

@@ -96,7 +96,7 @@ const SearchScreen: React.FC = () => {
           activeOpacity={0.8}
           onPress={() => navigation.goBack()}
         >
-          <Ionicons name="chevron-back" size={26} color="#fff" />
+          <Ionicons name="chevron-back" size={26} color="black" />
         </TouchableOpacity>
         <View style={styles.searchInputWrapper}>
           <Ionicons name="search-outline" size={18} color="#6f6f6f" />
@@ -106,7 +106,7 @@ const SearchScreen: React.FC = () => {
             onChangeText={setSearchText}
             style={styles.searchInput}
             placeholder={t('search.searchPrompt')}
-            placeholderTextColor="#7c7c7c"
+            placeholderTextColor={colors.inputPlaceholder}
             autoCorrect={false}
             autoCapitalize="none"
             returnKeyType="search"
@@ -181,14 +181,14 @@ const SearchScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
   },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 10,
     paddingBottom: 10,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
   },
   backButton: {
     width: 36,
@@ -200,16 +200,17 @@ const styles = StyleSheet.create({
   searchInputWrapper: {
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#2b2b2b',
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 12,
+    borderColor: colors.border,
+    borderWidth: 1,
     flex: 1,
   },
   searchInput: {
     flex: 1,
     marginLeft: 8,
-    color: '#fff',
+    color: colors.textColor,
     fontSize: 19,
   },
   listContent: {
@@ -224,12 +225,12 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   sectionTitle: {
-    color: '#f1f1f1',
+    color: colors.textSemiDark,
     fontSize: 16,
     fontWeight: '700',
   },
   clearAll: {
-    color: colors.border,
+    color: colors.textSemiDark,
     fontSize: 16,
   },
   row: {
@@ -244,7 +245,6 @@ const styles = StyleSheet.create({
   },
   rowText: {
     fontSize: 18,
-    color: '#fff',
   },
   separator: {
     height: StyleSheet.hairlineWidth,

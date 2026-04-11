@@ -279,7 +279,7 @@ const OfferDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
             )}
           </View>
           <View style={styles.swapIcon}>
-            <Ionicons name="swap-horizontal" size={20} color={colors.primaryDark} />
+            <Ionicons name="swap-horizontal" size={20} color={colors.backgroundColor} />
           </View>
         </View>
 
@@ -330,7 +330,7 @@ const OfferDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
   },
   content: {
     paddingHorizontal: 14,
@@ -353,24 +353,24 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   statusText: {
-    color: '#13211a',
+    color: colors.textDark,
     fontSize: 11,
     fontWeight: '700',
   },
   offerDirection: {
     flex: 1,
     fontSize: 12,
-    color: '#d3d3d3',
+    color: colors.textSemiDark,
     fontWeight: '600',
   },
   metaDate: {
     fontSize: 11,
-    color: '#8f8f8f',
+    color: colors.textSemiDark,
   },
   screenTitle: {
     marginTop: 14,
     fontSize: 20,
-    color: '#f4f4f4',
+    color: colors.textSemiDark,
     fontWeight: '700',
   },
   swapBoard: {
@@ -414,7 +414,7 @@ const styles = StyleSheet.create({
   tradeSideLabel: {
     fontSize: 11,
     fontWeight: '700',
-    color: colors.primaryYellow,
+    color: colors.textSemiDark,
   },
   tradeUserRow: {
     flexDirection: 'row',
@@ -436,13 +436,13 @@ const styles = StyleSheet.create({
   },
   tradeAvatarText: {
     fontSize: 10,
-    color: '#1f2937',
+    color: colors.textDark,
     fontWeight: '700',
   },
   tradeUsername: {
     flex: 1,
     fontSize: 11,
-    color: '#cfcfcf',
+    color: colors.textSemiDark,
     fontWeight: '600',
   },
   tradeImageFrame: {
@@ -469,16 +469,16 @@ const styles = StyleSheet.create({
   tradeTitle: {
     marginTop: 2,
     fontSize: 13,
-    color: '#efefef',
+    color: colors.textSemiDark,
     fontWeight: '700',
   },
   tradeMeta: {
     fontSize: 11,
-    color: '#a1a1a1',
+    color: colors.textSemiDark,
   },
   tradePrice: {
     fontSize: 12,
-    color: '#f4f4f4',
+    color: colors.textSemiDark,
     fontWeight: '700',
   },
   itemsList: {
@@ -494,24 +494,24 @@ const styles = StyleSheet.create({
   },
   itemBullet: {
     fontSize: 13,
-    color: '#7d7d7d',
+    color: colors.textSemiDark,
     marginRight: 6,
   },
   itemTitle: {
     fontSize: 12,
-    color: '#dfdfdf',
+    color: colors.textSemiDark,
   },
   itemPrice: {
     fontSize: 11,
-    color: '#b5b5b5',
+    color: colors.textSemiDark,
   },
   itemsEmpty: {
     fontSize: 12,
-    color: '#858585',
+    color: colors.textSemiDark,
   },
   moreItems: {
     fontSize: 11,
-    color: colors.primaryYellow,
+    color: colors.textSemiDark,
     fontWeight: '600',
   },
   topUpBox: {
@@ -533,13 +533,13 @@ const styles = StyleSheet.create({
   topUpText: {
     fontSize: 13,
     fontWeight: '700',
-    color: colors.primaryYellow,
+    color: colors.textSemiDark,
   },
   topUpIncomingText: {
-    color: '#4ade80',
+    color: colors.textSemiDark,
   },
   topUpOutgoingText: {
-    color: '#fb923c',
+    color: colors.textSemiDark,
   },
   messageCard: {
     marginTop: 10,
@@ -555,13 +555,13 @@ const styles = StyleSheet.create({
     fontSize: 10,
     letterSpacing: 0.4,
     textTransform: 'uppercase',
-    color: '#949494',
+    color: colors.textSemiDark,
     fontWeight: '700',
   },
   messageText: {
     fontSize: 13,
     lineHeight: 18,
-    color: '#dfdfdf',
+    color: colors.textSemiDark,
   },
   bottomBar: {
     position: 'absolute',
@@ -569,7 +569,7 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     padding: 16,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
     borderTopWidth: 1,
     borderTopColor: '#3a3a3a',
   },
@@ -580,7 +580,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   chatButtonText: {
-    color: '#202020',
+    color: colors.textDark,
     fontSize: 15,
     fontWeight: '700',
   },

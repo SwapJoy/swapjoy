@@ -282,7 +282,7 @@ const OfferCreateScreen: React.FC<OfferCreateScreenProps> = ({ navigation, route
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.primaryDark },
+  container: { flex: 1, backgroundColor: colors.backgroundColor },
   scroll: { flex: 1 },
   messageSection: {
     paddingHorizontal: 16,
@@ -292,7 +292,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
   },
   requestedCard: {
     borderRadius: 0,
@@ -309,14 +309,14 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#888',
+    color: colors.textSemiDark,
     marginBottom: 6,
     textTransform: 'uppercase',
     letterSpacing: 0.4,
   },
   offeredPreview: {
     fontSize: 15,
-    color: '#ccc',
+    color: colors.textSemiDark,
     lineHeight: 22,
     marginBottom: 12,
   },
@@ -338,7 +338,7 @@ const styles = StyleSheet.create({
   editBtnText: {
     fontSize: 15,
     fontWeight: '700',
-    color: colors.primaryYellow,
+    color: colors.textSemiDark,
   },
   addAmountBtn: {
     paddingHorizontal: 14,
@@ -352,7 +352,7 @@ const styles = StyleSheet.create({
   addAmountBtnText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#bbb',
+    color: colors.textSemiDark,
   },
 });
 

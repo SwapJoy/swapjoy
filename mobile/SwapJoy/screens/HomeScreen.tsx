@@ -31,7 +31,7 @@ const HomeScreen: React.FC<ExploreScreenProps> = () => {
           style={tabStyles.headerRightButtonContainer}
           onPress={() => navigation.navigate('Search')}
         >
-          <Ionicons name="search-outline" size={20} color={colors.primaryDark} />
+          <Ionicons name="search-outline" size={20} color={colors.backgroundColor} />
         </TouchableOpacity>
       ),
     });
@@ -133,10 +133,12 @@ const HomeScreen: React.FC<ExploreScreenProps> = () => {
   const headerComponent = useMemo(
     () => (
       <View style={styles.headerContainer}>
-        <SJText style={styles.header}>For you</SJText>
+        <SJText style={styles.header}>
+          {t('homeScreen.forYou', { defaultValue: 'For you' })}
+        </SJText>
       </View>
     ),
-    []
+    [t]
   );
 
   return (
@@ -155,8 +157,8 @@ const HomeScreen: React.FC<ExploreScreenProps> = () => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.gridListContent}
         horizontalPadding={0}
-        columnSpacing={4}
-        rowSpacing={2}
+        columnSpacing={8}
+        rowSpacing={8}
         listHeaderComponent={headerComponent}
         listFooterComponent={
           loadingMore ? (
@@ -173,7 +175,7 @@ const HomeScreen: React.FC<ExploreScreenProps> = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
   },
   headerContainer: {
     flexDirection: 'row',
@@ -182,13 +184,14 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: 4,
     paddingHorizontal: 8,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
   },
   header: {
-    color: colors.white,
-    fontSize: 28,
-    fontWeight: '200',
-    opacity: 0.6,
+    color: colors.textDark,
+    fontSize: 24,
+    fontWeight: '100',
+    opacity: 0.4,
+    paddingBottom: 8
   },
   gridListContent: {
     paddingTop: 6,

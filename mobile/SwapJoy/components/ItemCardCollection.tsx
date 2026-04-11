@@ -15,6 +15,7 @@ import { getConditionPresentation } from '../utils/conditions';
 import { getItemImageUri } from '../utils/imageUtils';
 import type { AppLanguage } from '../types/language';
 import { DEFAULT_LANGUAGE } from '../types/language';
+import { colors } from '@navigation/MainTabNavigator.styles';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -163,7 +164,7 @@ const ItemCardCollection: React.FC<ItemCardCollectionProps> = ({
         onRefresh={onRefresh}
         tintColor="#ffde21"
         colors={['#ffde21']}
-        progressBackgroundColor="#1a1a1a"
+        progressBackgroundColor={colors.primaryYellow}
       />
     );
   }, [refreshing, onRefresh]);

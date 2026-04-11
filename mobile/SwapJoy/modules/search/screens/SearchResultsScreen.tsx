@@ -47,7 +47,7 @@ const SearchResultsScreen: React.FC = () => {
           style={tabStyles.headerRightButtonContainer}
           onPress={() => setFilterVisible(true)}
         >
-          <Ionicons name="options-outline" size={20} color={colors.primaryDark} />
+          <Ionicons name="options-outline" size={20} color={colors.backgroundColor} />
         </TouchableOpacity>
       ),
     });
@@ -143,7 +143,7 @@ const SearchResultsScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
   },
   loaderWrap: {
     flex: 1,
@@ -163,11 +163,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyText: {
-    color: '#fff',
+    color: colors.textSemiDark,
     fontSize: 16,
   },
   errorText: {
-    color: '#ffb4b4',
+    color: colors.textSemiDark,
     marginTop: 8,
   },
 });

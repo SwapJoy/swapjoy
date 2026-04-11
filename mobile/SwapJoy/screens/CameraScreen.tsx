@@ -289,14 +289,14 @@ const styles = StyleSheet.create({
   permissionOverlayTitle: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: colors.primaryDark,
+    color: colors.textSemiDark,
     marginTop: 20,
     marginBottom: 12,
     textAlign: 'center',
   },
   permissionOverlayText: {
     fontSize: 16,
-    color: '#ccc',
+    color: colors.textSemiDark,
     textAlign: 'center',
     lineHeight: 24,
     marginBottom: 30,
@@ -308,7 +308,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   permissionOverlayButtonText: {
-    color: colors.primaryDark,
+    color: colors.textSemiDark,
     fontSize: 16,
     fontWeight: 'bold',
   },
@@ -341,7 +341,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primaryYellow,
   },
   nextButtonText: {
-    color: colors.primary,
+    color: colors.textLight,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -397,7 +397,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   photoCountText: {
-    color: '#fff',
+    color: colors.textLight,
     fontSize: 12,
     fontWeight: '600',
   },

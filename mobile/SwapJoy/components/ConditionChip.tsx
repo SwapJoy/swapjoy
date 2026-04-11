@@ -80,6 +80,8 @@ const styles = StyleSheet.create({
   },
   chipSelected: {
     transform: [{ scale: 1.05 }],
+    borderColor: colors.primaryYellow,
+    borderWidth: 3,
   },
   chipCompact: {
     paddingHorizontal: 10,
@@ -89,7 +91,7 @@ const styles = StyleSheet.create({
   chipText: {
     fontSize: 13,
     fontWeight: '400',
-    color: colors.primaryDark,
+    color: colors.textColor,
   },
   chipTextCompact: {
     fontSize: 11,

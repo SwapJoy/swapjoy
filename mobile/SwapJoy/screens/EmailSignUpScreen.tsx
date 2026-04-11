@@ -156,7 +156,7 @@ const EmailSignUpScreen: React.FC<EmailSignUpScreenProps> = ({ navigation }) => 
 const styles = StyleSheet.create({
   keyboardView: {
     flex: 1,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
   },
   scrollView: {
     flex: 1,
@@ -177,7 +177,7 @@ const styles = StyleSheet.create({
   },
   description: {
     fontSize: 16,
-    color: '#666',
+    color: colors.textSemiDark,
     lineHeight: 22,
     marginBottom: 30,
   },
@@ -188,7 +188,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   errorText: {
-    color: '#c00',
+    color: colors.textSemiDark,
     fontSize: 14,
   },
   signUpButton: {
@@ -202,7 +202,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ccc',
   },
   signUpButtonText: {
-    color: colors.primaryDark,
+    color: colors.textSemiDark,
     fontSize: 18,
     fontWeight: 'bold',
   },
@@ -216,7 +216,7 @@ const styles = StyleSheet.create({
   },
   signInLink: {
     fontSize: 14,
-    color: colors.primaryYellow,
+    color: colors.textSemiDark,
     fontWeight: '600',
   },
 });

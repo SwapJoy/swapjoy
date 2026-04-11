@@ -57,7 +57,7 @@ const CategoryInputScreen: React.FC<CategoryInputScreenProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
   },
   scrollView: {
     flex: 1,
@@ -68,7 +68,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   descriptionText: {
-    color: colors.white,
+    color: colors.textSemiDark,
     fontSize: 28,
     fontWeight: '200',
     opacity: 0.6,

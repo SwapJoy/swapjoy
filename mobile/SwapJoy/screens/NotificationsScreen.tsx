@@ -47,7 +47,7 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = memo(() => {
           style={styles.headerButton}
           onPress={() => setPopoverVisible(true)}
         >
-          <Ionicons name="ellipsis-vertical" size={20} color={colors.primaryDark} />
+          <Ionicons name="ellipsis-vertical" size={20} color={colors.backgroundColor} />
         </TouchableOpacity>
       ),
     });
@@ -296,7 +296,7 @@ const NotificationsScreen: React.FC<NotificationsScreenProps> = memo(() => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
   },
   header: {
     flexDirection: 'row',
@@ -304,7 +304,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
     paddingBottom: 10,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
     marginBottom: 10,
@@ -335,7 +335,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   notificationCard: {
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
     borderRadius: 10,
     marginBottom: 4,
     paddingHorizontal: 8,
@@ -386,7 +386,7 @@ const styles = StyleSheet.create({
   },
   notificationTime: {
     fontSize: 12,
-    color: '#6b7280',
+    color: colors.textSemiDark,
     marginBottom: 4,
   },
   unreadDot: {
@@ -403,12 +403,12 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: colors.textDark,
     marginBottom: 8,
   },
   emptySubtitle: {
     fontSize: 14,
-    color: '#666',
+    color: colors.textSemiDark,
     textAlign: 'center',
   },
   footerContainer: {
@@ -418,7 +418,7 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: 14,
-    color: '#666',
+    color: colors.textSemiDark,
   },
   headerButton: {
     marginRight: 8,
@@ -433,7 +433,7 @@ const styles = StyleSheet.create({
     paddingRight: 16,
   },
   popoverContainer: {
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
     borderRadius: 12,
     minWidth: 200,
     shadowColor: '#000',
@@ -454,7 +454,7 @@ const styles = StyleSheet.create({
   },
   popoverText: {
     fontSize: 16,
-    color: '#333',
+    color: colors.textDark,
   },
 });
 

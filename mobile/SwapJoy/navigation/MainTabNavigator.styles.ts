@@ -1,8 +1,16 @@
 import { Platform, StyleSheet } from 'react-native';
 
 export const colors = {
-  primaryDark: '#2A2D32',
-  primaryYellow: '#F69618',
+  textDark: '#1A1A1A',
+  textSemiDark: '#8E8E93',
+  textLight: '#FFFFFF',
+  textColor: 'black',
+  textColorLight: 'white',
+  inputPlaceholder: '#8E8E93',
+  inputText: '#FFFFFF',
+  backgroundColor: 'white',
+  primaryYellow: '#04B07B',
+  primaryYellowLight: '#04B07B0D',
   primaryBlue: '#36454F',
   primary: '#000',
   inactive: '#8E8E93',
@@ -40,12 +48,12 @@ export const styles = StyleSheet.create({
   headerTitleStyle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#000',
+    color: colors.textColorLight,
     letterSpacing: 0.3,
     fontFamily: 'Noto Sans Georgian',
   },
   tabBarStyle: {
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
     paddingBottom: Platform.OS === 'ios' ? 20 : 8,
     paddingTop: Platform.OS === 'ios' ? 8 : 8,
     height: Platform.OS === 'ios' ? 83 : 60,

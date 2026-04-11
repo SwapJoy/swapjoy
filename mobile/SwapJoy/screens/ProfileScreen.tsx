@@ -397,7 +397,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
   );
 
   const profileHeader = (
-    <View>
+    <View style={styles.profileHeader}>
       {/* Profile Header with Integrated Stats */}
       {loadingProfile ? (
         <ProfileHeaderSkeleton />
@@ -562,7 +562,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
   },
   scrollView: {
     flex: 1,
@@ -574,10 +574,10 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 16,
-    color: '#555',
+    color: colors.textSemiDark,
   },
   profileSection: {
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
     paddingTop: 16,
     paddingBottom: 20,
     paddingHorizontal: 20,
@@ -598,7 +598,7 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: 50,
     borderWidth: 3,
-    borderColor: colors.primaryDark,
+    borderColor: colors.backgroundColor,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -726,20 +726,20 @@ const styles = StyleSheet.create({
   ratingValue: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+    color: colors.textDark,
     marginRight: 10,
   },
   ratingStars: {
     fontSize: 16,
-    color: '#FFD700',
+    color: colors.textSemiDark,
     marginRight: 10,
   },
   ratingCount: {
     fontSize: 14,
-    color: '#666',
+    color: colors.textSemiDark,
   },
   profileOptions: {
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
     marginBottom: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -771,21 +771,21 @@ const styles = StyleSheet.create({
   },
   profileItemTitle: {
     fontSize: 16,
-    color: '#333',
+    color: colors.textDark,
     marginBottom: 2,
   },
   profileItemSubtitle: {
     fontSize: 14,
-    color: '#666',
+    color: colors.textSemiDark,
   },
   arrow: {
     fontSize: 18,
-    color: '#ccc',
+    color: colors.textSemiDark,
     marginLeft: 10,
   },
   itemCard: {
     flexDirection: 'row',
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
     padding: 12,
     marginBottom: 10,
     elevation: 2,
@@ -802,53 +802,53 @@ const styles = StyleSheet.create({
   itemTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
+    color: colors.textDark,
     marginBottom: 4,
   },
   itemPrice: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#007AFF',
+    color: colors.textSemiDark,
     marginBottom: 4,
   },
   itemCondition: {
     fontSize: 12,
-    color: '#666',
+    color: colors.textSemiDark,
     textTransform: 'capitalize',
     marginBottom: 2,
   },
   itemCategory: {
     fontSize: 12,
-    color: '#999',
+    color: colors.textSemiDark,
     fontStyle: 'italic',
   },
   emptyItemsContainer: {
     alignItems: 'center',
     padding: 20,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
     borderRadius: 10,
     marginTop: 10,
   },
   emptyItemsText: {
     fontSize: 16,
-    color: '#666',
+    color: colors.textSemiDark,
     marginBottom: 5,
   },
   emptyItemsSubtext: {
     fontSize: 14,
-    color: '#999',
+    color: colors.textSemiDark,
   },
   loadingItemsContainer: {
     alignItems: 'center',
     padding: 40,
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
     borderRadius: 10,
     marginTop: 10,
   },
   loadingItemsText: {
     marginTop: 10,
     fontSize: 14,
-    color: '#666',
+    color: colors.textSemiDark,
   },
   addItemsButton: {
     backgroundColor: '#007AFF',
@@ -859,14 +859,14 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   addItemsButtonText: {
-    color: colors.primaryDark,
+    color: colors.textSemiDark,
     fontSize: 16,
     fontWeight: 'bold',
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: colors.textDark,
     marginBottom: 10,
   },
   tabsContainer: {
@@ -888,12 +888,12 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.primaryYellow,
   },
   tabText: {
-    color: '#8E8E93',
+    color: colors.textSemiDark,
     fontSize: 14,
     fontWeight: '500',
   },
   tabTextActive: {
-    color: colors.primaryYellow,
+    color: colors.textSemiDark,
     fontWeight: '700',
   },
   gridListContent: {
@@ -948,10 +948,10 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   followButtonTextPrimary: {
-    color: colors.primaryDark,
+    color: colors.textSemiDark,
   },
   followButtonTextFollowing: {
-    color: '#111',
+    color: colors.textDark,
   },
   favChipsContainer: {
     flexDirection: 'row',
@@ -976,13 +976,13 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   favChipText: {
-    color: '#3b6cff',
+    color: colors.textSemiDark,
     fontSize: 12,
     fontWeight: '600',
   },
   followCountsContainer: {
     flexDirection: 'row',
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.backgroundColor,
     marginBottom: 10,
     paddingVertical: 20,
     paddingHorizontal: 20,
@@ -1000,12 +1000,12 @@ const styles = StyleSheet.create({
   followCountValue: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+    color: colors.textDark,
     marginBottom: 4,
   },
   followCountLabel: {
     fontSize: 14,
-    color: '#666',
+    color: colors.textSemiDark,
     textAlign: 'center',
   },
 });
