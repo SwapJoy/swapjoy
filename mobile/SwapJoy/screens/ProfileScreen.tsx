@@ -519,7 +519,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = memo(() => {
 
           {isLoadingCurrentTab ? (
             <View style={styles.loadingItemsContainer}>
-              <ActivityIndicator size="large" color="#007AFF" />
+              <ActivityIndicator size="large" color={colors.primaryYellow} />
               <SJText style={styles.loadingItemsText}>{strings.loading.items}</SJText>
             </View>
           ) : gridData.length === 0 ? (
@@ -566,15 +566,6 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: 16,
-    color: colors.textSemiDark,
   },
   profileSection: {
     backgroundColor: colors.backgroundColor,

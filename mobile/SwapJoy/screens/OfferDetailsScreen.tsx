@@ -38,7 +38,7 @@ const OfferDetailsScreen: React.FC<Props> = ({ navigation, route }) => {
       noMessage: t('offers.list.noMessage'),
       fromUser: t('offers.list.fromUser'),
       toUser: t('offers.list.toUser'),
-      messageAboutOffer: t('offers.details.messageAboutOffer', { defaultValue: 'Message about this offer' }),
+      messageAboutOffer: t('offers.details.messageAboutOffer', { defaultValue: 'Message' }),
       offerDetails: t('offers.details.title', { defaultValue: 'Offer details' }),
     }),
     [t]
@@ -338,9 +338,8 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   headerCard: {
-    backgroundColor: '#1d1d1d',
     borderWidth: 1,
-    borderColor: '#2f2f2f',
+    borderColor: colors.border,
     borderRadius: 14,
     padding: 10,
     flexDirection: 'row',
@@ -377,8 +376,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#343434',
-    backgroundColor: '#202020',
+    borderColor: colors.border,
     paddingVertical: 10,
     paddingHorizontal: 8,
   },
@@ -402,9 +400,8 @@ const styles = StyleSheet.create({
   tradeSide: {
     flex: 1,
     borderRadius: 12,
-    backgroundColor: '#121212',
     borderWidth: 1,
-    borderColor: '#2f2f2f',
+    borderColor: colors.border,
     padding: 8,
     gap: 6,
   },
@@ -449,8 +446,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: Math.min(140, Math.round(width * 0.34)),
     borderRadius: 10,
-    overflow: 'hidden',
-    backgroundColor: '#262626',
+    overflow: 'hidden'
   },
   tradeImage: {
     width: '100%',
@@ -519,16 +515,17 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     paddingHorizontal: 12,
     borderRadius: 10,
-    backgroundColor: '#242424',
+    borderColor: colors.border,
+    borderWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
   topUpIncoming: {
-    backgroundColor: '#13271d',
+    
   },
   topUpOutgoing: {
-    backgroundColor: '#2b1c14',
+    
   },
   topUpText: {
     fontSize: 13,
@@ -545,8 +542,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#2f2f2f',
-    backgroundColor: '#1d1d1d',
+    borderColor: colors.border,
     paddingHorizontal: 12,
     paddingVertical: 10,
     gap: 4,
@@ -568,10 +564,10 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    padding: 16,
+    padding: 32,
     backgroundColor: colors.backgroundColor,
     borderTopWidth: 1,
-    borderTopColor: '#3a3a3a',
+    borderTopColor: colors.border,
   },
   chatButton: {
     backgroundColor: colors.primaryYellow,
@@ -580,7 +576,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   chatButtonText: {
-    color: colors.textDark,
+    color: colors.textColorLight,
     fontSize: 15,
     fontWeight: '700',
   },

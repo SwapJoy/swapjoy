@@ -213,7 +213,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#5a5a5a',
+    backgroundColor: colors.border,
   },
   header: {
     flexDirection: 'row',
@@ -222,15 +222,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingBottom: 8,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#343434',
+    borderBottomColor: colors.border,
   },
   headerSide: {
     minWidth: 44,
   },
   title: {
     fontSize: 22,
-    color: colors.textLight,
-    fontWeight: '700',
+    color: colors.textColor,
+    fontWeight: '200',
     textAlign: 'center',
   },
   contentArea: {
@@ -282,7 +282,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 8,
     right: 8,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    backgroundColor: colors.backgroundColor,
     borderRadius: 14,
   },
   unselectedRing: {
@@ -293,14 +293,14 @@ const styles = StyleSheet.create({
     height: 26,
     borderRadius: 13,
     borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.35)',
-    backgroundColor: 'rgba(0,0,0,0.25)',
+    borderColor: colors.primaryYellow,
+    backgroundColor: colors.backgroundColor,
   },
   footer: {
     paddingHorizontal: 14,
     paddingTop: 12,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#333',
+    borderTopColor: colors.border,
     backgroundColor: colors.backgroundColor,
   },
   nextBtn: {

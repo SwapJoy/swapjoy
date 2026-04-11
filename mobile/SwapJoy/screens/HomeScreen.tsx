@@ -157,7 +157,7 @@ const HomeScreen: React.FC<ExploreScreenProps> = () => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.gridListContent}
         horizontalPadding={0}
-        columnSpacing={8}
+        columnSpacing={4}
         rowSpacing={8}
         listHeaderComponent={headerComponent}
         listFooterComponent={

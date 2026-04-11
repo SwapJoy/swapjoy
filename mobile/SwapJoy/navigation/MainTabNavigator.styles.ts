@@ -9,7 +9,7 @@ export const colors = {
   inputPlaceholder: '#8E8E93',
   inputText: '#FFFFFF',
   backgroundColor: 'white',
-  primaryYellow: '#04B07B',
+  primaryYellow: '#21BFC4',
   primaryYellowLight: '#04B07B0D',
   primaryBlue: '#36454F',
   primary: '#000',
@@ -46,11 +46,10 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.primaryYellow,
   },
   headerTitleStyle: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 28,
+    fontWeight: '200',
     color: colors.textColorLight,
-    letterSpacing: 0.3,
-    fontFamily: 'Noto Sans Georgian',
+    letterSpacing: 0.3
   },
   tabBarStyle: {
     backgroundColor: colors.backgroundColor,

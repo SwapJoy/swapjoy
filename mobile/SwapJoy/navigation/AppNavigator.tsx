@@ -286,12 +286,12 @@ const AppNavigator = forwardRef<NavigationContainerRef<RootStackParamList>>((pro
         screenOptions={{
           headerShown: true, // Explicitly set default - ensures header is shown unless screen overrides it
           headerStyle: {
-            backgroundColor: colors.primaryYellow,
+            backgroundColor: colors.primaryYellow
           },
           headerTitleStyle: {
-            fontSize: 18,
-            fontWeight: '700',
-            color: colors.backgroundColor,
+            fontSize: 28,
+            fontWeight: '100',
+            color: colors.textColorLight,
             letterSpacing: 0.3,
           },
           headerTintColor: colors.textLight,

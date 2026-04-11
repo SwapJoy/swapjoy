@@ -13,7 +13,7 @@ const ka = {
   },
   navigation: {
     back: 'უკან',
-    explore: 'აღმოჩენა',
+    explore: 'SwapJoy',
     offers: 'შეთავაზებები',
     notifications: 'შეტყობინებები',
     profile: 'პროფილი',
